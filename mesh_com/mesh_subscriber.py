@@ -12,7 +12,6 @@ class MeshSubscriber(Node):
     class MeshSettings:
         def __init__(self):
             self.api_version = 1
-            self.last_configuration_message = ""
             self.ssid = ""
             self.key = ""
             self.ap_mac = ""
@@ -58,23 +57,21 @@ class MeshSubscriber(Node):
         #     "mode": "mesh"                    mesh=mesh network, ap=debug hotspot
         # }
 
-        if self.settings.last_configuration_message != msg:
-            self.settings.last_configuration_message = msg
-            try:
-                parameters = json.loads(msg)
-                self.settings.ssid = parameters["ssid"]
-                self.settings.key = parameters["key"]
-                self.settings.ap_mac = parameters["ap_mac"]
-                self.settings.country = parameters["country"].lower()
-                self.settings.frequency = parameters["frequency"]
-                self.settings.ip = parameters["ip"]
-                self.settings.subnet = parameters["subnet"]
-                self.settings.tx_power = parameters["tx_power"]
-                self.settings.mode = parameters["mode"]
-                self.__change_configuration()
-            except json.decoder.JSONDecodeError or KeyError or Exception:
-                self.get_logger().info('Setting Failed')
-                pass
+        try:
+            parameters = json.loads(msg)
+            self.settings.ssid = parameters["ssid"]
+            self.settings.key = parameters["key"]
+            self.settings.ap_mac = parameters["ap_mac"]
+            self.settings.country = parameters["country"].lower()
+            self.settings.frequency = parameters["frequency"]
+            self.settings.ip = parameters["ip"]
+            self.settings.subnet = parameters["subnet"]
+            self.settings.tx_power = parameters["tx_power"]
+            self.settings.mode = parameters["mode"]
+            self.__change_configuration()
+        except json.decoder.JSONDecodeError or KeyError or Exception:
+            self.get_logger().info('Setting Failed')
+            pass
 
     def __change_configuration(self):
         subprocess.call(["/usr/bin/mesh.sh", quote(self.settings.mode),
