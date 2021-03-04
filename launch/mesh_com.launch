@@ -1,6 +1,6 @@
 <launch>
   <node name="mesh_com" pkg="mesh_com" exec="mesh_subscriber" namespace='$(env DRONE_DEVICE_ID)'>
   </node>
-  <!-- node name="mesh_com" pkg="mesh_com" exec="mesh_publisher" namespace='$(env DRONE_DEVICE_ID)'>
-  </node -->
+  <node name="mesh_com_pub" pkg="mesh_com" exec="mesh_publisher" namespace='$(env DRONE_DEVICE_ID)'>
+  </node>
 </launch>

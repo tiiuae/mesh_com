@@ -1,31 +1,43 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
+import subprocess
 
-i = ('{"api_version": 1,'
-     '"ssid": "mesh",'
-     '"key": "1234567890",'
-     '"ap_mac": "00:11:22:33:44:55",'
-     '"country": "fi",'
-     '"frequency": "5220",'
-     '"ip": "192.168.1.2",'
-     '"subnet":  "255.255.255.0",'
-     '"tx_power": "30",'
-     '"mode": "mesh"}')
+
+class BatmanVisualisation:
+
+    command = 'batadv-vis'
+
+    def __str__(self):
+        return 'BatmanVisualisation \'{0}\''.format(self.batadv_vis)
+
+    def get(self, format_type="dot"):
+        if format_type == "dot" or format_type == "jsondoc" or format_type == "json":
+            try:
+                # returns byte string
+                raw_data = subprocess.check_output([self.command, '-f', format_type])
+                if raw_data == 255:
+                    raw_data = b'NA'
+            except (FileNotFoundError, subprocess.CalledProcessError):
+                raw_data = b'NA'
+        else:
+            raw_data = b'NA'
+        # return string
+        return raw_data.decode('UTF-8').strip('\n')
 
 
 class MeshPublisher(Node):
 
     def __init__(self):
         super().__init__('mesh_publisher')
-        self.publisher_ = self.create_publisher(String, 'mesh_parameters', 10)
-        timer_period = 100  # seconds
+        self.publisher_ = self.create_publisher(String, 'mesh_visual', 10)
+        timer_period = 10  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
-        self.i = i
+        self.batman = BatmanVisualisation()
 
     def timer_callback(self):
         msg = String()
-        msg.data = self.i
+        msg.data = self.batman.get(format_type="dot")
         self.publisher_.publish(msg)
         self.get_logger().info('Mesh Publishing: "%s"' % msg.data)
 

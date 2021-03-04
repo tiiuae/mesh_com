@@ -47,6 +47,10 @@ EOF
 
       echo "Killing wpa_supplicant..."
       killall wpa_supplicant 2>/dev/null
+      killall alfred 2>/dev/null
+      killall batadv-vis 2>/dev/null
+      rm -f /var/run/alfred.sock
+
 
       echo "unmanage wifi interface.."
       nmcli dev set $wifidev managed no
@@ -70,12 +74,21 @@ EOF
       echo
       ifconfig bat0
 
-      wpa_supplicant -B -i $wifidev -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/
+      # Alfred is not able to create socket without this delay
+      sleep 3
+
+      # for visualisation
+      (alfred -i bat0 -m)&
+      echo "started alfred"
+      (batadv-vis -i bat0 -s)&
+      echo "started batadv-vis"
+
+      wpa_supplicant -i $wifidev -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
       ;;
 ap)
       if [[ -z "$1" ]]
         then
-          echo "check argumets..."
+          echo "check arguments..."
         help
       fi
 
@@ -84,7 +97,7 @@ ap)
 
       nmcli dev set $wifidev managed yes
       nmcli radio wifi on
-      
+
       # find ap parameters from enclave
       if [ -z "$DRONE_DEVICE_ID" ]
       then
@@ -93,7 +106,7 @@ ap)
       else
             nmcli device wifi hotspot con-name debug-hotspot ssid $DRONE_DEVICE_ID band a channel 36 password 1234567890
       fi
-      
+
       ;;
 *)
       help
