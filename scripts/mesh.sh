@@ -74,7 +74,6 @@ EOF
       echo
       ifconfig bat0
 
-      # Alfred is not able to create socket without this delay
       sleep 3
 
       # for visualisation

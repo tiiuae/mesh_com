@@ -21,6 +21,7 @@ class MeshSubscriber(Node):
             self.subnet = ""
             self.tx_power = ""
             self.mode = ""
+            # self.enc = ""
 
     def __init__(self):
         super().__init__('mesh_subscriber')
@@ -68,13 +69,14 @@ class MeshSubscriber(Node):
             self.settings.subnet = parameters["subnet"]
             self.settings.tx_power = parameters["tx_power"]
             self.settings.mode = parameters["mode"]
+            # self.settings.enc = parameters["enc"]
             self.__change_configuration()
         except json.decoder.JSONDecodeError or KeyError or Exception:
             self.get_logger().info('Setting Failed')
             pass
 
     def __change_configuration(self):
-        subprocess.call(["/usr/bin/mesh.sh", quote(self.settings.mode),
+        subprocess.call(["/opt/ros/foxy/share/bin/mesh.sh", quote(self.settings.mode),
                          quote(self.settings.ip),
                          quote(self.settings.subnet),
                          quote(self.settings.ap_mac),
