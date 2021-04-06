@@ -1,0 +1,8 @@
+*.der
+*_decrypt
+*_encrypt
+*.o
+*.a
+*.pyc
+.idea/
+*.enc
