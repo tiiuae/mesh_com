@@ -1,0 +1,63 @@
+name: main
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  tii-deb-build:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout mesh_com
+        uses: actions/checkout@v2
+        with:
+          path: mesh_com
+
+      - name: Checkout ci-scripts
+        uses: actions/checkout@v2
+        with:
+          repository: tiiuae/fogsw-ci-scripts
+          path: fogsw-ci-scripts
+
+      # Run docker build
+      - name: Run fog-sw docker build
+        run: |
+          set -eux
+          mkdir bin
+          pushd fogsw-ci-scripts
+          ./generate_deb.sh ../mesh_com ../bin/
+          popd
+
+      - name: Install jfrog CLI tool
+        env:
+          JFROG_CLI_URL: https://artifactory.ssrc.fi/artifactory/gen-public-local/tools/jfrog/jfrog-1.45.2.tar.gz
+        if: github.event_name == 'push'
+        run: |
+          set -exu
+          mkdir -p "$GITHUB_WORKSPACE/.jfrog/bin"
+          curl -L "$JFROG_CLI_URL" -o "$GITHUB_WORKSPACE/.jfrog/jfrog.tar.gz"
+          tar -C "$GITHUB_WORKSPACE/.jfrog/bin" -zxf "$GITHUB_WORKSPACE/.jfrog/jfrog.tar.gz"
+          echo "$GITHUB_WORKSPACE/.jfrog/bin" >> "$GITHUB_PATH"
+          echo "JFROG_CLI_HOME_DIR=$GITHUB_WORKSPACE/.jfrog" >> "$GITHUB_ENV"
+
+      - name: Upload to Artifactory
+        env:
+          ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+          ARTIFACTORY_REPO: debian-public-local
+          DISTRIBUTION: focal
+          COMPONENT: fog-sw
+          ARCHITECTURE: amd64
+          CI: true
+        if: github.event_name == 'push'
+        run: |
+          set -exu
+          jfrog rt c import "$ARTIFACTORY_TOKEN"
+          jfrog rt ping
+          pkg=$(find bin -name 'ros-foxy-mesh-com*.deb')
+          jfrog rt u --deb "$DISTRIBUTION/$COMPONENT/$ARCHITECTURE" \
+                     --target-props COMMIT="$GITHUB_SHA" \
+                     "$pkg" \
+                     "$ARTIFACTORY_REPO"
