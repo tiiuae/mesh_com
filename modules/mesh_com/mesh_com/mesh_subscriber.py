@@ -76,7 +76,7 @@ class MeshSubscriber(Node):
             pass
 
     def __change_configuration(self):
-        subprocess.call(["/opt/ros/foxy/share/bin/mesh.sh", quote(self.settings.mode),
+        subprocess.call(["/opt/ros/foxy/share/bin/mesh-ibss.sh", quote(self.settings.mode),
                          quote(self.settings.ip),
                          quote(self.settings.subnet),
                          quote(self.settings.ap_mac),
