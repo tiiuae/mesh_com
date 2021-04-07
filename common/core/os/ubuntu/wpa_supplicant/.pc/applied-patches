@@ -1,0 +1,12 @@
+01_use_pkg-config_for_pcsc-lite_module.patch
+02_dbus_group_policy.patch
+06_wpa_gui_menu_exec_path.patch
+07_dbus_service_syslog.patch
+12_wpa_gui_knotify_support.patch
+networkd-driver-fallback.patch
+wpa_supplicant_fix-dependency-odering-when-invoked-with-dbus.patch
+allow-tlsv1.patch
+session-ticket.patch
+wpa_service_ignore-on-isolate.patch
+CVE-2019-16275.patch
+git_realtek_macrand.patch
