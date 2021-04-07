@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# TODO: 11s configuration needs update
-
 function help
 {
     echo
@@ -41,9 +39,9 @@ network={
     bssid=$4
     mode=5
     frequency=$7
-    wep_key0=$5
-    wep_tx_keyidx=0
-    key_mgmt=NONE
+    psk=$5
+    key_mgmt=SAE
+    ieee80211w=2
 }
 EOF
 
