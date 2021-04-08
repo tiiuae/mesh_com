@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 from flask import Flask, request, jsonify, json, render_template
 from getmac import get_mac_address
 import subprocess
