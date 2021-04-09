@@ -6,7 +6,7 @@ module_root:=$(root_dir)/modules
 
 #common folder
 scripts_root:=$(common_root)/scripts
-cryptolib_root:=$(common_root)/cryptolib
+cryptolib_root:=$(common_root)/security/cryptolib
 
 #module folder
 meshcom_root:=$(module_root)/mesh_com

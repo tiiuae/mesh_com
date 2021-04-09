@@ -1,4 +1,5 @@
 [submodule "common/cryptolib"]
-	path = common/cryptolib
+	path = common/security/cryptolib
 	url = git@github.com:tiiuae/cryptolib.git
 	ignore = dirty
+
