@@ -48,7 +48,7 @@ $ sudo dpkg-buildpackage -rfakeroot -b
 
 #### Integration to fog_sw
 
-Dependecies:
+Mesh_com dependecies:
 ```
 $ sudo apt update
 $ sudo apt install \
@@ -58,9 +58,19 @@ $ sudo apt install \
 
 ```
 
+Bloom-generate integration to package.sh:
+```
+$ pushd ../ros2_ws/src/mesh_com/modules/mesh_com
+$ bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy &&\
+    fakeroot debian/rules binary && mv ../*.deb ../../../../../packaging/
+$ popd
+```
+
 #### Build in fog_sw
 
-Colcon:
+fog_sw installation and build [guide](https://github.com/tiiuae/fog_sw#readme)
+
+colcon:
 ```
 $ pushd .
 $ cd fog_sw/ros2_ws
@@ -68,12 +78,11 @@ $ colcon build
 $ popd
 ```
 
-Bloom-generate integration to package.sh:
+Bloom-generate (generate rosdebian package):
 ```
-$ pushd ../ros2_ws/src/mesh_com/modules/mesh_com
+$ cd ros2_ws/src/mesh_com/modules/mesh_com
 $ bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy &&\
-    fakeroot debian/rules binary && mv ../*.deb ../../../../../packaging/
-$ popd
+    fakeroot debian/rules binary
 ```
 
 ### sc-mesh-secure-deployment
