@@ -27,12 +27,53 @@ $ make server
 $ make client
 ```
 
+### core/os/ubuntu/wpa_supplicant
+
+Update and install dependencies:
+```
+$ sudo apt update
+$ sudo apt-get install build-essential fakeroot dpkg-dev
+``` 
+
+Build and create debian packages:
+
+```
+$ cd common/core/os/ubuntu/wpa_supplicant
+$ sudo dpkg-buildpackage -rfakeroot -b
+```
+
 ## Build Modules
 
 ### mesh_com
-```
-$ TBD
 
+#### Integration to fog_sw
+
+Dependecies:
+```
+$ sudo apt update
+$ sudo apt install \
+    dh-python \
+    batctl \
+    alfred
+
+```
+
+#### Build in fog_sw
+
+Colcon:
+```
+$ pushd .
+$ cd fog_sw/ros2_ws
+$ colcon build
+$ popd
+```
+
+Bloom-generate integration to package.sh:
+```
+$ pushd ../ros2_ws/src/mesh_com/modules/mesh_com
+$ bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy &&\
+    fakeroot debian/rules binary && mv ../*.deb ../../../../../packaging/
+$ popd
 ```
 
 ### sc-mesh-secure-deployment

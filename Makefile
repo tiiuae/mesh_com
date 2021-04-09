@@ -13,10 +13,11 @@ meshcom_root:=$(module_root)/mesh_com
 scmsd_root:=$(module_root)/sc-mesh-secure-deployment
 
 
-mesh_com_bloom: #TODO
+mesh_com_bloom:
+        pushd .
         cd $(module_root)/mesh_com
-	bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy && fakeroot debian/rules binary && mv ../*.deb ../../../packaging/
-
+	bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy && fakeroot debian/rules binary
+        popd
 
 certificate:
 	sudo apt-get --yes install clang libssl-dev
@@ -26,16 +27,14 @@ certificate:
 	  cp $(cryptolib_root)/ecies_decrypt $(cryptolib_root)/ecies_encrypt $(scmsd_root)/src/
 	fi
 
-
 client:
 	pip3 install -r $(scmsd_root)/requirements/client-requirements.txt
-	if [ ! -f "$(scmsd_root)/src/ecies_decrypt" ]; then 
+	if [ ! -f "$(scmsd_root)/src/ecies_decrypt" ]; then
 	  cp $(cryptolib_root)/ecies_decrypt $(cryptolib_root)/ecies_encrypt $(scmsd_root)/src/
 	fi
 
-
 server:
 	pip3 install -r $(scmsd_root)requirements/server-requirements.txt
-	if [ ! -f "src/ecies_decrypt" ]; then 
-	  cp $(cryptolib_root)/ecies_decrypt $(cryptolib_root)/ecies_encrypt $(scmsd_root)/src/ 
+	if [ ! -f "src/ecies_decrypt" ]; then
+	  cp $(cryptolib_root)/ecies_decrypt $(cryptolib_root)/ecies_encrypt $(scmsd_root)/src/
 	fi
