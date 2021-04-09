@@ -15,7 +15,7 @@ echo "Solving wifi device name.."
 wifidev=$(iw dev | awk '$1=="Interface"{print $2}')
 echo "Found: $wifidev"
 
-# 1      2    3      4        5     6       7      8         9   
+# 1      2    3      4        5     6       7      8         9
 # <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country>
 
 case "$1" in
@@ -39,7 +39,7 @@ network={
     bssid=$4
     mode=5
     frequency=$7
-    psk=$5
+    psk="$5"
     key_mgmt=SAE
     ieee80211w=2
 }
