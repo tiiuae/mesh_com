@@ -57,6 +57,20 @@ $ sudo apt install \
     alfred
 
 ```
+systemd mesh.service:
+```
+[Unit]
+Description="Mesh Service"
+
+[Service]
+User=root
+Group=root
+Type=idle
+ExecStart=/bin/sh -c ". /opt/ros/foxy/setup_fog.sh;/opt/ros/foxy/share/bin/mesh-ibss.sh ap; ros2 launch mesh_com mesh_com.launch"
+
+[Install]
+WantedBy=multi-user.target
+```
 
 Bloom-generate integration to package.sh:
 ```
