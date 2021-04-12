@@ -1,13 +1,15 @@
 #!/bin/bash
 
+# Check if command(s) exists and fail otherwise.
+# N.B. This doesn't work for packages that are run with a different name to
+#      the install package. E.g. "python3-pip" is called as "pip3"
 function command_exists {
-  # check if command(s) exists and fail otherwise
   for cmd in $1; do
     echo -n "> Checking $cmd installed... "
     if ! command -v $cmd &> /dev/null; then
       echo "FALSE"
       echo "WARN: Require dependency "$cmd" but it's not installed. Installing..."
-      sudo apt install --no-install-recommends $cmd -y
+      sudo apt install --no-install-recommends -y -qq $cmd
     else
       echo "TRUE"
     fi
@@ -85,7 +87,9 @@ if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
 fi
 # Provision the node with required packages
 echo "> Checking required packages..."
-command_exists "git make python3-pip batctl ssh clang libssl-dev net-tools iperf3 avahi-daemon avahi-dnsconfd avahi-utils libnss-mdns bmon isc-dhcp-server alfred batctl"
+command_exists "git make python3-pip batctl ssh clang libssl-dev net-tools \
+                iperf3 avahi-daemon avahi-dnsconfd avahi-utils libnss-mdns \
+                bmon isc-dhcp-server alfred batctl"
 # Clone this repo
 echo "> Cloning..."
-git clone https://github.com/tiiuae/sc-mesh-secure-deployment.git
+# git clone https://github.com/tiiuae/mesh_com.git

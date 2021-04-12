@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import argparse
 import json
 import subprocess
@@ -5,6 +7,7 @@ import time
 
 import netifaces
 import requests
+from termcolor import colored
 
 # Construct the argument parser
 ap = argparse.ArgumentParser()
@@ -33,10 +36,13 @@ def get_data(cert_file, os):
     message = '/api/add_message/' + os
     response = requests.post(URL + message,
                              files={'key': open(cert_file, 'rb')})
-    print('Encrypted Message: ' + str(response.content))
-
-    with open('payload.enc', 'wb') as file:
-        file.write(response.content)
+    if response.content == b'Not Valid Certificate':
+        print(colored('Not Valid Certificate', 'red'))
+        exit()
+    else:
+        print('Encrypted Message: ' + str(response.content))
+        with open('payload.enc', 'wb') as file:
+            file.write(response.content)
 
 
 def decrypt_reponse():  # assuming that data is on a file called payload.enc generated on the function get_data
@@ -91,9 +97,9 @@ def ubuntu_gw():
         new_config_file.write('Description="Gateway Service"\n\n')
         new_config_file.write('[Service]\n')
         new_config_file.write('Type=idle\n')
-        command_gw = 'ExecStart=/usr/bin/run-gw.sh'
-        subprocess.call('sudo cp src/client/run-gw.sh /usr/bin/.', shell=True)
-        subprocess.call('sudo chmod 744 /usr/bin/run-gw.sh', shell=True)
+        command_gw = 'ExecStart=/usr/bin/mesh-gw.sh'
+        subprocess.call('sudo cp ../../../../common/scripts/mesh-gw.sh /usr/bin/.', shell=True)
+        subprocess.call('sudo chmod 744 /usr/bin/mesh-gw.sh', shell=True)
         new_config_file.write(command_gw + '\n\n')
         new_config_file.write('[Install]\n')
         new_config_file.write('WantedBy=multi-user.target\n')
@@ -121,7 +127,7 @@ def create_config_ubuntu(response):
         config_file.write('Description="Mesh Service"\n\n')
         config_file.write('[Service]\n')
         config_file.write('Type=idle\n')
-        command = 'ExecStart=/usr/local/bin/mesh_init.sh ' + address + ' ' + res['ap_mac'] + ' ' + res['key'] + ' ' \
+        command = 'ExecStart=/usr/local/bin/mesh_ibss.sh ' + address + ' ' + res['ap_mac'] + ' ' + res['key'] + ' ' \
                   + res['ssid'] + ' ' + res['frequency'] + ' ' + interface
         if res['gateway']:
             ubuntu_gw()
@@ -158,13 +164,13 @@ def create_config_ubuntu(response):
 
 
 def final_settings_ubuntu():
-    # this setting assume that mesh_init.sh and run-gw.sh
+    # this setting assume that mesh-ibss.sh and mesh-gw.sh
     subprocess.call('sudo nmcli networking off', shell=True)
     subprocess.call('sudo systemctl stop network-manager.service', shell=True)
     subprocess.call('sudo systemctl disable network-manager.service', shell=True)
     subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
-    subprocess.call('sudo cp src/client/mesh_init.sh /usr/local/bin/.', shell=True)
-    subprocess.call('sudo chmod 744 /usr/local/bin/mesh_init.sh', shell=True)
+    subprocess.call('sudo cp ../../../../common/scripts/mesh-ibss.sh /usr/local/bin/.', shell=True)
+    subprocess.call('sudo chmod 744 /usr/local/bin/mesh-ibss.sh', shell=True)
     subprocess.call('sudo chmod 664 /etc/systemd/system/mesh.service', shell=True)
     subprocess.call('sudo systemctl enable mesh.service', shell=True)
     time.sleep(2)

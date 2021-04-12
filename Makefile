@@ -20,7 +20,7 @@ mesh_com_bloom:
 
 client:
 	pip3 install -r $(mesh_tb_root)/requirements/client-requirements.txt
-	if [ ! -f "$(cryptolib_root)/ecies_decrypt" ]; then \
+	if [ ! -f "$(mesh_tb_root)/src/ecies_decrypt" ]; then \
 		cp $(cryptolib_root)/ecies_decrypt $(cryptolib_root)/ecies_encrypt $(mesh_tb_root)/src/ ; \
 	fi
 

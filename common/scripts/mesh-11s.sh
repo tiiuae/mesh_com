@@ -3,7 +3,7 @@
 function help
 {
     echo
-    echo "Usage: sudo ./mesh_init.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country>"
+    echo "Usage: sudo ./mesh_11s.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country>"
     echo
     echo "example:"
     echo "sudo mesh.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi"
@@ -111,4 +111,3 @@ ap)
       help
       ;;
 esac
-

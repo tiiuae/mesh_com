@@ -3,7 +3,14 @@
 function help
 {
     echo
-    echo "Usage: sudo ./mesh_init.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country>"
+    echo "Usage: sudo ./mesh_ibss.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country>"
+    echo
+    echo "Parameters:"
+    echo "	<ip>"
+    echo "	<AP MAC>"
+    echo "	<WEP key>"
+    echo "	<essid>"
+    echo "	<freq>"
     echo
     echo "example:"
     echo "sudo mesh.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi"
@@ -15,7 +22,7 @@ echo "Solving wifi device name.."
 wifidev=$(iw dev | awk '$1=="Interface"{print $2}')
 echo "Found: $wifidev"
 
-# 1      2    3      4        5     6       7      8         9   
+# 1      2    3      4        5     6       7      8         9
 # <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country>
 
 case "$1" in
@@ -84,6 +91,7 @@ EOF
 
       wpa_supplicant -i $wifidev -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
       ;;
+
 ap)
       if [[ -z "$1" ]]
         then
@@ -111,4 +119,3 @@ ap)
       help
       ;;
 esac
-

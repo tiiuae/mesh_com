@@ -9,7 +9,7 @@ The Server side authenticates nodes validating certificates based on the Ellipti
 
 Initially, the client sends a request to join the mesh network. This request is attached with node certificates. Once the server validates the certificate, it encrypts the mesh parameters and sends them back to the requested node. The client detects the OS that is running (Ubuntu or OpenWRT) and sets the specific configuration of the mesh network.
 
-![alt text](images/Diagram.png?style=centerme)
+![alt text](../../images/Diagram.png?style=centerme)
 
 
 ## Installation
@@ -85,4 +85,4 @@ http://127.0.0.1:5000
 ```
 A web page with the authenticated and no-authenticated nodes should be displayed
 
-![alt text](images/server-screenshot.png?style=centerme)
+![alt text](../../images/server-screenshot.png?style=centerme)
