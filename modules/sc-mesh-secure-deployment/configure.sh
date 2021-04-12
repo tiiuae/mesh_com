@@ -67,11 +67,11 @@ function ap_create {
   menu_from_array "${interfaces_arr[@]}"
   read -p "- SSID: " ssid
   read -p "- Password: " password
-  echo "Password must be eight (8) characters lenght"
+  read -p "- 1st IP Field (e.g. 60 for AP 6): " ip
   create_ap_conf $ssid $password
   cd tools/wpa_tools
   chmod +x access_point_wpa_supplicant.sh
-  sudo bash access_point_wpa_supplicant.sh $choice
+  sudo bash access_point_wpa_supplicant.sh $choice $ip
   cd ../..
 }
 
