@@ -1068,6 +1068,15 @@ wpa_supplicant_add_network() {
 			;;
 		esac
 	}
+
+	[ "$mode" = mesh ] && {
+		case "$ieee80211w" in
+			[012])
+				[ "$wpa" -ge 2 ] && append network_data "ieee80211w=$ieee80211w" "$N$T"
+			;;
+		esac
+	}
+
 	[ -n "$bssid" ] && append network_data "bssid=$bssid" "$N$T"
 	[ -n "$beacon_int" ] && append network_data "beacon_int=$beacon_int" "$N$T"
 
