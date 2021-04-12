@@ -1,11 +1,13 @@
 #!/usr/bin/python
 
-from flask import Flask, request, jsonify, json, render_template
+from flask import Flask, request, json
 from getmac import get_mac_address
 import subprocess
 import netifaces
 import pandas as pd
 import argparse
+from termcolor import colored
+import pathlib
 
 # Construct the argument parser
 ap = argparse.ArgumentParser()
@@ -56,8 +58,9 @@ def add_message(uuid):
     print("Requester IP: " + ip_address)
     mac = get_mac_address(ip=ip_address)
     if localCert.read() == receivedKey:  # validating certificate. Comparing the local with the received
-        print('Valide Certificate')
+        print(colored('Valid Certificate', 'green'))
         ip_mesh = verify_addr(mac)
+        print('ip_mesh - ' + str(ip_mesh))
         aux = aux_ubuntu if uuid == 'Ubuntu' else aux
         if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
             aux['gateway'] = True
@@ -69,23 +72,28 @@ def add_message(uuid):
         print(SECRET_MESSAGE)
         proc = subprocess.Popen(['src/ecies_encrypt', SERVER_CERT, SECRET_MESSAGE], stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
+        file = pathlib.Path("payload.enc")
+        if not file.exists():
+            pathlib.Path('payload.enc').touch()
         enc = open('payload.enc', 'rb')
         encrypt_all = enc.read()
         print(encrypt_all)
         return encrypt_all
     else:
         NOT_AUTH[mac] = ip_address
-        print("Not Valid Certificate")
+        print(colored("Not Valid Certificate", 'red'))
         return 'Not Valid Certificate'
 
 
 
 def add_default_route(ip_gateway):
     inter = netifaces.interfaces()
+    for interf in inter:
+        if interf.startswith('wlan'):
+            interface = interf
 
-    command = 'ip route add ' + IP_PREFIX + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + inter[
-        -1]  # assuming only 2 interfaces are presented
-
+    command = 'ip route add ' + IP_PREFIX + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface  # assuming only 2 interfaces are presented
+    print(command)
     subprocess.call(command, shell=True)
 
 
