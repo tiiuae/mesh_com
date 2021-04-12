@@ -6,11 +6,13 @@ Following steps in your work directory:
 
 ### 1 create ubuntu docker image with image tag name
 ```
-./1_create_docker_image.sh <image tag name>
+./1_create_docker_image.sh <image_tag_name>
 ```
-### 2 run docker and attach to docker session (my_openwrt_build is freely chosen name for container/host)
+### 2 run docker and attach to docker session.  
+- my_openwrt_build is freely chosen name for container/host
+- image_tag_name is name used in step 1.
 ```
-./2_run_docker.sh my_openwrt_build
+./2_run_docker.sh <my_openwrt_build> <image_tag_name>
 ```
 [hit enter few times and terminal is open]
 
