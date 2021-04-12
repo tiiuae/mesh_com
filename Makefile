@@ -6,16 +6,17 @@ module_root:=$(root_dir)/modules
 
 #common folder
 scripts_root:=$(common_root)/scripts
-cryptolib_root:=$(common_root)/cryptolib
+cryptolib_root:=$(common_root)/security/cryptolib
 
 #module folder
 meshcom_root:=$(module_root)/mesh_com
 mesh_tb_root:=$(module_root)/sc-mesh-secure-deployment
 
 
-mesh_com_bloom: #TODO
+mesh_com_bloom:
 	cd $(module_root)/mesh_com
-	bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy && fakeroot debian/rules binary && mv ../*.deb ../../../packaging/
+	bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy && fakeroot debian/rules binary
+	cd $(root_dir)
 
 client:
 	pip3 install -r $(mesh_tb_root)/requirements/client-requirements.txt

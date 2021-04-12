@@ -39,7 +39,7 @@ network={
     bssid=$4
     mode=5
     frequency=$7
-    psk=$5
+    psk="$5"
     key_mgmt=SAE
     ieee80211w=2
 }

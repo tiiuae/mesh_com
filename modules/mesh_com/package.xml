@@ -4,7 +4,7 @@
   <name>mesh_com</name>
   <version>0.1.0</version>
   <description>ROS Mesh Node</description>
-  <maintainer email="mika.joenpera@unikie.com">sad</maintainer>
+  <maintainer email="mika.joenpera@unikie.com">joenpera</maintainer>
   <license>TODO: License declaration</license>
   
   <exec_depend>rclpy</exec_depend>

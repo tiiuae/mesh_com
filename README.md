@@ -27,12 +27,76 @@ $ make server
 $ make client
 ```
 
+### core/os/ubuntu/wpa_supplicant
+
+Update and install dependencies:
+```
+$ sudo apt update
+$ sudo apt-get install build-essential fakeroot dpkg-dev
+``` 
+
+Build and create debian packages:
+
+```
+$ cd common/core/os/ubuntu/wpa_supplicant
+$ sudo dpkg-buildpackage -rfakeroot -b
+```
+
 ## Build Modules
 
 ### mesh_com
-```
-$ TBD
 
+#### Integration to fog_sw
+
+Mesh_com dependecies:
+```
+$ sudo apt update
+$ sudo apt install \
+    dh-python \
+    batctl \
+    alfred
+
+```
+systemd mesh.service:
+```
+[Unit]
+Description="Mesh Service"
+
+[Service]
+User=root
+Group=root
+Type=idle
+ExecStart=/bin/sh -c ". /opt/ros/foxy/setup_fog.sh;/opt/ros/foxy/share/bin/mesh-ibss.sh ap; ros2 launch mesh_com mesh_com.launch"
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Bloom-generate integration to package.sh:
+```
+$ pushd ../ros2_ws/src/mesh_com/modules/mesh_com
+$ bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy &&\
+    fakeroot debian/rules binary && mv ../*.deb ../../../../../packaging/
+$ popd
+```
+
+#### Build in fog_sw
+
+fog_sw installation and build [guide](https://github.com/tiiuae/fog_sw#readme)
+
+colcon:
+```
+$ pushd .
+$ cd fog_sw/ros2_ws
+$ colcon build
+$ popd
+```
+
+Bloom-generate (generate rosdebian package):
+```
+$ cd ros2_ws/src/mesh_com/modules/mesh_com
+$ bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy &&\
+    fakeroot debian/rules binary
 ```
 
 ### sc-mesh-secure-deployment
