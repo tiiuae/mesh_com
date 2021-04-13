@@ -6,10 +6,12 @@
 function command_exists {
   for cmd in $1; do
     echo -n "> Checking $cmd installed... "
-    if ! command -v $cmd &> /dev/null; then
+    INSTALLED=($(apt -qq list $cmd 2>/dev/null | awk -F[ '{print $2}'))
+    if $INSTALLED &> /dev/null; then
       echo "FALSE"
-      echo "WARN: Require dependency "$cmd" but it's not installed. Installing..."
-      sudo apt install --no-install-recommends -y -qq $cmd
+      echo "> Installing..."
+      sudo apt-get install -y -qq $cmd --no-install-recommends
+      echo ""
     else
       echo "TRUE"
     fi
@@ -71,7 +73,7 @@ function ap_connect {
 }
 
 #-----------------------------------------------------------------------------#
-echo '== sc-mesh-secure-deployment INSTALL =='
+echo '== MESH-USER-DELOY INSTALL =='
 # Rename interfaces
 read -p "> Do you want to incrementally name your wlan interfaces? (Y/N): " confirm
 if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
@@ -92,4 +94,4 @@ command_exists "git make python3-pip batctl ssh clang libssl-dev net-tools \
                 bmon isc-dhcp-server alfred batctl"
 # Clone this repo
 echo "> Cloning..."
-# git clone https://github.com/tiiuae/mesh_com.git
+git clone -b repo_mege/michael https://github.com/tiiuae/mesh_com.git
