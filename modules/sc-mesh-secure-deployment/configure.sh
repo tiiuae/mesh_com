@@ -88,11 +88,11 @@ function access_point {
 
 
 function server {
-  echo '> Configuring the server...'
+  echo '> Configuring the mesh_tb server...'
+  # Make the server
   pushd .
   cd ../..
-  # Make the server
-  make server
+  make mesh_tb_server
   popd
   # Advertise the server using avahi (zeroconf)
   avahi-publish-service mesh_server _http._tcp 5000 &
@@ -105,7 +105,7 @@ function client {
   # Make the server
   pushd .
   cd ../..
-  make client
+  make mesh_tb_client
   popd
   # Connect to the same AP as the server
   read -p "> We need to be connect to the same network as the server... Connect to an Access Point? (Y/N): " confirm
@@ -128,6 +128,10 @@ function client {
     read -p "- Server Username: " server_user
     # pull the key from the server
     scp $server_user@$server_ip:/home/$server_user/mesh_com/modules/sc-mesh-secure-deployment/src/ecc_key.der src/ecc_key.der
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Couldn't get certificate from server. Exiting!"
+        exit 0
+    fi
   fi
 
   echo '> Configuring the client and connecting to server...'
