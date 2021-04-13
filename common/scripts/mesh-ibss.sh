@@ -25,7 +25,7 @@ function help
 # 1      2    3      4        5     6       7      8         9         10
 # <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface>
 
-if [[ -z "$10" ]] then
+if [[ -z "$10" ]]; then
   echo "Solving wifi device name.."
   wifidev=$(iw dev | awk '$1=="Interface"{print $2}')
   echo "Found: $wifidev"
