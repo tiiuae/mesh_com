@@ -3,27 +3,33 @@
 function help
 {
     echo
-    echo "Usage: sudo ./mesh_ibss.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country>"
-    echo
+    echo "Usage: sudo ./mesh-ibss.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface>"
     echo "Parameters:"
+    echo "	<mode>"
     echo "	<ip>"
+    echo "	<mask>"
     echo "	<AP MAC>"
     echo "	<WEP key>"
     echo "	<essid>"
     echo "	<freq>"
+    echo "	<txpower>"
+    echo "	<country>"
+    echo "	<interface>"
     echo
     echo "example:"
-    echo "sudo mesh.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi"
+    echo "sudo mesh.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi wlan1"
     echo "sudo mesh.sh ap"
     exit
 }
 
-echo "Solving wifi device name.."
-wifidev=$(iw dev | awk '$1=="Interface"{print $2}')
-echo "Found: $wifidev"
+# 1      2    3      4        5     6       7      8         9         10
+# <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface>
 
-# 1      2    3      4        5     6       7      8         9
-# <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country>
+if [[ -z "$10" ]] then
+  echo "Solving wifi device name.."
+  wifidev=$(iw dev | awk '$1=="Interface"{print $2}')
+  echo "Found: $wifidev"
+fi
 
 case "$1" in
 

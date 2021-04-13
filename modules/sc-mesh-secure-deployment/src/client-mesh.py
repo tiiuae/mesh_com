@@ -98,8 +98,8 @@ def ubuntu_gw():
         new_config_file.write('[Service]\n')
         new_config_file.write('Type=idle\n')
         command_gw = 'ExecStart=/usr/bin/mesh-gw.sh'
-        subprocess.call('sudo cp ../../../../common/scripts/mesh-gw.sh /usr/bin/.', shell=True)
-        subprocess.call('sudo chmod 744 /usr/bin/mesh-gw.sh', shell=True)
+        subprocess.call('sudo cp ../../../common/scripts/mesh_gw.sh /usr/bin/.', shell=True)
+        subprocess.call('sudo chmod 744 /usr/bin/mesh_gw.sh', shell=True)
         new_config_file.write(command_gw + '\n\n')
         new_config_file.write('[Install]\n')
         new_config_file.write('WantedBy=multi-user.target\n')
@@ -127,8 +127,10 @@ def create_config_ubuntu(response):
         config_file.write('Description="Mesh Service"\n\n')
         config_file.write('[Service]\n')
         config_file.write('Type=idle\n')
-        command = 'ExecStart=/usr/local/bin/mesh_ibss.sh ' + address + ' ' + res['ap_mac'] + ' ' + res['key'] + ' ' \
-                  + res['ssid'] + ' ' + res['frequency'] + ' ' + interface
+        # TODO fix mesh-ibss.sh script to accept proper args
+        # TODO remove hardcoded 30 fi (not actually used in mesh-ibss.sh script)
+        command = 'ExecStart=/usr/local/bin/mesh-ibss.sh mesh ' + address + ' 255.255.255.0 ' + res['ap_mac'] + ' ' + res['key'] + ' ' \
+                  + res['ssid'] + ' ' + res['frequency'] + ' 30 fi ' + interface
         if res['gateway']:
             ubuntu_gw()
         else:
@@ -169,7 +171,7 @@ def final_settings_ubuntu():
     subprocess.call('sudo systemctl stop network-manager.service', shell=True)
     subprocess.call('sudo systemctl disable network-manager.service', shell=True)
     subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
-    subprocess.call('sudo cp ../../../../common/scripts/mesh-ibss.sh /usr/local/bin/.', shell=True)
+    subprocess.call('sudo cp ../../common/scripts/mesh-ibss.sh /usr/local/bin/.', shell=True)
     subprocess.call('sudo chmod 744 /usr/local/bin/mesh-ibss.sh', shell=True)
     subprocess.call('sudo chmod 664 /etc/systemd/system/mesh.service', shell=True)
     subprocess.call('sudo systemctl enable mesh.service', shell=True)
