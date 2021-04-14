@@ -51,25 +51,22 @@ ip link set wlan$COUNTER up
 done
 }
 
-function create_wpa_supplicant_conf {
-cat <<EOF > wpa_supplicant_client_AP.conf
+function ap_connect {
+echo '> Connecting to Access Point...'
+read -p "- SSID: " ssid
+read -p "- Password: " password
+cat <<EOF > access_point.conf
 network={
-  ssid="$1"
-  psk="$2"
+  ssid="$ssid"
+  psk="$password"
 }
 EOF
 }
-
-function ap_connect {
-  echo '> Connecting to Access Point...'
-  read -p "- SSID: " ssid
-  read -p "- Password: " password
-  create_wpa_supplicant_conf $ssid $password
-  echo '> Please choose from the list of available interfaces...'
-  interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
-  menu_from_array "${interfaces_arr[@]}"
-  sudo wpa_supplicant -B -i $choice -c wpa_supplicant_client_AP.conf
-  sudo dhclient -v $choice
+echo '> Please choose from the list of available interfaces...'
+interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
+menu_from_array "${interfaces_arr[@]}"
+sudo wpa_supplicant -B -i $choice -c access_point.conf
+sudo dhclient -v $choice
 }
 
 #-----------------------------------------------------------------------------#
@@ -95,3 +92,6 @@ command_exists "git make python3-pip batctl ssh clang libssl-dev net-tools \
 # Clone this repo
 echo "> Cloning..."
 git clone -b repo_mege/michael https://github.com/tiiuae/mesh_com.git
+echo "> Init submodules..."
+cd mesh_com
+git submodule update --init --recursive

@@ -61,7 +61,7 @@ def add_message(uuid):
         print(colored('Valid Certificate', 'green'))
         ip_mesh = verify_addr(mac)
         print('ip_mesh - ' + str(ip_mesh))
-        aux = aux_ubuntu if uuid == 'Ubuntu' else aux
+        aux = aux_ubuntu if uuid == 'Ubuntu' else aux_openwrt
         if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
             aux['gateway'] = True
             add_default_route(ip_address)  # we will need to add the default route to communicate

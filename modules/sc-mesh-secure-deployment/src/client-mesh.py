@@ -92,21 +92,22 @@ def get_interfaces():
 
 
 def ubuntu_gw():
-    print('> Configuring Ubuntu mesh gateway...')
+    print('> Configuring mesh gateway service...')
     with open('/etc/systemd/system/gw.service', 'w') as new_config_file:
         new_config_file.write('[Unit]\n')
         new_config_file.write('Description="Gateway Service"\n\n')
         new_config_file.write('[Service]\n')
         new_config_file.write('Type=idle\n')
         command_gw = 'ExecStart=/usr/bin/mesh-gw.sh'
-        subprocess.call('sudo cp ../../common/scripts/mesh_gw.sh /usr/bin/.', shell=True)
-        subprocess.call('sudo chmod 744 /usr/bin/mesh_gw.sh', shell=True)
+        subprocess.call('sudo cp ../../common/scripts/mesh-gw.sh /usr/bin/.', shell=True)
+        subprocess.call('sudo chmod 744 /usr/bin/mesh-gw.sh', shell=True)
         new_config_file.write(command_gw + '\n\n')
         new_config_file.write('[Install]\n')
         new_config_file.write('WantedBy=multi-user.target\n')
     subprocess.call('sudo chmod 644 /etc/systemd/system/gw.service', shell=True)
     subprocess.call('systemctl enable gw.service', shell=True)
-    copy = 'sudo cp tools/wpa_tools/wpa_supplicant_client_AP.conf /etc/wpa_supplicant/wpa_supplicant-wlan0.conf'
+    print('> Configuring AP connection service...')
+    copy = 'sudo cp tools/wpa_tools/access_point.conf /etc/wpa_supplicant/wpa_supplicant-wlan0.conf'
     subprocess.call(copy, shell=True)
     subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-wlan0.conf', shell=True)
     subprocess.call('systemctl enable wpa_supplicant@wlan0.service', shell=True)
