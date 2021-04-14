@@ -28,7 +28,7 @@ jobs:
           set -eux
           mkdir bin
           pushd fogsw-ci-scripts
-          ./generate_deb.sh ../mesh_com/modules/mesh_com ../bin/
+          ./generate_deb.sh ../mesh_com ../bin/ modules/mesh_com/
           popd
 
       - name: Install jfrog CLI tool
