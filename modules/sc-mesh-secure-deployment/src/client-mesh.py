@@ -92,6 +92,7 @@ def get_interfaces():
 
 
 def ubuntu_gw():
+    print('> Configuring Ubuntu mesh gateway...')
     with open('/etc/systemd/system/gw.service', 'w') as new_config_file:
         new_config_file.write('[Unit]\n')
         new_config_file.write('Description="Gateway Service"\n\n')
@@ -114,46 +115,54 @@ def ubuntu_gw():
     subprocess.call('sudo iptables -A FORWARD -i wlan0 -o bat0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT', shell=True)
     subprocess.call('sudo iptables -A FORWARD -i bat0 -o wlan0 -j ACCEPT', shell=True)
 
+def ubuntu_node():
+    print('> Configuring Ubuntu mesh node...')
+    default_route = 'route add default gw ' + gw + ' bat0'
+    subprocess.call(default_route, shell=True)
+    with open('/etc/systemd/system/default.service', 'w') as config_default:
+        config_default.write('[Unit]\n')
+        config_default.write('Description="IP Route Default Service"\n\n')
+        config_default.write('[Service]\n')
+        config_default.write('Type=idle\n')
+        command_default = 'ExecStart=/usr/local/bin/default.sh '
+        config_default.write(command_default + '\n\n')
+        config_default.write('[Install]\n')
+        config_default.write('WantedBy=multi-user.target\n')
+    with open('/usr/local/bin/default.sh', 'w') as default_script:
+        default_script.write('#!/bin/bash\n')
+        default_script.write('sleep 5\n')
+        default_script.write('ip route add default via ' + gw + '\n')
+        subprocess.call('sudo chmod 744 /usr/local/bin/default.sh', shell=True)
+        subprocess.call('sudo chmod 664 /etc/systemd/system/default.service', shell=True)
+        subprocess.call('sudo systemctl enable default.service', shell=True)
 
 def create_config_ubuntu(response):
     interface = get_interfaces()
     res = json.loads(response)
+    print('Interfaces: ' + str(res))
     address = res['addr']
     prefix = address.split('.')[:-1]
     prefix = '.'.join(prefix)
     gw = prefix + '.2'
+    print('ExecStart=/usr/local/bin/mesh-ibss.sh mesh ' + address \
+              + ' 255.255.255.0 ' + res['ap_mac'] + ' ' + res['key'] + ' ' \
+              + res['ssid'] + ' ' + res['frequency'] + ' ' + res['tx_power'] \
+              + ' ' + res['country'] + ' ' + interface + ' phy1')
     with open('/etc/systemd/system/mesh.service', 'w') as config_file:
         config_file.write('[Unit]\n')
         config_file.write('Description="Mesh Service"\n\n')
         config_file.write('[Service]\n')
         config_file.write('Type=idle\n')
         # TODO fix mesh-ibss.sh script to accept proper args
-        # TODO remove hardcoded 30 fi (not actually used in mesh-ibss.sh script)
-        # command = 'ExecStart=/usr/local/bin/mesh-ibss.sh mesh ' + address + ' 255.255.255.0 ' + res['ap_mac'] + ' ' + res['key'] + ' ' \
-                  # + res['ssid'] + ' ' + res['frequency'] + ' 30 fi ' + interface
-        command = 'ExecStart=/usr/local/bin/mesh_init.sh ' + address + ' ' + res['ap_mac'] + ' ' + res['key'] + ' ' \
-                + res['ssid'] + ' ' + res['frequency'] + ' ' + interface
+        # TODO we should find the phyname associated with the interface
+        command = 'ExecStart=/usr/local/bin/mesh-ibss.sh mesh ' + address \
+                  + ' 255.255.255.0 ' + res['ap_mac'] + ' ' + res['key'] + ' ' \
+                  + res['ssid'] + ' ' + res['frequency'] + ' ' + res['tx_power'] \
+                  + ' ' + res['country'] + ' ' + interface + ' phy1'
         if res['gateway']:
             ubuntu_gw()
         else:
-            default_route = 'route add default gw ' + gw + ' bat0'
-            subprocess.call(default_route, shell=True)
-            with open('/etc/systemd/system/default.service', 'w') as config_default:
-                config_default.write('[Unit]\n')
-                config_default.write('Description="IP Route Default Service"\n\n')
-                config_default.write('[Service]\n')
-                config_default.write('Type=idle\n')
-                command_default = 'ExecStart=/usr/local/bin/default.sh '
-                config_default.write(command_default + '\n\n')
-                config_default.write('[Install]\n')
-                config_default.write('WantedBy=multi-user.target\n')
-            with open('/usr/local/bin/default.sh', 'w') as default_script:
-                default_script.write('#!/bin/bash\n')
-                default_script.write('sleep 5\n')
-                default_script.write('ip route add default via ' + gw + '\n')
-                subprocess.call('sudo chmod 744 /usr/local/bin/default.sh', shell=True)
-                subprocess.call('sudo chmod 664 /etc/systemd/system/default.service', shell=True)
-                subprocess.call('sudo systemctl enable default.service', shell=True)
+            ubuntu_node()
 
         config_file.write(command + '\n\n')
         config_file.write('[Install]\n')
@@ -165,16 +174,14 @@ def create_config_ubuntu(response):
     command_hostname_host = 'echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts'
     subprocess.call(command_hostname_host, shell=True)
 
-
-
 def final_settings_ubuntu():
     # this setting assume that mesh-ibss.sh and mesh-gw.sh
     subprocess.call('sudo nmcli networking off', shell=True)
     subprocess.call('sudo systemctl stop network-manager.service', shell=True)
     subprocess.call('sudo systemctl disable network-manager.service', shell=True)
     subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
-    subprocess.call('sudo cp ../../common/scripts/mesh_init.sh /usr/local/bin/.', shell=True)
-    subprocess.call('sudo chmod 744 /usr/local/bin/mesh_init.sh', shell=True)
+    subprocess.call('sudo cp ../../common/scripts/mesh-ibss.sh /usr/local/bin/.', shell=True)
+    subprocess.call('sudo chmod 744 /usr/local/bin/mesh-ibss.sh', shell=True)
     subprocess.call('sudo chmod 664 /etc/systemd/system/mesh.service', shell=True)
     subprocess.call('sudo systemctl enable mesh.service', shell=True)
     time.sleep(2)
