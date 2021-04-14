@@ -3,7 +3,7 @@
 function help
 {
     echo
-    echo "Usage: sudo ./mesh-ibss.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface>"
+    echo "Usage: sudo ./mesh-ibss.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface> <phyname>"
     echo "Parameters:"
     echo "	<mode>"
     echo "	<ip>"
@@ -15,9 +15,10 @@ function help
     echo "	<txpower>"
     echo "	<country>"
     echo "	<interface>"
+    echo "	<phyname>"
     echo
     echo "example:"
-    echo "sudo mesh.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi wlan1"
+    echo "sudo mesh.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 wlan1 phy1"
     echo "sudo mesh.sh ap"
     exit
 }
@@ -25,15 +26,20 @@ function help
 # 1      2    3      4        5     6       7      8         9         10
 # <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface>
 
-if [[ -z "$10" ]]; then
-  echo "Solving wifi device name.."
+echo "Solving wifi device name.."
+if [[ -z "${10}" ]]; then
   wifidev=$(iw dev | awk '$1=="Interface"{print $2}')
-  echo "Found: $wifidev"
+else
+  wifidev=${10}
+  phyname=${11}
 fi
+echo "Found: $wifidev"
 
 case "$1" in
 
 mesh)
+
+echo "sudo mesh $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11}"
       if [[ -z "$1" || -z "$2" || -z "$3" || -z "$4" || -z "$5" || -z "$6" ]]
         then
           echo "check argumets..."
@@ -71,7 +77,7 @@ EOF
 
       echo "$wifidev down.."
       iw dev $wifidev del
-      iw phy phy0 interface add $wifidev type ibss
+      iw phy $phyname interface add $wifidev type ibss
 
       echo "$wifidev create adhoc.."
       ifconfig $wifidev mtu 1560
