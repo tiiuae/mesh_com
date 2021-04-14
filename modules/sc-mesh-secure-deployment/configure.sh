@@ -102,7 +102,7 @@ function server {
 
 function client {
   echo '> Configuring the client...'
-  # Make the server
+  # Make the client
   pushd .
   cd ../..
   make mesh_tb_client
@@ -112,18 +112,19 @@ function client {
   if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
     ap_connect
   fi
-  echo -n '> Server discovery...'
-  # get server IPv4 and hostname
-  while ! [ "$server_details" ] ; do
-    server_details=$(timeout 7 avahi-browse -rptf _http._tcp | awk -F';' '$1 == "=" && $3 == "IPv4" && $4 == "mesh_server" {print $8 " " $7}')
-  done
-  # split ip/host into separate vars
-  server_details=($(sed -r 's/\b.local\b//g' <<< $server_details))
-  server_ip=${server_details[0]}
-  server_host=${server_details[1]}
   echo "> We will use src/ecc_key.der if it already exists, or we can try and fetch it..."
-  read -p "> Do you want to fetch the certificate from the server $server_host@$server_ip? (Y/N): " confirm
+  read -p "> Do you want to fetch the certificate from the server? (Y/N): " confirm
+  server_ip="0.0.0.0"
   if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
+    echo -n '> Server discovery...'
+    # get server IPv4 and hostname
+    while ! [ "$server_details" ] ; do
+      server_details=$(timeout 7 avahi-browse -rptf _http._tcp | awk -F';' '$1 == "=" && $3 == "IPv4" && $4 == "mesh_server" {print $8 " " $7}')
+    done
+    # split ip/host into separate vars
+    server_details=($(sed -r 's/\b.local\b//g' <<< $server_details))
+    server_ip=${server_details[0]}
+    server_host=${server_details[1]}
     echo '> Fetching certificate from server...'
     read -p "- Server Username: " server_user
     # pull the key from the server
