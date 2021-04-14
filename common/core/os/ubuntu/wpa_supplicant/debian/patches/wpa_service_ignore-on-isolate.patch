@@ -1,0 +1,16 @@
+Updated: 2017-11-10
+
+---
+ wpa_supplicant/systemd/wpa_supplicant.service.in |    2 ++
+ 1 file changed, 2 insertions(+)
+
+--- a/wpa_supplicant/systemd/wpa_supplicant.service.in
++++ b/wpa_supplicant/systemd/wpa_supplicant.service.in
+@@ -3,6 +3,7 @@ Description=WPA supplicant
+ Before=network.target
+ After=dbus.service
+ Wants=network.target
++IgnoreOnIsolate=true
+ 
+ [Service]
+ Type=dbus

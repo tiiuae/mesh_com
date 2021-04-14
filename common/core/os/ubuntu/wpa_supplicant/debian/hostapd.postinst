@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+
+#DEBHELPER#
+
+if [ -d /run/systemd/system ] && [ "$1" = configure ]
+then
+    DAEMON_CONF=
+    . /etc/default/hostapd
+    if [ -z "$DAEMON_CONF" ] && [ ! -r /etc/hostapd/hostapd.conf ] && ! systemctl --quiet is-active hostapd.service
+    then
+	    systemctl mask hostapd.service
+    fi
+fi
+
+exit 0

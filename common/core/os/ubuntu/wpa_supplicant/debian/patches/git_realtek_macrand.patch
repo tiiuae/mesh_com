@@ -1,0 +1,42 @@
+From 7546c489a95a033c78331915fcdfa0e6fd74d563 Mon Sep 17 00:00:00 2001
+From: Ouden <Ouden.Biz@gmail.com>
+Date: Wed, 18 Mar 2020 17:58:37 +0800
+Subject: nl80211: Fix RTM NEW/DELLINK IFLA_IFNAME copy for maximum ifname
+ length
+
+If the kernel rtm_newlink or rtm_dellink send the maximum length of
+ifname (IFNAMSIZ), the event handlers in
+wpa_driver_nl80211_event_rtm_addlink() and
+wpa_driver_nl80211_event_rtm_dellink() did not copy the IFLA_IFNAME
+value. Because the RTA_PAYLOAD (IFLA_IFNAME) length already includes the
+NULL termination, that equals the IFNAMSIZ.
+
+Fix the condition when IFNAME reach maximum size.
+
+Signed-off-by: Ouden <Ouden.Biz@gmail.com>
+---
+ src/drivers/driver_nl80211.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+Index: wpa-2.9/src/drivers/driver_nl80211.c
+===================================================================
+--- wpa-2.9.orig/src/drivers/driver_nl80211.c
++++ wpa-2.9/src/drivers/driver_nl80211.c
+@@ -1065,7 +1065,7 @@ static void wpa_driver_nl80211_event_rtm
+ 	while (RTA_OK(attr, attrlen)) {
+ 		switch (attr->rta_type) {
+ 		case IFLA_IFNAME:
+-			if (RTA_PAYLOAD(attr) >= IFNAMSIZ)
++			if (RTA_PAYLOAD(attr) > IFNAMSIZ)
+ 				break;
+ 			os_memcpy(ifname, RTA_DATA(attr), RTA_PAYLOAD(attr));
+ 			ifname[RTA_PAYLOAD(attr)] = '\0';
+@@ -1240,7 +1240,7 @@ static void wpa_driver_nl80211_event_rtm
+ 	while (RTA_OK(attr, attrlen)) {
+ 		switch (attr->rta_type) {
+ 		case IFLA_IFNAME:
+-			if (RTA_PAYLOAD(attr) >= IFNAMSIZ)
++			if (RTA_PAYLOAD(attr) > IFNAMSIZ)
+ 				break;
+ 			os_memcpy(ifname, RTA_DATA(attr), RTA_PAYLOAD(attr));
+ 			ifname[RTA_PAYLOAD(attr)] = '\0';
