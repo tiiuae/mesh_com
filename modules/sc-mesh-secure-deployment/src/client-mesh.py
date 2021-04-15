@@ -44,7 +44,7 @@ def get_data(cert_file, os):
 
 
 def decrypt_reponse():  # assuming that data is on a file called payload.enc generated on the function get_data
-    proc = subprocess.Popen(['../../common/security/ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(['src/ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
     aux_list = [element.decode() for element in out.split()]
     new_list = aux_list[40:64]
