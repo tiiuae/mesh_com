@@ -1,0 +1,10 @@
+[Unit]
+Description= Gateway Service on %I
+
+[Service]
+Type=idle
+ExecStart=/usr/local/bin/mesh-gw.sh %i
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
