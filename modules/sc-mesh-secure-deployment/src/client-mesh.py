@@ -175,6 +175,8 @@ def create_config_ubuntu(response):
     subprocess.call(command_hostname, shell=True)
     command_hostname_host = 'echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts'
     subprocess.call(command_hostname_host, shell=True)
+    # Ensure our nameserver persists as 8.8.8.8
+    subprocess.call('sudo cp ../conf/resolved.conf /etc/systemd/resolved.conf', shell=True)
 
 def final_settings_ubuntu():
     # this setting assume that mesh-ibss.sh and mesh-gw.sh
