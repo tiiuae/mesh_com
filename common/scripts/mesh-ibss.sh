@@ -65,7 +65,13 @@ network={
 EOF
 
       echo "Killing wpa_supplicant..."
-      killall wpa_supplicant 2>/dev/null
+      # FIXME: If there is another wifi module being used as an AP for a GW,
+      # this kills that process. We need a better way of handling this. For now
+      # we can just not kill wpa_supplicant when we are loading the mesh_com_tb
+      # module.
+      if [[ -z "${10}" ]]; then
+        killall wpa_supplicant 2>/dev/null
+      fi
       killall alfred 2>/dev/null
       killall batadv-vis 2>/dev/null
       rm -f /var/run/alfred.sock

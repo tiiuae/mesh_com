@@ -5,6 +5,7 @@ Before=network.target
 After=wpa_supplicant@%i.service
 
 [Service]
+Type=forking
 ExecStart=/sbin/dhclient %I
 Restart=always
 

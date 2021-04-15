@@ -114,7 +114,7 @@ def ubuntu_gw(ap_inf):
     subprocess.call('sudo sysctl -w net.ipv4.ip_forward=1', shell=True)
     subprocess.call('sudo iptables -t nat -A POSTROUTING -o ' + str(ap_inf) + ' -j MASQUERADE', shell=True)
     subprocess.call('sudo iptables -A FORWARD -i ' + str(ap_inf) + ' -o bat0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT', shell=True)
-    subprocess.call('sudo iptables -A FORWARD -i bat0 -o ' + str(AP_ING) + ' -j ACCEPT', shell=True)
+    subprocess.call('sudo iptables -A FORWARD -i bat0 -o ' + str(ap_inf) + ' -j ACCEPT', shell=True)
 
 def ubuntu_node(gateway):
     print('> Configuring Ubuntu mesh node...')
@@ -144,7 +144,7 @@ def create_config_ubuntu(response):
     # Create mesh service config
     with open('/usr/local/etc/mesh.conf', 'w') as mesh_config:
         mesh_config.write('MODE=mesh\n')
-        mesh_config.write('IP= ' + address + '\n')
+        mesh_config.write('IP=' + address + '\n')
         mesh_config.write('MASK=255.255.255.0\n')
         mesh_config.write('MAC=' + res['ap_mac'] + '\n')
         mesh_config.write('KEY=' + res['key'] + '\n')
@@ -169,8 +169,6 @@ def create_config_ubuntu(response):
     subprocess.call(command_hostname, shell=True)
     command_hostname_host = 'echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts'
     subprocess.call(command_hostname_host, shell=True)
-    # Ensure our nameserver persists as 8.8.8.8
-    subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True)
     # Final settings
     subprocess.call('sudo nmcli networking off', shell=True)
     subprocess.call('sudo systemctl stop network-manager.service', shell=True)
@@ -183,6 +181,8 @@ def create_config_ubuntu(response):
     subprocess.call('sudo cp services/mesh@.service /etc/systemd/system/.', shell=True)
     subprocess.call('sudo chmod 664 /etc/systemd/system/mesh@.service', shell=True)
     subprocess.call('sudo systemctl enable mesh@' + mesh_interface + '.service', shell=True)
+    # Ensure our nameserver persists as 8.8.8.8
+    subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True)
     time.sleep(2)
     subprocess.call('reboot', shell=True)
 

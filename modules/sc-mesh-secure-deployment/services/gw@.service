@@ -3,7 +3,7 @@ Description= Gateway Service on %I
 
 [Service]
 Type=idle
-ExecStart=/usr/local/bin/mesh-gw.sh %i
+ExecStart=/usr/local/bin/mesh-gw.sh %I
 Restart=always
 
 [Install]
