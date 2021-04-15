@@ -93,7 +93,7 @@ def get_mesh_interface():
     return list(interface)[0]
 
 
-def ubuntu_gw(mesh_inf, ap_inf):
+def ubuntu_gw(ap_inf):
     print('> Configuring Ubuntu gateway node...')
     # Create Gateway Service
     subprocess.call('sudo cp ../../common/scripts/mesh-gw.sh /usr/bin/.', shell=True)
@@ -102,19 +102,19 @@ def ubuntu_gw(mesh_inf, ap_inf):
     subprocess.call('sudo chmod 644 /etc/systemd/system/gw@.service', shell=True)
     subprocess.call('systemctl enable gw@' + str(ap_inf) + '.service', shell=True)
     # Auto connect wlx to AP at boot using wpa_supplicant
-    copy = 'sudo cp tools/wpa_tools/access_point.conf /etc/wpa_supplicant/wpa_supplicant-' + str(mesh_inf) + '.conf'
+    copy = 'sudo cp tools/wpa_tools/access_point.conf /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf'
     subprocess.call(copy, shell=True)
-    subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(mesh_inf) + '.conf', shell=True)
-    subprocess.call('systemctl enable wpa_supplicant@' + str(mesh_inf) + '.service', shell=True)
+    subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf', shell=True)
+    subprocess.call('systemctl enable wpa_supplicant@' + str(ap_inf) + '.service', shell=True)
     # Automatically start dhclient
     subprocess.call('sudo cp services/dhclient@.service /etc/systemd/system/.', shell=True)
     subprocess.call('sudo chmod 644 /etc/systemd/system/dhclient@.service', shell=True)
-    subprocess.call('systemctl enable dhclient@' + str(mesh_inf) + '.service', shell=True)
+    subprocess.call('systemctl enable dhclient@' + str(ap_inf) + '.service', shell=True)
     # Forward traffic from wlx to bat0 and vice versa
     subprocess.call('sudo sysctl -w net.ipv4.ip_forward=1', shell=True)
-    subprocess.call('sudo iptables -t nat -A POSTROUTING -o ' + str(mesh_inf) + ' -j MASQUERADE', shell=True)
-    subprocess.call('sudo iptables -A FORWARD -i ' + str(mesh_inf) + ' -o bat0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT', shell=True)
-    subprocess.call('sudo iptables -A FORWARD -i bat0 -o ' + str(mesh_inf) + ' -j ACCEPT', shell=True)
+    subprocess.call('sudo iptables -t nat -A POSTROUTING -o ' + str(ap_inf) + ' -j MASQUERADE', shell=True)
+    subprocess.call('sudo iptables -A FORWARD -i ' + str(ap_inf) + ' -o bat0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT', shell=True)
+    subprocess.call('sudo iptables -A FORWARD -i bat0 -o ' + str(AP_ING) + ' -j ACCEPT', shell=True)
 
 def ubuntu_node(gateway):
     print('> Configuring Ubuntu mesh node...')
@@ -141,11 +141,6 @@ def create_config_ubuntu(response):
     res = json.loads(response)
     print('Interfaces: ' + str(res))
     address = res['addr']
-    prefix = address.split('.')[:-1]
-    prefix = '.'.join(prefix)
-    ap_interface = get_ap_interface()
-    mesh_interface = get_mesh_interface()
-    mesh_gateway = prefix + '.2'
     # Create mesh service config
     with open('/usr/local/etc/mesh.conf', 'w') as mesh_config:
         mesh_config.write('MODE=mesh\n')
@@ -158,12 +153,15 @@ def create_config_ubuntu(response):
         mesh_config.write('TXPOWER=' + res['tx_power'] + '\n')
         mesh_config.write('COUNTRY=fi\n')
         mesh_config.write('PHY=phy1\n')
-    # Copy mesh service to /etc/systemd/system/
-    subprocess.call('sudo cp services/mesh@.service /etc/systemd/system/.', shell=True)
     # Are we a gateway node? If we are we need to set up the routes
     if res['gateway']:
-        ubuntu_gw(mesh_interface, ap_interface)
+        ap_interface = get_ap_interface()
+        ubuntu_gw(ap_interface)
     else:
+        # We aren't a gateway node, set up the default route (to gw) service
+        prefix = address.split('.')[:-1]
+        prefix = '.'.join(prefix)
+        mesh_gateway = prefix + '.2'
         ubuntu_node(mesh_gateway)
     # Set hostname
     nodeId = int(res['addr'].split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
@@ -178,8 +176,11 @@ def create_config_ubuntu(response):
     subprocess.call('sudo systemctl stop network-manager.service', shell=True)
     subprocess.call('sudo systemctl disable network-manager.service', shell=True)
     subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
+    # Copy mesh service to /etc/systemd/system/
+    mesh_interface = get_mesh_interface()
     subprocess.call('sudo cp ../../common/scripts/mesh-ibss.sh /usr/local/bin/.', shell=True)
     subprocess.call('sudo chmod 744 /usr/local/bin/mesh-ibss.sh', shell=True)
+    subprocess.call('sudo cp services/mesh@.service /etc/systemd/system/.', shell=True)
     subprocess.call('sudo chmod 664 /etc/systemd/system/mesh@.service', shell=True)
     subprocess.call('sudo systemctl enable mesh@' + mesh_interface + '.service', shell=True)
     time.sleep(2)
