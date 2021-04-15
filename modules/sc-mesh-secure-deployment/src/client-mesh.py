@@ -110,7 +110,7 @@ def ubuntu_gw(interface):
     subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(interface) + '.conf', shell=True)
     subprocess.call('systemctl enable wpa_supplicant@' + str(interface) + '.service', shell=True)
     # Automatically start dhclient
-    subprocess.call('sudo cp ../services/dhclient@' + str(interface) + '.service /etc/systemd/system/.', shell=True)
+    subprocess.call('sudo cp services/dhclient@' + str(interface) + '.service /etc/systemd/system/.', shell=True)
     subprocess.call('sudo chmod 644 /etc/systemd/system/dhclient@.service', shell=True)
     subprocess.call('systemctl enable dhclient@' + str(interface) + '.service', shell=True)
     # Forward traffic from wlx to bat0 and vice versa
@@ -161,7 +161,7 @@ def create_config_ubuntu(response):
         mesh_config.write('COUNTRY=fi\n')
         mesh_config.write('PHY=phy1\n')
     # Copy mesh service to /etc/systemd/system/
-    subprocess.call('sudo cp ../services/mesh@.service /etc/systemd/system/.', shell=True)
+    subprocess.call('sudo cp services/mesh@.service /etc/systemd/system/.', shell=True)
     # Are we a gateway node? If we are we need to set up the routes
     if res['gateway']:
         ubuntu_gw(mesh_interface)
@@ -174,7 +174,7 @@ def create_config_ubuntu(response):
     command_hostname_host = 'echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts'
     subprocess.call(command_hostname_host, shell=True)
     # Ensure our nameserver persists as 8.8.8.8
-    subprocess.call('sudo cp ../conf/resolved.conf /etc/systemd/resolved.conf', shell=True)
+    subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True)
     # Final settings
     subprocess.call('sudo nmcli networking off', shell=True)
     subprocess.call('sudo systemctl stop network-manager.service', shell=True)
