@@ -1,0 +1,11 @@
+[Unit]
+Description= Mesh Service on %I
+
+[Service]
+Type=idle
+EnvironmentFile=/usr/local/etc/mesh.conf
+ExecStart=/usr/local/bin/mesh-ibss.sh $MODE $IP $MAC $KEY $ESSID $FREQ $TXPOWER $COUNTRY %i $PHY
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

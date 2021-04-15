@@ -30,11 +30,11 @@ mesh_tb_client:
 mesh_tb_server:
 	sudo apt-get --yes install clang libssl-dev
 	pip3 install -r $(mesh_tb_root)/requirements/server-requirements.txt
-	if [ ! "$(ls -A $(cryptolib_root))"  ]; then \
-		cd $(cryptolib_root); make; make cert; cd $(root_dir);
+	if [ ! -f "$(cryptolib_root)/src/ecies_decrypt" ]; then \
+		cd $(cryptolib_root); make; make cert; cd $(root_dir); \
 	fi
 	if [ ! -f "$(mesh_tb_root)/src/ecies_decrypt" ]; then \
 		cp $(cryptolib_root)/ecies_decrypt $(cryptolib_root)/ecies_encrypt $(mesh_tb_root)/src/ ; \
 	fi
 	cp $(cryptolib_root)/ecc_key.der $(mesh_tb_root)/src/;
-	cd $(mesh_tb_root); sudo bash $(mesh_tb_root)/configure.sh -s
+	# cd $(mesh_tb_root); sudo bash $(mesh_tb_root)/configure.sh -s

@@ -85,40 +85,45 @@ def create_config_openwrt(response):
     config_file.close()
 
 
-def get_interfaces():
+def get_mesh_interface():
     interface_list = netifaces.interfaces()
     interface = filter(lambda x: 'wlx' in x, interface_list)
     return list(interface)[0]
 
 
-def ubuntu_gw():
-    print('> Configuring mesh gateway service...')
+def ubuntu_gw(interface):
+    print('> Configuring Ubuntu gateway node...')
+    # Create Gateway Service
+    subprocess.call('sudo cp ../../common/scripts/mesh-gw.sh /usr/bin/.', shell=True)
+    subprocess.call('sudo chmod 744 /usr/bin/mesh-gw.sh', shell=True)
     with open('/etc/systemd/system/gw.service', 'w') as new_config_file:
         new_config_file.write('[Unit]\n')
         new_config_file.write('Description="Gateway Service"\n\n')
         new_config_file.write('[Service]\n')
         new_config_file.write('Type=idle\n')
-        command_gw = 'ExecStart=/usr/bin/mesh-gw.sh'
-        subprocess.call('sudo cp ../../common/scripts/mesh-gw.sh /usr/bin/.', shell=True)
-        subprocess.call('sudo chmod 744 /usr/bin/mesh-gw.sh', shell=True)
-        new_config_file.write(command_gw + '\n\n')
+        new_config_file.write('ExecStart=/usr/bin/mesh-gw.sh' + '\n\n')
         new_config_file.write('[Install]\n')
         new_config_file.write('WantedBy=multi-user.target\n')
     subprocess.call('sudo chmod 644 /etc/systemd/system/gw.service', shell=True)
     subprocess.call('systemctl enable gw.service', shell=True)
-    print('> Configuring AP connection service...')
-    copy = 'sudo cp tools/wpa_tools/access_point.conf /etc/wpa_supplicant/wpa_supplicant-wlan0.conf'
+    # Auto connect wlx to AP at boot using wpa_supplicant
+    copy = 'sudo cp tools/wpa_tools/access_point.conf /etc/wpa_supplicant/wpa_supplicant-' + str(interface) + '.conf'
     subprocess.call(copy, shell=True)
-    subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-wlan0.conf', shell=True)
-    subprocess.call('systemctl enable wpa_supplicant@wlan0.service', shell=True)
+    subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(interface) + '.conf', shell=True)
+    subprocess.call('systemctl enable wpa_supplicant@' + str(interface) + '.service', shell=True)
+    # Automatically start dhclient
+    subprocess.call('sudo cp ../services/dhclient@' + str(interface) + '.service /etc/systemd/system/.', shell=True)
+    subprocess.call('sudo chmod 644 /etc/systemd/system/dhclient@.service', shell=True)
+    subprocess.call('systemctl enable dhclient@' + str(interface) + '.service', shell=True)
+    # Forward traffic from wlx to bat0 and vice versa
     subprocess.call('sudo sysctl -w net.ipv4.ip_forward=1', shell=True)
-    subprocess.call('sudo iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE', shell=True) #assuming that wlan0 is the internet
-    subprocess.call('sudo iptables -A FORWARD -i wlan0 -o bat0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT', shell=True)
-    subprocess.call('sudo iptables -A FORWARD -i bat0 -o wlan0 -j ACCEPT', shell=True)
+    subprocess.call('sudo iptables -t nat -A POSTROUTING -o ' + str(interface) + ' -j MASQUERADE', shell=True)
+    subprocess.call('sudo iptables -A FORWARD -i ' + str(interface) + ' -o bat0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT', shell=True)
+    subprocess.call('sudo iptables -A FORWARD -i bat0 -o ' + str(interface) + ' -j ACCEPT', shell=True)
 
-def ubuntu_node():
+def ubuntu_node(gateway):
     print('> Configuring Ubuntu mesh node...')
-    default_route = 'route add default gw ' + gw + ' bat0'
+    default_route = 'route add default gw ' + gateway + ' bat0'
     subprocess.call(default_route, shell=True)
     with open('/etc/systemd/system/default.service', 'w') as config_default:
         config_default.write('[Unit]\n')
@@ -132,43 +137,39 @@ def ubuntu_node():
     with open('/usr/local/bin/default.sh', 'w') as default_script:
         default_script.write('#!/bin/bash\n')
         default_script.write('sleep 5\n')
-        default_script.write('ip route add default via ' + gw + '\n')
+        default_script.write('ip route add default via ' + gateway + '\n')
         subprocess.call('sudo chmod 744 /usr/local/bin/default.sh', shell=True)
         subprocess.call('sudo chmod 664 /etc/systemd/system/default.service', shell=True)
         subprocess.call('sudo systemctl enable default.service', shell=True)
 
 def create_config_ubuntu(response):
-    interface = get_interfaces()
     res = json.loads(response)
     print('Interfaces: ' + str(res))
     address = res['addr']
     prefix = address.split('.')[:-1]
     prefix = '.'.join(prefix)
-    gw = prefix + '.2'
-    print('ExecStart=/usr/local/bin/mesh-ibss.sh mesh ' + address \
-              + ' 255.255.255.0 ' + res['ap_mac'] + ' ' + res['key'] + ' ' \
-              + res['ssid'] + ' ' + res['frequency'] + ' ' + res['tx_power'] \
-              + ' ' + res['country'] + ' ' + interface + ' phy1')
-    with open('/etc/systemd/system/mesh.service', 'w') as config_file:
-        config_file.write('[Unit]\n')
-        config_file.write('Description="Mesh Service"\n\n')
-        config_file.write('[Service]\n')
-        config_file.write('Type=idle\n')
-        # TODO fix mesh-ibss.sh script to accept proper args
-        # TODO we should find the phyname associated with the interface
-        command = 'ExecStart=/usr/local/bin/mesh-ibss.sh mesh ' + address \
-                  + ' 255.255.255.0 ' + res['ap_mac'] + ' ' + res['key'] + ' ' \
-                  + res['ssid'] + ' ' + res['frequency'] + ' ' + res['tx_power'] \
-                  + ' ' + res['country'] + ' ' + interface + ' phy1'
-        if res['gateway']:
-            ubuntu_gw()
-        else:
-            ubuntu_node()
-
-        config_file.write(command + '\n\n')
-        config_file.write('[Install]\n')
-        config_file.write('WantedBy=multi-user.target\n')
-
+    mesh_interface = get_interfaces()
+    mesh_gateway = prefix + '.2'
+    # Create mesh service config
+    with open('/usr/local/etc/mesh.conf', 'w') as mesh_config:
+        mesh_config.write('MODE=mesh\n')
+        mesh_config.write('IP= ' + address + '\n')
+        mesh_config.write('MASK=255.255.255.0\n')
+        mesh_config.write('MAC=' + res['ap_mac'] + '\n')
+        mesh_config.write('KEY=' + res['key'] + '\n')
+        mesh_config.write('ESSID=' + res['ssid'] + '\n')
+        mesh_config.write('FREQ=' + res['frequency'] + '\n')
+        mesh_config.write('TXPOWER=' + res['tx_power'] + '\n')
+        mesh_config.write('COUNTRY=fi\n')
+        mesh_config.write('PHY=phy1\n')
+    # Copy mesh service to /etc/systemd/system/
+    subprocess.call('sudo cp ../services/mesh@.service /etc/systemd/system/.', shell=True)
+    # Are we a gateway node? If we are we need to set up the routes
+    if res['gateway']:
+        ubuntu_gw(mesh_interface)
+    else:
+        ubuntu_node(mesh_gateway)
+    # Set hostname
     nodeId = int(res['addr'].split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
     command_hostname = 'sudo hostnamectl set-hostname node' + str(nodeId)
     subprocess.call(command_hostname, shell=True)

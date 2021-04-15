@@ -11,33 +11,6 @@ exit 1
 }
 
 #-----------------------------------------------------------------------------#
-PARAMS=""
-while (( "$#" )); do
-  case "$1" in
-    -s)
-      server
-      shift
-      ;;
-    -c)
-      client
-      shift
-      ;;
-    -ap)
-      access_point
-      shift
-      ;;
-    --help)
-      help
-      shift 2
-      ;;
-    *) # preserve positional arguments
-      PARAMS="$PARAMS $1"
-      shift
-      ;;
-  esac
-done
-
-#-----------------------------------------------------------------------------#
 function menu_from_array()
 {
   select choice; do
@@ -106,7 +79,7 @@ function avahi_fetch_certificate {
   echo '> Fetching certificate from server...'
   read -p "- Server Username: " server_user
   # pull the key from the server
-  scp $server_user@${1}:/home/${1}/mesh_com/modules/sc-mesh-secure-deployment/src/ecc_key.der src/ecc_key.der
+  scp $server_user@${1}:/home/${server_user}/mesh_com/modules/sc-mesh-secure-deployment/src/ecc_key.der src/ecc_key.der
   if [ $? -ne 0 ]; then
       echo "ERROR: Couldn't get certificate from server. Are you running the server from '/home/\$USER/mesh_com/..'?"
       exit 0
@@ -119,7 +92,7 @@ function avahi_fetch_certificate {
 #-----------------------------------------------------------------------------#
 function server {
   echo '> Configuring the mesh_tb server...'
-  # Make the server
+  Make the server
   pushd .
   cd ../..
   make mesh_tb_server
@@ -138,8 +111,7 @@ function client {
   make mesh_tb_client
   popd
   # Connect to the same AP as the server
-  echo "> We need to be connect to the same network as the server to get \
-          the certificate and setup a gateway (if first node)."
+  echo "> We need to be connect to the same network as the server to get the certificate and setup a gateway (if first node)."
   ap_connect
   echo -n '> Looking for authentication server...'
   # Get server IPv4 and hostname
@@ -159,3 +131,30 @@ function client {
   echo '> Configuring the client and connecting to server...'
   sudo python3 src/client-mesh.py -c src/ecc_key.der -s http://$server_ip:5000
 }
+
+#-----------------------------------------------------------------------------#
+PARAMS=""
+while (( "$#" )); do
+  case "$1" in
+    -s)
+      server
+      shift
+      ;;
+    -c)
+      client
+      shift
+      ;;
+    -ap)
+      access_point
+      shift
+      ;;
+    --help)
+      help
+      shift 2
+      ;;
+    *) # preserve positional arguments
+      PARAMS="$PARAMS $1"
+      shift
+      ;;
+  esac
+done

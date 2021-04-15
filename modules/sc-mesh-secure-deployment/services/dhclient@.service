@@ -1,0 +1,12 @@
+[Unit]
+Description= DHCP Client on %I
+Wants=network.target
+Before=network.target
+After=wpa_supplicant@%i.service
+
+[Service]
+ExecStart=/sbin/dhclient %I
+Restart=always
+
+[Install]
+WantedBy=multi-user.target.wants/wpa_supplicant@%i.service

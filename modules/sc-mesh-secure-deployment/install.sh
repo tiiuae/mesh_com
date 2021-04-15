@@ -61,7 +61,6 @@ network={
   psk="$password"
 }
 EOF
-}
 echo '> Please choose from the list of available interfaces...'
 interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
 menu_from_array "${interfaces_arr[@]}"
@@ -88,7 +87,7 @@ fi
 echo "> Checking required packages..."
 command_exists "git make python3-pip batctl ssh clang libssl-dev net-tools \
                 iperf3 avahi-daemon avahi-dnsconfd avahi-utils libnss-mdns \
-                bmon isc-dhcp-server alfred batctl"
+                bmon isc-dhcp-server alfred batctl resolvconf"
 # Clone this repo
 echo "> Cloning..."
 git clone -b repo_mege/michael https://github.com/tiiuae/mesh_com.git
