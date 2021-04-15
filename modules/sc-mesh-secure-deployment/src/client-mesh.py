@@ -110,7 +110,7 @@ def ubuntu_gw(interface):
     subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(interface) + '.conf', shell=True)
     subprocess.call('systemctl enable wpa_supplicant@' + str(interface) + '.service', shell=True)
     # Automatically start dhclient
-    subprocess.call('sudo cp services/dhclient@' + str(interface) + '.service /etc/systemd/system/.', shell=True)
+    subprocess.call('sudo cp services/dhclient@.service /etc/systemd/system/.', shell=True)
     subprocess.call('sudo chmod 644 /etc/systemd/system/dhclient@.service', shell=True)
     subprocess.call('systemctl enable dhclient@' + str(interface) + '.service', shell=True)
     # Forward traffic from wlx to bat0 and vice versa
@@ -182,7 +182,7 @@ def create_config_ubuntu(response):
     subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
     subprocess.call('sudo cp ../../common/scripts/mesh-ibss.sh /usr/local/bin/.', shell=True)
     subprocess.call('sudo chmod 744 /usr/local/bin/mesh-ibss.sh', shell=True)
-    subprocess.call('sudo chmod 664 /etc/systemd/system/mesh@' + mesh_interface + '.service', shell=True)
+    subprocess.call('sudo chmod 664 /etc/systemd/system/mesh@.service', shell=True)
     subprocess.call('sudo systemctl enable mesh@' + mesh_interface + '.service', shell=True)
     time.sleep(2)
     subprocess.call('reboot', shell=True)

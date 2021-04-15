@@ -9,4 +9,4 @@ ExecStart=/sbin/dhclient %I
 Restart=always
 
 [Install]
-WantedBy=multi-user.target.wants/wpa_supplicant@%i.service
+WantedBy=multi-user.target.wants/wpa_supplicant@.service
