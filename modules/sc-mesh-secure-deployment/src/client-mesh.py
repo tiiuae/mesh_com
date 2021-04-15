@@ -17,10 +17,8 @@ ap.add_argument("-s", "--server", required=True, help="Server IP:Port Address. E
 ap.add_argument("-c", "--certificate", required=True)
 args = ap.parse_args()
 
-# URL = 'https://192.168.15.14:5000' #
 URL = args.server
 print(URL)
-
 
 def get_os():
     proc = subprocess.Popen(['lsb_release', '-a'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -46,7 +44,7 @@ def get_data(cert_file, os):
 
 
 def decrypt_reponse():  # assuming that data is on a file called payload.enc generated on the function get_data
-    proc = subprocess.Popen(['src/ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(['../../common/security/ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
     aux_list = [element.decode() for element in out.split()]
     new_list = aux_list[40:64]
@@ -66,13 +64,11 @@ def create_config_openwrt(response):
         config_file.write('config lime ' + "'system'" + '\n')
         config_file.write('\t' + 'option hostname ' + "'" + 'node' + str(nodeId) + "'" + '\n')
         config_file.write('\t' + 'option firstbootwizard_configured ' + "'" + 'true' + "'" + '\n\n')
-
     config_file.write('config wifi radio1' + '\n')
     config_file.write('\t' + 'list modes ' + "'ieee80211s'" + '\n')
     config_file.write('\t' + 'option ieee80211s_mesh_fwding ' + "'" + res['ieee80211s_mesh_fwding'] + "'" + '\n')
     config_file.write('\t' + 'option ieee80211s_mesh_id ' + "'" + res['ieee80211s_mesh_id'] + "'" + '\n')
     config_file.write('\t' + 'option channel ' + "'" + str(res['channel']) + "'" + '\n\n')
-
     config_file.write('config lime ' + "'network'" + '\n')
     config_file.write('\t' + 'list protocols ' + "'ieee80211s'" + '\n')
     config_file.write('\t' + 'list protocols ' + "'lan'" + '\n')
@@ -81,8 +77,10 @@ def create_config_openwrt(response):
     config_file.write('\t' + 'list protocols ' + "'" + 'babeld:' + res['babeld'] + "'" '\n')
     config_file.write('\t' + 'list protocols ' + "'" + 'bmx7:' + res['bmx7'] + "'" + '\n')
     config_file.write('\t' + 'option main_ipv4_address ' + "'" + res['addr'] + '/24' + "'")
-
     config_file.close()
+    subprocess.call('lime-config', shell=True)
+    time.sleep(2)
+    subprocess.call('reboot', shell=True)
 
 
 def get_mesh_interface():
@@ -148,7 +146,7 @@ def create_config_ubuntu(response):
     address = res['addr']
     prefix = address.split('.')[:-1]
     prefix = '.'.join(prefix)
-    mesh_interface = get_interfaces()
+    mesh_interface = get_mesh_interface()
     mesh_gateway = prefix + '.2'
     # Create mesh service config
     with open('/usr/local/etc/mesh.conf', 'w') as mesh_config:
@@ -177,23 +175,15 @@ def create_config_ubuntu(response):
     subprocess.call(command_hostname_host, shell=True)
     # Ensure our nameserver persists as 8.8.8.8
     subprocess.call('sudo cp ../conf/resolved.conf /etc/systemd/resolved.conf', shell=True)
-
-def final_settings_ubuntu():
-    # this setting assume that mesh-ibss.sh and mesh-gw.sh
+    # Final settings
     subprocess.call('sudo nmcli networking off', shell=True)
     subprocess.call('sudo systemctl stop network-manager.service', shell=True)
     subprocess.call('sudo systemctl disable network-manager.service', shell=True)
     subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
     subprocess.call('sudo cp ../../common/scripts/mesh-ibss.sh /usr/local/bin/.', shell=True)
     subprocess.call('sudo chmod 744 /usr/local/bin/mesh-ibss.sh', shell=True)
-    subprocess.call('sudo chmod 664 /etc/systemd/system/mesh.service', shell=True)
-    subprocess.call('sudo systemctl enable mesh.service', shell=True)
-    time.sleep(2)
-    subprocess.call('reboot', shell=True)
-
-
-def final_settings_openwrt():
-    subprocess.call('lime-config', shell=True)
+    subprocess.call('sudo chmod 664 /etc/systemd/system/mesh@' + mesh_interface + '.service', shell=True)
+    subprocess.call('sudo systemctl enable mesh@' + mesh_interface + '.service', shell=True)
     time.sleep(2)
     subprocess.call('reboot', shell=True)
 
@@ -204,7 +194,5 @@ if __name__ == "__main__":
     res = decrypt_reponse()
     if os == 'Ubuntu':
         create_config_ubuntu(res)
-        final_settings_ubuntu()
     if os == 'openwrt':
         create_config_openwrt(res)
-        final_settings_openwrt()
