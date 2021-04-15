@@ -111,8 +111,10 @@ function client {
   make mesh_tb_client
   popd
   # Connect to the same AP as the server
-  echo "> We need to be connect to the same network as the server to get the certificate and setup a gateway (if first node)."
-  ap_connect
+  read -p "> We MUST be on the same network as the Server. Connect to AP? (Y/N): " confirm
+  if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
+    ap_connect
+  fi
   echo -n '> Looking for authentication server...'
   # Get server IPv4 and hostname
   # TODO: If we can't find the sercer we should exit
