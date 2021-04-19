@@ -65,7 +65,7 @@ network={
 EOF
 
       echo "Killing wpa_supplicant..."
-      # FIXME: If there is another wifi module being used as an AP for a GW,
+      # FIXME: If there is another Wi-Fi module being used as an AP for a GW,
       # this kills that process. We need a better way of handling this. For now
       # we can just not kill wpa_supplicant when we are loading the mesh_com_tb
       # module.
@@ -107,7 +107,13 @@ EOF
       (batadv-vis -i bat0 -s)&
       echo "started batadv-vis"
 
-      wpa_supplicant -i $wifidev -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
+      # FIXME: Like the comment above - we need to figure out how to handle
+      # multiple Wi-Fi interfaces better.
+      if [[ -z "${10}" ]]; then
+        wpa_supplicant -i $wifidev -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/
+      else
+        wpa_supplicant -i $wifidev -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
+      fi
       ;;
 
 ap)
