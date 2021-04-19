@@ -1,8 +1,6 @@
 #!/bin/bash
 
 # Check if command(s) exists and fail otherwise.
-# N.B. This doesn't work for packages that are run with a different name to
-#      the install package. E.g. "python3-pip" is called as "pip3"
 function command_exists {
   for cmd in $1; do
     echo -n "> Checking $cmd installed... "
@@ -31,7 +29,7 @@ function menu_from_array()
   done
 }
 
-# TODO: Do for more than one interface.
+# TODO: This isn't used. Might be useful in future? It can gather dust here.
 function rename_interfaces {
 inf_arr=($(ip -o link | awk '$2 ~ "wl" && $2 !~ "wlan"  {print substr($2, 1, length($2)-1) "," $(NF-2)}'))
 COUNTER=2
@@ -51,11 +49,12 @@ ip link set wlan$COUNTER up
 done
 }
 
+# TODO: This is the same function as the one in configure.sh - remove one.
 function ap_connect {
 echo '> Connecting to Access Point...'
 read -p "- SSID: " ssid
 read -p "- Password: " password
-cat <<EOF > access_point.conf
+cat <<EOF > tools/wpa_tools/access_point.conf
 network={
   ssid="$ssid"
   psk="$password"
@@ -64,22 +63,18 @@ EOF
 echo '> Please choose from the list of available interfaces...'
 interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
 menu_from_array "${interfaces_arr[@]}"
-sudo wpa_supplicant -B -i $choice -c access_point.conf
+sudo wpa_supplicant -B -i $choice -c tools/wpa_tools/access_point.conf
 sudo dhclient -v $choice
 }
 
 #-----------------------------------------------------------------------------#
-echo '== MESH-USER-DELOY INSTALL =='
-# Rename interfaces
-read -p "> Do you want to incrementally name your wlan interfaces? (Y/N): " confirm
-if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
-  rename_interfaces
-fi
+# Main Script
+#-----------------------------------------------------------------------------#
 echo '> Allow ssh and turn on netmanager so we can connect to this node...'
 sudo ufw allow ssh
 sudo nmcli networking on
 # Connect to AP
-read -p "> We need to be connect to the same network as the server... Connect to an Access Point? (Y/N): " confirm
+read -p "> We MUST be on the same network as the Server. Connect to AP? (Y/N): " confirm
 if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
   ap_connect
 fi
@@ -90,7 +85,11 @@ command_exists "git make python3-pip batctl ssh clang libssl-dev net-tools \
                 bmon isc-dhcp-server alfred batctl resolvconf"
 # Clone this repo
 echo "> Cloning..."
-git clone -b repo_mege/michael https://github.com/tiiuae/mesh_com.git
+git clone https://github.com/tiiuae/mesh_com.git
+if [ $? -ne 0 ]; then
+    echo "ERROR: Couldn't clone the git repo! Exiting.."
+    exit 0
+fi
 echo "> Init submodules..."
 cd mesh_com
 git submodule update --init --recursive
