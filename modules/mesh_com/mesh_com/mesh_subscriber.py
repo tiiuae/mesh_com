@@ -59,7 +59,9 @@ class MeshSubscriber(Node):
         # }
 
         try:
+            self.get_logger().info('Before JSON loads')
             parameters = json.loads(msg)
+            self.get_logger().info('After JSON loads')
             self.settings.ssid = parameters["ssid"]
             self.settings.key = parameters["key"]
             self.settings.ap_mac = parameters["ap_mac"]
@@ -70,6 +72,7 @@ class MeshSubscriber(Node):
             self.settings.tx_power = parameters["tx_power"]
             self.settings.mode = parameters["mode"]
             # self.settings.enc = parameters["enc"]
+            self.get_logger().info('Enter __change_configuration()')
             self.__change_configuration()
         except json.decoder.JSONDecodeError or KeyError or Exception:
             self.get_logger().info('Setting Failed')
