@@ -8,6 +8,7 @@ import time
 import netifaces
 import requests
 from termcolor import colored
+from pathlib import Path
 
 # Construct the argument parser
 ap = argparse.ArgumentParser()
@@ -96,8 +97,8 @@ def get_mesh_interface():
 def ubuntu_gw(ap_inf):
     print('> Configuring Ubuntu gateway node...')
     # Create Gateway Service
-    subprocess.call('sudo cp ../../common/scripts/mesh-gw.sh /usr/bin/.', shell=True)
-    subprocess.call('sudo chmod 744 /usr/bin/mesh-gw.sh', shell=True)
+    subprocess.call('sudo cp ../../common/scripts/mesh-gw.sh /usr/local/bin/.', shell=True)
+    subprocess.call('sudo chmod 744 /usr/local/bin/mesh-gw.sh', shell=True)
     subprocess.call('sudo cp services/gw@.service /etc/systemd/system/.', shell=True)
     subprocess.call('sudo chmod 644 /etc/systemd/system/gw@.service', shell=True)
     subprocess.call('sudo systemctl enable gw@' + str(ap_inf) + '.service', shell=True)
@@ -119,21 +120,22 @@ def ubuntu_gw(ap_inf):
 def ubuntu_node(gateway):
     print('> Configuring Ubuntu mesh node...')
     # Add gateway to mesh conf
-    with open('/etc/mesh_com/mesh.conf', 'w') as mesh_config:
+    with open('/etc/mesh_com/mesh.conf', 'a+') as mesh_config:
         mesh_config.write('GW=' + gateway + '\n')
     subprocess.call('route add default gw ' + gateway + ' bat0', shell=True)
     # Create default route service
-    subprocess.call('sudo cp ../../common/scripts/mesh-default.sh /usr/bin/.', shell=True)
+    subprocess.call('sudo cp ../../common/scripts/mesh-default.sh /usr/local/bin/.', shell=True)
     subprocess.call('sudo chmod 744 /usr/local/bin/mesh-default.sh', shell=True)
-    subprocess.call('sudo cp services/default.service /etc/systemd/system/.', shell=True)
-    subprocess.call('sudo chmod 644 /etc/systemd/system/default.service', shell=True)
-    subprocess.call('sudo systemctl enable default.service', shell=True)
+    subprocess.call('sudo cp services/default@.service /etc/systemd/system/.', shell=True)
+    subprocess.call('sudo chmod 644 /etc/systemd/system/default@.service', shell=True)
+    subprocess.call('sudo systemctl enable default@' + gateway + '.service', shell=True)
 
 def create_config_ubuntu(response):
     res = json.loads(response)
     print('Interfaces: ' + str(res))
     address = res['addr']
     # Create mesh service config
+    Path("/etc/mesh_com").mkdir(parents=True, exist_ok=True)
     with open('/etc/mesh_com/mesh.conf', 'w') as mesh_config:
         mesh_config.write('MODE=mesh\n')
         mesh_config.write('IP=' + address + '\n')
