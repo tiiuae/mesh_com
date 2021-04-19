@@ -1,0 +1,10 @@
+[Unit]
+Description= IP Route Default Service
+
+[Service]
+Type=idle
+EnvironmentFile=/etc/mesh_com/mesh.conf
+ExecStart=/usr/local/bin/mesh-mesh-default.sh $GW
+
+[Install]
+WantedBy=multi-user.target

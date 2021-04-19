@@ -5,7 +5,7 @@ Before=network.target
 
 [Service]
 Type=idle
-EnvironmentFile=/usr/local/etc/mesh.conf
+EnvironmentFile=/etc/mesh_com/mesh.conf
 ExecStart=/usr/local/bin/mesh-ibss.sh $MODE $IP $MASK $MAC $KEY $ESSID $FREQ $TXPOWER $COUNTRY %i $PHY
 Restart=always
 
