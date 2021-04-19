@@ -108,7 +108,10 @@ EOF
       echo "started batadv-vis"
 
       # FIXME: Like the comment above - we need to figure out how to handle
-      # multiple Wi-Fi interfaces better.
+      # multiple Wi-Fi interfaces better. For some reason the background setting
+      # ensures wpa_supplicant doesn't start when this script is run as a process.
+      # This is likely due to the interface not being up in time, and will
+      # require some fiddling with the systemd startup order.
       if [[ -z "${10}" ]]; then
         wpa_supplicant -i $wifidev -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/
       else
