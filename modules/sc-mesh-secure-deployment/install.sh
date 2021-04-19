@@ -54,7 +54,7 @@ function ap_connect {
 echo '> Connecting to Access Point...'
 read -p "- SSID: " ssid
 read -p "- Password: " password
-cat <<EOF > tools/wpa_tools/access_point.conf
+cat <<EOF > access_point.conf
 network={
   ssid="$ssid"
   psk="$password"
@@ -63,7 +63,7 @@ EOF
 echo '> Please choose from the list of available interfaces...'
 interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
 menu_from_array "${interfaces_arr[@]}"
-sudo wpa_supplicant -B -i $choice -c tools/wpa_tools/access_point.conf
+sudo wpa_supplicant -B -i $choice -c access_point.conf
 sudo dhclient -v $choice
 }
 
