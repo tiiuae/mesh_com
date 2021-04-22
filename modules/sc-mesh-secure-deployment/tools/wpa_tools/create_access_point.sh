@@ -26,7 +26,7 @@ sudo nmcli network off
 
 
 #add to wpa_supplicant.conf
-wpa_supplicant -B -i "$1" -c access-point.conf &
+wpa_supplicant -B -i "$1" -c access_point.conf &
 
 echo 'INTERFACES='"$INTERFACE" >> /etc/default/isc-dhcp-server
 cat <<EOF > /etc/dhcp/dhcpd.conf

@@ -51,10 +51,10 @@ read -p "- Password: " password
 read -p "- 1st IP Field (e.g. 60 for AP 6): " ip
 cat <<EOF > tools/wpa_tools/access_point.conf
   network={
-    ssid="$1"
+    ssid="$ssid"
     mode=2
     key_mgmt=WPA-PSK
-    psk="$2"
+    psk="$password"
     frequency=2437
 }
 EOF
