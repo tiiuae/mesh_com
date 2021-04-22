@@ -107,12 +107,7 @@ def ubuntu_gw(ap_inf):
     subprocess.call(copy, shell=True)
     subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf', shell=True)
     subprocess.call('sudo systemctl enable wpa_supplicant@' + str(ap_inf) + '.service', shell=True)
-    # Forward traffic from wlx to bat0 and vice versa
-    subprocess.call('sudo sysctl -w net.ipv4.ip_forward=1', shell=True)
-    subprocess.call('sudo iptables -t nat -A POSTROUTING -o ' + str(ap_inf) + ' -j MASQUERADE', shell=True)
-    subprocess.call('sudo iptables -A FORWARD -i ' + str(ap_inf) + ' -o bat0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT', shell=True)
-    subprocess.call('sudo iptables -A FORWARD -i bat0 -o ' + str(ap_inf) + ' -j ACCEPT', shell=True)
-
+    
 def ubuntu_node(gateway):
     print('> Configuring Ubuntu mesh node...')
     # Add gateway to mesh conf
