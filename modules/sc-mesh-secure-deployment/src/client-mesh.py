@@ -120,8 +120,8 @@ def ubuntu_node(gateway):
         mesh_config.write('GW=' + gateway + '\n')
     subprocess.call('route add default gw ' + gateway + ' bat0', shell=True)
     # Create default route service
-    subprocess.call('sudo cp ../../common/scripts/mesh-default.sh /usr/local/bin/.', shell=True)
-    subprocess.call('sudo chmod 744 /usr/local/bin/mesh-default.sh', shell=True)
+    subprocess.call('sudo cp ../../common/scripts/mesh-default-gw.sh /usr/local/bin/.', shell=True)
+    subprocess.call('sudo chmod 744 /usr/local/bin/mesh-default-gw.sh', shell=True)
     subprocess.call('sudo cp services/default@.service /etc/systemd/system/.', shell=True)
     subprocess.call('sudo chmod 644 /etc/systemd/system/default@.service', shell=True)
     subprocess.call('sudo systemctl enable default@' + gateway + '.service', shell=True)
