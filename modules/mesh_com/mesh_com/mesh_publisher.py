@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import QoSPresetProfiles
+
 from std_msgs.msg import String
 import subprocess
 
@@ -31,7 +32,7 @@ class MeshPublisher(Node):
 
     def __init__(self):
         super().__init__('mesh_publisher')
-        self.publisher_ = self.create_publisher(String, 'mesh_visual', qos_profile_sensor_data)
+        self.publisher_ = self.create_publisher(String, 'mesh_visual', QoSPresetProfiles.SYSTEM_DEFAULT.value)
         timer_period = 10  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.batman = BatmanVisualisation()
