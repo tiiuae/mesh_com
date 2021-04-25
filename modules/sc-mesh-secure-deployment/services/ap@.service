@@ -1,0 +1,10 @@
+[Unit]
+Description= Mesh Access Point Service
+
+[Service]
+Type=idle
+EnvironmentFile=/etc/mesh_com/ap.conf
+ExecStart=/usr/local/bin/mesh-ap.sh $AP_INF %I
+
+[Install]
+WantedBy=multi-user.target
