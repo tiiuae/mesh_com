@@ -19,7 +19,7 @@ ap.add_argument("-c", "--certificate", required=True)
 args = ap.parse_args()
 
 URL = args.server
-print(URL)
+print('> Conncting to server: ' + str(URL))
 
 def get_os():
     proc = subprocess.Popen(['lsb_release', '-a'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -39,7 +39,7 @@ def get_data(cert_file, os):
         print(colored('Not Valid Certificate', 'red'))
         exit()
     else:
-        print('Encrypted Message: ' + str(response.content))
+        print('> Received encrypted message: ' + str(response.content))
         with open('payload.enc', 'wb') as file:
             file.write(response.content)
 
@@ -51,7 +51,7 @@ def decrypt_reponse():  # assuming that data is on a file called payload.enc gen
     new_list = aux_list[40:64]
     joined_list = ''.join(new_list)
     output_dict = joined_list.replace("\'", '"')
-    print('Decrypted Message: ', output_dict)  # res =  json.loads(output_dict)
+    print('> Decrypted Message: ', output_dict)  # res =  json.loads(output_dict)
     return output_dict
 
 
@@ -107,7 +107,7 @@ def ubuntu_gw(ap_inf):
     subprocess.call(copy, shell=True)
     subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf', shell=True)
     subprocess.call('sudo systemctl enable wpa_supplicant@' + str(ap_inf) + '.service', shell=True)
-    
+
 def ubuntu_node(gateway):
     print('> Configuring Ubuntu mesh node...')
     # Add gateway to mesh conf
@@ -123,7 +123,7 @@ def ubuntu_node(gateway):
 
 def create_config_ubuntu(response):
     res = json.loads(response)
-    print('Interfaces: ' + str(res))
+    print('> Interfaces: ' + str(res))
     address = res['addr']
     # Create mesh service config
     Path("/etc/mesh_com").mkdir(parents=True, exist_ok=True)

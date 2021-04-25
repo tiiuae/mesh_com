@@ -55,12 +55,13 @@ def add_message(uuid):
     receivedKey = key.read()
     localCert = open(SERVER_CERT, 'rb')
     ip_address = request.remote_addr
-    print("Requester IP: " + ip_address)
+    print("> Requester IP: " + ip_address)
     mac = get_mac_address(ip=ip_address)
     if localCert.read() == receivedKey:  # validating certificate. Comparing the local with the received
-        print(colored('Valid Certificate', 'green'))
+        print(colored('> Valid Certificate', 'green'))
         ip_mesh = verify_addr(mac)
-        print('ip_mesh - ' + str(ip_mesh))
+        print('> Assigned IP: ', end='')
+        print(ip_mesh)
         aux = aux_ubuntu if uuid == 'Ubuntu' else aux_openwrt
         if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
             aux['gateway'] = True
@@ -69,14 +70,15 @@ def add_message(uuid):
             aux['gateway'] = False
         aux['addr'] = ip_mesh
         SECRET_MESSAGE = json.dumps(aux)
+        print('> Unencrypted message: ', end='')
         print(SECRET_MESSAGE)
-        proc = subprocess.Popen(['src/ecies_encrypt', SERVER_CERT, SECRET_MESSAGE], stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
-        file = pathlib.Path("payload.enc")
-        if not file.exists():
-            pathlib.Path('payload.enc').touch()
+        # use .call() to block and avoid race condition with open()
+        proc = subprocess.call(['src/ecies_encrypt',
+            SERVER_CERT, SECRET_MESSAGE],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         enc = open('payload.enc', 'rb')
         encrypt_all = enc.read()
+        print('> Sending encrypted message: ', end='')
         print(encrypt_all)
         return encrypt_all
     else:
@@ -105,7 +107,7 @@ def verify_addr(mac):
         ADDRESSES[mac] = ip_mesh
     else:
         ip_mesh = ADDRESSES[mac]
-    print('Assigned IP_Mesh: ' + ip_mesh)
+    print('> ALL Addresses: ', end='')
     print(ADDRESSES)
     return ip_mesh
 
