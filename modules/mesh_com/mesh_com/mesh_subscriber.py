@@ -1,5 +1,6 @@
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSPresetProfiles
 
 from std_msgs.msg import String
 
@@ -29,7 +30,7 @@ class MeshSubscriber(Node):
             String,
             'mesh_parameters',
             self.listener_callback,
-            10)
+            QoSPresetProfiles.SYSTEM_DEFAULT.value)
         self.subscription  # prevent unused variable warning
         self.settings = self.MeshSettings()
 
