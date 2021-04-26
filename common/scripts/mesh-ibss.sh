@@ -3,31 +3,44 @@
 function help
 {
     echo
-    echo "Usage: sudo ./mesh_ibss.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country>"
-    echo
+    echo "Usage: sudo ./mesh-ibss.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface> <phyname>"
     echo "Parameters:"
+    echo "	<mode>"
     echo "	<ip>"
+    echo "	<mask>"
     echo "	<AP MAC>"
     echo "	<WEP key>"
     echo "	<essid>"
     echo "	<freq>"
+    echo "	<txpower>"
+    echo "	<country>"
+    echo "	<interface>"
+    echo "	<phyname>"
     echo
     echo "example:"
-    echo "sudo mesh.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi"
+    echo "sudo mesh.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi wlan1 phy1"
     echo "sudo mesh.sh ap"
     exit
 }
 
-echo "Solving wifi device name.."
-wifidev=$(iw dev | awk '$1=="Interface"{print $2}')
-echo "Found: $wifidev"
+# 1      2    3      4        5     6       7      8         9         10
+# <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface>
 
-# 1      2    3      4        5     6       7      8         9
-# <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country>
+echo "Solving wifi device name.."
+if [[ -z "${10}" ]]; then
+  wifidev=$(iw dev | awk '$1=="Interface"{print $2}')
+  phyname=phy0
+else
+  wifidev=${10}
+  phyname=${11}
+fi
+echo "Found: $wifidev"
 
 case "$1" in
 
 mesh)
+
+echo "sudo mesh $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11}"
       if [[ -z "$1" || -z "$2" || -z "$3" || -z "$4" || -z "$5" || -z "$6" ]]
         then
           echo "check argumets..."
@@ -53,7 +66,13 @@ network={
 EOF
 
       echo "Killing wpa_supplicant..."
-      killall wpa_supplicant 2>/dev/null
+      # FIXME: If there is another Wi-Fi module being used as an AP for a GW,
+      # this kills that process. We need a better way of handling this. For now
+      # we can just not kill wpa_supplicant when we are loading the mesh_com_tb
+      # module.
+      if [[ -z "${10}" ]]; then
+        killall wpa_supplicant 2>/dev/null
+      fi
       killall alfred 2>/dev/null
       killall batadv-vis 2>/dev/null
       rm -f /var/run/alfred.sock
@@ -65,7 +84,7 @@ EOF
 
       echo "$wifidev down.."
       iw dev $wifidev del
-      iw phy phy0 interface add $wifidev type ibss
+      iw phy $phyname interface add $wifidev type ibss
 
       echo "$wifidev create adhoc.."
       ifconfig $wifidev mtu 1560
@@ -89,7 +108,16 @@ EOF
       (batadv-vis -i bat0 -s)&
       echo "started batadv-vis"
 
-      wpa_supplicant -i $wifidev -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
+      # FIXME: Like the comment above - we need to figure out how to handle
+      # multiple Wi-Fi interfaces better. For some reason the background setting
+      # ensures wpa_supplicant doesn't start when this script is run as a process.
+      # This is likely due to the interface not being up in time, and will
+      # require some fiddling with the systemd startup order.
+      if [[ -z "${10}" ]]; then
+        wpa_supplicant -i $wifidev -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
+      else
+        wpa_supplicant -i $wifidev -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/
+      fi
       ;;
 
 ap)
