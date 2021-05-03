@@ -103,18 +103,14 @@ def ubuntu_gw(ap_inf):
     subprocess.call('sudo chmod 644 /etc/systemd/system/gw@.service', shell=True)
     subprocess.call('sudo systemctl enable gw@' + str(ap_inf) + '.service', shell=True)
     # Auto connect wlx to AP at boot using wpa_supplicant
-    copy = 'sudo cp tools/wpa_tools/access_point.conf /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf'
-    subprocess.call(copy, shell=True)
+    subprocess.call('sudo cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf', shell=True)
     subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf', shell=True)
     subprocess.call('sudo systemctl enable wpa_supplicant@' + str(ap_inf) + '.service', shell=True)
 
 def ubuntu_node(gateway):
     print('> Configuring Ubuntu mesh node...')
-    # Add gateway to mesh conf
-    with open('/etc/mesh_com/mesh.conf', 'a+') as mesh_config:
-        mesh_config.write('GW=' + gateway + '\n')
-    subprocess.call('route add default gw ' + gateway + ' bat0', shell=True)
     # Create default route service
+    subprocess.call('route add default gw ' + gateway + ' bat0', shell=True)  # FIXME: Is this line necessary?
     subprocess.call('sudo cp ../../common/scripts/mesh-default-gw.sh /usr/local/bin/.', shell=True)
     subprocess.call('sudo chmod 744 /usr/local/bin/mesh-default-gw.sh', shell=True)
     subprocess.call('sudo cp services/default@.service /etc/systemd/system/.', shell=True)

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# TODO: We should do the bash n bash and the python in python as much
+#       as possible
+
 function help {
 echo " ./configure.sh"
 echo "     -s               configure as server"
@@ -11,6 +14,24 @@ exit 1
 }
 
 #-----------------------------------------------------------------------------#
+
+# Check if command(s) exists and fail otherwise.
+function command_exists {
+  for cmd in $1; do
+    echo -n "> Checking $cmd installed... "
+    INSTALLED=($(apt -qq list $cmd 2>/dev/null | awk -F[ '{print $2}'))
+    if $INSTALLED &> /dev/null; then
+      echo "FALSE"
+      echo "> Installing..."
+      sudo apt-get install -y -qq $cmd --no-install-recommends
+      echo ""
+    else
+      echo "TRUE"
+    fi
+  done
+}
+
+
 function menu_from_array()
 {
   select choice; do
@@ -24,11 +45,13 @@ function menu_from_array()
   done
 }
 
+
+#-----------------------------------------------------------------------------#
 function ap_connect {
 echo '> Connecting to Access Point...'
 read -p "- SSID: " ssid
 read -p "- Password: " password
-cat <<EOF > tools/wpa_tools/access_point.conf
+cat <<EOF > tools/wpa_tools/wpa_supplicant_client_AP.conf
 network={
   ssid="$ssid"
   psk="$password"
@@ -37,19 +60,20 @@ EOF
 echo '> Please choose from the list of available interfaces...'
 interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
 menu_from_array "${interfaces_arr[@]}"
-sudo wpa_supplicant -B -i $choice -c tools/wpa_tools/access_point.conf
+sudo wpa_supplicant -B -i $choice -c tools/wpa_tools/wpa_supplicant_client_AP.conf
 sudo dhclient -v $choice
 }
 
 function ap_create {
-echo '> Creating a Mesh Access Point...'
+echo '> Creating an Access Point...'
+command_exists 'isc-dhcp-server net-tools'
 echo '> Please choose from the list of available interfaces...'
 interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
 menu_from_array "${interfaces_arr[@]}"
 read -p "- SSID: " ssid
 read -p "- Password: " password
-read -p "- 1st IP Field (e.g. 60 for AP 6): " ip
-cat <<EOF > tools/wpa_tools/access_point.conf
+read -p "- Custom IP (e.g. XX.0.0.1): " ip
+cat <<EOF > conf/ap.conf
   network={
     ssid="$ssid"
     mode=2
@@ -58,44 +82,59 @@ cat <<EOF > tools/wpa_tools/access_point.conf
     frequency=2437
 }
 EOF
-cd tools/wpa_tools
-chmod +x create_access_point.sh
-sudo bash create_access_point.sh $choice $ip
-cd ../..
+# FIXME: Each time you echo this it's gonna add to the end of the files and
+#        create duplicate lines
+echo "INTERFACES=$1" >> /etc/default/isc-dhcp-server
+if [ ! -d "/path/to/dir" ]; then
+  sudo mkdir /etc/mesh_com
+fi
+echo "AP_INF=$choice\n" >> /etc/mesh_com/ap.conf
+# Create Gateway Service
+sudo cp ../../common/scripts/mesh-ap.sh /usr/local/bin/.
+sudo chmod 744 /usr/local/bin/mesh-ap.sh
+sudo cp services/ap@.service /etc/systemd/system/.
+sudo chmod 644 /etc/systemd/system/ap@.service
+sudo systemctl enable ap@$ip.service
+# Setup wlx at boot using wpa_supplicant
+sudo cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+sudo chmod 600 /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+sudo systemctl enable wpa_supplicant@$choice.service
+sleep 2
+reboot
 }
 
-function access_point {
+function ap_remove {
+  echo '> Remove an Access Point...'
+  echo '> Please choose from the list of available interfaces...'
+  interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
+  menu_from_array "${interfaces_arr[@]}"
+  sudo rm /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+  sudo rm /usr/local/bin/mesh-ap.sh
+  sudo rm /etc/systemd/system/ap@.service
+  sudo rm /etc/mesh_com/ap.conf
+  reboot
+}
+
+function ap_menu {
   echo '> Do you wish to...'
-  ap_arr=('Connect to an Access Point?' 'Create an Access Point?')
+  ap_arr=('Connect to an Access Point?' 'Create an Access Point?' 'Remove an Access Point?')
   menu_from_array "${ap_arr[@]}"
   if [ $REPLY == "1" ]; then
     ap_connect
   elif [[ $REPLY == "2" ]]; then
     ap_create
-  fi
-}
-
-function avahi_fetch_certificate {
-  echo '> Fetching certificate from server...'
-  read -p "- Server Username: " server_user
-  # pull the key from the server
-  scp $server_user@${1}:/home/${server_user}/mesh_com/modules/sc-mesh-secure-deployment/src/ecc_key.der src/ecc_key.der
-  if [ $? -ne 0 ]; then
-      echo "ERROR: Couldn't get certificate from server. Are you running the server from '/home/\$USER/mesh_com/..'?"
-      exit 0
+  elif [[ $REPLY == "3" ]]; then
+    ap_remove
   fi
 }
 
 
-#-----------------------------------------------------------------------------#
-# Main client/Server configuration functions
-#-----------------------------------------------------------------------------#
 function server {
-  echo '> Configuring the mesh_tb server...'
-  Make the server
+  echo '> Configuring the server...'
   pushd .
   cd ../..
-  make mesh_tb_server
+  # Make the server
+  make server
   popd
   # Advertise the server using avahi (zeroconf)
   avahi-publish-service mesh_server _http._tcp 5000 &
@@ -105,19 +144,18 @@ function server {
 
 function client {
   echo '> Configuring the client...'
-  # Make the client
+  # Make the server
   pushd .
   cd ../..
-  make mesh_tb_client
+  make client
   popd
   # Connect to the same AP as the server
-  read -p "> We MUST be on the same network as the Server. Connect to AP? (Y/N): " confirm
+  read -p "> We need to be connect to the same network as the server... Connect to an Access Point? (Y/N): " confirm
   if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
     ap_connect
   fi
-  echo -n '> Looking for authentication server...'
-  # Get server IPv4 and hostname
-  # TODO: If we can't find the sercer we should exit
+  echo -n '> Server discovery...'
+  # get server IPv4 and hostname
   while ! [ "$server_details" ] ; do
     server_details=$(timeout 7 avahi-browse -rptf _http._tcp | awk -F';' '$1 == "=" && $3 == "IPv4" && $4 == "mesh_server" {print $8 " " $7}')
   done
@@ -126,15 +164,23 @@ function client {
   server_ip=${server_details[0]}
   server_host=${server_details[1]}
   echo "> We will use src/ecc_key.der if it already exists, or we can try and fetch it..."
-  read -p "> Do you want to fetch the certificate from the server? (Y/N): " confirm
+  read -p "> Do you want to fetch the certificate from the server $server_host@$server_ip? (Y/N): " confirm
   if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
-    avahi_fetch_certificate $server_ip
+    echo '> Fetching certificate from server...'
+    read -p "- Server Username: " server_user
+    # pull the key from the server
+    scp $server_user@$server_ip:/home/$server_user/mesh_com/modules/sc-mesh-secure-deployment/src/ecc_key.der src/ecc_key.der
   fi
+
   echo '> Configuring the client and connecting to server...'
   sudo python3 src/client-mesh.py -c src/ecc_key.der -s http://$server_ip:5000
 }
 
+
+
 #-----------------------------------------------------------------------------#
+echo '=== sc-mesh-secure-deployment-configure ==='
+
 PARAMS=""
 while (( "$#" )); do
   case "$1" in
@@ -144,10 +190,11 @@ while (( "$#" )); do
       ;;
     -c)
       client
+      NOAP=1
       shift
       ;;
     -ap)
-      access_point
+      ap_menu
       shift
       ;;
     --help)
