@@ -51,7 +51,7 @@ function ap_connect {
 echo '> Connecting to Access Point...'
 read -p "- SSID: " ssid
 read -p "- Password: " password
-cat <<EOF > tools/wpa_tools/wpa_supplicant_client_AP.conf
+cat <<EOF > conf/ap.conf
 network={
   ssid="$ssid"
   psk="$password"
@@ -60,7 +60,7 @@ EOF
 echo '> Please choose from the list of available interfaces...'
 interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
 menu_from_array "${interfaces_arr[@]}"
-sudo wpa_supplicant -B -i $choice -c tools/wpa_tools/wpa_supplicant_client_AP.conf
+sudo wpa_supplicant -B -i $choice -c conf/ap.conf
 sudo dhclient -v $choice
 }
 
@@ -134,7 +134,7 @@ function server {
   pushd .
   cd ../..
   # Make the server
-  make server
+  make mesh_tb_server
   popd
   # Advertise the server using avahi (zeroconf)
   avahi-publish-service mesh_server _http._tcp 5000 &
@@ -142,12 +142,13 @@ function server {
   sudo python3 src/server-mesh.py -c src/ecc_key.der
 }
 
+
 function client {
   echo '> Configuring the client...'
   # Make the server
   pushd .
   cd ../..
-  make client
+  make mesh_tb_client
   popd
   # Connect to the same AP as the server
   read -p "> We need to be connect to the same network as the server... Connect to an Access Point? (Y/N): " confirm
@@ -175,7 +176,6 @@ function client {
   echo '> Configuring the client and connecting to server...'
   sudo python3 src/client-mesh.py -c src/ecc_key.der -s http://$server_ip:5000
 }
-
 
 
 #-----------------------------------------------------------------------------#
