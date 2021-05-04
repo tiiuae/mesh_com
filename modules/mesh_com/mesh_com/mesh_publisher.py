@@ -32,7 +32,8 @@ class MeshPublisher(Node):
 
     def __init__(self):
         super().__init__('mesh_publisher')
-        self.publisher_ = self.create_publisher(String, 'mesh_visual', QoSPresetProfiles.SYSTEM_DEFAULT.value)
+        self.publisher_ = self.create_publisher(String, 'mesh_visual',
+                                                QoSPresetProfiles.SYSTEM_DEFAULT.value)
         timer_period = 10  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.batman = BatmanVisualisation()

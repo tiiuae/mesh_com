@@ -25,6 +25,7 @@ setup(
         'console_scripts': [
         'mesh_subscriber = mesh_com.mesh_subscriber:main',
         'mesh_publisher = mesh_com.mesh_publisher:main',
+        'mesh_executor = mesh_executor:main',
         ],
     },
 )
