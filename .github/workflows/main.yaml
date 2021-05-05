@@ -50,6 +50,7 @@ jobs:
           DISTRIBUTION: focal
           COMPONENT: fog-sw
           ARCHITECTURE: amd64
+          BUILD_NAME: mesh-com
           CI: true
         if: github.event_name == 'push'
         run: |
@@ -59,5 +60,11 @@ jobs:
           pkg=$(find bin -name 'ros-foxy-mesh-com*.deb')
           jfrog rt u --deb "$DISTRIBUTION/$COMPONENT/$ARCHITECTURE" \
                      --target-props COMMIT="$GITHUB_SHA" \
+                     --build-name "$BUILD_NAME" \
+                     --build-number "$GITHUB_SHA" \
                      "$pkg" \
                      "$ARTIFACTORY_REPO"
+          jfrog rt build-publish "$BUILD_NAME" "$GITHUB_SHA"
+          jfrog rt bpr "$BUILD_NAME" "$GITHUB_SHA" "$ARTIFACTORY_REPO" \
+                       --status dev \
+                       --comment "development build"
