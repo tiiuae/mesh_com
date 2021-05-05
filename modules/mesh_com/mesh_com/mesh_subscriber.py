@@ -18,7 +18,6 @@ class MeshSubscriber(Node):
         self.HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
         self.PORT = 33221  # Port to listen on (non-privileged ports are > 1023)
         self.mesh_socket = 0
-
         self.backup_timer = 0
         self.backup_data = 0
 
@@ -33,6 +32,7 @@ class MeshSubscriber(Node):
         try:
             self.get_logger().info('mesh subscriber: "%s"' % msg.data)
             if msg.data:
+                self.destroy_timer(self.backup_timer)  # resend fresh data only
                 self.setup_socket()
                 self.mesh_socket.sendall(str.encode(msg.data))
                 self.mesh_socket.close()
@@ -43,7 +43,7 @@ class MeshSubscriber(Node):
 
     def backup_caller(self):
         try:
-            self.backup_timer.destroy_timer()
+            self.destroy_timer(self.backup_timer)
             self.get_logger().info('backup_caller: "%s"' % self.backup_data)
             self.setup_socket()
             self.mesh_socket.sendall(str.encode(self.backup_data))

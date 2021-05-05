@@ -96,6 +96,10 @@ class MeshNetwork:
             sleep(1)
 
 
-if __name__ == '__main__':
+def main():
     mesh_network = MeshNetwork()
     mesh_network.run()
+
+if __name__ == '__main__':
+    main()
+
