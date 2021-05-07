@@ -22,7 +22,7 @@ Once you have done this, startup your host machine and run install.sh.
 
 ```bash
 cd ~
-sudo ./install.sh
+./install.sh
 ```
 
 This script will do the following...
@@ -44,14 +44,17 @@ Using the *configure.sh* script, you can now set up two different configurations
 ```
 
 ### On the Server-Side
+
 Your server will provide the necessary authentication certificates for you mesh network, as well as avahi services to allow clients to autodiscover the authentication server and automatically fetch these certificates. The *configure.sh* script should guide you through the process. The server must be executed on the */home/<username>/sc-mesh-secure-deployment* path. To set your machine up as a server, please run...
 
 ```bash
-./configure.sh -s
+sudo ./configure.sh -s
 ```
 
 ### On the Client Side
 Likewise, the *configure.sh* script should guide you through the process of setting your host up as a mesh client.
+
+*NB: There is a known bug where the server always sends the PREVIOUS request. To get around this run the client configuration twice on each node.*
 
 1. It will automatically try to discover the server through avahi in order to fetch the certificates **(make sure you are connected to the same network as the server during this process!)**.
 2. The **FIRST** node to connect to the server will automatically be set up as the mesh gateway, thus providing the mesh with internet access.
@@ -59,29 +62,27 @@ Likewise, the *configure.sh* script should guide you through the process of sett
 To set your machine up as a client, please run...
 
 ```bash
-./configure.sh -c
+sudo ./configure.sh -c
 ```
 
-Please note that when the configuration is complete **the node will reboot** and automatically connect to the BATMAN-adv L2 network. You now have three options:
+Please note that when the configuration is complete **the node will reboot** and automatically connect to the BATMAN-adv L2 network. You now have two options:
 
 1. Leave the client as a L2 router with BATMAN-adv.
-2. Set a secondary wlan interface as a Wi-Fi Access Point to allow you to connect STA devices to the network.
-3. Set a secondary wlan interface to connect to a Wi-Fi AP and act as gateway.
+2. Set a secondary wlan interface as a Wi-Fi Access Point to allow you to connect STA devices to the network (see below).
 
 ### Setup a Client as an Access Point / Gateway
 
 To set your client up as an access point, the configuration script has an *-ap* option that allows you to either **connect to** or **create** an Access Point. Run the configuration script as follows...
 
-
 ```bash
-./configure.sh -ap
+sudo ./configure.sh -ap
 ```
 
 ### Usage
 On the server open a web browser and type...
 
 ```bash
-http://127.0.0.1:5000
+http://0.0.0.0:5000
 ```
 A web page with the authenticated and no-authenticated nodes should be displayed
 
