@@ -18,7 +18,7 @@ function help
     echo "	<phyname>"
     echo
     echo "example:"
-    echo "sudo mesh.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi wlan1 phy1"
+    echo "sudo ./mesh-ibss.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh 5220 30 fi wlan1 phy1"
     echo "sudo mesh.sh ap"
     exit
 }
@@ -43,7 +43,7 @@ mesh)
 echo "sudo mesh $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11}"
       if [[ -z "$1" || -z "$2" || -z "$3" || -z "$4" || -z "$5" || -z "$6" ]]
         then
-          echo "check argumets..."
+          echo "check arguments..."
         help
       fi
 
@@ -79,24 +79,24 @@ EOF
 
 
       echo "unmanage wifi interface.."
-      nmcli dev set $wifidev managed no
+      nmcli dev set "$wifidev" managed no
       modprobe batman-adv
 
       echo "$wifidev down.."
-      iw dev $wifidev del
-      iw phy $phyname interface add $wifidev type ibss
+      iw dev "$wifidev" del
+      iw phy "$phyname" interface add "$wifidev" type ibss
 
       echo "$wifidev create adhoc.."
-      ifconfig $wifidev mtu 1560
+      ifconfig "$wifidev" mtu 1560
 
       echo "$wifidev up.."
-      ip link set $wifidev up
-      batctl if add $wifidev
+      ip link set "$wifidev" up
+      batctl if add "$wifidev"
 
       echo "bat0 up.."
       ifconfig bat0 up
       echo "bat0 ip address.."
-      ifconfig bat0 $2 netmask $3
+      ifconfig bat0 "$2" netmask "$3"
       echo
       ifconfig bat0
 
@@ -114,9 +114,9 @@ EOF
       # This is likely due to the interface not being up in time, and will
       # require some fiddling with the systemd startup order.
       if [[ -z "${10}" ]]; then
-        wpa_supplicant -i $wifidev -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
+        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
       else
-        wpa_supplicant -i $wifidev -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/
+        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/
       fi
       ;;
 
@@ -127,23 +127,97 @@ ap)
         help
       fi
 
-      # remove all saved wifi networks
-      nmcli --pretty --fields UUID,TYPE con show | grep wifi | cut -b -37 | while read line; do nmcli con delete uuid  $line; done
-
-      nmcli dev set $wifidev managed yes
-      nmcli radio wifi on
-
       # find ap parameters from enclave
       if [ -z "$DRONE_DEVICE_ID" ]
       then
-            echo "DRONE_DEVICE_ID not available"
-            nmcli device wifi hotspot con-name debug-hotspot ssid debug_hotspot band a channel 36 password 1234567890
+        echo "DRONE_DEVICE_ID not available"
+
+cat <<EOF >/var/run/wpa_supplicant-ap.conf
+ctrl_interface=DIR=/var/run/wpa_supplicant
+ap_scan=1
+p2p_disabled=1
+network={
+    ssid="debug-hotspot"
+    mode=2
+    frequency=5220
+    key_mgmt=WPA-PSK
+    psk="1234567890"
+    pairwise=CCMP
+    group=CCMP
+    proto=RSN
+}
+EOF
       else
-            nmcli device wifi hotspot con-name debug-hotspot ssid $DRONE_DEVICE_ID band a channel 36 password 1234567890
+        echo "DRONE_DEVICE_ID available"
+cat <<EOF >/var/run/wpa_supplicant-ap.conf
+ctrl_interface=DIR=/var/run/wpa_supplicant
+ap_scan=1
+p2p_disabled=1
+network={
+    ssid="$DRONE_DEVICE_ID"
+    mode=2
+    frequency=5220
+    key_mgmt=WPA-PSK
+    psk="1234567890"
+    pairwise=CCMP
+    group=CCMP
+    proto=RSN
+}
+EOF
       fi
+           
+      echo "Killing wpa_supplicant..."
+      killall wpa_supplicant 2>/dev/null
+
+      echo "create $wifidev"
+      iw dev "$wifidev" del
+      iw phy phy0 interface add "$wifidev" type managed
+
+      echo "$wifidev up.."
+      ip link set "$wifidev" up
+      batctl if add "$wifidev"
+        
+      echo "set ip address.."
+	    # set AP ipaddr
+	    ifconfig "$wifidev" 192.168.1.1 netmask 255.255.255.0
+
+	    # set bat0 ipaddr
+      if [ -z "$DRONE_DEVICE_ID" ]
+        then 
+          # DRONE_DEVICE_ID not available set default
+          ifconfig bat0 192.168.1.1 netmask 255.255.255.0
+        else
+          declare -i ip=$(echo "$DRONE_DEVICE_ID" | tr -d -c 0-9)
+          ifconfig bat0 192.168.1."$ip" netmask 255.255.255.0
+      fi
+      
+      echo "bat0 up.."
+      ifconfig bat0 up
+      echo 
+      ifconfig bat0 
+      
+      route del -net 192.168.1.0 netmask 255.255.255.0 dev bat0
+      route add -net 192.168.1.0 netmask 255.255.255.0 dev bat0 metric 1
+       
+      #TODO
+      # dhserver
+
+      wpa_supplicant -B -i "$wifidev" -c /var/run/wpa_supplicant-ap.conf -D nl80211 -C /var/run/wpa_supplicant/
 
       ;;
+
+      
+off)  
+      # service off
+      killall wpa_supplicant 2>/dev/null
+      killall alfred 2>/dev/null
+      killall batadv-vis 2>/dev/null
+      rm -f /var/run/alfred.sock 2>/dev/null
+            
+      ;;   
+      
 *)
       help
       ;;
 esac
+

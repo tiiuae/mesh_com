@@ -58,6 +58,11 @@ $ sudo apt install \
 
 ```
 systemd mesh.service:
+- currently up-to-date versions for fogsw are in:
+
+    https://github.com/tiiuae/fogsw_systemd/tree/main/system
+
+- example:
 ```
 [Unit]
 Description="Mesh Service"
