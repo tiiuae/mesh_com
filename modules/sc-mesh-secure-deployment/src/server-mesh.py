@@ -91,6 +91,7 @@ def add_message(uuid):
 def add_default_route(ip_gateway):
     inter = netifaces.interfaces()
     for interf in inter:
+        # TODO: what it if doesn't start with wlan???
         if interf.startswith('wlan'):
             interface = interf
 

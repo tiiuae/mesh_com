@@ -85,10 +85,10 @@ EOF
 # FIXME: Each time you echo this it's gonna add to the end of the files and
 #        create duplicate lines
 echo "INTERFACES=$1" >> /etc/default/isc-dhcp-server
-if [ ! -d "/path/to/dir" ]; then
+if [ ! -d "/etc/mesh_com" ]; then
   sudo mkdir /etc/mesh_com
 fi
-echo "AP_INF=$choice\n" >> /etc/mesh_com/ap.conf
+echo "AP_INF=$choice" >> /etc/mesh_com/ap.conf
 # Create Gateway Service
 sudo cp ../../common/scripts/mesh-ap.sh /usr/local/bin/.
 sudo chmod 744 /usr/local/bin/mesh-ap.sh
@@ -99,8 +99,8 @@ sudo systemctl enable ap@$ip.service
 sudo cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-$choice.conf
 sudo chmod 600 /etc/wpa_supplicant/wpa_supplicant-$choice.conf
 sudo systemctl enable wpa_supplicant@$choice.service
-sleep 2
-reboot
+#sleep 2
+#reboot
 }
 
 function ap_remove {
@@ -108,11 +108,13 @@ function ap_remove {
   echo '> Please choose from the list of available interfaces...'
   interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
   menu_from_array "${interfaces_arr[@]}"
+  sudo systemctl disable wpa_supplicant@$choice.service
+  # sudo systemctl enable ap@$ip.service
   sudo rm /etc/wpa_supplicant/wpa_supplicant-$choice.conf
   sudo rm /usr/local/bin/mesh-ap.sh
   sudo rm /etc/systemd/system/ap@.service
   sudo rm /etc/mesh_com/ap.conf
-  reboot
+#  reboot
 }
 
 function ap_menu {
@@ -176,7 +178,6 @@ function client {
   echo '> Configuring the client and connecting to server...'
   sudo python3 src/client-mesh.py -c src/ecc_key.der -s http://$server_ip:5000
 }
-
 
 #-----------------------------------------------------------------------------#
 echo '=== sc-mesh-secure-deployment-configure ==='
