@@ -180,20 +180,21 @@ class MeshNetwork:
                     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     s.bind((self.HOST, self.PORT))
                     s.listen()
-                    conn, addr = s.accept()
+                    conn, address = s.accept()
                     with conn:
-                        print('Connected by', addr)
+                        print('Connected by', address)
                         while True:
                             data = conn.recv(1024)
                             data = data.decode('utf-8')
                             if not data:
                                 break
                             elif "report" in data:
-                                conn.send((self.__handle_report_request()).encode())
+                                conn.sendall((self.__handle_report_request()).encode())
                             else:
                                 conn.close()
                                 self.__handle_msg(data)
             except:
+                s.close()
                 pass
             sleep(1)
 

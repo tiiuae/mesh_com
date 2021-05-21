@@ -34,7 +34,7 @@ class MeshSubscriber(Node):
             if msg.data:
                 self.destroy_timer(self.backup_timer)  # resend fresh data only
                 self.setup_socket()
-                self.mesh_socket.send(str.encode(msg.data))
+                self.mesh_socket.sendall(str.encode(msg.data))
                 self.mesh_socket.close()
         except:
             self.backup_data = msg.data
@@ -46,7 +46,7 @@ class MeshSubscriber(Node):
             self.destroy_timer(self.backup_timer)
             self.get_logger().info('backup_caller: "%s"' % self.backup_data)
             self.setup_socket()
-            self.mesh_socket.send(str.encode(self.backup_data))
+            self.mesh_socket.sendall(str.encode(self.backup_data))
             self.mesh_socket.close()
         except:
             self.backup_timer = self.create_timer(
