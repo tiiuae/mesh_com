@@ -165,7 +165,7 @@ network={
 }
 EOF
       fi
-           
+
       echo "Killing wpa_supplicant..."
       killall wpa_supplicant 2>/dev/null
 
@@ -176,7 +176,7 @@ EOF
       echo "$wifidev up.."
       ip link set "$wifidev" up
       batctl if add "$wifidev"
-        
+
       echo "set ip address.."
 	    # set AP ipaddr
 	    ifconfig "$wifidev" 192.168.1.1 netmask 255.255.255.0
@@ -187,18 +187,18 @@ EOF
           # DRONE_DEVICE_ID not available set default
           ifconfig bat0 192.168.1.1 netmask 255.255.255.0
         else
-          declare -i ip=$(echo "$DRONE_DEVICE_ID" | tr -d -c 0-9)
+          declare -i ip=10#$(echo "$DRONE_DEVICE_ID" | tr -d -c 0-9)
           ifconfig bat0 192.168.1."$ip" netmask 255.255.255.0
       fi
-      
+
       echo "bat0 up.."
       ifconfig bat0 up
-      echo 
-      ifconfig bat0 
-      
+      echo
+      ifconfig bat0
+
       route del -net 192.168.1.0 netmask 255.255.255.0 dev bat0
       route add -net 192.168.1.0 netmask 255.255.255.0 dev bat0 metric 1
-       
+
       #TODO
       # dhserver
 
@@ -206,16 +206,14 @@ EOF
 
       ;;
 
-      
-off)  
+
+off)
       # service off
       killall wpa_supplicant 2>/dev/null
       killall alfred 2>/dev/null
       killall batadv-vis 2>/dev/null
       rm -f /var/run/alfred.sock 2>/dev/null
-            
-      ;;   
-      
+      ;;
 *)
       help
       ;;
