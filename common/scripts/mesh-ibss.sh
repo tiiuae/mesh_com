@@ -72,6 +72,7 @@ EOF
       # module.
       if [[ -z "${10}" ]]; then
         killall wpa_supplicant 2>/dev/null
+        rm -fr /var/run/wpa_supplicant/"$wifidev"
       fi
       killall alfred 2>/dev/null
       killall batadv-vis 2>/dev/null
@@ -168,6 +169,7 @@ EOF
 
       echo "Killing wpa_supplicant..."
       killall wpa_supplicant 2>/dev/null
+      rm -fr /var/run/wpa_supplicant/"$wifidev"
 
       echo "create $wifidev"
       iw dev "$wifidev" del
@@ -210,6 +212,7 @@ EOF
 off)
       # service off
       killall wpa_supplicant 2>/dev/null
+      rm -fr /var/run/wpa_supplicant/"$wifidev"
       killall alfred 2>/dev/null
       killall batadv-vis 2>/dev/null
       rm -f /var/run/alfred.sock 2>/dev/null
