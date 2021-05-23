@@ -71,7 +71,8 @@ echo '> Please choose from the list of available interfaces...'
 interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
 menu_from_array "${interfaces_arr[@]}"
 read -p "- SSID: " ssid
-read -p "- Password: " password
+#read -p "- Password: " password
+password=$(systemd-ask-password "Please type your Password:")
 read -p "- Custom IP (e.g. XX.0.0.1): " ip
 cat <<EOF > conf/ap.conf
   network={
@@ -181,7 +182,10 @@ function client {
 
 #-----------------------------------------------------------------------------#
 echo '=== sc-mesh-secure-deployment-configure ==='
-
+if [[ $# -eq 0 ]] ; then
+    help
+    exit 0
+fi
 PARAMS=""
 while (( "$#" )); do
   case "$1" in
