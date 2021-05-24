@@ -1,4 +1,4 @@
-rsa==4.6
+rsa==4.7
 netifaces==0.10.4
 asymcrypt==0.0.10
 Flask==1.1.2
