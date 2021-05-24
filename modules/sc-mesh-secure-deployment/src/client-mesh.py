@@ -4,8 +4,10 @@ import argparse
 import json
 import subprocess
 import time
+import hashlib
 
 import netifaces
+from getmac import get_mac_address
 import requests
 from termcolor import colored
 from pathlib import Path
@@ -19,7 +21,8 @@ ap.add_argument("-c", "--certificate", required=True)
 args = ap.parse_args()
 
 URL = args.server
-print('> Conncting to server: ' + str(URL))
+print('> Connecting to server: ' + str(URL))
+
 
 def get_os():
     proc = subprocess.Popen(['lsb_release', '-a'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -44,15 +47,43 @@ def get_data(cert_file, os):
             file.write(response.content)
 
 
-def decrypt_reponse():  # assuming that data is on a file called payload.enc generated on the function get_data
+def decrypt_response():  # assuming that data is on a file called payload.enc generated on the function get_data
     proc = subprocess.Popen(['src/ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
     aux_list = [element.decode() for element in out.split()]
+    server_cert = aux_list[:39]
     new_list = aux_list[40:64]
+    output_dict = serializing(new_list)
+    print('> Decrypted Message: ', output_dict)  # res =  json.loads(output_dict)
+
+    return output_dict, server_cert
+
+
+def serializing(new_list):
     joined_list = ''.join(new_list)
     output_dict = joined_list.replace("\'", '"')
-    print('> Decrypted Message: ', output_dict)  # res =  json.loads(output_dict)
+
     return output_dict
+
+
+def verify_certificate(old, new):
+    """
+    Here we are validating the hash of the certificate. This is giving us the integrity of the file, not if the
+    certificate is valid. To validate if the certificate is valid, we need to verify the features of the certificate
+    such as NotBefore, notAfter, crl file and its signature, issuer validity, if chain is there then this for all but
+    for this we need to use x509 certificates.
+
+    """
+    proc = subprocess.Popen(['src/ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = proc.communicate()
+    old = [element.decode() for element in out.split()]
+    local_cert = old[:39]
+    old_aux = serializing(local_cert)
+    new_aux = serializing(new)
+    old_md5 = hashlib.md5(old_aux.encode('utf-8')).hexdigest()
+    new_md5 = hashlib.md5(new_aux.encode('utf-8')).hexdigest()
+
+    return old_md5 == new_md5
 
 
 def create_config_openwrt(response):
@@ -83,10 +114,12 @@ def create_config_openwrt(response):
     time.sleep(2)
     subprocess.call('reboot', shell=True)
 
+
 def get_ap_interface():
     interface_list = netifaces.interfaces()
     interface = filter(lambda x: 'wla' in x or 'wlp' in x, interface_list)
     return list(interface)[0]
+
 
 def get_mesh_interface():
     interface_list = netifaces.interfaces()
@@ -107,6 +140,7 @@ def ubuntu_gw(ap_inf):
     subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf', shell=True)
     subprocess.call('sudo systemctl enable wpa_supplicant@' + str(ap_inf) + '.service', shell=True)
 
+
 def ubuntu_node(gateway):
     print('> Configuring Ubuntu mesh node...')
     # Create default route service
@@ -116,6 +150,7 @@ def ubuntu_node(gateway):
     subprocess.call('sudo cp services/default@.service /etc/systemd/system/.', shell=True)
     subprocess.call('sudo chmod 644 /etc/systemd/system/default@.service', shell=True)
     subprocess.call('sudo systemctl enable default@' + gateway + '.service', shell=True)
+
 
 def create_config_ubuntu(response):
     res = json.loads(response)
@@ -170,9 +205,17 @@ def create_config_ubuntu(response):
 
 if __name__ == "__main__":
     os = get_os()
-    get_data(args.certificate, os)
-    res = decrypt_reponse()
-    if os == 'Ubuntu':
-        create_config_ubuntu(res)
-    if os == 'openwrt':
-        create_config_openwrt(res)
+    local_cert = args.certificate
+    get_data(local_cert, os)
+    res, server_cert = decrypt_response()
+    if verify_certificate(local_cert, server_cert):
+        print(colored('> Valid Server Certificate', 'green'))
+        mac = get_mac_address(interface=get_mesh_interface())
+        response = requests.post(URL + '/mac/' + mac)
+        if os == 'Ubuntu':
+            create_config_ubuntu(res)
+        if os == 'openwrt':
+            create_config_openwrt(res)
+    else:
+        print(colored("Not Valid Server Certificate", 'red'))
+        exit(0)

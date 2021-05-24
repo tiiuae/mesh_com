@@ -40,7 +40,10 @@ aux_ubuntu = {
     "mode": "mesh"  # "mesh=mesh network, ap=debug hotspot"
 }
 
-ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
+# ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
+
+IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
+MAC_ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
 
 IP_PREFIX = '10.20.15'
 
@@ -58,9 +61,9 @@ def add_message(uuid):
     print("> Requester IP: " + ip_address)
     mac = get_mac_address(ip=ip_address)
     if verify_certificate(localCert, receivedKey):
-        print(colored('> Valid Certificate', 'green'))
-        ip_mesh = verify_addr(mac)
-        print('> Assigned IP: ', end='')
+        print(colored('> Valid Client Certificate', 'green'))
+        ip_mesh = verify_addr(ip_address)
+        print('> Assigned Mesh IP: ', end='')
         print(ip_mesh)
         aux = aux_ubuntu if uuid == 'Ubuntu' else aux_openwrt
         if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
@@ -80,10 +83,10 @@ def add_message(uuid):
         encrypt_all = enc.read()
         print('> Sending encrypted message: ', end='')
         print(encrypt_all)
-        return encrypt_all
+        return encrypt_all + localCert.read()
     else:
         NOT_AUTH[mac] = ip_address
-        print(colored("Not Valid Certificate", 'red'))
+        print(colored("Not Valid Client Certificate", 'red'))
         return 'Not Valid Certificate'
 
 
@@ -104,7 +107,7 @@ def add_default_route(ip_gateway):
     inter = netifaces.interfaces()
     for interf in inter:
         # TODO: what it if doesn't start with wlan???
-        #if interf.startswith('wlan'):
+        # if interf.startswith('wlan'):
         if interf.startswith('wl'):
             interface = interf
 
@@ -113,25 +116,38 @@ def add_default_route(ip_gateway):
     subprocess.call(command, shell=True)
 
 
-def verify_addr(mac):
-    last_ip = ADDRESSES[list(ADDRESSES.keys())[-1]]  # get last ip
+def verify_addr(wan_ip):
+    last_ip = IP_ADDRESSES[list(IP_ADDRESSES.keys())[-1]]  # get last ip
     last_octect = int(last_ip.split('.')[-1])  # get last ip octet
-    if mac not in ADDRESSES:
+    if wan_ip not in IP_ADDRESSES:
         ip_mesh = IP_PREFIX + '.' + str(last_octect + 1)
-        ADDRESSES[mac] = ip_mesh
+        IP_ADDRESSES[wan_ip] = ip_mesh
     else:
-        ip_mesh = ADDRESSES[mac]
-    print('> ALL Addresses: ', end='')
-    print(ADDRESSES)
+        ip_mesh = IP_ADDRESSES[wan_ip]
+    print('> All Addresses: ', end='')
+    print(IP_ADDRESSES)
     return ip_mesh
 
 
 def printing_auth():
-    return ADDRESSES
+    return MAC_ADDRESSES
 
 
 def printing_no_auth():
     return NOT_AUTH
+
+
+@app.route('/mac/<uuid>', methods=['GET', 'POST'])
+def add_mac_addr(uuid):
+    mac = uuid
+    ip_address = request.remote_addr
+    MAC_ADDRESSES[mac] = IP_ADDRESSES[ip_address]
+    if '00:00:00:00:00:00' in MAC_ADDRESSES.keys():
+        del MAC_ADDRESSES['00:00:00:00:00:00']
+    print('> All Addresses: ', end='')
+    print(MAC_ADDRESSES)
+    return MAC_ADDRESSES
+
 
 
 @app.route('/')
