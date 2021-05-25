@@ -40,8 +40,6 @@ aux_ubuntu = {
     "mode": "mesh"  # "mesh=mesh network, ap=debug hotspot"
 }
 
-# ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
-
 IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
 MAC_ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
 
@@ -107,8 +105,7 @@ def add_default_route(ip_gateway):
     inter = netifaces.interfaces()
     for interf in inter:
         # TODO: what it if doesn't start with wlan???
-        # if interf.startswith('wlan'):
-        if interf.startswith('wl'):
+        if interf.startswith('wlan'):
             interface = interf
 
     command = 'ip route add ' + IP_PREFIX + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface  # assuming only 2 interfaces are presented
@@ -147,7 +144,6 @@ def add_mac_addr(uuid):
     print('> All Addresses: ', end='')
     print(MAC_ADDRESSES)
     return MAC_ADDRESSES
-
 
 
 @app.route('/')
