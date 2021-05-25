@@ -5,7 +5,7 @@
   <version>0.3.0</version>
   <description>ROS Mesh Node</description>
   <maintainer email="mika.joenpera@unikie.com">joenpera</maintainer>
-  <license>TODO: License declaration</license>
+  <license>BSD 3-Clause License</license>
   
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
