@@ -9,5 +9,5 @@ cat <<EOF >/usr/lib/NetworkManager/conf.d/unamaged_wifi_interfaces.conf
 #
 
 [keyfile]
-unmanaged-devices=interface-name:wl*
+unmanaged-devices=interface-name:wlp*;interface-name:wlan*
 EOF
