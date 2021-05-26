@@ -15,48 +15,26 @@ class MeshPublisher(Node):
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
         self.PORT = 33221  # Port to listen on (non-privileged ports are > 1023)
-        self.mesh_socket = 0
-        self.backup_timer = 0
+        self.mesh_socket = socket.socket()  # to remove python warning
 
     def timer_callback(self):
         msg = String()
-
+        self.get_logger().info('publisher timer_callback')
         try:
-            self.destroy_timer(self.backup_timer)
             self.setup_socket()
-            self.mesh_socket.sendall(str.encode("report"))
-            data = self.mesh_socket.recv(2048)
+            self.mesh_socket.connect((self.HOST, self.PORT))
+            self.mesh_socket.sendall(str.encode("report\n"))
+            msg.data = self.mesh_socket.recv(2048).decode('utf-8')
             self.mesh_socket.close()
-            msg.data = data.decode('utf-8')
             self.publisher_.publish(msg)
             self.get_logger().info('Mesh Publishing: "%s"' % msg.data)
-        except:
-            self.backup_timer = self.create_timer(
-                1.0, self.backup_caller)
+        except (ConnectionRefusedError, socket.timeout, ConnectionResetError):
+            pass
 
     def setup_socket(self):
         self.mesh_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.mesh_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.mesh_socket.settimeout(1)
-
-        self.mesh_socket.connect((self.HOST, self.PORT))
-
-    def backup_caller(self):
-        msg = String()
-
-        try:
-            self.destroy_timer(self.backup_timer)
-            self.get_logger().info('publisher backup_caller"')
-            self.setup_socket()
-            self.mesh_socket.sendall(str.encode("report"))
-            data = self.mesh_socket.recv(2048)
-            self.mesh_socket.close()
-            msg.data = data.decode('utf-8')
-            self.publisher_.publish(msg)
-            self.get_logger().info('Mesh Publishing: "%s"' % msg.data)
-        except:
-            self.backup_timer = self.create_timer(
-                1.0, self.backup_caller)
 
 
 def main(args=None):
