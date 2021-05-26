@@ -14,8 +14,8 @@ function help
     echo "	<freq>"
     echo "	<txpower>"
     echo "	<country>"
-    echo "	<interface>"
-    echo "	<phyname>"
+    echo "	<interface>" - optional
+    echo "	<phyname>"   - optional
     echo
     echo "example:"
     echo "sudo ./mesh-ibss.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh 5220 30 fi wlan1 phy1"
@@ -28,13 +28,14 @@ function help
 
 echo "Solving wifi device name.."
 if [[ -z "${10}" ]]; then
-  wifidev=$(iw dev | awk '$1=="Interface"{print $2}')
-  phyname=phy0
+  # one pci qca6174 radio is used in a drone, second one is usb --> can be detected as follows:
+  phyname=$(ls /sys/bus/pci/devices/*/ieee80211/)
+  wifidev=$(ls /sys/class/ieee80211/$phyname/device/net/)
 else
   wifidev=${10}
   phyname=${11}
 fi
-echo "Found: $wifidev"
+echo "Found: $wifidev $phyname"
 
 case "$1" in
 
@@ -173,7 +174,7 @@ EOF
 
       echo "create $wifidev"
       iw dev "$wifidev" del
-      iw phy phy0 interface add "$wifidev" type managed
+      iw phy "$phyname" interface add "$wifidev" type managed
 
       echo "$wifidev up.."
       ip link set "$wifidev" up
