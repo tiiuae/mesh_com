@@ -1,5 +1,4 @@
 import json
-# import subprocess
 from shlex import quote
 from time import sleep
 import socket
@@ -120,6 +119,8 @@ class MeshNetwork:
         self.HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
         self.PORT = 33221  # Port to listen on (non-privileged ports are > 1023)
         self.batman = BatmanVisualisation()
+        self.script_path_1 = "/opt/ros/foxy/share/bin/mesh-ibss.sh"
+        self.script_path_2 = "/opt/ros/foxy/share/bin/mesh-11s.sh"
 
     def __handle_msg(self, msg):
 
@@ -143,6 +144,7 @@ class MeshNetwork:
 
         try:
             parameters = json.loads(msg)
+            self.settings.api_version = parameters["api_version"]
             self.settings.ssid = parameters["ssid"]
             self.settings.key = parameters["key"]
             self.settings.ap_mac = parameters["ap_mac"]
@@ -153,21 +155,32 @@ class MeshNetwork:
             self.settings.tx_power = parameters["tx_power"]
             self.settings.mode = parameters["mode"]
             # self.settings.enc = parameters["enc"]
-            self.__change_configuration()
         except json.decoder.JSONDecodeError or KeyError or Exception:
             print('Setting Failed')
             pass
+        self.__change_configuration()
 
     def __change_configuration(self):
-        subprocess.call(["/opt/ros/foxy/share/bin/mesh-ibss.sh", quote(self.settings.mode),
-                         quote(self.settings.ip),
-                         quote(self.settings.subnet),
-                         quote(self.settings.ap_mac),
-                         quote(self.settings.key),
-                         quote(self.settings.ssid),
-                         quote(self.settings.frequency),
-                         quote(self.settings.tx_power),
-                         quote(self.settings.country)])
+        # api 1, ad-hoc
+        # api 2, 11s
+        if int(self.settings.api_version) == 1:
+            path = self.script_path_1
+        else:
+            path = self.script_path_2
+
+        if self.settings.mode == "ap" or self.settings.mode == "off":
+            subprocess.call([path, quote(self.settings.mode)])
+        elif self.settings.mode == "mesh":
+            subprocess.call([path, quote(self.settings.mode),
+                             quote(self.settings.ip),
+                             quote(self.settings.subnet),
+                             quote(self.settings.ap_mac),
+                             quote(self.settings.key),
+                             quote(self.settings.ssid),
+                             quote(self.settings.frequency),
+                             quote(self.settings.tx_power),
+                             quote(self.settings.country)])
+
         print('Setting Done')
 
     def __handle_report_request(self):
@@ -180,22 +193,25 @@ class MeshNetwork:
                     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     s.bind((self.HOST, self.PORT))
                     s.listen()
-                    conn, addr = s.accept()
+                    conn, address = s.accept()
                     with conn:
-                        print('Connected by', addr)
+                        print('Connected by', address)
                         while True:
                             data = conn.recv(1024)
                             data = data.decode('utf-8')
                             if not data:
                                 break
-                            elif "report" in data:
-                                conn.send((self.__handle_report_request()).encode())
+                            elif "report\n" in data:
+                                conn.sendall((self.__handle_report_request()).encode())
+                            elif "ssid" in data and \
+                                    "api_version" in data:
+                                self.__handle_msg(data)
                             else:
                                 conn.close()
-                                self.__handle_msg(data)
-            except:
+            except (ConnectionRefusedError, socket.timeout, ConnectionResetError, OSError):
+                # just create new socket and start serving
                 pass
-            sleep(1)
+            sleep(0.5)
 
 
 def main():

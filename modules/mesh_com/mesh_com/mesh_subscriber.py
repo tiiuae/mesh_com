@@ -17,7 +17,7 @@ class MeshSubscriber(Node):
         self.subscription  # prevent unused variable warning
         self.HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
         self.PORT = 33221  # Port to listen on (non-privileged ports are > 1023)
-        self.mesh_socket = 0
+        self.mesh_socket = socket.socket()  # to remove python warning
         self.backup_timer = 0
         self.backup_data = ""
 
@@ -26,31 +26,33 @@ class MeshSubscriber(Node):
         self.mesh_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.mesh_socket.settimeout(1)
 
-        self.mesh_socket.connect((self.HOST, self.PORT))
-
     def listener_callback(self, msg):
+        self.get_logger().info('listener_callback')
+        self.destroy_timer(self.backup_timer)  # resend fresh data only
+        self.get_logger().info('mesh subscriber: "%s"' % msg.data)
         try:
-            self.get_logger().info('mesh subscriber: "%s"' % msg.data)
             if msg.data:
-                self.destroy_timer(self.backup_timer)  # resend fresh data only
                 self.setup_socket()
-                self.mesh_socket.send(str.encode(msg.data))
+                self.mesh_socket.connect((self.HOST, self.PORT))
+                self.mesh_socket.sendall(str.encode(msg.data))
                 self.mesh_socket.close()
-        except:
+        except (ConnectionRefusedError, socket.timeout, ConnectionResetError):
             self.backup_data = msg.data
             self.backup_timer = self.create_timer(
-                1.0, self.backup_caller)
+                2.0, self.backup_caller)
 
     def backup_caller(self):
+        self.get_logger().info('backup_caller: "%s"' % self.backup_data)
         try:
             self.destroy_timer(self.backup_timer)
-            self.get_logger().info('backup_caller: "%s"' % self.backup_data)
             self.setup_socket()
-            self.mesh_socket.send(str.encode(self.backup_data))
+            self.mesh_socket.connect((self.HOST, self.PORT))
+            self.mesh_socket.sendall(str.encode(self.backup_data))
             self.mesh_socket.close()
-        except:
+        except (ConnectionRefusedError, socket.timeout, ConnectionResetError):
+            self.get_logger().info('mesh backup_caller: ##')
             self.backup_timer = self.create_timer(
-                1.0, self.backup_caller)
+                2.0, self.backup_caller)
 
 
 def main(args=None):

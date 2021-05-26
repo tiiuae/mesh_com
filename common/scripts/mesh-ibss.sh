@@ -14,8 +14,8 @@ function help
     echo "	<freq>"
     echo "	<txpower>"
     echo "	<country>"
-    echo "	<interface>"
-    echo "	<phyname>"
+    echo "	<interface>" - optional
+    echo "	<phyname>"   - optional
     echo
     echo "example:"
     echo "sudo ./mesh-ibss.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh 5220 30 fi wlan1 phy1"
@@ -28,13 +28,14 @@ function help
 
 echo "Solving wifi device name.."
 if [[ -z "${10}" ]]; then
-  wifidev=$(iw dev | awk '$1=="Interface"{print $2}')
-  phyname=phy0
+  # one pci qca6174 radio is used in a drone, second one is usb --> can be detected as follows:
+  phyname=$(ls /sys/bus/pci/devices/*/ieee80211/)
+  wifidev=$(ls /sys/class/ieee80211/$phyname/device/net/)
 else
   wifidev=${10}
   phyname=${11}
 fi
-echo "Found: $wifidev"
+echo "Found: $wifidev $phyname"
 
 case "$1" in
 
@@ -72,6 +73,7 @@ EOF
       # module.
       if [[ -z "${10}" ]]; then
         killall wpa_supplicant 2>/dev/null
+        rm -fr /var/run/wpa_supplicant/"$wifidev"
       fi
       killall alfred 2>/dev/null
       killall batadv-vis 2>/dev/null
@@ -165,18 +167,19 @@ network={
 }
 EOF
       fi
-           
+
       echo "Killing wpa_supplicant..."
       killall wpa_supplicant 2>/dev/null
+      rm -fr /var/run/wpa_supplicant/"$wifidev"
 
       echo "create $wifidev"
       iw dev "$wifidev" del
-      iw phy phy0 interface add "$wifidev" type managed
+      iw phy "$phyname" interface add "$wifidev" type managed
 
       echo "$wifidev up.."
       ip link set "$wifidev" up
       batctl if add "$wifidev"
-        
+
       echo "set ip address.."
 	    # set AP ipaddr
 	    ifconfig "$wifidev" 192.168.1.1 netmask 255.255.255.0
@@ -187,18 +190,18 @@ EOF
           # DRONE_DEVICE_ID not available set default
           ifconfig bat0 192.168.1.1 netmask 255.255.255.0
         else
-          declare -i ip=$(echo "$DRONE_DEVICE_ID" | tr -d -c 0-9)
+          declare -i ip=10#$(echo "$DRONE_DEVICE_ID" | tr -d -c 0-9)
           ifconfig bat0 192.168.1."$ip" netmask 255.255.255.0
       fi
-      
+
       echo "bat0 up.."
       ifconfig bat0 up
-      echo 
-      ifconfig bat0 
-      
+      echo
+      ifconfig bat0
+
       route del -net 192.168.1.0 netmask 255.255.255.0 dev bat0
       route add -net 192.168.1.0 netmask 255.255.255.0 dev bat0 metric 1
-       
+
       #TODO
       # dhserver
 
@@ -206,16 +209,15 @@ EOF
 
       ;;
 
-      
-off)  
+
+off)
       # service off
       killall wpa_supplicant 2>/dev/null
+      rm -fr /var/run/wpa_supplicant/"$wifidev"
       killall alfred 2>/dev/null
       killall batadv-vis 2>/dev/null
       rm -f /var/run/alfred.sock 2>/dev/null
-            
-      ;;   
-      
+      ;;
 *)
       help
       ;;
