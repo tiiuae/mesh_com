@@ -1,8 +1,9 @@
 import json
 from shlex import quote
-from time import sleep
 import socket
 import subprocess
+import syslog
+import select
 
 
 # work in progress
@@ -156,7 +157,7 @@ class MeshNetwork:
             self.settings.mode = parameters["mode"]
             # self.settings.enc = parameters["enc"]
         except json.decoder.JSONDecodeError or KeyError or Exception:
-            print('Setting Failed')
+            syslog.syslog('Setting Failed')
             pass
         self.__change_configuration()
 
@@ -181,37 +182,52 @@ class MeshNetwork:
                              quote(self.settings.tx_power),
                              quote(self.settings.country)])
 
-        print('Setting Done')
+        syslog.syslog('Setting Done')
 
     def __handle_report_request(self):
         return self.batman.get()
 
     def run(self):
+
+        connection_list = []
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((self.HOST, self.PORT))
+        s.listen(10)
+        connection_list.append(s)
+
         while True:
-            try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    s.bind((self.HOST, self.PORT))
-                    s.listen()
-                    conn, address = s.accept()
-                    with conn:
-                        print('Connected by', address)
-                        while True:
-                            data = conn.recv(1024)
-                            data = data.decode('utf-8')
-                            if not data:
-                                break
-                            elif "report\n" in data:
-                                conn.sendall((self.__handle_report_request()).encode())
-                            elif "ssid" in data and \
-                                    "api_version" in data:
-                                self.__handle_msg(data)
-                            else:
-                                conn.close()
-            except (ConnectionRefusedError, socket.timeout, ConnectionResetError, OSError):
-                # just create new socket and start serving
-                pass
-            sleep(0.5)
+            read_sockets, write_sockets, error_sockets = select.select(connection_list, [], [], 1)
+
+            for sock in read_sockets:
+                if sock == s:
+                    # new connection received through server s socket
+                    sockfd, address = s.accept()
+                    connection_list.append(sockfd)
+                    syslog.syslog("Client ({}, {}) connected".format(address[0], address[1]))
+                else:
+                    try:
+                        data = sock.recv(1024)
+                        data = data.decode('utf-8')
+                        if "report\n" in data:
+                            syslog.syslog(str("r:" + data))
+                            sock.sendall((self.__handle_report_request()).encode())
+                        elif "ssid" in data and \
+                                "api_version" in data:
+                            syslog.syslog(str("j:" + data))
+                            self.__handle_msg(data)
+                        else:
+                            _address = sock.getpeername()
+                            syslog.syslog("Client ({}, {}) empty and removed".format(
+                                _address[0], _address[1]))
+                            sock.close()
+                            connection_list.remove(sock)
+                    except (ConnectionRefusedError, socket.timeout, ConnectionResetError, OSError):
+                        syslog.syslog("except")
+                        sock.close()
+                        if sock in connection_list:
+                            connection_list.remove(sock)
+                        continue
 
 
 def main():
