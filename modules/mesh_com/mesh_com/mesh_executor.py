@@ -159,7 +159,8 @@ class MeshNetwork:
             self.__change_configuration()
         except (json.decoder.JSONDecodeError or KeyError or
                 TypeError or AttributeError) as e:
-            syslog.syslog("JSON format not correct\n" + e)
+            syslog.syslog("JSON format not correct")
+            syslog.syslog(str(e))
 
     def __change_configuration(self):
         # api 1, ad-hoc
