@@ -145,21 +145,21 @@ class MeshNetwork:
 
         try:
             parameters = json.loads(msg)
-            self.settings.api_version = parameters["api_version"]
-            self.settings.ssid = parameters["ssid"]
-            self.settings.key = parameters["key"]
-            self.settings.ap_mac = parameters["ap_mac"]
-            self.settings.country = parameters["country"].lower()
-            self.settings.frequency = parameters["frequency"]
-            self.settings.ip = parameters["ip"]
-            self.settings.subnet = parameters["subnet"]
-            self.settings.tx_power = parameters["tx_power"]
-            self.settings.mode = parameters["mode"]
-            # self.settings.enc = parameters["enc"]
-        except json.decoder.JSONDecodeError or KeyError or Exception:
-            syslog.syslog('Setting Failed')
-            pass
-        self.__change_configuration()
+            self.settings.api_version = int(parameters["api_version"])
+            self.settings.ssid = str(parameters["ssid"])
+            self.settings.key = str(parameters["key"])
+            self.settings.ap_mac = str(parameters["ap_mac"])
+            self.settings.country = str(parameters["country"]).lower()
+            self.settings.frequency = str(parameters["frequency"])
+            self.settings.ip = str(parameters["ip"])
+            self.settings.subnet = str(parameters["subnet"])
+            self.settings.tx_power = str(parameters["tx_power"])
+            self.settings.mode = str(parameters["mode"])
+            # self.settings.enc = str(parameters["enc"])
+            self.__change_configuration()
+        except (json.decoder.JSONDecodeError or KeyError or
+                TypeError or AttributeError) as e:
+            syslog.syslog("JSON format not correct\n" + e)
 
     def __change_configuration(self):
         # api 1, ad-hoc
