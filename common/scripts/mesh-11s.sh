@@ -23,14 +23,47 @@ function help
     exit
 }
 
+find_mesh_wifi_device()
+{
+        # arguments:
+        # $1 = wifi device vendor
+        # $2 = wifi device id
+
+        # return values:
+
+        echo "$1 $2"
+        echo "Find WIFI card deviceVendor=$1 deviceID=$2"
+        echo
+        phynames=$(ls /sys/class/ieee80211/)
+
+        for phy in $phynames; do
+          device_id="$(cat /sys/bus/pci/devices/*/ieee80211/$phy/device/device 2>/dev/null)"
+          device_vendor="$(cat /sys/bus/pci/devices/*/ieee80211/$phy/device/vendor 2>/dev/null)"
+
+          if [ "$device_id" = "$2" -a "$device_vendor" = "$1" ]; then
+                RETVAL_PHY="$phy"
+                RETVAL_NAME="$(ls /sys/class/ieee80211/$phy/device/net/ 2>/dev/null)"
+                break
+          fi
+        done
+}
+
 # 1      2    3      4        5     6       7      8         9         10
 # <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface>
 
 echo "Solving wifi device name.."
 if [[ -z "${10}" ]]; then
-  # one pci qca6174 radio is used in a drone, second one is usb --> can be detected as follows:
-  phyname=$(ls /sys/bus/pci/devices/*/ieee80211/)
-  wifidev=$(ls /sys/class/ieee80211/$phyname/device/net/)
+  rfkill unblock all
+  # multiple wifi options --> can be detected as follows:
+  #              988x   9462   #qca6174(0x003c) not supporting 11s
+  for device in "0x003c 0x0034"; do
+    find_mesh_wifi_device 0x168c $device
+    if [ "$RETVAL_PHY" != "" ]; then
+        phyname=$RETVAL_PHY
+        wifidev=$RETVAL_NAME
+        break
+    fi
+  done
 else
   wifidev=${10}
   phyname=${11}
@@ -72,21 +105,18 @@ EOF
       # we can just not kill wpa_supplicant when we are loading the mesh_com_tb
       # module.
       if [[ -z "${10}" ]]; then
-        killall wpa_supplicant 2>/dev/null
+        pkill -f "/var/run/wpa_supplicant-" 2>/dev/null
         rm -fr /var/run/wpa_supplicant/"$wifidev"
       fi
       killall alfred 2>/dev/null
       killall batadv-vis 2>/dev/null
       rm -f /var/run/alfred.sock
 
-
-      echo "unmanage wifi interface.."
-      nmcli dev set "$wifidev" managed no
       modprobe batman-adv
 
       echo "$wifidev down.."
       iw dev "$wifidev" del
-      iw phy "$phyname" interface add "$wifidev" type ibss
+      iw phy "$phyname" interface add "$wifidev" type mp
 
       echo "$wifidev create adhoc.."
       ifconfig "$wifidev" mtu 1560
@@ -116,9 +146,9 @@ EOF
       # This is likely due to the interface not being up in time, and will
       # require some fiddling with the systemd startup order.
       if [[ -z "${10}" ]]; then
-        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
+        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
       else
-        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/
+        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s.conf -D nl80211 -C /var/run/wpa_supplicant/
       fi
       ;;
 
@@ -169,7 +199,7 @@ EOF
       fi
 
       echo "Killing wpa_supplicant..."
-      killall wpa_supplicant 2>/dev/null
+      pkill -f "/var/run/wpa_supplicant-" 2>/dev/null
       rm -fr /var/run/wpa_supplicant/"$wifidev"
 
       echo "create $wifidev"
@@ -212,7 +242,7 @@ EOF
 
 off)
       # service off
-      killall wpa_supplicant 2>/dev/null
+      pkill -f "/var/run/wpa_supplicant-" 2>/dev/null
       rm -fr /var/run/wpa_supplicant/"$wifidev"
       killall alfred 2>/dev/null
       killall batadv-vis 2>/dev/null
