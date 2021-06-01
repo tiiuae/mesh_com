@@ -27,7 +27,7 @@ class MeshPublisher(Node):
             msg.data = self.mesh_socket.recv(2048).decode('utf-8')
             self.mesh_socket.close()
             self.publisher_.publish(msg)
-            self.get_logger().info('Mesh Publishing: "%s"' % msg.data)
+            # self.get_logger().info('Mesh Publishing: "%s"' % msg.data)
         except (ConnectionRefusedError, socket.timeout, ConnectionResetError):
             pass
 
