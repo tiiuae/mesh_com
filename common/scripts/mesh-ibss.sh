@@ -55,8 +55,8 @@ echo "Solving wifi device name.."
 if [[ -z "${10}" ]]; then
   rfkill unblock all
   # multiple wifi options --> can be detected as follows:
-  #              9462   6174     # qca988x (0x003c) not supporting ibss
-  for device in "0x0034 0x003e"; do
+  #              6174     # qca988x (0x003c) not supporting ibss
+  for device in "0x003e"; do
     find_mesh_wifi_device 0x168c $device
     if [ "$RETVAL_PHY" != "" ]; then
         phyname=$RETVAL_PHY
