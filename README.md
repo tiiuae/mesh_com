@@ -33,7 +33,7 @@ Update and install dependencies:
 ```
 $ sudo apt update
 $ sudo apt-get install build-essential fakeroot dpkg-dev
-``` 
+```
 
 Build and create debian packages:
 
@@ -58,6 +58,11 @@ $ sudo apt install \
 
 ```
 systemd mesh.service:
+- currently up-to-date versions for fogsw are in:
+
+    https://github.com/tiiuae/fogsw_systemd/tree/main/system
+
+- example:
 ```
 [Unit]
 Description="Mesh Service"
@@ -100,7 +105,4 @@ $ bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy
 ```
 
 ### sc-mesh-secure-deployment
-```
-$ TBD
-
-```
+An in-depth README on how to set up sc-mesh-secure-deployment can be accessed [here](modules/sc-mesh-secure-deployment/README.md)

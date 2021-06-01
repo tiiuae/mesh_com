@@ -1,16 +1,37 @@
 #!/bin/bash
 
+# TODO: We should do the bash n bash and the python in python as much
+#       as possible
+
 function help {
 echo " ./configure.sh"
 echo "     -s               configure as server"
 echo "     -c               configure as client"
 echo "     -ap              connect/configure Access Point"
+echo "     -gw              create/remove gateway"
 echo "     --help           this help menu"
 echo ""
 exit 1
 }
 
 #-----------------------------------------------------------------------------#
+
+# Check if command(s) exists and fail otherwise.
+function command_exists {
+  for cmd in $1; do
+    echo -n "> Checking $cmd installed... "
+    INSTALLED=($(apt -qq list $cmd 2>/dev/null | awk -F[ '{print $2}'))
+    if $INSTALLED &> /dev/null; then
+      echo "FALSE"
+      echo "> Installing..."
+      sudo apt-get install -y -qq $cmd --no-install-recommends
+      echo ""
+    else
+      echo "TRUE"
+    fi
+  done
+}
+
 
 function menu_from_array()
 {
@@ -25,74 +46,157 @@ function menu_from_array()
   done
 }
 
-function create_wpa_supplicant_conf {
-cat <<EOF > tools/wpa_tools/wpa_supplicant_client_AP.conf
-network={
-  ssid="$1"
-  psk="$2"
-}
-EOF
-}
-
-function create_ap_conf {
-cat <<EOF > tools/wpa_tools/access-point.conf
-  network={
-    ssid="$1"
-    mode=2
-    key_mgmt=WPA-PSK
-    psk="$2"
-    frequency=2437
-}
-EOF
-}
 
 #-----------------------------------------------------------------------------#
-
 function ap_connect {
-  echo '> Connecting to Access Point...'
-  read -p "- SSID: " ssid
-  read -p "- Password: " password
-  create_wpa_supplicant_conf $ssid $password
-  echo '> Please choose from the list of available interfaces...'
-  interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
-  menu_from_array "${interfaces_arr[@]}"
-  sudo wpa_supplicant -B -i $choice -c tools/wpa_tools/wpa_supplicant_client_AP.conf
-  sudo dhclient -v $choice
+echo '> Connecting to Access Point...'
+read -p "- SSID: " ssid
+read -p "- Password: " password
+cat <<EOF > conf/ap.conf
+network={
+  ssid="$ssid"
+  psk="$password"
+}
+EOF
+echo '> Please choose from the list of available interfaces...'
+interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
+menu_from_array "${interfaces_arr[@]}"
+sudo wpa_supplicant -B -i $choice -c conf/ap.conf
+sudo dhclient -v $choice
 }
 
 function ap_create {
-  echo '> Creating a Mesh Access Point...'
+echo '> Creating an Access Point...'
+command_exists 'isc-dhcp-server net-tools'
+echo '> Please choose from the list of available interfaces...'
+interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
+menu_from_array "${interfaces_arr[@]}"
+read -p "- SSID: " ssid
+#read -p "- Password: " password
+password=$(systemd-ask-password "Please type your Password:")
+read -p "- Custom IP (e.g. XX.0.0.1): " ip
+cat <<EOF > conf/ap.conf
+  network={
+    ssid="$ssid"
+    mode=2
+    key_mgmt=WPA-PSK
+    psk="$password"
+    frequency=2437
+}
+EOF
+# FIXME: Each time you echo this it's gonna add to the end of the files and
+#        create duplicate lines
+echo "INTERFACES=$1" >> /etc/default/isc-dhcp-server
+if [ ! -d "/etc/mesh_com" ]; then
+  sudo mkdir /etc/mesh_com
+fi
+echo "AP_INF=$choice" >> /etc/mesh_com/ap.conf
+# Create Gateway Service
+sudo cp ../../common/scripts/mesh-ap.sh /usr/local/bin/.
+sudo chmod 744 /usr/local/bin/mesh-ap.sh
+sudo cp services/ap@.service /etc/systemd/system/.
+sudo chmod 644 /etc/systemd/system/ap@.service
+sudo systemctl enable ap@$ip.service
+# Setup wlx at boot using wpa_supplicant
+sudo cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+sudo chmod 600 /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+sudo systemctl enable wpa_supplicant@$choice.service
+#sleep 2
+#reboot
+}
+
+function ap_remove {
+  echo '> Remove an Access Point...'
   echo '> Please choose from the list of available interfaces...'
   interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
   menu_from_array "${interfaces_arr[@]}"
-  read -p "- SSID: " ssid
-  read -p "- Password: " password
-  read -p "- 1st IP Field (e.g. 60 for AP 6): " ip
-  create_ap_conf $ssid $password
-  cd tools/wpa_tools
-  chmod +x access_point_wpa_supplicant.sh
-  sudo bash access_point_wpa_supplicant.sh $choice $ip
-  cd ../..
+  sudo systemctl disable wpa_supplicant@$choice.service
+  # sudo systemctl enable ap@$ip.service
+  sudo rm /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+  sudo rm /usr/local/bin/mesh-ap.sh
+  sudo rm /etc/systemd/system/ap@.service
+  sudo rm /etc/mesh_com/ap.conf
+#  reboot
 }
 
-function access_point {
+function ap_menu {
   echo '> Do you wish to...'
-  ap_arr=('Connect to an Access Point?' 'Create an Access Point?')
+  ap_arr=('Connect to an Access Point?' 'Create an Access Point?' 'Remove an Access Point?')
   menu_from_array "${ap_arr[@]}"
   if [ $REPLY == "1" ]; then
     ap_connect
   elif [[ $REPLY == "2" ]]; then
     ap_create
+  elif [[ $REPLY == "3" ]]; then
+    ap_remove
+  fi
+}
+
+#-----------------------------------------------------------------------------#
+# TODO: Gateway creation and removal currently creates and completely removes
+#       services. Not sure if this is the best approach or if we should check
+#       if files already exist / just disable and don't remove scripts.
+#-----------------------------------------------------------------------------#
+function gw_create {
+  echo '> Configuring gateway... Choose a gateway interface:'
+  interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|bat|^[^0-9]"{print $2}'))
+  menu_from_array "${interfaces_arr[@]}"
+  # Create Gateway Service
+  echo '> Copying mesh-gw.sh to /usr/local/bin/.'
+  sudo cp ../../common/scripts/mesh-gw.sh /usr/local/bin/.
+  sudo chmod 744 /usr/local/bin/mesh-gw.sh
+  echo "> Copying gw@.service to /etc/systemd/system/"
+  sudo cp services/gw@.service /etc/systemd/system/.
+  sudo chmod 644 /etc/systemd/system/gw@.service
+  echo "> Enabling gw@$choice.service"
+  sudo systemctl enable gw@$choice.service
+  # If gw inf is a wlan then auto connect to AP at boot using wpa_supplicant
+  if [[ $choice = wl* ]]; then
+    echo "> Enabling wpa_supplicant@$choice.service"
+    sudo cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+    chmod 600 /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+    sudo systemctl enable wpa_supplicant@$choice.service
+  fi
+}
+
+function gw_remove {
+  echo '> Removing gateway... Choose a gateway interface:'
+  interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|bat|^[^0-9]"{print $2}'))
+  menu_from_array "${interfaces_arr[@]}"
+  # Create Gateway Service
+  echo '> Removing /usr/local/bin/mesh-gw.sh'
+  sudo rm /usr/local/bin/mesh-gw.sh
+  echo '> Removing /etc/systemd/system/gw@.service'
+  sudo systemctl disable gw@$choice.service
+  sudo rm /etc/systemd/system/gw@.service
+  # If gw inf is a wlan then remove wpa_supplicant configuration
+  if [[ $choice = wl* ]]; then
+    echo "> Disabling wpa_supplicant-$choice.service"
+    sudo systemctl disable wpa_supplicant@$choice.service
+    echo "> Removing /etc/wpa_supplicant/wpa_supplicant-$choice.conf"
+    sudo rm /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+  fi
+}
+
+function gw_menu {
+  echo '> Do you wish to...'
+  ap_arr=('Create a gateway?' 'Remove a gateway?')
+  menu_from_array "${ap_arr[@]}"
+  if [ $REPLY == "1" ]; then
+    gw_create
+  elif [[ $REPLY == "2" ]]; then
+    gw_remove
   fi
 }
 
 
+#-----------------------------------------------------------------------------#
 function server {
   echo '> Configuring the server...'
   pushd .
   cd ../..
   # Make the server
-  make server
+  make mesh_tb_server
   popd
   # Advertise the server using avahi (zeroconf)
   avahi-publish-service mesh_server _http._tcp 5000 &
@@ -100,12 +204,13 @@ function server {
   sudo python3 src/server-mesh.py -c src/ecc_key.der
 }
 
+
 function client {
   echo '> Configuring the client...'
   # Make the server
   pushd .
   cd ../..
-  make client
+  make mesh_tb_client
   popd
   # Connect to the same AP as the server
   read -p "> We need to be connect to the same network as the server... Connect to an Access Point? (Y/N): " confirm
@@ -134,11 +239,12 @@ function client {
   sudo python3 src/client-mesh.py -c src/ecc_key.der -s http://$server_ip:5000
 }
 
-
-
 #-----------------------------------------------------------------------------#
 echo '=== sc-mesh-secure-deployment-configure ==='
-
+if [[ $# -eq 0 ]] ; then
+    help
+    exit 0
+fi
 PARAMS=""
 while (( "$#" )); do
   case "$1" in
@@ -152,7 +258,11 @@ while (( "$#" )); do
       shift
       ;;
     -ap)
-      access_point
+      ap_menu
+      shift
+      ;;
+    -gw)
+      gw_menu
       shift
       ;;
     --help)

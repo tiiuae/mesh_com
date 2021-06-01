@@ -1,0 +1,13 @@
+#!/bin/bash
+
+mkdir -p /usr/lib/NetworkManager/conf.d
+cat <<EOF >/usr/lib/NetworkManager/conf.d/unamaged_wifi_interfaces.conf
+#
+# All wl* interfaces are unmanaged
+#
+# See man NetworkManager.conf
+#
+
+[keyfile]
+unmanaged-devices=interface-name:wlp*;interface-name:wlan*
+EOF

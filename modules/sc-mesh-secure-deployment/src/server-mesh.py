@@ -8,6 +8,7 @@ import pandas as pd
 import argparse
 from termcolor import colored
 import pathlib
+import hashlib
 
 # Construct the argument parser
 ap = argparse.ArgumentParser()
@@ -15,7 +16,6 @@ ap = argparse.ArgumentParser()
 # Add the arguments to the parser
 ap.add_argument("-c", "--certificate", required=True)
 args = ap.parse_args()
-
 
 app = Flask(__name__)
 
@@ -32,7 +32,7 @@ aux_ubuntu = {
     "enc": "wep",  # "encryption (wep, wpa2, wpa3, sae)"
     "ap_mac": "00:11:22:33:44:55",  # "bssid for mesh network"
     "country": "fi",  # "Country code, sets tx power limits and supported channels"
-    "frequency": "5180",  #5180 wifi channel frequency, depends on the country code and HW"
+    "frequency": "5180",  # 5180 wifi channel frequency, depends on the country code and HW"
     # "ip": "192.168.1.1",              #"select unique IP address"
     "subnet": "255.255.255.0",  # "subnet mask"
     "tx_power": "30",
@@ -40,7 +40,8 @@ aux_ubuntu = {
     "mode": "mesh"  # "mesh=mesh network, ap=debug hotspot"
 }
 
-ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
+IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
+MAC_ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
 
 IP_PREFIX = '10.20.15'
 
@@ -55,13 +56,14 @@ def add_message(uuid):
     receivedKey = key.read()
     localCert = open(SERVER_CERT, 'rb')
     ip_address = request.remote_addr
-    print("Requester IP: " + ip_address)
+    print("> Requester IP: " + ip_address)
     mac = get_mac_address(ip=ip_address)
-    if localCert.read() == receivedKey:  # validating certificate. Comparing the local with the received
-        print(colored('Valid Certificate', 'green'))
-        ip_mesh = verify_addr(mac)
-        print('ip_mesh - ' + str(ip_mesh))
-        aux = aux_ubuntu if uuid == 'Ubuntu' else aux
+    if verify_certificate(localCert, receivedKey):
+        print(colored('> Valid Client Certificate', 'green'))
+        ip_mesh = verify_addr(ip_address)
+        print('> Assigned Mesh IP: ', end='')
+        print(ip_mesh)
+        aux = aux_ubuntu if uuid == 'Ubuntu' else aux_openwrt
         if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
             aux['gateway'] = True
             add_default_route(ip_address)  # we will need to add the default route to communicate
@@ -69,26 +71,40 @@ def add_message(uuid):
             aux['gateway'] = False
         aux['addr'] = ip_mesh
         SECRET_MESSAGE = json.dumps(aux)
+        print('> Unencrypted message: ', end='')
         print(SECRET_MESSAGE)
-        proc = subprocess.Popen(['src/ecies_encrypt', SERVER_CERT, SECRET_MESSAGE], stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
-        file = pathlib.Path("payload.enc")
-        if not file.exists():
-            pathlib.Path('payload.enc').touch()
+        # use .call() to block and avoid race condition with open()
+        proc = subprocess.call(['src/ecies_encrypt',
+                                SERVER_CERT, SECRET_MESSAGE],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         enc = open('payload.enc', 'rb')
         encrypt_all = enc.read()
+        print('> Sending encrypted message: ', end='')
         print(encrypt_all)
-        return encrypt_all
+        return encrypt_all + localCert.read()
     else:
         NOT_AUTH[mac] = ip_address
-        print(colored("Not Valid Certificate", 'red'))
+        print(colored("Not Valid Client Certificate", 'red'))
         return 'Not Valid Certificate'
 
+
+def verify_certificate(old, new):
+    """
+    Here we are validating the hash of the certificate. This is giving us the integrity of the file, not if the
+    certificate is valid. To validate if the certificate is valid, we need to verify the features of the certificate
+    such as NotBefore, notAfter, crl file and its signature, issuer validity, if chain is there then this for all but
+    for this we need to use x509 certificates.
+
+    """
+    old_md5 = hashlib.md5(old.read()).hexdigest()
+    new_md5 = hashlib.md5(new).hexdigest()
+    return old_md5 == new_md5
 
 
 def add_default_route(ip_gateway):
     inter = netifaces.interfaces()
     for interf in inter:
+        # TODO: what it if doesn't start with wlan???
         if interf.startswith('wlan'):
             interface = interf
 
@@ -97,24 +113,37 @@ def add_default_route(ip_gateway):
     subprocess.call(command, shell=True)
 
 
-def verify_addr(mac):
-    last_ip = ADDRESSES[list(ADDRESSES.keys())[-1]]  # get last ip
-    last_octect = int(last_ip.split('.')[-1])  # get last ip octect
-    if mac not in ADDRESSES:
+def verify_addr(wan_ip):
+    last_ip = IP_ADDRESSES[list(IP_ADDRESSES.keys())[-1]]  # get last ip
+    last_octect = int(last_ip.split('.')[-1])  # get last ip octet
+    if wan_ip not in IP_ADDRESSES:
         ip_mesh = IP_PREFIX + '.' + str(last_octect + 1)
-        ADDRESSES[mac] = ip_mesh
+        IP_ADDRESSES[wan_ip] = ip_mesh
     else:
-        ip_mesh = ADDRESSES[mac]
-    print('Assigned IP_Mesh: ' + ip_mesh)
-    print(ADDRESSES)
+        ip_mesh = IP_ADDRESSES[wan_ip]
+    print('> All Addresses: ', end='')
+    print(IP_ADDRESSES)
     return ip_mesh
 
 
 def printing_auth():
-    return ADDRESSES
+    return MAC_ADDRESSES
+
 
 def printing_no_auth():
     return NOT_AUTH
+
+
+@app.route('/mac/<uuid>', methods=['GET', 'POST'])
+def add_mac_addr(uuid):
+    mac = uuid
+    ip_address = request.remote_addr
+    MAC_ADDRESSES[mac] = IP_ADDRESSES[ip_address]
+    if '00:00:00:00:00:00' in MAC_ADDRESSES.keys():
+        del MAC_ADDRESSES['00:00:00:00:00:00']
+    print('> All Addresses: ', end='')
+    print(MAC_ADDRESSES)
+    return MAC_ADDRESSES
 
 
 @app.route('/')

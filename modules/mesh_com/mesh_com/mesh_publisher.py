@@ -1,45 +1,40 @@
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSPresetProfiles
+
 from std_msgs.msg import String
-import subprocess
-
-
-class BatmanVisualisation:
-
-    command = 'batadv-vis'
-
-    def __str__(self):
-        return 'BatmanVisualisation \'{0}\''.format(self.batadv_vis)
-
-    def get(self, format_type="dot"):
-        if format_type == "dot" or format_type == "jsondoc" or format_type == "json":
-            try:
-                # returns byte string
-                raw_data = subprocess.check_output([self.command, '-f', format_type])
-                if raw_data == 255:
-                    raw_data = b'NA'
-            except (FileNotFoundError, subprocess.CalledProcessError):
-                raw_data = b'NA'
-        else:
-            raw_data = b'NA'
-        # return string
-        return raw_data.decode('UTF-8').strip('\n')
+import socket
 
 
 class MeshPublisher(Node):
-
     def __init__(self):
         super().__init__('mesh_publisher')
-        self.publisher_ = self.create_publisher(String, 'mesh_visual', 10)
+        self.publisher_ = self.create_publisher(String, 'mesh_visual',
+                                                QoSPresetProfiles.SYSTEM_DEFAULT.value)
         timer_period = 10  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
-        self.batman = BatmanVisualisation()
+        self.HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
+        self.PORT = 33221  # Port to listen on (non-privileged ports are > 1023)
+        self.mesh_socket = socket.socket()  # to remove python warning
 
     def timer_callback(self):
         msg = String()
-        msg.data = self.batman.get(format_type="dot")
-        self.publisher_.publish(msg)
-        self.get_logger().info('Mesh Publishing: "%s"' % msg.data)
+        self.get_logger().info('publisher timer_callback')
+        try:
+            self.setup_socket()
+            self.mesh_socket.connect((self.HOST, self.PORT))
+            self.mesh_socket.sendall(str.encode("report\n"))
+            msg.data = self.mesh_socket.recv(2048).decode('utf-8')
+            self.mesh_socket.close()
+            self.publisher_.publish(msg)
+            self.get_logger().info('Mesh Publishing: "%s"' % msg.data)
+        except (ConnectionRefusedError, socket.timeout, ConnectionResetError):
+            pass
+
+    def setup_socket(self):
+        self.mesh_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.mesh_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.mesh_socket.settimeout(1)
 
 
 def main(args=None):
