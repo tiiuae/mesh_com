@@ -125,6 +125,9 @@ def get_ap_interface():
 def get_mesh_interface():
     interface_list = netifaces.interfaces()
     interface = filter(lambda x: 'wlx' in x, interface_list)
+    if not list(interface):
+        mesh_interface = filter(lambda x: 'wla' in x or 'wlp' in x, interface_list)
+        return  list(mesh_interface)[0]
     return list(interface)[0]
 
 
