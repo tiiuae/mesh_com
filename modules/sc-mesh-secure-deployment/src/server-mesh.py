@@ -7,7 +7,6 @@ import netifaces
 import pandas as pd
 import argparse
 from termcolor import colored
-import pathlib
 import hashlib
 
 # Construct the argument parser
