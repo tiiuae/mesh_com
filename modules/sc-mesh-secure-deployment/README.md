@@ -22,7 +22,7 @@ Once you have done this, startup your host machine and run install.sh.
 
 ```bash
 cd ~
-./install.sh
+sudo ./install.sh
 ```
 
 This script will do the following...
