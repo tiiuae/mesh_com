@@ -14,6 +14,8 @@ ap = argparse.ArgumentParser()
 
 # Add the arguments to the parser
 ap.add_argument("-c", "--certificate", required=True)
+ap.add_argument("-a", "--address", help='SubNetwork address to provision, example: 10.10.0.1', required=False,
+                default='10.0.0.0')
 args = ap.parse_args()
 
 app = Flask(__name__)
@@ -36,17 +38,20 @@ aux_ubuntu = {
     "subnet": "255.255.255.0",  # "subnet mask"
     "tx_power": "30",
     # "select 30dBm, HW and regulations limiting it correct level. Can be used to set lower dBm levels for testing purposes (e.g. 5dBm)"
-    "mode": "mesh"  # "mesh=mesh network, ap=debug hotspot"
+    "mode": "mesh",  # "mesh=mesh network, ap=debug hotspot"
+    "authServer": False
 }
 
-IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
-MAC_ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
+IP_PREFIX = '.'.join(args.address.split('.')[0:3])
 
-IP_PREFIX = '10.20.15'
+IP_ADDRESSES = {'0.0.0.0': IP_PREFIX + '.1'}
+MAC_ADDRESSES = {'00:00:00:00:00:00': IP_PREFIX + '.1'}
 
 SERVER_CERT = args.certificate
 
 NOT_AUTH = {}
+
+AUTH_ROUTES = pd.DataFrame(columns=['MAC', 'Mesh_IP', 'Mesh_Network'])
 
 
 @app.route('/api/add_message/<uuid>', methods=['GET', 'POST'])
@@ -65,9 +70,11 @@ def add_message(uuid):
         aux = aux_ubuntu if uuid == 'Ubuntu' else aux_openwrt
         if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
             aux['gateway'] = True
-            add_default_route(ip_address)  # we will need to add the default route to communicate
+            add_default_route(ip_mesh, ip_address)  # we will need to add the default route to communicate
         else:
             aux['gateway'] = False
+        if ip_mesh == IP_PREFIX + '.3':  # TODO: find smart way to set this value. Currently: only one server == '.3'
+            aux['authServer'] = True
         aux['addr'] = ip_mesh
         SECRET_MESSAGE = json.dumps(aux)
         print('> Unencrypted message: ', end='')
@@ -100,14 +107,14 @@ def verify_certificate(old, new):
     return old_md5 == new_md5
 
 
-def add_default_route(ip_gateway):
+def add_default_route(ip_network, ip_gateway):
     inter = netifaces.interfaces()
     for interf in inter:
         # TODO: what it if doesn't start with wlan???
         if interf.startswith('wlan'):
             interface = interf
 
-    command = 'ip route add ' + IP_PREFIX + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface  # assuming only 2 interfaces are presented
+    command = 'ip route add ' + ip_network + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface  # assuming only 2 interfaces are presented
     print(command)
     subprocess.call(command, shell=True)
 
@@ -143,6 +150,19 @@ def add_mac_addr(uuid):
     print('> All Addresses: ', end='')
     print(MAC_ADDRESSES)
     return MAC_ADDRESSES
+
+
+"""
+This function adds elements to a dataframe, only the auth neighbor is store in a dataframe.
+Also, it creates a default route to that network. 
+"""
+@app.route('authServ/<address>')
+def store_authServer(address):
+    ip_address = request.remote_addr
+    mac = list(MAC_ADDRESSES.keys())[list(MAC_ADDRESSES.values()).index(ip_address)]
+    AUTH_ROUTES.append({'MAC': mac, 'Mesh_IP': ip_address, 'Mesh_Network': address}, ignore_index=True)
+    add_default_route(address, ip_address)
+    return AUTH_ROUTES
 
 
 @app.route('/')
