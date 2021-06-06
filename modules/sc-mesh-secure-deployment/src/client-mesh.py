@@ -189,7 +189,7 @@ if __name__ == "__main__":
     local_cert = args.certificate
     get_data(local_cert, os)
     res, server_cert = decrypt_response()
-    if verify_certificate(local_cert, server_cert):
+    if verify_certificate(server_cert):
         print(colored('> Valid Server Certificate', 'green'))
         mac = get_mac_address(interface=get_mesh_interface())
         response = requests.post(URL + '/mac/' + mac)
