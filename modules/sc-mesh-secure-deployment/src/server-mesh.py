@@ -73,7 +73,7 @@ def add_message(uuid):
             add_default_route(ip_mesh, ip_address)  # we will need to add the default route to communicate
         else:
             aux['gateway'] = False
-        if ip_mesh % 2 == 0:  # TODO: find smart way to set this value. Currently: only one server == '.3'
+        if int(ip_mesh.split('.')[-1]) % 2 == 0:  # TODO: find smart way to set this value. Currently: only one server == '.3'
             aux['authServer'] = True
         aux['addr'] = ip_mesh
         SECRET_MESSAGE = json.dumps(aux)
