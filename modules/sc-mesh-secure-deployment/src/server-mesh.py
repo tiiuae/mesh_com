@@ -73,7 +73,7 @@ def add_message(uuid):
             add_default_route(ip_mesh, ip_address)  # we will need to add the default route to communicate
         else:
             aux['gateway'] = False
-        if ip_mesh == IP_PREFIX + '.3':  # TODO: find smart way to set this value. Currently: only one server == '.3'
+        if ip_mesh % 2 == 0:  # TODO: find smart way to set this value. Currently: only one server == '.3'
             aux['authServer'] = True
         aux['addr'] = ip_mesh
         SECRET_MESSAGE = json.dumps(aux)
@@ -156,6 +156,8 @@ def add_mac_addr(uuid):
 This function adds elements to a dataframe, only the auth neighbor is store in a dataframe.
 Also, it creates a default route to that network. 
 """
+
+
 @app.route('authServ/<address>')
 def store_authServer(address):
     ip_address = request.remote_addr

@@ -62,9 +62,7 @@ def decrypt_response():  # assuming that data is on a file called payload.enc ge
 
 def serializing(new_list):
     joined_list = ''.join(new_list)
-    output_dict = joined_list.replace("\'", '"')
-
-    return output_dict
+    return joined_list.replace("\'", '"')
 
 
 def verify_certificate(new):
