@@ -158,7 +158,7 @@ Also, it creates a default route to that network.
 """
 
 
-@app.route('authServ/<address>')
+@app.route('/authServ/<address>')
 def store_authServer(address):
     ip_address = request.remote_addr
     mac = list(MAC_ADDRESSES.keys())[list(MAC_ADDRESSES.values()).index(ip_address)]
