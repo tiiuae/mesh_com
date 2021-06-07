@@ -1,0 +1,9 @@
+[Unit]
+Description= Connect to Access Point Service
+
+[Service]
+Type=idle
+ExecStart=/usr/local/bin/mesh-ap-connect.sh
+
+[Install]
+WantedBy=multi-user.target

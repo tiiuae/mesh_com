@@ -12,6 +12,8 @@ from getmac import get_mac_address
 import requests
 from termcolor import colored
 from pathlib import Path
+import os
+import psutil
 
 # Construct the argument parser
 ap = argparse.ArgumentParser()
@@ -31,12 +33,12 @@ def get_os():
     for element in out.split():
         aux = element.decode('utf-8')
         if 'Ubuntu' in aux:
-            os = aux
-    return os
+            OS = aux
+    return OS
 
 
 def get_data(cert_file, os):
-    message = '/api/add_message/' + os
+    message = '/add_message/' + os
     response = requests.post(URL + message,
                              files={'key': open(cert_file, 'rb')})
     if response.content == b'Not Valid Certificate':
@@ -124,9 +126,18 @@ def ubuntu_node(gateway):
 
 def authServer(addr):
     ip_prefix = '.'.join(addr.split('.')[0:2])
-    new_ip = ip_prefix + '.' + random.randint(1, 254) + '.1'  # TODO: Currently random number, this is gonna cause collision still
-    subprocess.call('../configure -s ' + new_ip, shell=True)
-    requests.post(URL + '/mac/' + new_ip)
+    new_ip = ip_prefix + '.' + str(random.randint(1, 254)) + '.1'  # TODO: Currently random number, this is gonna cause collision still
+    requests.post(URL+'/authServer/'+new_ip)
+    # to make it persistent
+    name = os.listdir('/home')[-1]
+    with open('/etc/mesh_com/server.conf', 'w') as mesh_config:
+        mesh_config.write('NAME=' + name + '\n')
+        mesh_config.write('IP=' + addr + '\n')
+    subprocess.call('sudo cp ../../common/scripts/mesh-server.sh /usr/local/bin/.', shell=True)
+    subprocess.call('sudo chmod 744 /usr/local/bin/mesh-server.sh', shell=True)
+    subprocess.call('sudo cp services/mesh-server.service /etc/systemd/system/.', shell=True)
+    subprocess.call('sudo chmod 644 /etc/systemd/system/mesh-server.service', shell=True)
+    subprocess.call('sudo systemctl enable mesh-server.service', shell=True)
 
 
 def create_config_ubuntu(response):
@@ -162,10 +173,22 @@ def create_config_ubuntu(response):
     subprocess.call(command_hostname, shell=True)
     command_hostname_host = 'echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts'
     subprocess.call(command_hostname_host, shell=True)
+    if res['gateway']:
+        authServer(address)
+    if int(res['addr'].split('.')[-1]) == 1:
+        if ("mesh-server.sh" not in p.name() for p in psutil.process_iter()):
+            # this mean we have a server running on the same node
+            authServer(address)
+        subprocess.call('sudo cp ../../common/scripts/mesh-ap-connect.sh /usr/local/bin/.', shell=True)
+        subprocess.call('sudo chmod 744 /usr/local/bin/mesh-ap-connect.sh', shell=True)
+        subprocess.call('sudo cp services/connect_ap.service /etc/systemd/system/.', shell=True)
+        subprocess.call('sudo chmod 664 /etc/systemd/system/connect_ap.service', shell=True)
+        subprocess.call('sudo systemctl enable connect_ap.service', shell=True)
+        subprocess.call('reboot', shell=True)
     # Final settings
     subprocess.call('sudo nmcli networking off', shell=True)
-    subprocess.call('sudo systemctl stop network-manager.service', shell=True)
-    subprocess.call('sudo systemctl disable network-manager.service', shell=True)
+    #subprocess.call('sudo systemctl stop network-manager.service', shell=True)
+    #subprocess.call('sudo systemctl disable network-manager.service', shell=True)
     subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
     # Copy mesh service to /etc/systemd/system/
     mesh_interface = get_mesh_interface()
@@ -179,23 +202,18 @@ def create_config_ubuntu(response):
     time.sleep(2)
     # subprocess.call('reboot', shell=True)
     # Are we an Auth-server node?
-    if res['gateway']:
-        authServer(address)
-    if int(address.split('.')[-1]) == 1:  # this is the mesh initiator/server
-        subprocess.call('sudo cp ../conf/ap_connect.sh /usr/local/bin/.', shell=True)
-        subprocess.call('sudo chmod 744 /usr/local/bin/ap_connect.sh', shell=True)
 
 
 if __name__ == "__main__":
-    os = get_os()
+    OS = get_os()
     local_cert = args.certificate
-    get_data(local_cert, os)
+    get_data(local_cert, OS)
     res, server_cert = decrypt_response()
     if verify_certificate(server_cert):
         print(colored('> Valid Server Certificate', 'green'))
         mac = get_mac_address(interface=get_mesh_interface())
         response = requests.post(URL + '/mac/' + mac)
-        if os == 'Ubuntu':
+        if OS == 'Ubuntu':
             create_config_ubuntu(res)
         else:
             print(colored('Wrong OS'), 'red')

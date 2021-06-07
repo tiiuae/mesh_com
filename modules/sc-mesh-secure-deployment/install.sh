@@ -54,7 +54,7 @@ function ap_connect {
 echo '> Connecting to Access Point...'
 read -p "- SSID: " ssid
 read -p "- Password: " password
-cat <<EOF > conf/ap.conf
+cat <<EOF > /tmp/ap.conf
 network={
   ssid="$ssid"
   psk="$password"
@@ -63,7 +63,7 @@ EOF
 echo '> Please choose from the list of available interfaces...'
 interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
 menu_from_array "${interfaces_arr[@]}"
-sudo wpa_supplicant -B -i $choice -c conf/ap.conf
+sudo wpa_supplicant -B -i $choice -c /tmp/ap.conf
 sudo dhclient -v $choice
 }
 
@@ -82,7 +82,7 @@ fi
 echo "> Checking required packages..."
 command_exists "git make python3-pip batctl ssh clang libssl-dev net-tools \
                 iperf3 avahi-daemon avahi-dnsconfd avahi-utils libnss-mdns \
-                bmon isc-dhcp-server alfred batctl resolvconf python3-pandas"
+                bmon isc-dhcp-server alfred batctl resolvconf python3-pandas python3-psutil"
 #remove gnome-keyring
 gnome-keyring-daemon --start --components=ssh
 # Clone this repo
@@ -95,3 +95,9 @@ fi
 echo "> Init submodules..."
 cd mesh_com
 git submodule update --init --recursive
+FILE=/tmp/ap.conf
+if [ -f $FILE ]; then
+    cp $FILE modules/sc-mesh-secure-deployment/conf
+fi
+
+
