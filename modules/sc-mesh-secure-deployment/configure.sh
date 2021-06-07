@@ -49,8 +49,7 @@ function menu_from_array()
 
 #-----------------------------------------------------------------------------#
 # connect to Access Point previously created
-chmod 744 conf/ap_connect.sh
-conf/ap_connect.sh
+
 
 function ap_create {
 echo '> Creating an Access Point...'
@@ -111,7 +110,8 @@ function ap_menu {
   ap_arr=('Connect to an Access Point?' 'Create an Access Point?' 'Remove an Access Point?')
   menu_from_array "${ap_arr[@]}"
   if [ $REPLY == "1" ]; then
-    ap_connect
+    chmod 744 conf/ap_connect.sh
+    conf/ap_connect.sh
   elif [[ $REPLY == "2" ]]; then
     ap_create
   elif [[ $REPLY == "3" ]]; then
