@@ -44,8 +44,8 @@ aux_ubuntu = {
 
 IP_PREFIX = '.'.join(args.address.split('.')[0:3])
 
-IP_ADDRESSES = {'0.0.0.0': IP_PREFIX + '.0'}
-MAC_ADDRESSES = {'00:00:00:00:00:00': IP_PREFIX + '.0'}
+IP_ADDRESSES = {'0.0.0.0': IP_PREFIX + '.1'}
+MAC_ADDRESSES = {'00:00:00:00:00:00': IP_PREFIX + '.1'}
 
 SERVER_CERT = args.certificate
 
@@ -70,7 +70,7 @@ def add_message(uuid):
         aux = aux_ubuntu if uuid == 'Ubuntu' else aux_openwrt
         if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
             aux['gateway'] = True
-            add_default_route(IP_PREFIX + '.2', ip_address)  # we will need to add the default route to communicate
+            add_default_route(ip_mesh, ip_address)  # we will need to add the default route to communicate
         else:
             aux['gateway'] = False
         if int(ip_mesh.split('.')[-1]) % 2 == 0:  # TODO: find smart way to set this value. Currently: only one server == '.3'
@@ -114,7 +114,7 @@ def add_default_route(ip_network, ip_gateway):
         if interf.startswith('wlan'):
             interface = interf
 
-    command = 'ip route add ' + ip_network + '/24 ' + 'via ' + ip_gateway + ' dev ' + interface  # assuming only 2 interfaces are presented
+    command = 'ip route add ' + ip_network + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface  # assuming only 2 interfaces are presented
     print(command)
     subprocess.call(command, shell=True)
 

@@ -48,8 +48,22 @@ function menu_from_array()
 
 
 #-----------------------------------------------------------------------------#
-# connect to Access Point previously created
-
+function ap_connect {
+echo '> Connecting to Access Point...'
+read -p "- SSID: " ssid
+read -p "- Password: " password
+cat <<EOF > conf/ap.conf
+network={
+  ssid="$ssid"
+  psk="$password"
+}
+EOF
+echo '> Please choose from the list of available interfaces...'
+interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
+menu_from_array "${interfaces_arr[@]}"
+sudo wpa_supplicant -B -i $choice -c conf/ap.conf
+sudo dhclient -v $choice
+}
 
 function ap_create {
 echo '> Creating an Access Point...'
@@ -110,8 +124,7 @@ function ap_menu {
   ap_arr=('Connect to an Access Point?' 'Create an Access Point?' 'Remove an Access Point?')
   menu_from_array "${ap_arr[@]}"
   if [ $REPLY == "1" ]; then
-    chmod 744 conf/ap_connect.sh
-    conf/ap_connect.sh
+    ap_connect
   elif [[ $REPLY == "2" ]]; then
     ap_create
   elif [[ $REPLY == "3" ]]; then
@@ -215,27 +228,25 @@ function client {
   while ! [ "$servers" ] ; do
     servers=($(avahi-browse -rptf _http._tcp | awk -F';' '$1 == "=" && $3 == "IPv4" && $4 ~ /^mesh_server/ {print $8 " " $7}'))
   done
-  if ! printf '%s\0' "${servers[@]}" | grep -Fqxz -- "127.0.0.1"; then
-    if [ "${#servers[@]}" -gt 2 ]; then
-        echo "More than one server found"
-        echo "Measuring delay";
-        fastest_response=2147483647 # largest possible integer
-        for index in "${!servers[@]}"
-        do :
-          if [ $((index%2)) -eq 0 ]
-           then
-              avg=$(ping -c 4 "${servers[index]}" | tail -1| awk '{print $4}' | cut -d '/' -f 2)
-              if (( $(bc -l <<< "$avg < $fastest_response") )) ; then
-                  fastest_response=$avg
-                  fastest_site=${servers[index]}
-                  fastest_index=$index
-              fi
-           fi
-        done
-        server_ip=$fastest_site
-        server_host=${servers[$((fastest_index+1))]}
-    fi
-    else
+  if [ "${#servers[@]}" -gt 2 ]; then
+	  echo "More than one server found"
+	  echo "Measuring delay";
+    fastest_response=2147483647 # largest possible integer
+	  for index in "${!servers[@]}"
+	  do :
+     	if [ $((index%2)) -eq 0 ]
+	     then
+	        avg=$(ping -c 4 "${servers[index]}" | tail -1| awk '{print $4}' | cut -d '/' -f 2)
+	        if (( $(bc -l <<< "$avg < $fastest_response") )) ; then
+        	    fastest_response=$avg
+	      	    fastest_site=${servers[index]}
+		          fastest_index=$index
+        	fi
+       fi
+    done
+	  server_ip=$fastest_site
+	  server_host=${servers[$((fastest_index+1))]}
+  else
         server_ip=${servers[0]}
         server_host=${servers[1]}
   fi
