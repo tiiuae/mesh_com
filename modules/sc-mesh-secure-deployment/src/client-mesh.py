@@ -53,7 +53,7 @@ def decrypt_response():  # assuming that data is on a file called payload.enc ge
     out, err = proc.communicate()
     aux_list = [element.decode() for element in out.split()]
     server_cert = aux_list[:39]
-    new_list = aux_list[40:64]
+    new_list = aux_list[40:66]
     output_dict = serializing(new_list)
     print('> Decrypted Message: ', output_dict)  # res =  json.loads(output_dict)
 
@@ -124,7 +124,7 @@ def ubuntu_node(gateway):
 
 def authServer(addr):
     ip_prefix = '.'.join(addr.split('.')[0:2])
-    new_ip = ip_prefix + '.' + random.randint(1, 254) + '.1' #TODO: Currently random number, this is gonna cause collision still
+    new_ip = ip_prefix + '.' + random.randint(1, 254) + '.1'  # TODO: Currently random number, this is gonna cause collision still
     subprocess.call('../configure -s ' + new_ip, shell=True)
     requests.post(URL + '/mac/' + new_ip)
 
@@ -177,11 +177,13 @@ def create_config_ubuntu(response):
     # Ensure our nameserver persists as 8.8.8.8
     subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True)
     time.sleep(2)
-    #subprocess.call('reboot', shell=True)
+    # subprocess.call('reboot', shell=True)
     # Are we an Auth-server node?
     if res['gateway']:
         authServer(address)
-
+    if int(address.split('.')[-1]) == 1:  # this is the mesh initiator/server
+        subprocess.call('sudo cp ../conf/ap_connect.sh /usr/local/bin/.', shell=True)
+        subprocess.call('sudo chmod 744 /usr/local/bin/ap_connect.sh', shell=True)
 
 
 if __name__ == "__main__":
