@@ -44,8 +44,8 @@ aux_ubuntu = {
 
 IP_PREFIX = '.'.join(args.address.split('.')[0:3])
 
-IP_ADDRESSES = {'0.0.0.0': IP_PREFIX + '.1'}
-MAC_ADDRESSES = {'00:00:00:00:00:00': IP_PREFIX + '.1'}
+IP_ADDRESSES = {'0.0.0.0': IP_PREFIX + '.0'}
+MAC_ADDRESSES = {'00:00:00:00:00:00': IP_PREFIX + '.0'}
 
 SERVER_CERT = args.certificate
 
@@ -68,11 +68,12 @@ def add_message(uuid):
         print('> Assigned Mesh IP: ', end='')
         print(ip_mesh)
         aux = aux_ubuntu if uuid == 'Ubuntu' else aux_openwrt
-        if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
-            aux['gateway'] = True
-            add_default_route(ip_mesh, ip_address)  # we will need to add the default route to communicate
-        else:
-            aux['gateway'] = False
+        aux['gateway'] = False
+        # if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
+        #     aux['gateway'] = True
+        #     add_default_route(ip_mesh, ip_address)  # we will need to add the default route to communicate
+        # else:
+        #     aux['gateway'] = False
         if int(ip_mesh.split('.')[-1]) % 2 == 0:  # TODO: find smart way to set this value. Currently: only one server == '.3'
             aux['authServer'] = True
         aux['addr'] = ip_mesh
