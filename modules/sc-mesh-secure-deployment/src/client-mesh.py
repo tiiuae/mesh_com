@@ -182,8 +182,12 @@ def create_config_ubuntu(response):
     if res['gateway']:
         authServer(address)
     if int(address.split('.')[-1]) == 1:  # this is the mesh initiator/server
-        subprocess.call('sudo cp ../conf/ap_connect.sh /usr/local/bin/.', shell=True)
+        print('FIRST NODE')
+        subprocess.call('sudo cp conf/ap_connect.sh /usr/local/bin/.', shell=True)
         subprocess.call('sudo chmod 744 /usr/local/bin/ap_connect.sh', shell=True)
+        subprocess.call('sudo cp services/connect_ap@.service /etc/systemd/system/.', shell=True)
+        subprocess.call('sudo chmod 664 /etc/systemd/system/connect_ap@.service', shell=True)
+        subprocess.call('sudo systemctl enable connect_ap@.service', shell=True)
 
 
 if __name__ == "__main__":

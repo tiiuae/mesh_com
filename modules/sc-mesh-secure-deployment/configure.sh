@@ -215,25 +215,27 @@ function client {
   while ! [ "$servers" ] ; do
     servers=($(avahi-browse -rptf _http._tcp | awk -F';' '$1 == "=" && $3 == "IPv4" && $4 ~ /^mesh_server/ {print $8 " " $7}'))
   done
-  if [ "${#servers[@]}" -gt 2 ]; then
-	  echo "More than one server found"
-	  echo "Measuring delay";
-    fastest_response=2147483647 # largest possible integer
-	  for index in "${!servers[@]}"
-	  do :
-     	if [ $((index%2)) -eq 0 ]
-	     then
-	        avg=$(ping -c 4 "${servers[index]}" | tail -1| awk '{print $4}' | cut -d '/' -f 2)
-	        if (( $(bc -l <<< "$avg < $fastest_response") )) ; then
-        	    fastest_response=$avg
-	      	    fastest_site=${servers[index]}
-		          fastest_index=$index
-        	fi
-       fi
-    done
-	  server_ip=$fastest_site
-	  server_host=${servers[$((fastest_index+1))]}
-  else
+  if ! printf '%s\0' "${servers[@]}" | grep -Fqxz -- "127.0.0.1"; then
+    if [ "${#servers[@]}" -gt 2 ]; then
+        echo "More than one server found"
+        echo "Measuring delay";
+        fastest_response=2147483647 # largest possible integer
+        for index in "${!servers[@]}"
+        do :
+          if [ $((index%2)) -eq 0 ]
+           then
+              avg=$(ping -c 4 "${servers[index]}" | tail -1| awk '{print $4}' | cut -d '/' -f 2)
+              if (( $(bc -l <<< "$avg < $fastest_response") )) ; then
+                  fastest_response=$avg
+                  fastest_site=${servers[index]}
+                  fastest_index=$index
+              fi
+           fi
+        done
+        server_ip=$fastest_site
+        server_host=${servers[$((fastest_index+1))]}
+    fi
+    else
         server_ip=${servers[0]}
         server_host=${servers[1]}
   fi

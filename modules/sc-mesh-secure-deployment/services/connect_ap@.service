@@ -1,0 +1,9 @@
+[Unit]
+Description= Connect to Access Point Service
+
+[Service]
+Type=idle
+ExecStart=/usr/local/bin/ap_connect.sh
+
+[Install]
+WantedBy=multi-user.target
