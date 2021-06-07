@@ -53,7 +53,7 @@ def decrypt_response():  # assuming that data is on a file called payload.enc ge
     out, err = proc.communicate()
     aux_list = [element.decode() for element in out.split()]
     server_cert = aux_list[:39]
-    new_list = aux_list[40:64]
+    new_list = aux_list[40:66]
     output_dict = serializing(new_list)
     print('> Decrypted Message: ', output_dict)  # res =  json.loads(output_dict)
 
@@ -127,6 +127,17 @@ def authServer(addr):
     new_ip = ip_prefix + '.' + random.randint(1, 254) + '.1' #TODO: Currently random number, this is gonna cause collision still
     subprocess.call('../configure -s ' + new_ip, shell=True)
     requests.post(URL + '/mac/' + new_ip)
+    # to make it persistent
+    nodeId = int(addr.split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
+    name = 'node' + str(nodeId)
+    with open('/etc/mesh_com/server.conf', 'w') as mesh_config:
+        mesh_config.write('NAME=' + name + '\n')
+        mesh_config.write('IP=' + addr + '\n')
+    subprocess.call('sudo cp ../../common/scripts/mesh-server.sh /usr/local/bin/.', shell=True)
+    subprocess.call('sudo chmod 744 /usr/local/bin/mesh-server.sh', shell=True)
+    subprocess.call('sudo cp services/mesh-server@.service /etc/systemd/system/.', shell=True)
+    subprocess.call('sudo chmod 644 /etc/systemd/system/mesh-server@.service', shell=True)
+    subprocess.call('sudo systemctl enable mesh-server@.service', shell=True)
 
 
 def create_config_ubuntu(response):

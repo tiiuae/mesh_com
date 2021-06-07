@@ -4,7 +4,7 @@
 function ap_connect {
 echo '> Connecting to Access Point...'
 choice='wlan0'
-sudo wpa_supplicant -B -i $choice -c ap.conf
+sudo wpa_supplicant -B -i $choice -c conf/ap.conf
 sudo dhclient -v $choice
 }
 
