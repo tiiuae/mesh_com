@@ -2,3 +2,6 @@
 	path = common/security/cryptolib
 	url = https://github.com/tiiuae/cryptolib.git
 	ignore = dirty
+[submodule "common/core/os/ubuntu/wpa_supplicant"]
+	path = common/core/os/ubuntu/wpa_supplicant
+	url = https://github.com/tiiuae/wpa.git
