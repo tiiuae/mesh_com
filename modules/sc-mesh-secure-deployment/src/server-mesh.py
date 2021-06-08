@@ -54,12 +54,10 @@ if os.path.isfile("data/auth.csv"):
     MAC_ADDRESSES.drop_duplicates(inplace=True)
 else:
     MAC_ADDRESSES = pd.DataFrame(columns=['Mesh IP', 'MAC Address'])
-    MAC_ADDRESSES['MAC Address'] = '00:00:00:00:00:00'
-    MAC_ADDRESSES['Mesh IP'] = IP_PREFIX + '.0'
 if os.path.isfile("data/no_auth.csv"):
     NOT_AUTH = pd.read_csv('data/no_auth.csv', names=['Mesh IP', 'MAC Address'])
 else:
-    NOT_AUTH = {}
+    NOT_AUTH = pd.DataFrame(columns=['Mesh IP', 'MAC Address'])
 if os.path.isfile("data/auth_routes.csv"):
     AUTH_ROUTES = pd.read_csv('data/auth_routes.csv')
 else:
@@ -168,12 +166,12 @@ def add_mac_addr(uuid):
         MAC_ADDRESSES = pd.read_csv('data/auth.csv', names=['Mesh IP', 'MAC Address'])
         MAC_ADDRESSES.drop_duplicates(inplace=True)
     else:
-        MAC_ADDRESSES = {'00:00:00:00:00:00': IP_PREFIX + '.0'}
+        if not os.path.exists("data"):
+            os.mkdir("data")
+        MAC_ADDRESSES = pd.DataFrame(columns=['Mesh IP', 'MAC Address'])
     mac = uuid
     ip_address = request.remote_addr
-    if '00:00:00:00:00:00' in MAC_ADDRESSES.values:
-        del MAC_ADDRESSES['00:00:00:00:00:00']
-    if mac not in MAC_ADDRESSES.values:
+    if not MAC_ADDRESSES.empty and mac not in MAC_ADDRESSES.values:
         aux = {'Mesh IP': ip_address, 'MAC Address': mac}
         MAC_ADDRESSES = MAC_ADDRESSES.append(aux, ignore_index=True)
         MAC_ADDRESSES.to_csv('data/auth.csv', index=False, header=False, mode='a')
@@ -192,6 +190,8 @@ def store_authServer(address):
     if os.path.isfile("data/auth_routes.csv"):
         AUTH_ROUTES = pd.read_csv('data/auth_routes.csv')
     else:
+        if not os.path.exists("data"):
+            os.mkdir("data")
         AUTH_ROUTES = pd.DataFrame(columns=['MAC', 'Mesh_IP', 'Mesh_Network'])
     ip_address = request.remote_addr
     mac = list(MAC_ADDRESSES.keys())[list(MAC_ADDRESSES.values()).index(ip_address)]
