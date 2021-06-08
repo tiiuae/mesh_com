@@ -133,8 +133,6 @@ def authServer(addr):
     with open('/etc/mesh_com/server.conf', 'w') as mesh_config:
         mesh_config.write('NAME=' + name + '\n')
         mesh_config.write('IP=' + addr + '\n')
-        mesh_config.write('CERT=' + '/etc/mesh_conf/ecc_key.der' + '\n')
-    subprocess.call('sudo cp ' + args.certificate + ' /etc/mesh_conf/.', shell=True)
     subprocess.call('sudo cp ../../common/scripts/mesh-server.sh /usr/local/bin/.', shell=True)
     subprocess.call('sudo chmod 744 /usr/local/bin/mesh-server.sh', shell=True)
     subprocess.call('sudo cp services/mesh-server.service /etc/systemd/system/.', shell=True)
@@ -177,8 +175,8 @@ def create_config_ubuntu(response):
     subprocess.call(command_hostname_host, shell=True)
     # Final settings
     subprocess.call('sudo nmcli networking off', shell=True)
-    subprocess.call('sudo systemctl stop network-manager.service', shell=True)
-    subprocess.call('sudo systemctl disable network-manager.service', shell=True)
+    #subprocess.call('sudo systemctl stop network-manager.service', shell=True)
+    #subprocess.call('sudo systemctl disable network-manager.service', shell=True)
     subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
     # Copy mesh service to /etc/systemd/system/
     mesh_interface = get_mesh_interface()
