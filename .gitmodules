@@ -7,4 +7,4 @@
 	url = https://github.com/tiiuae/wpa.git
 [submodule "common/core/os/openwrt"]
 	path = common/core/os/openwrt
-	url = https://github.com/tiiuae/openwrt.git
+	url = git@github.com:tiiuae/openwrt.git
