@@ -1,4 +1,5 @@
 #!/bin/bash
 
-python3 '/home/'$1'/mesh_com/modules/sc-mesh-secure-deployment/src/server-mesh.py' -a $2 -c $3
-'./home/'$1'/mesh_com/modules/sc-mesh-secure-deployment/configure -s' $2
+SPATH='/home/'$1'/mesh_com/modules/sc-mesh-secure-deployment/configure.sh -s' $2
+
+/bin/bash $SPATH
