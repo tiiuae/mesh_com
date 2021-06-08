@@ -49,14 +49,13 @@ IP_ADDRESSES = {'0.0.0.0': IP_PREFIX + '.0'}
 
 SERVER_CERT = args.certificate
 
-
 if os.path.isfile("data/auth.csv"):
     MAC_ADDRESSES = pd.read_csv('data/auth.csv', names=['Mesh IP', 'MAC Address'])
     MAC_ADDRESSES.drop_duplicates(inplace=True)
 else:
     MAC_ADDRESSES = {'00:00:00:00:00:00': IP_PREFIX + '.0'}
 if os.path.isfile("data/no_auth.csv"):
-     NOT_AUTH = pd.read_csv('data/no_auth.csv', names=['Mesh IP', 'MAC Address'])
+    NOT_AUTH = pd.read_csv('data/no_auth.csv', names=['Mesh IP', 'MAC Address'])
 else:
     NOT_AUTH = {}
 if os.path.isfile("data/auth_routes.csv"):
@@ -85,7 +84,8 @@ def add_message(uuid):
         #     add_default_route(ip_mesh, ip_address)  # we will need to add the default route to communicate
         # else:
         #     aux['gateway'] = False
-        if int(ip_mesh.split('.')[-1]) % 2 == 0:  # TODO: find smart way to set this value. Currently: only one server == '.3'
+        if int(ip_mesh.split('.')[
+                   -1]) % 2 == 0:  # TODO: find smart way to set this value. Currently: only one server == '.3'
             aux['authServer'] = True
         aux['addr'] = ip_mesh
         SECRET_MESSAGE = json.dumps(aux)
@@ -162,7 +162,11 @@ def printing_no_auth():
 
 @app.route('/mac/<uuid>', methods=['GET', 'POST'])
 def add_mac_addr(uuid):
-    MAC_ADDRESSES = pd.read_csv('data/auth.csv', names=['Mesh IP', 'MAC Address'])
+    if os.path.isfile("data/auth.csv"):
+        MAC_ADDRESSES = pd.read_csv('data/auth.csv', names=['Mesh IP', 'MAC Address'])
+        MAC_ADDRESSES.drop_duplicates(inplace=True)
+    else:
+        MAC_ADDRESSES = {'00:00:00:00:00:00': IP_PREFIX + '.0'}
     mac = uuid
     ip_address = request.remote_addr
     if '00:00:00:00:00:00' in MAC_ADDRESSES.values:

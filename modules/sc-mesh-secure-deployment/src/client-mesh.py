@@ -32,8 +32,8 @@ def get_os():
     for element in out.split():
         aux = element.decode('utf-8')
         if 'Ubuntu' in aux:
-            os = aux
-    return os
+            OS = aux
+    return OS
 
 
 def get_data(cert_file, os):
@@ -126,10 +126,9 @@ def ubuntu_node(gateway):
 def authServer(addr):
     ip_prefix = '.'.join(addr.split('.')[0:2])
     new_ip = ip_prefix + '.' + str(random.randint(1, 254)) + '.1'  # TODO: Currently random number, this is gonna cause collision still
-    subprocess.call('./configure -s ' + new_ip, shell=True)
+    #subprocess.call('./configure -s ' + new_ip, shell=True)
     requests.post(URL + '/mac/' + new_ip)
     # to make it persistent
-    nodeId = int(addr.split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
     name = os.listdir('/home')[-1]
     with open('/etc/mesh_com/server.conf', 'w') as mesh_config:
         mesh_config.write('NAME=' + name + '\n')
