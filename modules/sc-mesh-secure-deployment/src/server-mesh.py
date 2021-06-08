@@ -53,7 +53,9 @@ if os.path.isfile("data/auth.csv"):
     MAC_ADDRESSES = pd.read_csv('data/auth.csv', names=['Mesh IP', 'MAC Address'])
     MAC_ADDRESSES.drop_duplicates(inplace=True)
 else:
-    MAC_ADDRESSES = {'00:00:00:00:00:00': IP_PREFIX + '.0'}
+    MAC_ADDRESSES = pd.DataFrame(columns=['Mesh IP', 'MAC Address'])
+    MAC_ADDRESSES['MAC Address'] = '00:00:00:00:00:00'
+    MAC_ADDRESSES['Mesh IP'] = IP_PREFIX + '.0'
 if os.path.isfile("data/no_auth.csv"):
     NOT_AUTH = pd.read_csv('data/no_auth.csv', names=['Mesh IP', 'MAC Address'])
 else:
