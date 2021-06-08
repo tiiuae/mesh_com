@@ -4,7 +4,7 @@ Description= Mesh Server Persistent Service
 [Service]
 Type=idle
 EnvironmentFile=/etc/mesh_com/server.conf
-ExecStart=/usr/local/bin/mesh-server.sh $NAME $IP
+ExecStart=/usr/local/bin/mesh-server.sh $NAME $IP $CERT
 
 [Install]
 WantedBy=multi-user.target
