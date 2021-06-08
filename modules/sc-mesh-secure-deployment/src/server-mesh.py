@@ -43,27 +43,33 @@ aux_ubuntu = {
     "authServer": False
 }
 
+IP_PREFIX = '.'.join(args.address.split('.')[0:3])
 
-def __init__(self):
-    self.IP_PREFIX = '.'.join(args.address.split('.')[0:3])
-    self.IP_ADDRESSES = {'0.0.0.0': self.IP_PREFIX + '.0'}
-    self.SERVER_CERT = args.certificate
-    if not os.path.dir("data/"):
-        os.mkdir("data/")
-        self.MAC_ADDRESSES = {'00:00:00:00:00:00': self.IP_PREFIX + '.0'}
-        self.NOT_AUTH = {}
-        self.AUTH_ROUTES = pd.DataFrame(columns=['MAC', 'Mesh_IP', 'Mesh_Network'])
-    else:
-        self.MAC_ADDRESSES = pd.read_csv('data/mac_addresses.csv')
-        self.NOT_AUTH = pd.read_csv('data/no_auth.csv')
-        self.AUTH_ROUTES = pd.read_csv('data/auth_routes.csv')
+IP_ADDRESSES = {'0.0.0.0': IP_PREFIX + '.0'}
+
+SERVER_CERT = args.certificate
 
 
-@app.route('/api/add_message/<uuid>', methods=['GET', 'POST'])
-def add_message(self, uuid):
+if os.path.isfile("data/auth.csv"):
+    MAC_ADDRESSES = pd.read_csv('data/auth.csv', names=['Mesh IP', 'MAC Address'])
+    MAC_ADDRESSES.drop_duplicates(inplace=True)
+else:
+    MAC_ADDRESSES = {'00:00:00:00:00:00': IP_PREFIX + '.0'}
+if os.path.isfile("data/no_auth.csv"):
+     NOT_AUTH = pd.read_csv('data/no_auth.csv', names=['Mesh IP', 'MAC Address'])
+else:
+    NOT_AUTH = {}
+if os.path.isfile("data/auth_routes.csv"):
+    AUTH_ROUTES = pd.read_csv('data/auth_routes.csv')
+else:
+    AUTH_ROUTES = pd.DataFrame(columns=['MAC', 'Mesh_IP', 'Mesh_Network'])
+
+
+@app.route('/add_message/<uuid>', methods=['GET', 'POST'])
+def add_message(uuid):
     key = request.files['key']
     receivedKey = key.read()
-    localCert = open(self.SERVER_CERT, 'rb')
+    localCert = open(SERVER_CERT, 'rb')
     ip_address = request.remote_addr
     print("> Requester IP: " + ip_address)
     mac = get_mac_address(ip=ip_address)
@@ -73,11 +79,13 @@ def add_message(self, uuid):
         print('> Assigned Mesh IP: ', end='')
         print(ip_mesh)
         aux = aux_ubuntu if uuid == 'Ubuntu' else aux_openwrt
-        aux['gateway'] = False  # TODO: verify if we need gw as parameter
-        if ip_mesh == self.IP_PREFIX + '.1':  # First node, then gateway
-            aux['authServer'] = True
-        if int(ip_mesh.split('.')[-1]) % 2 == 0:
-            # TODO: find smart way to set this value. Currently: only one server == '.3'
+        aux['gateway'] = False
+        # if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
+        #     aux['gateway'] = True
+        #     add_default_route(ip_mesh, ip_address)  # we will need to add the default route to communicate
+        # else:
+        #     aux['gateway'] = False
+        if int(ip_mesh.split('.')[-1]) % 2 == 0:  # TODO: find smart way to set this value. Currently: only one server == '.3'
             aux['authServer'] = True
         aux['addr'] = ip_mesh
         SECRET_MESSAGE = json.dumps(aux)
@@ -85,7 +93,7 @@ def add_message(self, uuid):
         print(SECRET_MESSAGE)
         # use .call() to block and avoid race condition with open()
         proc = subprocess.call(['src/ecies_encrypt',
-                                self.SERVER_CERT, SECRET_MESSAGE],
+                                SERVER_CERT, SECRET_MESSAGE],
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         enc = open('payload.enc', 'rb')
         encrypt_all = enc.read()
@@ -93,7 +101,15 @@ def add_message(self, uuid):
         print(encrypt_all)
         return encrypt_all + localCert.read()
     else:
-        self.NOT_AUTH[mac] = ip_address
+        if os.path.isfile("data/no_auth.csv"):
+            NOT_AUTH = pd.read_csv('data/no_auth.csv', names=['Mesh IP', 'MAC Address'])
+        else:
+            NOT_AUTH = {}
+        if mac not in NOT_AUTH.values:
+            aux = {'Mesh IP': ip_address, 'MAC Address': mac}
+            NOT_AUTH = NOT_AUTH.append(aux, ignore_index=True)
+            NOT_AUTH.to_csv('data/no_auth.csv', index=False, header=False, mode='a')
+            # FIX: this can cause overflow in case of IP/MAC spoofing
         print(colored("Not Valid Client Certificate", 'red'))
         return 'Not Valid Certificate'
 
@@ -118,43 +134,45 @@ def add_default_route(ip_network, ip_gateway):
         if interf.startswith('wlan'):
             interface = interf
 
-    command = 'ip route add ' + ip_network + '/24 ' + 'via ' + ip_gateway + ' dev ' + interface  # assuming only 2 interfaces are presented
+    command = 'ip route add ' + ip_network + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface  # assuming only 2 interfaces are presented
     print(command)
     subprocess.call(command, shell=True)
 
 
-def verify_addr(self, wan_ip):
-    last_ip = self.IP_ADDRESSES[list(self.IP_ADDRESSES.keys())[-1]]  # get last ip
+def verify_addr(wan_ip):
+    last_ip = IP_ADDRESSES[list(IP_ADDRESSES.keys())[-1]]  # get last ip
     last_octect = int(last_ip.split('.')[-1])  # get last ip octet
-    if wan_ip not in self.IP_ADDRESSES:
-        ip_mesh = self.IP_PREFIX + '.' + str(last_octect + 1)
-        self.IP_ADDRESSES[wan_ip] = ip_mesh
+    if wan_ip not in IP_ADDRESSES:
+        ip_mesh = IP_PREFIX + '.' + str(last_octect + 1)
+        IP_ADDRESSES[wan_ip] = ip_mesh
     else:
-        ip_mesh = self.IP_ADDRESSES[wan_ip]
+        ip_mesh = IP_ADDRESSES[wan_ip]
     print('> All Addresses: ', end='')
-    print(self.IP_ADDRESSES)
+    print(IP_ADDRESSES)
     return ip_mesh
 
 
-def printing_auth(self):
-    return self.MAC_ADDRESSES
+def printing_auth():
+    return MAC_ADDRESSES
 
 
-def printing_no_auth(self):
-    return self.NOT_AUTH
+def printing_no_auth():
+    return NOT_AUTH
 
 
 @app.route('/mac/<uuid>', methods=['GET', 'POST'])
-def add_mac_addr(self, uuid):
+def add_mac_addr(uuid):
+    MAC_ADDRESSES = pd.read_csv('data/auth.csv', names=['Mesh IP', 'MAC Address'])
     mac = uuid
     ip_address = request.remote_addr
-    self.MAC_ADDRESSES[mac] = self.IP_ADDRESSES[ip_address]
-    if '00:00:00:00:00:00' in self.MAC_ADDRESSES.keys():
-        del self.MAC_ADDRESSES['00:00:00:00:00:00']
+    if '00:00:00:00:00:00' in MAC_ADDRESSES.values:
+        del MAC_ADDRESSES['00:00:00:00:00:00']
+    if mac not in MAC_ADDRESSES.values:
+        aux = {'Mesh IP': ip_address, 'MAC Address': mac}
+        MAC_ADDRESSES = MAC_ADDRESSES.append(aux, ignore_index=True)
+        MAC_ADDRESSES.to_csv('data/auth.csv', index=False, header=False, mode='a')
     print('> All Addresses: ', end='')
-    print(self.MAC_ADDRESSES)
-    self.MAC_ADDRESSES.to_csv('data/mac_addresses.csv', index=False, header=True, mode='a')
-    return self.MAC_ADDRESSES
+    return 'OK'
 
 
 """
@@ -164,29 +182,27 @@ Also, it creates a default route to that network.
 
 
 @app.route('/authServ/<address>')
-def store_authServer(self, address):
+def store_authServer(address):
+    if os.path.isfile("data/auth_routes.csv"):
+        AUTH_ROUTES = pd.read_csv('data/auth_routes.csv')
+    else:
+        AUTH_ROUTES = pd.DataFrame(columns=['MAC', 'Mesh_IP', 'Mesh_Network'])
     ip_address = request.remote_addr
-    mac = list(self.MAC_ADDRESSES.keys())[list(self.MAC_ADDRESSES.values()).index(ip_address)]
-    self.AUTH_ROUTES.append({'MAC': mac, 'Mesh_IP': ip_address, 'Mesh_Network': address}, ignore_index=True)
-    add_default_route(address, ip_address)
-    self.AUTH_ROUTES.to_csv('data/auth_routes.csv', index=False, header=True, mode='a')
-    return self.AUTH_ROUTES
+    mac = list(MAC_ADDRESSES.keys())[list(MAC_ADDRESSES.values()).index(ip_address)]
+    if mac not in AUTH_ROUTES.values:
+        aux = {'MAC': mac, 'Mesh_IP': ip_address, 'Mesh_Network': address}
+        AUTH_ROUTES = AUTH_ROUTES.append(aux, ignore_index=True)
+        AUTH_ROUTES.to_csv('data/auth_routes.csv', index=False, header=False, mode='a')
+        add_default_route(address, ip_address)
+    return AUTH_ROUTES
 
 
 @app.route('/')
 def debug():
-    addresses_auth = printing_auth()
-    auth = pd.DataFrame.from_dict(addresses_auth, orient='index', columns=['Mesh IP Address'])
-    auth['MAC Address'] = auth.index
-    auth.reset_index(drop=True, inplace=True)
-    auth.to_csv('data/auth.csv', index=False, header=True, mode='a')
+    auth = printing_auth()
     bes = auth.to_html(classes='table table-striped', header=True, index=False)
 
-    no_auth = printing_no_auth()
-    table = pd.DataFrame.from_dict(no_auth, orient='index', columns=['IP Address'])
-    table['MAC Address'] = table.index
-    table.reset_index(drop=True, inplace=True)
-    table.to_csv('data/no_auth.csv', index=False, header=True, mode='a')
+    table = printing_no_auth()
     bes2 = table.to_html(classes='table table-striped', header=True, index=False)
 
     return '<h3>Authenticated Nodes</h3>' + bes + '\n' + "<h3>Not Valid Certificate Nodes</h3>" + bes2

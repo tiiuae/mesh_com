@@ -124,7 +124,7 @@ def ubuntu_node(gateway):
 
 def authServer(addr):
     ip_prefix = '.'.join(addr.split('.')[0:2])
-    new_ip = ip_prefix + '.' + random.randint(1, 254) + '.1' #TODO: Currently random number, this is gonna cause collision still
+    new_ip = ip_prefix + '.' + random.randint(1, 254) + '.1'  # TODO: Currently random number, this is gonna cause collision still
     subprocess.call('../configure -s ' + new_ip, shell=True)
     requests.post(URL + '/mac/' + new_ip)
     # to make it persistent
@@ -188,16 +188,16 @@ def create_config_ubuntu(response):
     # Ensure our nameserver persists as 8.8.8.8
     subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True)
     time.sleep(2)
-    #subprocess.call('reboot', shell=True)
+    # subprocess.call('reboot', shell=True)
     # Are we an Auth-server node?
     if res['gateway']:
         authServer(address)
     if int(res['addr'].split('.')[-1]) == 1:
         subprocess.call('sudo cp ../../common/scripts/mesh-ap-connect.sh /usr/local/bin/.', shell=True)
         subprocess.call('sudo chmod 744 /usr/local/bin/mesh-ap-connect.sh', shell=True)
-        subprocess.call('sudo cp services/connect_ap@.service /etc/systemd/system/.', shell=True)
-        subprocess.call('sudo chmod 664 /etc/systemd/system/connect_ap@.service', shell=True)
-        subprocess.call('sudo systemctl enable connect_ap@.service', shell=True)
+        subprocess.call('sudo cp services/connect_ap.service /etc/systemd/system/.', shell=True)
+        subprocess.call('sudo chmod 664 /etc/systemd/system/connect_ap.service', shell=True)
+        subprocess.call('sudo systemctl enable connect_ap.service', shell=True)
 
 
 if __name__ == "__main__":
