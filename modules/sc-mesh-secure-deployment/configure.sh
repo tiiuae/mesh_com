@@ -61,6 +61,28 @@ EOF
 echo '> Please choose from the list of available interfaces...'
 interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
 menu_from_array "${interfaces_arr[@]}"
+
+#mesh(IBSS) and sta interface are not supported concurrently.
+#Stop mesh(IBSS) service on the selected vif, if already running.
+#Below condition will be false for dual radio using seperate sta/ibss vif.
+wlan_if="$(iw dev | awk '$1=="Interface"{print $2}')"
+wlan_if_count="$(echo $wlan_if | wc -l)"
+if [ "$wlan_if_count" = "1" ]; then
+  choice="wlan0"
+  mesh_service="mesh@""$choice"".service"
+  STATUS="$(systemctl is-active $mesh_service)"
+  if [ "${STATUS}" = "active" ]; then
+    echo "Disabling" $mesh_service
+    sudo systemctl stop $mesh_service
+    sudo systemctl disable $mesh_service
+    sudo ifconfig bat0 down
+    sudo rmmod batman_adv
+    killall wpa_supplicant
+    ifconfig $choice down
+    ifconfig $choice up
+  fi
+fi
+
 sudo wpa_supplicant -B -i $choice -c conf/ap.conf
 sudo dhclient -v $choice
 }
