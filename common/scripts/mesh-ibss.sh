@@ -25,28 +25,34 @@ function help
 
 find_mesh_wifi_device()
 {
-        # arguments:
-        # $1 = wifi device vendor
-        # $2 = wifi device id
+  # arguments:
+  # $1 = wifi device vendor
+  # $2 = wifi device id list
 
-        # return values:
+  # return values: retval_phy, retval_name as global
 
-        echo "$1 $2"
-        echo "Find WIFI card deviceVendor=$1 deviceID=$2"
-        echo
-        phynames=$(ls /sys/class/ieee80211/)
+  echo "$1 $2"
+  echo "Find WIFI card deviceVendor=$1 deviceID=$2"
+  echo
+  phynames=$(ls /sys/class/ieee80211/)
 
-        for phy in $phynames; do
-          device_id="$(cat /sys/bus/pci/devices/*/ieee80211/$phy/device/device 2>/dev/null)"
-          device_vendor="$(cat /sys/bus/pci/devices/*/ieee80211/$phy/device/vendor 2>/dev/null)"
-
-          if [ "$device_id" = "$2" -a "$device_vendor" = "$1" ]; then
-                RETVAL_PHY="$phy"
-                RETVAL_NAME="$(ls /sys/class/ieee80211/$phy/device/net/)"
-                break
-          fi
-        done
+  for device in $2; do
+    echo "$device"
+    for phy in $phynames; do
+      device_id="$(cat /sys/bus/pci/devices/*/ieee80211/"$phy"/device/device 2>/dev/null)"
+      device_vendor="$(cat /sys/bus/pci/devices/*/ieee80211/"$phy"/device/vendor 2>/dev/null)"
+      if [ "$device_id" = "$device" -a "$device_vendor" = "$1" ]; then
+        retval_phy=$phy
+        retval_name=$(ls /sys/class/ieee80211/"$phy"/device/net/)
+        break 2
+      else
+        retval_phy=""
+        retval_name=""
+      fi
+    done
+  done
 }
+
 
 # 1      2    3      4        5     6       7      8         9         10
 # <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface>
@@ -55,15 +61,18 @@ echo "Solving wifi device name.."
 if [[ -z "${10}" ]]; then
   rfkill unblock all
   # multiple wifi options --> can be detected as follows:
-  #              6174     # qca988x (0x003c) not supporting ibss
-  for device in "0x003e"; do
-    find_mesh_wifi_device 0x168c $device
-    if [ "$RETVAL_PHY" != "" ]; then
-        phyname=$RETVAL_PHY
-        wifidev=$RETVAL_NAME
-        break
-    fi
-  done
+  # manufacturer 0x168c = Qualcomm
+  # devices = 0x0034 0x003c 9462/988x
+  #           0x003e        6174
+  find_mesh_wifi_device 0x168c "0x003e 0x0034 0x003c"
+
+  if [ "$retval_phy" != "" ]; then
+      phyname=$retval_phy
+      wifidev=$retval_name
+  else
+      echo "ERROR! Can't find correct wifi device!"
+      exit 1
+  fi
 else
   wifidev=${10}
   phyname=${11}
