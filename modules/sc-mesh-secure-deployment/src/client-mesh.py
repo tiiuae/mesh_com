@@ -29,9 +29,8 @@ def get_os():
     out, err = proc.communicate()
     for element in out.split():
         aux = element.decode('utf-8')
-        if 'Ubuntu' in aux or 'Raspbian' in aux or 'Linux' in aux:
-            os = 'Ubuntu'
-
+        if 'Ubuntu' in aux:
+            os = aux
     return os
 
 
