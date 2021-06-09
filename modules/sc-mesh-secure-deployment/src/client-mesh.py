@@ -193,14 +193,14 @@ def create_config_ubuntu(response):
     if res['gateway']:
         authServer(address)
     if int(res['addr'].split('.')[-1]) == 1:
+        if ("mesh-server.sh" not in p.name() for p in psutil.process_iter()):
+            # this mean we have a server running on the same node
+            authServer(address)
         subprocess.call('sudo cp ../../common/scripts/mesh-ap-connect.sh /usr/local/bin/.', shell=True)
         subprocess.call('sudo chmod 744 /usr/local/bin/mesh-ap-connect.sh', shell=True)
         subprocess.call('sudo cp services/connect_ap.service /etc/systemd/system/.', shell=True)
         subprocess.call('sudo chmod 664 /etc/systemd/system/connect_ap.service', shell=True)
         subprocess.call('sudo systemctl enable connect_ap.service', shell=True)
-        if ("mesh-server.sh" not in p.name() for p in psutil.process_iter()):
-            # this mean we have a server running on the same node
-            authServer(address)
         subprocess.call('reboot', shell=True)
 
 
