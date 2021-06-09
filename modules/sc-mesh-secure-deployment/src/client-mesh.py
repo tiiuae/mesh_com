@@ -13,6 +13,7 @@ import requests
 from termcolor import colored
 from pathlib import Path
 import os
+import psutil
 
 # Construct the argument parser
 ap = argparse.ArgumentParser()
@@ -126,8 +127,7 @@ def ubuntu_node(gateway):
 def authServer(addr):
     ip_prefix = '.'.join(addr.split('.')[0:2])
     new_ip = ip_prefix + '.' + str(random.randint(1, 254)) + '.1'  # TODO: Currently random number, this is gonna cause collision still
-    #subprocess.call('./configure -s ' + new_ip, shell=True)
-    requests.post(URL + '/mac/' + new_ip)
+    requests.post(URL+'/authServer/'+new_ip)
     # to make it persistent
     name = os.listdir('/home')[-1]
     with open('/etc/mesh_com/server.conf', 'w') as mesh_config:
@@ -198,7 +198,9 @@ def create_config_ubuntu(response):
         subprocess.call('sudo cp services/connect_ap.service /etc/systemd/system/.', shell=True)
         subprocess.call('sudo chmod 664 /etc/systemd/system/connect_ap.service', shell=True)
         subprocess.call('sudo systemctl enable connect_ap.service', shell=True)
-        authServer(address)
+        if ("mesh-server.sh" not in p.name() for p in psutil.process_iter()):
+            # this mean we have a server running on the same node
+            authServer(address)
         subprocess.call('reboot', shell=True)
 
 

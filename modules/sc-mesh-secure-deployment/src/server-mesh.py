@@ -54,10 +54,12 @@ if os.path.isfile("data/auth.csv"):
     MAC_ADDRESSES.drop_duplicates(inplace=True)
 else:
     MAC_ADDRESSES = pd.DataFrame(columns=['Mesh IP', 'MAC Address'])
+
 if os.path.isfile("data/no_auth.csv"):
     NOT_AUTH = pd.read_csv('data/no_auth.csv', names=['Mesh IP', 'MAC Address'])
 else:
     NOT_AUTH = pd.DataFrame(columns=['Mesh IP', 'MAC Address'])
+
 if os.path.isfile("data/auth_routes.csv"):
     AUTH_ROUTES = pd.read_csv('data/auth_routes.csv')
 else:
@@ -171,7 +173,7 @@ def add_mac_addr(uuid):
         MAC_ADDRESSES = pd.DataFrame(columns=['Mesh IP', 'MAC Address'])
     mac = uuid
     ip_address = request.remote_addr
-    if not MAC_ADDRESSES.empty and mac not in MAC_ADDRESSES.values:
+    if mac not in MAC_ADDRESSES.values:
         aux = {'Mesh IP': ip_address, 'MAC Address': mac}
         MAC_ADDRESSES = MAC_ADDRESSES.append(aux, ignore_index=True)
         MAC_ADDRESSES.to_csv('data/auth.csv', index=False, header=False, mode='a')

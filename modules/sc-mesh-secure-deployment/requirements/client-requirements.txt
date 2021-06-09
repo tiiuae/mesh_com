@@ -3,3 +3,4 @@ pycryptodome
 termcolor
 getmac==0.8.2
 netifaces==0.10.4
+psutil
