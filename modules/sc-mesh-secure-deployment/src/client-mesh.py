@@ -2,9 +2,11 @@
 
 import argparse
 import json
+import yaml
 import subprocess
 import time
 import hashlib
+import re
 
 import netifaces
 from getmac import get_mac_address
@@ -20,9 +22,17 @@ ap.add_argument("-s", "--server", required=True, help="Server IP:Port Address. E
 ap.add_argument("-c", "--certificate", required=True)
 args = ap.parse_args()
 
+# Get the mesh_com config
+print('> Loading yaml conf... ')
+conf = yaml.safe_load(open("src/mesh_com.conf", 'r'))
+debug = conf['debug']
+client_conf = conf['client']
+if debug:
+    print(conf)
+
+# Connect to server
 URL = args.server
 print('> Connecting to server: ' + str(URL))
-
 
 def get_os():
     proc = subprocess.Popen(['lsb_release', '-a'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -33,7 +43,6 @@ def get_os():
             os = aux
     return os
 
-
 def get_data(cert_file, os):
     message = '/api/add_message/' + os
     response = requests.post(URL + message,
@@ -42,7 +51,8 @@ def get_data(cert_file, os):
         print(colored('Not Valid Certificate', 'red'))
         exit()
     else:
-        print('> Received encrypted message: ' + str(response.content))
+        if debug:
+            print('> Encrypted message: ' + str(response.content))
         with open('payload.enc', 'wb') as file:
             file.write(response.content)
 
@@ -51,10 +61,15 @@ def decrypt_response():  # assuming that data is on a file called payload.enc ge
     proc = subprocess.Popen(['src/ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
     aux_list = [element.decode() for element in out.split()]
+    # print(aux_list)
     server_cert = aux_list[:39]
-    new_list = aux_list[40:64]
+    # Get server configuration json using regex
+    new_list = ''.join(aux_list)
+    pattern = re.compile(r'\{(?:[^{}])*\}')
+    new_list = pattern.findall(new_list)
     output_dict = serializing(new_list)
-    print('> Decrypted Message: ', output_dict)  # res =  json.loads(output_dict)
+    if debug:
+        print('> Decrypted Message: ', output_dict)
 
     return output_dict, server_cert
 
@@ -86,38 +101,9 @@ def verify_certificate(old, new):
     return old_md5 == new_md5
 
 
-def create_config_openwrt(response):
-    res = json.loads(response)
-    if res['gateway']:
-        config_file = open('/etc/config/lime-node', 'a+')
-    else:
-        nodeId = int(res['addr'].split('.')[-1]) - 1  # the IP is sequential, then it gaves me the nodeId.
-        config_file = open('/etc/config/lime-node', 'w')
-        config_file.write('config lime ' + "'system'" + '\n')
-        config_file.write('\t' + 'option hostname ' + "'" + 'node' + str(nodeId) + "'" + '\n')
-        config_file.write('\t' + 'option firstbootwizard_configured ' + "'" + 'true' + "'" + '\n\n')
-    config_file.write('config wifi radio1' + '\n')
-    config_file.write('\t' + 'list modes ' + "'ieee80211s'" + '\n')
-    config_file.write('\t' + 'option ieee80211s_mesh_fwding ' + "'" + res['ieee80211s_mesh_fwding'] + "'" + '\n')
-    config_file.write('\t' + 'option ieee80211s_mesh_id ' + "'" + res['ieee80211s_mesh_id'] + "'" + '\n')
-    config_file.write('\t' + 'option channel ' + "'" + str(res['channel']) + "'" + '\n\n')
-    config_file.write('config lime ' + "'network'" + '\n')
-    config_file.write('\t' + 'list protocols ' + "'ieee80211s'" + '\n')
-    config_file.write('\t' + 'list protocols ' + "'lan'" + '\n')
-    config_file.write('\t' + 'list protocols ' + "'anygw'" + '\n')
-    config_file.write('\t' + 'list protocols ' + "'" + 'batadv:' + res['batadv'] + "'" + '\n')
-    config_file.write('\t' + 'list protocols ' + "'" + 'babeld:' + res['babeld'] + "'" '\n')
-    config_file.write('\t' + 'list protocols ' + "'" + 'bmx7:' + res['bmx7'] + "'" + '\n')
-    config_file.write('\t' + 'option main_ipv4_address ' + "'" + res['addr'] + '/24' + "'")
-    config_file.close()
-    subprocess.call('lime-config', shell=True)
-    time.sleep(2)
-    subprocess.call('reboot', shell=True)
-
-
 def get_ap_interface():
     interface_list = netifaces.interfaces()
-    interface = filter(lambda x: 'wla' in x or 'wlp' in x, interface_list)
+    interface = filter(lambda x: 'enx' in x or 'wlp' in x, interface_list)
     return list(interface)[0]
 
 
@@ -128,17 +114,18 @@ def get_mesh_interface():
 
 
 def ubuntu_gw(ap_inf):
-    print('> Configuring Ubuntu gateway node...')
+    print('> Configuring Ubuntu gateway node with ap_inf:' + str(ap_inf) + '...')
     # Create Gateway Service
     subprocess.call('sudo cp ../../common/scripts/mesh-gw.sh /usr/local/bin/.', shell=True)
     subprocess.call('sudo chmod 744 /usr/local/bin/mesh-gw.sh', shell=True)
     subprocess.call('sudo cp services/gw@.service /etc/systemd/system/.', shell=True)
     subprocess.call('sudo chmod 644 /etc/systemd/system/gw@.service', shell=True)
     subprocess.call('sudo systemctl enable gw@' + str(ap_inf) + '.service', shell=True)
-    # Auto connect wlx to AP at boot using wpa_supplicant
-    subprocess.call('sudo cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf', shell=True)
-    subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf', shell=True)
-    subprocess.call('sudo systemctl enable wpa_supplicant@' + str(ap_inf) + '.service', shell=True)
+    # IF inf is wl, auto connect wlx to AP at boot using wpa_supplicant
+    if "wl" in str(ap_inf):
+        subprocess.call('sudo cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf', shell=True)
+        subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf', shell=True)
+        subprocess.call('sudo systemctl enable wpa_supplicant@' + str(ap_inf) + '.service', shell=True)
 
 
 def ubuntu_node(gateway):
@@ -153,6 +140,7 @@ def ubuntu_node(gateway):
 
 
 def create_config_ubuntu(response):
+    print(response)
     res = json.loads(response)
     print('> Interfaces: ' + str(res))
     address = res['addr']
@@ -165,8 +153,8 @@ def create_config_ubuntu(response):
         mesh_config.write('MAC=' + res['ap_mac'] + '\n')
         mesh_config.write('KEY=' + res['key'] + '\n')
         mesh_config.write('ESSID=' + res['ssid'] + '\n')
-        mesh_config.write('FREQ=' + res['frequency'] + '\n')
-        mesh_config.write('TXPOWER=' + res['tx_power'] + '\n')
+        mesh_config.write('FREQ=' + str(res['frequency']) + '\n')
+        mesh_config.write('TXPOWER=' + str(res['tx_power']) + '\n')
         mesh_config.write('COUNTRY=fi\n')
         mesh_config.write('PHY=phy1\n')
     # Are we a gateway node? If we are we need to set up the routes
@@ -180,25 +168,26 @@ def create_config_ubuntu(response):
         mesh_gateway = prefix + '.2'
         ubuntu_node(mesh_gateway)
     # Set hostname
-    nodeId = int(res['addr'].split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
-    command_hostname = 'sudo hostnamectl set-hostname node' + str(nodeId)
-    subprocess.call(command_hostname, shell=True)
-    command_hostname_host = 'echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts'
-    subprocess.call(command_hostname_host, shell=True)
+    if client_conf['set_hostname']:
+        print('> Setting hostname...')
+        nodeId = int(res['addr'].split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
+        subprocess.call('sudo hostnamectl set-hostname node' + str(nodeId), shell=True)
+        subprocess.call('echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts', shell=True)
     # Final settings
-    subprocess.call('sudo nmcli networking off', shell=True)
-    subprocess.call('sudo systemctl stop network-manager.service', shell=True)
-    subprocess.call('sudo systemctl disable network-manager.service', shell=True)
-    subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
+    if client_conf['disable_networking']:
+        subprocess.call('sudo nmcli networking off', shell=True)
+        subprocess.call('sudo systemctl stop network-manager.service', shell=True)
+        subprocess.call('sudo systemctl disable network-manager.service', shell=True)
+        subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
     # Copy mesh service to /etc/systemd/system/
     mesh_interface = get_mesh_interface()
-    subprocess.call('sudo cp ../../common/scripts/mesh-ibss.sh /usr/local/bin/.', shell=True)
-    subprocess.call('sudo chmod 744 /usr/local/bin/mesh-ibss.sh', shell=True)
+    subprocess.call('sudo cp ../../common/scripts/mesh-' + res['type'] + '.sh /usr/local/bin/.', shell=True)
+    subprocess.call('sudo chmod 744 /usr/local/bin/mesh-' + res['type'] + '.sh', shell=True)
     subprocess.call('sudo cp services/mesh@.service /etc/systemd/system/.', shell=True)
     subprocess.call('sudo chmod 664 /etc/systemd/system/mesh@.service', shell=True)
     subprocess.call('sudo systemctl enable mesh@' + mesh_interface + '.service', shell=True)
     # Ensure our nameserver persists as 8.8.8.8
-    subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True)
+    # subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True) # FIXME: I don't actually think we need this any more...
     time.sleep(2)
     subprocess.call('reboot', shell=True)
 
@@ -214,8 +203,6 @@ if __name__ == "__main__":
         response = requests.post(URL + '/mac/' + mac)
         if os == 'Ubuntu':
             create_config_ubuntu(res)
-        if os == 'openwrt':
-            create_config_openwrt(res)
     else:
         print(colored("Not Valid Server Certificate", 'red'))
         exit(0)
