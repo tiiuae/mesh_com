@@ -37,4 +37,6 @@ mesh_tb_server:
 		cp $(cryptolib_root)/ecies_decrypt $(cryptolib_root)/ecies_encrypt $(mesh_tb_root)/src/ ; \
 	fi
 	cp $(cryptolib_root)/ecc_key.der $(mesh_tb_root)/src/;
+	cp $(cryptolib_root)/ecc_key.der /etc/ssl/certs/;
+
 	# cd $(mesh_tb_root); sudo bash $(mesh_tb_root)/configure.sh -s

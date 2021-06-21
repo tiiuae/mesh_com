@@ -241,21 +241,21 @@ function client {
       for index in "${!servers[@]}"
       do :
         if [ $((index%2)) -eq 0 ]
-         then
+        then
             avg=$(ping -c 4 "${servers[index]}" | tail -1| awk '{print $4}' | cut -d '/' -f 2)
             if (( $(bc -l <<< "$avg < $fastest_response") )) ; then
                 fastest_response=$avg
                 fastest_site=${servers[index]}
                 fastest_index=$index
             fi
-         fi
+        fi
       done
       server_ip=$fastest_site
       server_host=${servers[$((fastest_index+1))]}
-    fi
     else
           server_ip=${servers[0]}
           server_host=${servers[1]}
+    fi
   fi
 
   echo "> We will use src/ecc_key.der if it already exists, or we can try and fetch it..."

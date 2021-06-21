@@ -94,7 +94,7 @@ if [ $? -ne 0 ]; then
 fi
 echo "> Init submodules..."
 cd mesh_com
-git submodule update --init --recursive
+git submodule update --init common/security/cryptolib/
 FILE=/tmp/ap.conf
 if [ -f $FILE ]; then
     cp $FILE modules/sc-mesh-secure-deployment/conf

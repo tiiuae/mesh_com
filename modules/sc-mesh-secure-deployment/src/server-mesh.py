@@ -49,6 +49,8 @@ IP_ADDRESSES = {'0.0.0.0': IP_PREFIX + '.0'}
 
 SERVER_CERT = args.certificate
 
+if not os.path.isdir("data"):
+    os.mkdir("data")
 if os.path.isfile("data/auth.csv"):
     MAC_ADDRESSES = pd.read_csv('data/auth.csv', names=['Mesh IP', 'MAC Address'])
     MAC_ADDRESSES.drop_duplicates(inplace=True)
@@ -106,7 +108,8 @@ def add_message(uuid):
         if os.path.isfile("data/no_auth.csv"):
             NOT_AUTH = pd.read_csv('data/no_auth.csv', names=['Mesh IP', 'MAC Address'])
         else:
-            NOT_AUTH = {}
+            NOT_AUTH = pd.DataFrame(columns=['Mesh IP', 'MAC Address'])
+        print(mac)
         if mac not in NOT_AUTH.values:
             aux = {'Mesh IP': ip_address, 'MAC Address': mac}
             NOT_AUTH = NOT_AUTH.append(aux, ignore_index=True)
