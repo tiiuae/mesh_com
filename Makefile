@@ -38,5 +38,4 @@ mesh_tb_server:
 	fi
 	cp $(cryptolib_root)/ecc_key.der $(mesh_tb_root)/src/;
 	cp $(cryptolib_root)/ecc_key.der /etc/ssl/certs/;
-
 	# cd $(mesh_tb_root); sudo bash $(mesh_tb_root)/configure.sh -s
