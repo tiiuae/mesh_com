@@ -101,16 +101,13 @@ def verify_certificate(old, new):
     return old_md5 == new_md5
 
 
-def get_ap_interface():
+def get_interface(pattern):
     interface_list = netifaces.interfaces()
-    interface = filter(lambda x: 'enx' in x or 'wlp' in x, interface_list)
-    return list(interface)[0]
-
-
-def get_mesh_interface():
-    interface_list = netifaces.interfaces()
-    interface = filter(lambda x: 'wlx' in x, interface_list)
-    return list(interface)[0]
+    interface = filter(lambda x: pattern in x, interface_list)
+    if not list(interface):
+        print('> ERROR: ap_inf ' + pattern + ' not found!')
+    else:
+        return list(interface)[0]
 
 
 def ubuntu_gw(ap_inf):
@@ -159,7 +156,7 @@ def create_config_ubuntu(response):
         mesh_config.write('PHY=phy1\n')
     # Are we a gateway node? If we are we need to set up the routes
     if res['gateway']:
-        ap_interface = get_ap_interface()
+        ap_interface = get_interface(client_conf['ap_inf'])
         ubuntu_gw(ap_interface)
     else:
         # We aren't a gateway node, set up the default route (to gw) service
@@ -180,7 +177,7 @@ def create_config_ubuntu(response):
         subprocess.call('sudo systemctl disable network-manager.service', shell=True)
         subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
     # Copy mesh service to /etc/systemd/system/
-    mesh_interface = get_mesh_interface()
+    mesh_interface = get_interface(client_conf['mesh_inf'])
     subprocess.call('sudo cp ../../common/scripts/mesh-' + res['type'] + '.sh /usr/local/bin/.', shell=True)
     subprocess.call('sudo chmod 744 /usr/local/bin/mesh-' + res['type'] + '.sh', shell=True)
     subprocess.call('sudo cp services/mesh@.service /etc/systemd/system/.', shell=True)
@@ -199,7 +196,7 @@ if __name__ == "__main__":
     res, server_cert = decrypt_response()
     if verify_certificate(local_cert, server_cert):
         print(colored('> Valid Server Certificate', 'green'))
-        mac = get_mac_address(interface=get_mesh_interface())
+        mac = get_mac_address(interface=get_interface(client_conf['mesh_inf']))
         response = requests.post(URL + '/mac/' + mac)
         if os == 'Ubuntu':
             create_config_ubuntu(res)
