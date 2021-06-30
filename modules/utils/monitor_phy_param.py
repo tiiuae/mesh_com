@@ -6,9 +6,9 @@ import subprocess
 from time import sleep
 from threading import Thread
 
-#defult rssi monitoring interval: 5sec
+#default rssi monitoring interval: 5sec
 rssi_mon_interval = 5
-#defualt interface
+#default interface
 interface = "wlan0"
 
 def get_rssi():
