@@ -2,6 +2,7 @@ import argparse
 import getopt
 import sys
 import datetime
+import time
 import subprocess
 from time import sleep
 from threading import Thread
@@ -20,14 +21,14 @@ def get_rssi():
 
 def log_rssi():
     global rssi_mon_interval
-    fn_suffix=str(datetime.datetime.now())
+    fn_suffix=str(datetime.datetime.now().strftime('%m_%d_%Y_%H_%M_%S'))
     log_file_path = '/var/log/'
     log_file_name =  'rssi'+fn_suffix+'.txt'
     while True:
         f = open(log_file_path+log_file_name, 'a')
         rssi_sta = get_rssi()
         print(rssi_sta)
-        f.write(rssi_sta)
+        f.write(str(time.time())+' '+rssi_sta)
         f.close()
         sleep(rssi_mon_interval)
 
