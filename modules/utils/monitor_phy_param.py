@@ -1,3 +1,4 @@
+import argparse
 import getopt
 import sys
 import datetime
@@ -31,22 +32,19 @@ def log_rssi():
         sleep(rssi_mon_interval)
 
 if __name__=='__main__':
-    argv = sys.argv[1:]
 
-    try:
-        opts, args = getopt.getopt(argv, "hr:i:")
-        for opt, arg in opts:
-            if opt in ['-h']:
-                print ("monitor_phy_param.py -r period -i interface")
-                sys.exit()
-            elif opt in ['-r']:
-                print ("rssi mon period:", arg)
-                rssi_mon_interval = int(arg)
-            elif opt in ['-i']:
-                print ("interface:", arg)
-                interface = arg
-    except getopt.error as err:
-        print (str(err))
+    # Construct the argument parser
+    phy_cfg = argparse.ArgumentParser()
+
+    # Add the arguments to the parser
+    phy_cfg.add_argument("-r", "--rssi_period", required=True, help="RSSI monitoring period Ex: 5 (equals to 5 sec)")
+    phy_cfg.add_argument("-i", "--interface", required=True)
+    args = phy_cfg.parse_args()
+
+    #populate args
+    rssi_mon_interval = int(args.rssi_period)
+    interface = args.interface
+
 
     Thread(target=log_rssi).start()
 
