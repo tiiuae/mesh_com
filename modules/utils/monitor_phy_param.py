@@ -6,11 +6,19 @@ import time
 import subprocess
 from time import sleep
 from threading import Thread
+from getmac import get_mac_address
+from netaddr import *
 
 #default rssi monitoring interval: 5sec
 rssi_mon_interval = 5
 #default interface
 interface = "wlan0"
+
+def get_mac_oui():
+    mac = EUI(get_mac_address(interface))
+    oui = mac.oui
+    print(oui.registration().address)
+    return oui
 
 def get_rssi():
     global interface
@@ -45,7 +53,7 @@ if __name__=='__main__':
     #populate args
     rssi_mon_interval = int(args.rssi_period)
     interface = args.interface
-
+    get_mac_oui()
 
     Thread(target=log_rssi).start()
 
