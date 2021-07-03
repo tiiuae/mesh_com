@@ -13,6 +13,41 @@ from netaddr import *
 rssi_mon_interval = 5
 #default interface
 interface = "wlan0"
+mac_addr_filter = "FF:FF:FF:FF:FF:FF"
+
+def is_csi_supported():
+    soc_version_cmd = "cat /proc/cpuinfo | grep 'Revision' | awk '{print $3}'"
+    proc = subprocess.Popen(soc_version_cmd, stdout=subprocess.PIPE, shell=True)
+    soc_version = proc.communicate()[0].decode('utf-8').strip()
+    print("SOC VERSION:"+soc_version)
+    if ((soc_version == 'a020d3') or (soc_version == 'b03114')):
+        print("RPI nexmon CSI is supported, SOC VERSION:"+soc_version)
+        return  1
+    else:
+       return 0
+
+def capture_csi():
+    global interface
+    global mac_addr_filter
+    #Get CSI extractor filter
+    csi_filter_cmd = "makecsiparams -c 157/80 -C 1 -N 1 -m " + mac_addr_filter + " -b 0x88"
+    proc = subprocess.Popen(csi_filter_cmd, stdout=subprocess.PIPE, shell=True)
+    filter_conf = proc.communicate()[0].decode('utf-8').strip()
+    print(filter_conf)
+
+   #Configure CSI extractor
+    csi_ext_cmd = "nexutil -I" + interface + " -s500 -b -l34 -v"+filter_conf
+    proc = subprocess.Popen(csi_ext_cmd, stdout=subprocess.PIPE, shell=True)
+    print(csi_ext_cmd)
+
+    en_monitor_mode_cmd = "iw phy `iw dev " + interface + " info | gawk '/wiphy/ {printf \"phy\" $2}'` interface add mon0 type monitor && ifconfig mon0 up"
+    proc = subprocess.Popen(en_monitor_mode_cmd, stdout=subprocess.PIPE, shell=True)
+    print(en_monitor_mode_cmd)
+
+    #Make sure injector is generating unicast traffic to mac_addr_filter
+    #destination, Start tcpdump to capture  the CSI
+    dump_cmd = "tcpdump -G 60 -i " + interface + " dst port 5500 -w csi-%m_%d_%Y_%H_%M_%S.pcap"
+    proc = subprocess.Popen(dump_cmd, stdout=subprocess.PIPE, shell=True)
 
 def get_mac_oui():
     mac = EUI(get_mac_address(interface))
@@ -53,7 +88,10 @@ if __name__=='__main__':
     #populate args
     rssi_mon_interval = int(args.rssi_period)
     interface = args.interface
-    get_mac_oui()
+
+    val = is_csi_supported()
+    if (val == 1):
+        Thread(target=capture_csi).start()
 
     Thread(target=log_rssi).start()
 
