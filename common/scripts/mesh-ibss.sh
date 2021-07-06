@@ -123,7 +123,7 @@ ctrl_interface=DIR=/var/run/wpa_supplicant
 update_config=1
 ap_scan=1
 p2p_disabled=1
-country=$1
+country=$9
 network={
     ssid="$6"
     key_mgmt=WPA-PSK
