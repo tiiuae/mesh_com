@@ -101,7 +101,7 @@ else
 fi
 
 cat <<EOF >/var/run/wpa_supplicant-adhoc-wep.conf
-ctrl_interface=DIR=/var/run/wpa_supplicant
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 # use 'ap_scan=2' on all devices connected to the network
 # this is unnecessary if you only want the network to be created when no other networks..
 ap_scan=1
@@ -119,7 +119,7 @@ network={
 EOF
 
 cat <<EOF >/var/run/wpa_supplicant-adhoc-wpa2.conf
-ctrl_interface=DIR=/var/run/wpa_supplicant
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
 ap_scan=1
 p2p_disabled=1
@@ -200,7 +200,7 @@ ap)
         echo "DRONE_DEVICE_ID not available"
 
 cat <<EOF >/var/run/wpa_supplicant-ap.conf
-ctrl_interface=DIR=/var/run/wpa_supplicant
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 ap_scan=1
 p2p_disabled=1
 network={
@@ -217,7 +217,7 @@ EOF
       else
         echo "DRONE_DEVICE_ID available"
 cat <<EOF >/var/run/wpa_supplicant-ap.conf
-ctrl_interface=DIR=/var/run/wpa_supplicant
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 ap_scan=1
 p2p_disabled=1
 network={
