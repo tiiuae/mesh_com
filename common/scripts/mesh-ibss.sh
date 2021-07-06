@@ -90,7 +90,17 @@ echo "sudo mesh $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11}"
         help
       fi
 
-cat <<EOF >/var/run/wpa_supplicant-adhoc.conf
+
+phy_if=$(iw dev $wifidev info | awk '/wiphy/ {printf "phy" $2}')
+rsn_ibss_cap=$(iw phy $phy_if info | awk '/RSN/ {printf $3}')
+
+if [ "$rsn_ibss_cap" = "RSN-IBSS." ]; then
+    ibss_conf_file="wpa_supplicant-adhoc-wpa2.conf"
+else
+    ibss_conf_file="wpa_supplicant-adhoc-wep.conf"
+fi
+
+cat <<EOF >/var/run/wpa_supplicant-adhoc-wep.conf
 ctrl_interface=DIR=/var/run/wpa_supplicant
 # use 'ap_scan=2' on all devices connected to the network
 # this is unnecessary if you only want the network to be created when no other networks..
@@ -108,6 +118,22 @@ network={
 }
 EOF
 
+cat <<EOF >/var/run/wpa_supplicant-adhoc-wpa2.conf
+ctrl_interface=DIR=/var/run/wpa_supplicant
+update_config=1
+ap_scan=1
+p2p_disabled=1
+country=$1
+network={
+    ssid="$6"
+    key_mgmt=WPA-PSK
+    proto=RSN
+    psk="1234567890"
+    mode=1
+    frequency=$7
+}
+
+EOF
       echo "Killing wpa_supplicant..."
       # FIXME: If there is another Wi-Fi module being used as an AP for a GW,
       # this kills that process. We need a better way of handling this. For now
@@ -155,9 +181,9 @@ EOF
       # This is likely due to the interface not being up in time, and will
       # require some fiddling with the systemd startup order.
       if [[ -z "${10}" ]]; then
-        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
+        wpa_supplicant -i "$wifidev" -c /var/run/$ibss_conf_file -D nl80211 -C /var/run/wpa_supplicant/ -B
       else
-        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/
+        wpa_supplicant -i "$wifidev" -c /var/run/$ibss_conf_file -D nl80211 -C /var/run/wpa_supplicant/
       fi
       ;;
 
