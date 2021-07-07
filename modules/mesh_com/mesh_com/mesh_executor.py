@@ -183,6 +183,10 @@ class MeshNetwork:
                              quote(self.settings.tx_power),
                              quote(self.settings.country)])
 
+            if os.path.exists("/opt/ros/foxy/setup_ros_profiles.sh"):
+                subprocess.call(["/opt/ros/foxy/setup_ros_profiles.sh",
+                                 quote(self.settings.ip)])
+
         syslog.syslog('Setting Done')
 
     def __handle_report_request(self):
