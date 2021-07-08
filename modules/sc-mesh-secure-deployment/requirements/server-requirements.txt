@@ -4,3 +4,4 @@ asymcrypt==0.0.10
 Flask==1.1.2
 getmac==0.8.2
 termcolor
+pandas
