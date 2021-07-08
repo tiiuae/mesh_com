@@ -12,29 +12,27 @@ from termcolor import colored
 import pathlib
 import hashlib
 
+# Get the mesh_com config
+print('> Loading yaml conf... ')
+try:
+    yaml_conf = yaml.safe_load(open('src/mesh_com.conf', 'r'))
+    conf = yaml_conf['server']
+    debug = yaml_conf['debug']
+except (IOError, yaml.YAMLError) as error:
+    print(error)
+    exit()
+
 # Construct the argument parser
 ap = argparse.ArgumentParser()
 
 # Add the arguments to the parser
 ap.add_argument("-c", "--certificate", required=True)
 args = ap.parse_args()
-
 app = Flask(__name__)
-
-# Get the mesh_com config
-print('> Loading yaml conf... ')
-conf = yaml.safe_load(open("src/mesh_com.conf", 'r'))
-debug = conf['debug']
-# if debug:
-    # print(conf)
-
 IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
 MAC_ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
-
 IP_PREFIX = '10.20.15'
-
 SERVER_CERT = args.certificate
-
 NOT_AUTH = {}
 
 
@@ -44,7 +42,7 @@ def add_message(uuid):
     receivedKey = key.read()
     localCert = open(SERVER_CERT, 'rb')
     # Do we need the ubuntu or openwrt setup?
-    aux = conf['server'][str(uuid).lower()]
+    aux = conf[str(uuid).lower()]
     # Requester a new IP
     ip_address = request.remote_addr
     print("> Requester IP: " + ip_address)
@@ -53,7 +51,7 @@ def add_message(uuid):
     if verify_certificate(localCert, receivedKey):
         print(colored('> Valid Client Certificate', 'green'))
         ip_mesh = verify_addr(ip_address)
-        print('> Assigned Mesh IP: ' + ip_mesh)
+        print('> Assigned mesh IP: ' + ip_mesh)
         if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
             aux['gateway'] = True
             add_default_route(ip_address)  # we will need to add the default route to communicate
@@ -94,15 +92,17 @@ def verify_certificate(old, new):
 
 
 def add_default_route(ip_gateway):
-    inter = netifaces.interfaces()
-    for interf in inter:
-        # TODO: what it if doesn't start with wlan???
-        if interf.startswith('wlan'):
-            interface = interf
-
-    command = 'ip route add ' + IP_PREFIX + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface  # assuming only 2 interfaces are presented
-    print(command)
-    subprocess.call(command, shell=True)
+    try:
+        for interf in netifaces.interfaces():
+            # TODO: what it if doesn't start with wlan???
+            if interf.startswith(conf['mesh_inf']):
+                interface = interf
+        command = 'ip route add ' + IP_PREFIX + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface
+        print('> Adding default route to mesh... \'' + command + '\'')
+        subprocess.call(command, shell=True)
+    except:
+        print("ERROR: No available interface for default route!")
+        exit()
 
 
 def verify_addr(wan_ip):
@@ -113,7 +113,7 @@ def verify_addr(wan_ip):
         IP_ADDRESSES[wan_ip] = ip_mesh
     else:
         ip_mesh = IP_ADDRESSES[wan_ip]
-    print('> All Addresses: ', end='')
+    print('> All addresses: ', end='')
     print(IP_ADDRESSES)
     return ip_mesh
 

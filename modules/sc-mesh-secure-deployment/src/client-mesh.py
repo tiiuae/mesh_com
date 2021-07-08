@@ -14,25 +14,33 @@ import requests
 from termcolor import colored
 from pathlib import Path
 
+
+# Get the mesh_com config
+print('> Loading yaml conf... ')
+try:
+    yaml_conf = yaml.safe_load(open('src/mesh_com.conf', 'r'))
+    conf = yaml_conf['client']
+    debug = yaml_conf['debug']
+    print(conf)
+except (IOError, yaml.YAMLError) as error:
+    print(error)
+    exit()
+
+
 # Construct the argument parser
 ap = argparse.ArgumentParser()
+
 
 # Add the arguments to the parser
 ap.add_argument("-s", "--server", required=True, help="Server IP:Port Address. Ex: 'http://192.168.15.14:5000'")
 ap.add_argument("-c", "--certificate", required=True)
 args = ap.parse_args()
 
-# Get the mesh_com config
-print('> Loading yaml conf... ')
-conf = yaml.safe_load(open("src/mesh_com.conf", 'r'))
-debug = conf['debug']
-client_conf = conf['client']
-if debug:
-    print(conf)
 
 # Connect to server
 URL = args.server
 print('> Connecting to server: ' + str(URL))
+
 
 def get_os():
     proc = subprocess.Popen(['lsb_release', '-a'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -105,24 +113,24 @@ def get_interface(pattern):
     interface_list = netifaces.interfaces()
     interface = filter(lambda x: pattern in x, interface_list)
     if not list(interface):
-        print('> ERROR: ap_inf ' + pattern + ' not found!')
+        print('> ERROR: Interface ' + pattern + ' not found!')
     else:
         return list(interface)[0]
 
 
-def ubuntu_gw(ap_inf):
-    print('> Configuring Ubuntu gateway node with ap_inf:' + str(ap_inf) + '...')
+def ubuntu_gw(gw_inf):
+    print('> Configuring Ubuntu gateway node with gw_inf:' + str(gw_inf) + '...')
     # Create Gateway Service
     subprocess.call('sudo cp ../../common/scripts/mesh-gw.sh /usr/local/bin/.', shell=True)
     subprocess.call('sudo chmod 744 /usr/local/bin/mesh-gw.sh', shell=True)
     subprocess.call('sudo cp services/gw@.service /etc/systemd/system/.', shell=True)
     subprocess.call('sudo chmod 644 /etc/systemd/system/gw@.service', shell=True)
-    subprocess.call('sudo systemctl enable gw@' + str(ap_inf) + '.service', shell=True)
+    subprocess.call('sudo systemctl enable gw@' + str(gw_inf) + '.service', shell=True)
     # IF inf is wl, auto connect wlx to AP at boot using wpa_supplicant
-    if "wl" in str(ap_inf):
-        subprocess.call('sudo cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf', shell=True)
-        subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(ap_inf) + '.conf', shell=True)
-        subprocess.call('sudo systemctl enable wpa_supplicant@' + str(ap_inf) + '.service', shell=True)
+    if "wl" in str(gw_inf):
+        subprocess.call('sudo cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-' + str(gw_inf) + '.conf', shell=True)
+        subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(gw_inf) + '.conf', shell=True)
+        subprocess.call('sudo systemctl enable wpa_supplicant@' + str(gw_inf) + '.service', shell=True)
 
 
 def ubuntu_node(gateway):
@@ -137,7 +145,6 @@ def ubuntu_node(gateway):
 
 
 def create_config_ubuntu(response):
-    print(response)
     res = json.loads(response)
     print('> Interfaces: ' + str(res))
     address = res['addr']
@@ -155,38 +162,40 @@ def create_config_ubuntu(response):
         mesh_config.write('COUNTRY=fi\n')
         mesh_config.write('PHY=phy1\n')
     # Are we a gateway node? If we are we need to set up the routes
-    if res['gateway']:
-        ap_interface = get_interface(client_conf['ap_inf'])
-        ubuntu_gw(ap_interface)
-    else:
+    if res['gateway'] and conf['gw_service']:
+        print("============================================")
+        gw_inf = get_interface(conf['gw_inf'])
+        ubuntu_gw(gw_inf)
+    elif conf['dflt_service']:
         # We aren't a gateway node, set up the default route (to gw) service
         prefix = address.split('.')[:-1]
         prefix = '.'.join(prefix)
         mesh_gateway = prefix + '.2'
         ubuntu_node(mesh_gateway)
     # Set hostname
-    if client_conf['set_hostname']:
+    if conf['set_hostname']:
         print('> Setting hostname...')
         nodeId = int(res['addr'].split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
         subprocess.call('sudo hostnamectl set-hostname node' + str(nodeId), shell=True)
         subprocess.call('echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts', shell=True)
     # Final settings
-    if client_conf['disable_networking']:
+    if conf['disable_networking']:
         subprocess.call('sudo nmcli networking off', shell=True)
         subprocess.call('sudo systemctl stop network-manager.service', shell=True)
         subprocess.call('sudo systemctl disable network-manager.service', shell=True)
         subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
     # Copy mesh service to /etc/systemd/system/
-    mesh_interface = get_interface(client_conf['mesh_inf'])
-    subprocess.call('sudo cp ../../common/scripts/mesh-' + res['type'] + '.sh /usr/local/bin/.', shell=True)
-    subprocess.call('sudo chmod 744 /usr/local/bin/mesh-' + res['type'] + '.sh', shell=True)
-    subprocess.call('sudo cp services/mesh@.service /etc/systemd/system/.', shell=True)
-    subprocess.call('sudo chmod 664 /etc/systemd/system/mesh@.service', shell=True)
-    subprocess.call('sudo systemctl enable mesh@' + mesh_interface + '.service', shell=True)
-    # Ensure our nameserver persists as 8.8.8.8
-    # subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True) # FIXME: I don't actually think we need this any more...
-    time.sleep(2)
-    subprocess.call('reboot', shell=True)
+    if conf['mesh_service']:
+        mesh_interface = get_interface(conf['mesh_inf'])
+        subprocess.call('sudo cp ../../common/scripts/mesh-' + res['type'] + '.sh /usr/local/bin/.', shell=True)
+        subprocess.call('sudo chmod 744 /usr/local/bin/mesh-' + res['type'] + '.sh', shell=True)
+        subprocess.call('sudo cp services/mesh@.service /etc/systemd/system/.', shell=True)
+        subprocess.call('sudo chmod 664 /etc/systemd/system/mesh@.service', shell=True)
+        subprocess.call('sudo systemctl enable mesh@' + mesh_interface + '.service', shell=True)
+        # Ensure our nameserver persists as 8.8.8.8
+        # subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True) # FIXME: I don't actually think we need this any more...
+        time.sleep(2)
+        subprocess.call('reboot', shell=True)
 
 
 if __name__ == "__main__":
@@ -196,7 +205,7 @@ if __name__ == "__main__":
     res, server_cert = decrypt_response()
     if verify_certificate(local_cert, server_cert):
         print(colored('> Valid Server Certificate', 'green'))
-        mac = get_mac_address(interface=get_interface(client_conf['mesh_inf']))
+        mac = get_mac_address(interface=get_interface(conf['mesh_inf']))
         response = requests.post(URL + '/mac/' + mac)
         if os == 'Ubuntu':
             create_config_ubuntu(res)
