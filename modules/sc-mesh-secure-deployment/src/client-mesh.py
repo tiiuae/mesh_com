@@ -112,10 +112,11 @@ def verify_certificate(old, new):
 def get_interface(pattern):
     interface_list = netifaces.interfaces()
     interface = filter(lambda x: pattern in x, interface_list)
-    if not list(interface):
+    pre = list(interface)
+    if not pre:
         print('> ERROR: Interface ' + pattern + ' not found!')
     else:
-        return list(interface)[0]
+        return pre[0]
 
 
 def ubuntu_gw(gw_inf):
