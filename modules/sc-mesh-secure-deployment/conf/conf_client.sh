@@ -12,7 +12,7 @@ function client {
   # Connect to the same AP as the server
   read -p "> We need to be connect to the same network as the server... Connect to an Access Point? (Y/N): " confirm
   if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
-    ap_connect
+     ../../sc-mesh-secure-deployment/configure.sh ap_connect
   fi
   echo -n '> Server discovery...'
   # get server IPv4 and hostname
