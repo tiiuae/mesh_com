@@ -32,13 +32,15 @@ def is_csi_supported():
         else:
             return 0
     elif (csi_type == 'esp'):
+        filepath = "/var/log/"
+        filename = "esp_csi_data-%m_%d_%Y_%H_%M_%S.txt"
         ser=serial.Serial('/dev/' + serial_port, 115200, timeout=1)
         ser.flush()
         while True:
             try:
                 data = ser.readline().decode('utf-8')
                 if re.search('CSI', data):
-                    with open("esp_csi_data.txt", "a") as f:
+                    with open(filepath+filename, "a") as f:
                         f.write(data)
                         no_csi_record += 1
                         if (no_csi_record == csi_max_record):
