@@ -9,6 +9,8 @@ from threading import Thread
 from getmac import get_mac_address
 from netaddr import *
 import yaml
+import serial
+import re
 
 def is_csi_supported():
     global csi_type
@@ -26,6 +28,16 @@ def is_csi_supported():
         else:
             return 0
     elif (csi_type == 'esp'):
+        ser=serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
+        ser.flush()
+        while True:
+            try:
+                data = ser.readline().decode('utf-8')
+                if re.search('CSI', data):
+                    with open("esp_csi_data.txt", "a") as f:
+                        f.write(data)
+            except:
+                break
         return 0
     else:
         return 0;
