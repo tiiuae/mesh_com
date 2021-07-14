@@ -16,6 +16,8 @@ def is_csi_supported():
     global csi_type
     global debug
     global serial_port
+    global csi_max_records
+    no_csi_record = 0
 
     print(csi_type)
     if (csi_type == 'nexmon'):
@@ -38,6 +40,10 @@ def is_csi_supported():
                 if re.search('CSI', data):
                     with open("esp_csi_data.txt", "a") as f:
                         f.write(data)
+                        no_csi_record += 1
+                        if (no_csi_record == csi_max_record):
+                            ser.close()
+                            break
             except:
                 break
         return 0
@@ -130,6 +136,8 @@ if __name__=='__main__':
     channel = conf['channel']
     bandwidth = conf['bandwidth']
     serial_port = conf['serial_port']
+    csi_max_records = conf['csi_max_records']
+
     #populate args
     rssi_mon_interval = int(args.rssi_period)
     interface = args.interface
