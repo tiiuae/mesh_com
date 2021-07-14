@@ -13,8 +13,8 @@ import yaml
 def is_csi_supported():
     global csi_type
     global debug
-
-    if (csi_type == "nexmom"):
+    print(csi_type)
+    if (csi_type == 'nexmon'):
         soc_version_cmd = "cat /proc/cpuinfo | grep 'Revision' | awk '{print $3}'"
         proc = subprocess.Popen(soc_version_cmd, stdout=subprocess.PIPE, shell=True)
         soc_version = proc.communicate()[0].decode('utf-8').strip()
@@ -31,20 +31,24 @@ def is_csi_supported():
         return 0;
 
 
-def capture_csi():
+def capture_raw_csi():
     global interface
     global mac_addr_filter
+    global channel
+    global bandwidth
     global debug
 
     #Get CSI extractor filter
-    csi_filter_cmd = "makecsiparams -c 157/80 -C 1 -N 1 -m " + mac_addr_filter + " -b 0x88"
-    proc = subprocess.Popen(csi_filter_cmd, stdout=subprocess.PIPE, shell=True)
-    filter_conf = proc.communicate()[0].decode('utf-8').strip()
+    csi_filter_cmd = "makecsiparams -c " + str(channel) + '\/' + str(bandwidth) + " -C 1 -N 1 -m " + mac_addr_filter + " -b 0x88"
     if debug:
-        print(filter_conf)
+        print(csi_filter_cmd)
+    proc = subprocess.Popen(csi_filter_cmd, stdout=subprocess.PIPE, shell=True)
+    filter_conf_resp = proc.communicate()[0].decode('utf-8').strip()
+    if debug:
+        print(filter_conf_resp)
 
    #Configure CSI extractor
-    csi_ext_cmd = "nexutil -I" + interface + " -s500 -b -l34 -v"+filter_conf
+    csi_ext_cmd = "nexutil -I" + interface + " -s500 -b -l34 -v"+filter_conf_resp
     proc = subprocess.Popen(csi_ext_cmd, stdout=subprocess.PIPE, shell=True)
     if debug:
         print(csi_ext_cmd)
@@ -109,7 +113,8 @@ if __name__=='__main__':
     capture_rssi = conf['rssi']
     capture_csi = conf['csi']
     mac_addr_filter = conf['mac_addr_filter']
-
+    channel = conf['channel']
+    bandwidth = conf['bandwidth']
     #populate args
     rssi_mon_interval = int(args.rssi_period)
     interface = args.interface
@@ -118,7 +123,7 @@ if __name__=='__main__':
     if capture_csi:
         val = is_csi_supported()
         if (val == 1):
-            Thread(target=capture_csi).start()
+            Thread(target=capture_raw_csi).start()
 
     # Capture RSSI if enabled in config file
     if capture_rssi:
