@@ -8,41 +8,52 @@ from time import sleep
 from threading import Thread
 from getmac import get_mac_address
 from netaddr import *
-
-#default rssi monitoring interval: 5sec
-rssi_mon_interval = 5
-#default interface
-interface = "wlan0"
-mac_addr_filter = "FF:FF:FF:FF:FF:FF"
+import yaml
 
 def is_csi_supported():
-    soc_version_cmd = "cat /proc/cpuinfo | grep 'Revision' | awk '{print $3}'"
-    proc = subprocess.Popen(soc_version_cmd, stdout=subprocess.PIPE, shell=True)
-    soc_version = proc.communicate()[0].decode('utf-8').strip()
-    print("SOC VERSION:"+soc_version)
-    if ((soc_version == 'a020d3') or (soc_version == 'b03114')):
-        print("RPI nexmon CSI is supported, SOC VERSION:"+soc_version)
-        return  1
+    global csi_type
+    global debug
+
+    if (csi_type == "nexmom"):
+        soc_version_cmd = "cat /proc/cpuinfo | grep 'Revision' | awk '{print $3}'"
+        proc = subprocess.Popen(soc_version_cmd, stdout=subprocess.PIPE, shell=True)
+        soc_version = proc.communicate()[0].decode('utf-8').strip()
+        if debug:
+           print("SOC VERSION:"+soc_version)
+        if ((soc_version == 'a020d3') or (soc_version == 'b03114')):
+            print("RPI nexmon CSI is supported, SOC VERSION:"+soc_version)
+            return 1
+        else:
+            return 0
+    elif (csi_type == 'esp'):
+        return 0
     else:
-       return 0
+        return 0;
+
 
 def capture_csi():
     global interface
     global mac_addr_filter
+    global debug
+
     #Get CSI extractor filter
     csi_filter_cmd = "makecsiparams -c 157/80 -C 1 -N 1 -m " + mac_addr_filter + " -b 0x88"
     proc = subprocess.Popen(csi_filter_cmd, stdout=subprocess.PIPE, shell=True)
     filter_conf = proc.communicate()[0].decode('utf-8').strip()
-    print(filter_conf)
+    if debug:
+        print(filter_conf)
 
    #Configure CSI extractor
     csi_ext_cmd = "nexutil -I" + interface + " -s500 -b -l34 -v"+filter_conf
     proc = subprocess.Popen(csi_ext_cmd, stdout=subprocess.PIPE, shell=True)
-    print(csi_ext_cmd)
+    if debug:
+        print(csi_ext_cmd)
 
     en_monitor_mode_cmd = "iw phy `iw dev " + interface + " info | gawk '/wiphy/ {printf \"phy\" $2}'` interface add mon0 type monitor && ifconfig mon0 up"
     proc = subprocess.Popen(en_monitor_mode_cmd, stdout=subprocess.PIPE, shell=True)
-    print(en_monitor_mode_cmd)
+
+    if debug:
+        print(en_monitor_mode_cmd)
 
     #Make sure injector is generating unicast traffic to mac_addr_filter
     #destination, Start tcpdump to capture  the CSI
@@ -64,13 +75,16 @@ def get_rssi():
 
 def log_rssi():
     global rssi_mon_interval
+    global debug
+
     fn_suffix=str(datetime.datetime.now().strftime('%m_%d_%Y_%H_%M_%S'))
     log_file_path = '/var/log/'
     log_file_name =  'rssi'+fn_suffix+'.txt'
     while True:
         f = open(log_file_path+log_file_name, 'a')
         rssi_sta = get_rssi()
-        print(rssi_sta)
+        if debug:
+            print(rssi_sta)
         f.write(str(time.time())+' '+rssi_sta)
         f.close()
         sleep(rssi_mon_interval)
@@ -85,13 +99,28 @@ if __name__=='__main__':
     phy_cfg.add_argument("-i", "--interface", required=True)
     args = phy_cfg.parse_args()
 
+    # Get the physical parameter monitoring configuration
+    print('> Loading yaml conf... ')
+    conf = yaml.safe_load(open("phy_param.conf", 'r'))
+    debug = conf['debug']
+    rssi_mon_interval = conf['rssi_poll_interval']
+    csi_type  = conf['csi_format']
+    interface = conf['interface']
+    capture_rssi = conf['rssi']
+    capture_csi = conf['csi']
+    mac_addr_filter = conf['mac_addr_filter']
+
     #populate args
     rssi_mon_interval = int(args.rssi_period)
     interface = args.interface
 
-    val = is_csi_supported()
-    if (val == 1):
-        Thread(target=capture_csi).start()
+    # Capture CSI with type defined in config file
+    if capture_csi:
+        val = is_csi_supported()
+        if (val == 1):
+            Thread(target=capture_csi).start()
 
-    Thread(target=log_rssi).start()
+    # Capture RSSI if enabled in config file
+    if capture_rssi:
+        Thread(target=log_rssi).start()
 
