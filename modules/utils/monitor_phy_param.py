@@ -15,6 +15,8 @@ import re
 def is_csi_supported():
     global csi_type
     global debug
+    global serial_port
+
     print(csi_type)
     if (csi_type == 'nexmon'):
         soc_version_cmd = "cat /proc/cpuinfo | grep 'Revision' | awk '{print $3}'"
@@ -28,7 +30,7 @@ def is_csi_supported():
         else:
             return 0
     elif (csi_type == 'esp'):
-        ser=serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
+        ser=serial.Serial('/dev/' + serial_port, 115200, timeout=1)
         ser.flush()
         while True:
             try:
@@ -127,6 +129,7 @@ if __name__=='__main__':
     mac_addr_filter = conf['mac_addr_filter']
     channel = conf['channel']
     bandwidth = conf['bandwidth']
+    serial_port = conf['serial_port']
     #populate args
     rssi_mon_interval = int(args.rssi_period)
     interface = args.interface
