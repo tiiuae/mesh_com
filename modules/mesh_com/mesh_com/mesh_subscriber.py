@@ -1,7 +1,9 @@
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSPresetProfiles
-
+from rclpy.qos import QoSProfile
+from rclpy.qos import QoSReliabilityPolicy
+from rclpy.qos import QoSDurabilityPolicy
+from rclpy.qos import QoSHistoryPolicy
 from std_msgs.msg import String
 import socket
 
@@ -9,11 +11,16 @@ import socket
 class MeshSubscriber(Node):
     def __init__(self):
         super().__init__('mesh_subscriber')
+        qos = QoSProfile(
+            depth=1,
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+
         self.subscription = self.create_subscription(
             String,
             'mesh_parameters',
             self.listener_callback,
-            QoSPresetProfiles.SYSTEM_DEFAULT.value)
+            qos)
         self.subscription  # prevent unused variable warning
         self.HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
         self.PORT = 33221  # Port to listen on (non-privileged ports are > 1023)
