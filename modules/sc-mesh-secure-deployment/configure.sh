@@ -9,6 +9,7 @@ echo "     -s               configure as server"
 echo "     -c               configure as client"
 echo "     -ap              connect/configure Access Point"
 echo "     -gw              create/remove gateway"
+echo "     -mb              mosquito broker"
 echo "     --help           this help menu"
 echo ""
 exit 1
@@ -213,10 +214,18 @@ function server {
     sudo python3 $EPATH/src/server-mesh.py -c /etc/ssl/certs/ecc_key.der -a $1
   fi
 }
-
-
-
 #-----------------------------------------------------------------------------#
+
+function mosquito {
+  if [[ $(avahi-browse -rptf _mqtt._tcp) ]]; then
+    ip=$(avahi-browse -rptf _mqtt._tcp | awk -F';' '$1 == "=" && $3 == "IPv4"  { print $8 }')
+    echo "Mosquito Broker running on " $ip
+  else
+    sudo systemctl enable mosquitto.service
+    avahi-publish -s $HOSTNAME _mqtt._tcp 1883 "Status=Running" "Version=1.0" &> /dev/null &
+  fi
+}
+
 echo '=== sc-mesh-secure-deployment-configure ==='
 if [[ $# -eq 0 ]] ; then
     help
@@ -245,6 +254,10 @@ while (( "$#" )); do
       ;;
     -gw)
       gw_menu
+      shift
+      ;;
+    -mb)
+      mosquito
       shift
       ;;
     --help)

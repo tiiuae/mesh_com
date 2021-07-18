@@ -82,7 +82,8 @@ fi
 echo "> Checking required packages..."
 command_exists "git make python3-pip batctl ssh clang libssl-dev net-tools \
                 iperf3 avahi-daemon avahi-dnsconfd avahi-utils libnss-mdns \
-                bmon isc-dhcp-server alfred batctl resolvconf python3-pandas python3-psutil"
+                bmon isc-dhcp-server alfred batctl resolvconf python3-pandas python3-psutil \
+                mosquitto"
 #remove gnome-keyring
 gnome-keyring-daemon --start --components=ssh
 # Clone this repo
@@ -100,4 +101,4 @@ if [ -f $FILE ]; then
     cp $FILE modules/sc-mesh-secure-deployment/conf
 fi
 
-
+git checkout feature/distributed
