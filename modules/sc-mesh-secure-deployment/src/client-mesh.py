@@ -116,6 +116,9 @@ def get_interface(pattern):
     if not pre:
         print('> ERROR: Interface ' + pattern + ' not found!')
     else:
+    if not list(interface):
+        mesh_interface = filter(lambda x: 'wla' in x or 'wlp' in x, interface_list)
+        return  list(mesh_interface)[0]
         return pre[0]
 
 
