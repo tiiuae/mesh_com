@@ -19,11 +19,14 @@ Parameters:
   <phyname>    - optional
 
 example:
- sudo ./mesh-11s-mr.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi wlan1 phy1
- or
- sudo ./mesh-11s-mr.sh ap
- or
- sudo ./mesh-11s-mr.sh off
+ For One Radio:
+   sudo ./mesh-11s-mr.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi wlan1 phy1
+ Automatic detection:
+   sudo ./mesh-11s-mr.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi
+ Create simple AP for debug purposes:
+   sudo ./mesh-11s-mr.sh ap
+ Turn all radios off:
+   sudo ./mesh-11s-mr.sh off
 EOF
   exit
 }
