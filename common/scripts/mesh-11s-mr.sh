@@ -233,7 +233,7 @@ EOF
   route del -net 192.168.1.0 netmask 255.255.255.0 dev bat0
   route add -net 192.168.1.0 netmask 255.255.255.0 dev bat0 metric 1
 
-  #TODO
+  # TODO DHCP server?
   # dhserver
 
   wpa_supplicant -B -i "${10}" -c /var/run/wpa_supplicant-ap_"${10}".conf -D nl80211 -C /var/run/wpa_supplicant/
@@ -295,39 +295,53 @@ main ()
   echo
   #----------------
 
+  count=0
+
+  rfkill unblock all
+
   if [[ -z "${10}" ]]; then
-    rfkill unblock all
     # multiple wifi options --> can be detected as follows:
     # manufacturer 0x168c = Qualcomm
     # devices = 0x0034 0x003c 9462/988x  11s
     #           0x003e        6174       adhoc
     list="0x0034 0x003c 0x003e"
     for dev in $list; do
-       find_mesh_wifi_device "pci" 0x168c "$dev"
+      find_mesh_wifi_device "pci" 0x168c "$dev"
 
-       if [ "$device_list" != "" ]; then
-         for pair in $device_list; do
-           phyname=$(echo "$pair" | cut -f1 -d ',')
-           wifidev=$(echo "$pair" | cut -f2 -d ',')
+      if [ "$device_list" != "" ]; then
+        for pair in $device_list; do
+          phyname=$(echo "$pair" | cut -f1 -d ',')
+          wifidev=$(echo "$pair" | cut -f2 -d ',')
 
-           echo "  --------------------------------------------------------"
-           echo "- Found: $wifidev $phyname"
-           init_device "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$wifidev" "$phyname"
-           if [ "$1" = "ap" ]; then
-             # only one AP is initialised
-             exit 0
-           fi
+          echo "  --------------------------------------------------------"
+
+          count=$((count+1))
+          echo "- #$count Found: $wifidev $phyname"
+
+          if [ "$count" -gt 1 ]; then
+            # ACS - Automatic Channel Selection, not yet working for wpa/ap
+            # TODO Hardcoded frequency used
+            init_device "$1" "$2" "$3" "$4" "$5" "$6" "2412" "$8" "$9" "$wifidev" "$phyname"
+          else
+            init_device "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$wifidev" "$phyname"
+          fi
+
+          if [ "$1" = "ap" ]; then
+            # only one AP is initialised
+            exit 0
+          fi
         done
-        else
-          echo "- Not Found: 0x168c $dev -  (not installed)"
-        fi
-       echo
+      else
+        echo "- Not Found: 0x168c $dev -  (not installed)"
+      fi
+      echo
     done
   else
     wifidev=${10}
     phyname=${11}
-    init_device "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "$wifidev" "$phyname"
+    init_device "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}"
   fi
 }
 
 main "$@"
+
