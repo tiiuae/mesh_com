@@ -1,0 +1,5 @@
+wifi-firmware (0.1) unstable; urgency=low
+
+  * qca6174 WLAN.RM.4.4.1.c3-00230 added
+   
+ -- Mika Joenpera <mika.joenpera@unikie.com>  Mon, 26 jul 2021 10:00:00 +0100

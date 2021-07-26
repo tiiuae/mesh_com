@@ -1,0 +1,8 @@
+Source: wifi-firmware
+Package: wifi-firmware
+Version: 0.1
+Maintainer: Mika Joenpera <mika.joenpera@unikie.com>
+Architecture: amd64
+Depends: 
+Description: wifi-firmware delivery for mesh 11s network
+
