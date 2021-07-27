@@ -5,10 +5,22 @@ from getmac import get_mac_address
 import subprocess
 import netifaces
 import pandas as pd
+import yaml
+import json
 import argparse
 from termcolor import colored
 import pathlib
 import hashlib
+
+# Get the mesh_com config
+print('> Loading yaml conf... ')
+try:
+    yaml_conf = yaml.safe_load(open('src/mesh_com.conf', 'r'))
+    conf = yaml_conf['server']
+    debug = yaml_conf['debug']
+except (IOError, yaml.YAMLError) as error:
+    print(error)
+    exit()
 
 # Construct the argument parser
 ap = argparse.ArgumentParser()
@@ -16,37 +28,11 @@ ap = argparse.ArgumentParser()
 # Add the arguments to the parser
 ap.add_argument("-c", "--certificate", required=True)
 args = ap.parse_args()
-
 app = Flask(__name__)
-
-aux_openwrt = {'batadv': '120', 'babeld': '17',
-               'ieee80211s_mesh_id': 'ssrc',
-               'bmx7': '18',
-               'ieee80211s_mesh_fwding': '0',
-               'channel': 5, 'gateway': False}
-
-aux_ubuntu = {
-    "api_version": 1,  # "interface version for future purposes"
-    "ssid": "gold",  # "0-32 octets, UTF-8, shlex.quote chars limiting"
-    "key": "1234567890",  # "key for the network"
-    "enc": "wep",  # "encryption (wep, wpa2, wpa3, sae)"
-    "ap_mac": "00:11:22:33:44:55",  # "bssid for mesh network"
-    "country": "fi",  # "Country code, sets tx power limits and supported channels"
-    "frequency": "5180",  # 5180 wifi channel frequency, depends on the country code and HW"
-    # "ip": "192.168.1.1",              #"select unique IP address"
-    "subnet": "255.255.255.0",  # "subnet mask"
-    "tx_power": "30",
-    # "select 30dBm, HW and regulations limiting it correct level. Can be used to set lower dBm levels for testing purposes (e.g. 5dBm)"
-    "mode": "mesh"  # "mesh=mesh network, ap=debug hotspot"
-}
-
 IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
 MAC_ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
-
 IP_PREFIX = '10.20.15'
-
 SERVER_CERT = '/etc/ssl/certs/' + args.certificate
-
 NOT_AUTH = {}
 
 
@@ -55,32 +41,36 @@ def add_message(uuid):
     key = request.files['key']
     receivedKey = key.read()
     localCert = open(SERVER_CERT, 'rb')
+    # Do we need the ubuntu or openwrt setup?
+    aux = conf[str(uuid).lower()]
+    # Requester a new IP
     ip_address = request.remote_addr
     print("> Requester IP: " + ip_address)
+    # Get MAC
     mac = get_mac_address(ip=ip_address)
     if verify_certificate(localCert, receivedKey):
         print(colored('> Valid Client Certificate', 'green'))
         ip_mesh = verify_addr(ip_address)
-        print('> Assigned Mesh IP: ', end='')
-        print(ip_mesh)
-        aux = aux_ubuntu if uuid == 'Ubuntu' else aux_openwrt
+        print('> Assigned mesh IP: ' + ip_mesh)
         if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
             aux['gateway'] = True
             add_default_route(ip_address)  # we will need to add the default route to communicate
         else:
             aux['gateway'] = False
         aux['addr'] = ip_mesh
-        SECRET_MESSAGE = json.dumps(aux)
-        print('> Unencrypted message: ', end='')
-        print(SECRET_MESSAGE)
-        # use .call() to block and avoid race condition with open()
+        msg_json = json.dumps(aux)
+        if debug:
+            print('> Unencrypted message: ', end='')
+            print(msg_json)
+        # Encrypt message use .call() to block and avoid race condition with open()
         proc = subprocess.call(['src/ecies_encrypt',
-                                SERVER_CERT, SECRET_MESSAGE],
+                                SERVER_CERT, msg_json],
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         enc = open('payload.enc', 'rb')
         encrypt_all = enc.read()
-        print('> Sending encrypted message: ', end='')
-        print(encrypt_all)
+        print('> Sending encrypted message...')
+        if debug:
+            print(encrypt_all)
         return encrypt_all + localCert.read()
     else:
         NOT_AUTH[mac] = ip_address
@@ -102,15 +92,17 @@ def verify_certificate(old, new):
 
 
 def add_default_route(ip_gateway):
-    inter = netifaces.interfaces()
-    for interf in inter:
-        # TODO: what it if doesn't start with wlan???
-        if interf.startswith('wlan'):
-            interface = interf
-
-    command = 'ip route add ' + IP_PREFIX + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface  # assuming only 2 interfaces are presented
-    print(command)
-    subprocess.call(command, shell=True)
+    try:
+        for interf in netifaces.interfaces():
+            # TODO: what it if doesn't start with wlan???
+            if interf.startswith(conf['mesh_inf']):
+                interface = interf
+        command = 'ip route add ' + IP_PREFIX + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface
+        print('> Adding default route to mesh... \'' + command + '\'')
+        subprocess.call(command, shell=True)
+    except:
+        print("ERROR: No available interface for default route!")
+        exit()
 
 
 def verify_addr(wan_ip):
@@ -121,7 +113,7 @@ def verify_addr(wan_ip):
         IP_ADDRESSES[wan_ip] = ip_mesh
     else:
         ip_mesh = IP_ADDRESSES[wan_ip]
-    print('> All Addresses: ', end='')
+    print('> All addresses: ', end='')
     print(IP_ADDRESSES)
     return ip_mesh
 

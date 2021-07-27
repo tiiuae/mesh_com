@@ -1,0 +1,5 @@
+#!/bin/bash
+
+if [ -e /usr/lib/NetworkManager/conf.d/unamaged_wifi_interfaces.conf ]; then
+    rm /usr/lib/NetworkManager/conf.d/unamaged_wifi_interfaces.conf
+fi
