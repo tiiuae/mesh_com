@@ -9,9 +9,9 @@ import syslog
 import select
 import threading
 
-from batstat import Batman, STATUS
-from batadvvis import BatAdvVis
-from socket_helper import recv_msg, send_msg
+from .src.batstat import Batman, STATUS
+from .src.batadvvis import BatAdvVis
+from .src.socket_helper import recv_msg, send_msg
 
 
 class MeshNetwork:

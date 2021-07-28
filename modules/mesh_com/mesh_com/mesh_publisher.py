@@ -4,7 +4,7 @@ from rclpy.qos import QoSPresetProfiles
 
 from std_msgs.msg import String
 import socket
-from socket_helper import recv_msg, send_msg
+from .src.socket_helper import recv_msg, send_msg
 
 
 class MeshPublisher(Node):

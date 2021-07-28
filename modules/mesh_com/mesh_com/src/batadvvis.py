@@ -5,6 +5,7 @@ import subprocess
 import json
 import time
 
+
 class BatAdvVis:
     """
     batadv-vis helper class
@@ -41,21 +42,25 @@ class BatAdvVis:
         if format_type in ("dot", "jsondoc", "json"):
             try:
                 # returns byte string
-                raw_data = subprocess.check_output([self.command, '-f', format_type])
+                raw_data = subprocess.check_output([self.command,
+                                                    '-f',
+                                                    format_type],
+                                                    stderr=subprocess.DEVNULL)
                 if raw_data == 255:
                     raw_data = b'NA'
             except (FileNotFoundError, subprocess.CalledProcessError):
                 raw_data = b'NA'
 
-            if format_type == "jsondoc":
-                json_data = json.loads(raw_data.decode('utf8'))
+            if raw_data != b'NA':
+                if format_type == "jsondoc":
+                    json_data = json.loads(raw_data.decode('utf8'))
 
-                for i in range(raw_data.count(b"clients")):
-                    json_data["vis"][i].pop("clients", None)
+                    for i in range(raw_data.count(b"clients")):
+                        json_data["vis"][i].pop("clients", None)
 
-                raw_data = json.dumps(json_data).encode()
-            elif format_type == "dot":
-                raw_data = self.remove_interfaces(raw_data.decode('UTF-8')).encode()
+                    raw_data = json.dumps(json_data).encode()
+                elif format_type == "dot":
+                    raw_data = self.remove_interfaces(raw_data.decode('UTF-8')).encode()
 
         else:
             raw_data = b'NA'

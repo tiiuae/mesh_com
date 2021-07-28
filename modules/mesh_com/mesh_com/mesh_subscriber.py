@@ -6,7 +6,8 @@ from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSHistoryPolicy
 from std_msgs.msg import String
 import socket
-from socket_helper import send_msg
+
+from .src.socket_helper import send_msg
 
 
 class MeshSubscriber(Node):

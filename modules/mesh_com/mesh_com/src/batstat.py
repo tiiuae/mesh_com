@@ -34,6 +34,7 @@ class Batman:
         self.device_noise_dict = {}
         self.mesh_status = STATUS()
         self._status = self.mesh_status.no_config  # "MESH/OFF/NO_CONFIG/ONGOING/AP/ERROR"
+        self.iw_type = self.mesh_status.not_avail  # iw dev <wifi> info  - type
         self.network_interface = self.mesh_status.not_avail
         self.freq = self.mesh_status.not_avail
         self.txpower = self.mesh_status.not_avail
@@ -126,9 +127,31 @@ class Batman:
                     self.freq = re.findall(r'\((\d+) MHz\)', line)[0]
                 elif "txpower" in line:
                     self.txpower = re.findall(r'\d+.\d+', line)[0]
+                elif "type" in line:
+                    self.iw_state = re.findall(r'type (\w+)', line)[0]
         except (IndexError, TypeError):
             self.freq = self.mesh_status.not_avail
             self.txpower = self.mesh_status.not_avail
+
+    def _update_iw_type(self):
+        """
+        Update device self.country code
+
+        :return: None
+        """
+
+        if self.iw_state == "managed":
+            self.status = self.mesh_status.no_config
+        elif self.iw_state == "AP":
+            self.status = self.mesh_status.accesspoint
+        elif self.iw_state == "mesh":
+            self.status = self.mesh_status.mesh
+        elif self.iw_state == "IBSS":
+            self.status = self.mesh_status.mesh
+        elif self.iw_state == self.mesh_status.not_avail:
+            self.status = self.mesh_status.not_avail
+        else:
+            self.status = self.mesh_status.error
 
     def _update_iw_reg(self):
         """
@@ -191,12 +214,13 @@ class Batman:
         self._status = new_status
 
     def _update_device_info(self):
-        self._update_interface_name()
+        self._update_interface_name()  # wifi interface name
         self._update_station_dump_info()
         self._update_iw_info()
+        self._update_iw_type()
         self._update_iw_reg()
         self._update_survey_dump()
-        self._solve_device_name()
+        self._solve_device_name()  # HW info
 
     def _create_template(self):
         """
@@ -287,6 +311,7 @@ class Batman:
 
     def run(self):
         while self.thread_running:
+            self.update_stat_data()
             self.latest_stat = self.get_stat()
             sleep(0.1)
 
