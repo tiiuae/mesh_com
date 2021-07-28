@@ -13,7 +13,7 @@ class BatAdvVis:
     command = 'batadv-vis'
 
     def __init__(self):
-        self.latest_topology = ""
+        self.latest_topology = "{}"
         self.thread_running = True
 
     @staticmethod
@@ -47,11 +47,11 @@ class BatAdvVis:
                                                     format_type],
                                                     stderr=subprocess.DEVNULL)
                 if raw_data == 255:
-                    raw_data = b'NA'
+                    raw_data = b'{}'
             except (FileNotFoundError, subprocess.CalledProcessError):
-                raw_data = b'NA'
+                raw_data = b'{}'
 
-            if raw_data != b'NA':
+            if raw_data != b'{}':
                 if format_type == "jsondoc":
                     json_data = json.loads(raw_data.decode('utf8'))
 
@@ -63,7 +63,7 @@ class BatAdvVis:
                     raw_data = self.remove_interfaces(raw_data.decode('UTF-8')).encode()
 
         else:
-            raw_data = b'NA'
+            raw_data = b'{}'
         # return string
         return raw_data.decode('utf-8')
 
@@ -71,3 +71,13 @@ class BatAdvVis:
         while self.thread_running:
             self.latest_topology = self.get()
             time.sleep(0.1)
+
+
+# Real user is mesh_executor
+if __name__ == "__main__":
+    # usage tip
+    batadvvis = BatAdvVis()
+
+    # get topology and example pretty print
+    obj = json.loads(batadvvis.get())
+    print(json.dumps(obj, indent=3))

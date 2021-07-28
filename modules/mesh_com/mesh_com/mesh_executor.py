@@ -118,7 +118,7 @@ class MeshNetwork:
         syslog.syslog('Setting Done')
 
     def __handle_report_request(self):
-        return f"{self.batman_visual.latest_topology},{self.batman.latest_stat}]". \
+        return f"[{self.batman_visual.latest_topology},{self.batman.latest_stat}]". \
             replace(": ", ":"). \
             replace(", ", ",")
 
