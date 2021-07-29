@@ -46,11 +46,24 @@ function menu_from_array()
   done
 }
 
+function get_SSID() {
+  local ssid_list
+  #declare -A ssid_array
+  while read -r ssid_list; do
+         [[ "${ssid_list//'SSID: '*}" == '' ]] && ssid="${ssid_list/'SSID: '}" && ssid_array+=($ssid)
+  done
+}
 
 #-----------------------------------------------------------------------------#
 function ap_connect {
-echo '> Connecting to Access Point...'
-read -p "- SSID: " ssid
+echo '> Please choose from the list of available interfaces...'
+interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
+menu_from_array "${interfaces_arr[@]}"
+sta_if=$choice
+get_SSID <<< "$(iw $sta_if scan)"
+echo '> scanning available Access Point, select ssid from scan list...'
+menu_from_array "${ssid_array[@]}"
+ssid=$choice
 read -p "- Password: " password
 cat <<EOF > conf/ap.conf
 network={
@@ -58,9 +71,6 @@ network={
   psk="$password"
 }
 EOF
-echo '> Please choose from the list of available interfaces...'
-interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
-menu_from_array "${interfaces_arr[@]}"
 
 #mesh(IBSS) and sta interface are not supported concurrently.
 #Stop mesh(IBSS) service on the selected vif, if already running.
@@ -83,8 +93,10 @@ if [ "$wlan_if_count" = "1" ]; then
   fi
 fi
 
-sudo wpa_supplicant -B -i $choice -c conf/ap.conf
-sudo dhclient -v $choice
+echo '> Connecting to Access Point:'
+echo $ssid
+sudo wpa_supplicant -B -i $sta_if -c conf/ap.conf
+sudo dhclient -v $sta_if
 }
 
 function ap_create {
