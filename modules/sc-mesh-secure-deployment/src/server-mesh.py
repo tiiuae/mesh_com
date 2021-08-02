@@ -32,7 +32,7 @@ app = Flask(__name__)
 IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
 MAC_ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
 IP_PREFIX = '10.20.15'
-SERVER_CERT = '/etc/ssl/certs/' + args.certificate
+SERVER_CERT = args.certificate
 NOT_AUTH = {}
 
 
