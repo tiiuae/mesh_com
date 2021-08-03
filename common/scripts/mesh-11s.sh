@@ -64,7 +64,7 @@ if [[ -z "${10}" ]]; then
   # manufacturer 0x168c = Qualcomm
   # devices = 0x0034 0x003c 9462/988x  11s
   #           0x003e        6174       adhoc
-  find_mesh_wifi_device 0x168c "0x0034 0x003c"
+  find_mesh_wifi_device 0x168c "0x0034 0x003c 0x003e"
 
   if [ "$retval_phy" != "" ]; then
       phyname=$retval_phy
@@ -105,6 +105,7 @@ network={
     psk="$5"
     key_mgmt=SAE
     ieee80211w=2
+    mesh_fwding=0
 }
 EOF
 
