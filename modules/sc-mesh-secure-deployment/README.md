@@ -13,62 +13,72 @@ Initially, the client sends a request to join the mesh network. This request is 
 
 
 ## Installation
-To get started, either
-
-1. Copy the *install.sh* script to the home folder of your mounted Ubuntu drive.
-2. On your host machine, copy download the *install.sh* script from this repo into your home folder.
-
-Once you have done this, startup your host machine and run install.sh.
+Firstly we need to install linux dependencies.
 
 ```bash
-cd ~
-./install.sh
+$ sudo apt update
+$ sudo apt install \
+    git make python3-pip batctl ssh clang libssl-dev net-tools \
+    iperf3 avahi-daemon avahi-dnsconfd avahi-utils libnss-mdns \
+    bmon isc-dhcp-server alfred batctl resolvconf
 ```
 
-This script will do the following...
-
-1. Give you the option to connect to an access point (*N.B. This should be the same network as your server*).
-2. Download all required packages.
-3. Clone **this** repository (https://github.com/tiiuae/sc-mesh-secure-deployment.git)
-
-Once this process is complete, you should now have a git repo called **sc-mesh-secure-deployment** in your home directory alongside the install.sh script.
+Clone this repository if you haven't already.
 
 ```bash
-cd sc-mesh-secure-deployment
+$ git clone https://github.com/tiiuae/mesh_com
 ```
 
-Using the *configure.sh* script, you can now set up two different configurations, **server** and **client**, as well as either connect to an access point or set your machine up as an access point.
+From the **top level mesh_com directory**, init the *cryptolib* submodule.
 
 ```bash
-./configure.sh --help
+$ git submodule update --init common/security/cryptolib/
+```
+
+Using the *configure.sh* script, you can now set up two different configurations, **server** and **client**, as well as either connect to an access point or set your machine up as an access point. Two things to note:
+
+1. The server is currently only used for (i) authenticating clients and can be **any machine on the network** and (ii) distributing the mesh network configuration (e.g., channel, tx_power, etc.)
+2. The **FIRST** client node to be authenticated by the server will be configured as a gateway (i.e., for internet access).
+
+```bash
+$ cd modules/sc-mesh-secure-deployment/
+$ ./configure.sh --help
 ```
 
 ### On the Server-Side
 
-Your server will provide the necessary authentication certificates for you mesh network, as well as avahi services to allow clients to autodiscover the authentication server and automatically fetch these certificates. The *configure.sh* script should guide you through the process. The server must be executed on the */home/<username>/sc-mesh-secure-deployment* path. To set your machine up as a server, please run...
+To set up a machine up as an authentication server, **WITHOUT SUDO** please run... 
 
 ```bash
-sudo ./configure.sh -s
+$ ./configure.sh -s
 ```
+
+On the server open a web browser and go to `http://0.0.0.0:5000`. A web page with the authenticated and no-authenticated nodes should be displayed.
+
+![alt text](../../images/server-screenshot.png?style=centerme)
 
 ### On the Client Side
-Likewise, the *configure.sh* script should guide you through the process of setting your host up as a mesh client.
-
-*NB: There is a known bug where the server always sends the PREVIOUS request. To get around this run the client configuration twice on each node.*
-
-1. It will automatically try to discover the server through avahi in order to fetch the certificates **(make sure you are connected to the same network as the server during this process!)**.
-2. The **FIRST** node to connect to the server will automatically be set up as the mesh gateway, thus providing the mesh with internet access.
-
-To set your machine up as a client, please run...
+To set your node up as a client, please run...
 
 ```bash
-sudo ./configure.sh -c
+$ sudo ./configure.sh -c
 ```
 
-Please note that when the configuration is complete **the node will reboot** and automatically connect to the BATMAN-adv L2 network. You now have two options:
+Please remember to note:
 
-1. Leave the client as a L2 router with BATMAN-adv.
-2. Set a secondary wlan interface as a Wi-Fi Access Point to allow you to connect STA devices to the network (see below).
+1. It will automatically try to discover the server through avahi in order to fetch the certificates **(make sure you are connected to the same network as the server during this process!)**.
+2. The **FIRST** node to connect to the server will automatically be set up as the mesh gateway.
+
+When the configuration is complete **the node will reboot** and automatically connect to the BATMAN-adv L2 network. You can test the client node by pinging an address.
+
+```bash
+$ ping 8.8.8.8
+```
+
+You now have two options:
+
+1. Leave the client as a L2 routing node with BATMAN-adv.
+2. Set a secondary WLAN interface as a Wi-Fi Access Point to allow you to connect STA devices to the network (see below).
 
 ### Setup a Client as an Access Point / Gateway
 
@@ -77,13 +87,3 @@ To set your client up as an access point, the configuration script has an *-ap* 
 ```bash
 sudo ./configure.sh -ap
 ```
-
-### Usage
-On the server open a web browser and type...
-
-```bash
-http://0.0.0.0:5000
-```
-A web page with the authenticated and no-authenticated nodes should be displayed
-
-![alt text](../../images/server-screenshot.png?style=centerme)
