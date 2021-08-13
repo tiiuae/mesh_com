@@ -4,6 +4,7 @@ from rclpy.qos import QoSPresetProfiles
 
 from std_msgs.msg import String
 import socket
+from .src.socket_helper import recv_msg, send_msg
 
 
 class MeshPublisher(Node):
@@ -23,10 +24,12 @@ class MeshPublisher(Node):
         try:
             self.setup_socket()
             self.mesh_socket.connect((self.HOST, self.PORT))
-            self.mesh_socket.sendall(str.encode("report\n"))
-            msg.data = self.mesh_socket.recv(2048).decode('utf-8')
+            send_msg(self.mesh_socket, str.encode("report\n"))
+            data = recv_msg(self.mesh_socket)
             self.mesh_socket.close()
-            self.publisher_.publish(msg)
+            if data:
+                msg.data = data.decode('utf-8')
+                self.publisher_.publish(msg)
             # self.get_logger().info('Mesh Publishing: "%s"' % msg.data)
         except (ConnectionRefusedError, socket.timeout, ConnectionResetError):
             pass
@@ -34,6 +37,7 @@ class MeshPublisher(Node):
     def setup_socket(self):
         self.mesh_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.mesh_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.mesh_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.mesh_socket.settimeout(1)
 
 

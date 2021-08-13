@@ -1,107 +1,29 @@
+"""
+mesh executor with root rights
+"""
 import json
 from shlex import quote
 import socket
 import subprocess
 import syslog
 import select
+import threading
 
-
-# work in progress
-
-# class Batman:
-#     """
-#     Batman mesh class
-#     """
-#     def __init__(self):
-#         self.topology = {}
-#
-#     def update_topology_data(self):
-#         """
-#         Update topology as JSON
-#
-#         :return: self.topology as str
-#         """
-#         self.topology = {'my_mac': '', 'devices': ''}
-#         device_template = {'a': '',   # active
-#                            'o': '',   # originator
-#                            'ls': '',  # last-seen
-#                            'q': '',   # quality
-#                            'nh': ''}  # next-hop
-#
-#         route = []
-#
-#         try:
-#             proc = subprocess.Popen(['batctl', 'o'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-#
-#             for line in proc.stdout:
-#                 device = dict(device_template)
-#                 aux = line.split()
-#
-#                 if b"B.A.T" in line:
-#                     self.topology["my_mac"] = aux[4].decode("utf-8").split("/")[1]
-#                 elif b"Originator" not in aux[0]:
-#
-#                     # active route check
-#                     if b"*" in aux[0]:
-#                         index = 1
-#                     else:
-#                         index = 0
-#
-#                     device['a'] = str(index)
-#                     device['o'] = aux[0 + index].decode("utf-8")
-#                     device['ls'] = aux[1 + index].decode("utf-8").replace("s", "")
-#                     device['q'] = aux[2 + index].decode("utf-8").replace(')', '').replace('(', '')
-#                     device['nh'] = aux[3 + index].decode("utf-8")
-#                     route.append(device)
-#
-#             self.topology['devices'] = route
-#         except (FileNotFoundError, Exception):
-#             self.topology = device_template  # if not succeed, return empty template
-#
-#         return self.topology
-#
-#     def get_topology(self):
-#         """
-#         Get topology as JSON
-#
-#         :return: self.topology in json compatible str
-#         """
-#         return "[" + str(self.topology) + "]"
-
-
-class BatmanVisualisation:
-    command = 'batadv-vis'
-
-    @staticmethod
-    def remove_interfaces(visual_lines):
-        lines = visual_lines.split("\n")
-        new_visual = ""
-        for line in lines:
-            if line and "TT" not in line:
-                new_visual += line + "\n"
-
-        while '  ' in new_visual:
-            new_visual = new_visual.replace('  ', ' ')
-
-        return new_visual
-
-    def get(self, format_type="dot"):
-        if format_type == "dot" or format_type == "jsondoc" or format_type == "json":
-            try:
-                # returns byte string
-                raw_data = subprocess.check_output([self.command, '-f', format_type])
-                if raw_data == 255:
-                    raw_data = b'NA'
-            except (FileNotFoundError, subprocess.CalledProcessError):
-                raw_data = b'NA'
-        else:
-            raw_data = b'NA'
-        # return string
-        return self.remove_interfaces(raw_data.decode('UTF-8'))
+from .src.batstat import Batman, STATUS
+from .src.batadvvis import BatAdvVis
+from .src.socket_helper import recv_msg, send_msg
 
 
 class MeshNetwork:
-    class MeshSettings:
+    """
+    Mesh network executor
+    """
+
+    class MeshSettings:  # pylint: disable=too-few-public-methods
+        """
+        Settings class
+        """
+
         def __init__(self):
             self.api_version = 1
             self.ssid = ""
@@ -109,7 +31,7 @@ class MeshNetwork:
             self.ap_mac = ""
             self.country = ""
             self.frequency = ""
-            self.ip = ""
+            self.ip_address = ""
             self.subnet = ""
             self.tx_power = ""
             self.mode = ""
@@ -117,11 +39,13 @@ class MeshNetwork:
 
     def __init__(self):
         self.settings = self.MeshSettings()
-        self.HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
-        self.PORT = 33221  # Port to listen on (non-privileged ports are > 1023)
-        self.batman = BatmanVisualisation()
+        self.host = '127.0.0.1'  # Standard loopback interface address (localhost)
+        self.port = 33221  # Port to listen on (non-privileged ports are > 1023)
         self.script_path_1 = "/opt/ros/foxy/share/bin/mesh-ibss.sh"
         self.script_path_2 = "/opt/ros/foxy/share/bin/mesh-11s.sh"
+        self.batman_visual = BatAdvVis()
+        self.batman = Batman()
+        self.status = STATUS()
 
     def __handle_msg(self, msg):
 
@@ -151,30 +75,37 @@ class MeshNetwork:
             self.settings.ap_mac = str(parameters["ap_mac"])
             self.settings.country = str(parameters["country"]).lower()
             self.settings.frequency = str(parameters["frequency"])
-            self.settings.ip = str(parameters["ip"])
+            self.settings.ip_address = str(parameters["ip"])
             self.settings.subnet = str(parameters["subnet"])
             self.settings.tx_power = str(parameters["tx_power"])
             self.settings.mode = str(parameters["mode"])
             # self.settings.enc = str(parameters["enc"])
             self.__change_configuration()
-        except (json.decoder.JSONDecodeError or KeyError or
-                TypeError or AttributeError) as e:
+        except (json.decoder.JSONDecodeError, KeyError,
+                TypeError, AttributeError) as error:
             syslog.syslog("JSON format not correct")
-            syslog.syslog(str(e))
+            syslog.syslog(str(error))
 
     def __change_configuration(self):
         # api 1, ad-hoc
         # api 2, 11s
+
+        self.batman.status = self.status.ongoing
+
         if int(self.settings.api_version) == 1:
             path = self.script_path_1
         else:
             path = self.script_path_2
 
-        if self.settings.mode == "ap" or self.settings.mode == "off":
+        if self.settings.mode == "ap":
             subprocess.call([path, quote(self.settings.mode)])
+            self.batman.status = self.status.accesspoint
+        elif self.settings.mode == "off":
+            subprocess.call([path, quote(self.settings.mode)])
+            self.batman.status = self.status.off
         elif self.settings.mode == "mesh":
             subprocess.call([path, quote(self.settings.mode),
-                             quote(self.settings.ip),
+                             quote(self.settings.ip_address),
                              quote(self.settings.subnet),
                              quote(self.settings.ap_mac),
                              quote(self.settings.key),
@@ -182,41 +113,66 @@ class MeshNetwork:
                              quote(self.settings.frequency),
                              quote(self.settings.tx_power),
                              quote(self.settings.country)])
+            self.batman.status = self.status.mesh
 
         syslog.syslog('Setting Done')
 
     def __handle_report_request(self):
-        return self.batman.get()
+        return f"[{self.batman_visual.latest_topology},{self.batman.latest_stat}]". \
+            replace(": ", ":"). \
+            replace(", ", ",")
 
     def run(self):
+        """
+        Run method for executor
 
+        :return: never
+        """
         connection_list = []
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind((self.HOST, self.PORT))
-        s.listen(10)
-        connection_list.append(s)
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        server.bind((self.host, self.port))
+        server.listen(10)
+        connection_list.append(server)
+
+        self.batman.status = self.status.no_config
+
+        t1 = threading.Thread(target=self.batman_visual.run)
+        t1.start()
+        t2 = threading.Thread(target=self.batman.run)
+        t2.start()
 
         while True:
+
+            if not t1.is_alive():
+                t1 = threading.Thread(target=self.batman_visual.run)
+                t1.start()
+            if not t2.is_alive():
+                t2 = threading.Thread(target=self.batman.run)
+                t2.start()
+
             read_sockets, write_sockets, error_sockets = select.select(connection_list, [], [], 1)
 
             for sock in read_sockets:
-                if sock == s:
+                if sock == server:
                     # new connection received through server s socket
-                    sockfd, address = s.accept()
+                    sockfd, address = server.accept()
                     connection_list.append(sockfd)
                     syslog.syslog("Client ({}, {}) connected".format(address[0], address[1]))
                 else:
                     try:
-                        data = sock.recv(1024)
-                        data = data.decode('utf-8')
-                        if "report\n" in data:
-                            syslog.syslog(str("r:" + data))
-                            sock.sendall((self.__handle_report_request()).encode())
-                        elif "ssid" in data and \
-                                "api_version" in data:
-                            syslog.syslog(str("j:" + data))
-                            self.__handle_msg(data)
+                        data = recv_msg(sock)
+                        if data:
+                            data = data.decode('utf-8')
+                            if "report\n" in data:
+                                # syslog.syslog(str("r:" + data))
+                                # send_msg adds 4 byte length prefix
+                                send_msg(sock, self.__handle_report_request().encode())
+                            elif "ssid" in data and \
+                                    "api_version" in data:
+                                syslog.syslog(str("j:" + data))
+                                self.__handle_msg(data)
                         else:
                             _address = sock.getpeername()
                             syslog.syslog("Client ({}, {}) empty and removed".format(
@@ -232,6 +188,9 @@ class MeshNetwork:
 
 
 def main():
+    """
+    main
+    """
     mesh_network = MeshNetwork()
     mesh_network.run()
 
