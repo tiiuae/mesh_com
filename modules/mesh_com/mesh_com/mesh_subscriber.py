@@ -7,6 +7,8 @@ from rclpy.qos import QoSHistoryPolicy
 from std_msgs.msg import String
 import socket
 
+from .src.socket_helper import send_msg
+
 
 class MeshSubscriber(Node):
     def __init__(self):
@@ -31,6 +33,7 @@ class MeshSubscriber(Node):
     def setup_socket(self):
         self.mesh_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.mesh_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.mesh_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.mesh_socket.settimeout(1)
 
     def listener_callback(self, msg):
@@ -41,7 +44,7 @@ class MeshSubscriber(Node):
             if msg.data:
                 self.setup_socket()
                 self.mesh_socket.connect((self.HOST, self.PORT))
-                self.mesh_socket.sendall(str.encode(msg.data))
+                send_msg(self.mesh_socket, str.encode(msg.data))
                 self.mesh_socket.close()
         except (ConnectionRefusedError, socket.timeout, ConnectionResetError):
             self.backup_data = msg.data
@@ -54,7 +57,7 @@ class MeshSubscriber(Node):
             self.destroy_timer(self.backup_timer)
             self.setup_socket()
             self.mesh_socket.connect((self.HOST, self.PORT))
-            self.mesh_socket.sendall(str.encode(self.backup_data))
+            send_msg(self.mesh_socket, str.encode(self.backup_data))
             self.mesh_socket.close()
         except (ConnectionRefusedError, socket.timeout, ConnectionResetError):
             self.get_logger().info('mesh backup_caller: ##')

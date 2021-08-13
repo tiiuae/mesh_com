@@ -1,11 +1,12 @@
 from setuptools import setup
 
 package_name = 'mesh_com'
+submodules = "mesh_com/src"
 
 setup(
     name=package_name,
     version='0.0.0',
-    packages=[package_name],
+    packages=[package_name, submodules],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -13,6 +14,7 @@ setup(
         ('share/' + package_name, ['launch/mesh_com.launch']),
         ('share/bin', ['../../common/scripts/mesh-ibss.sh']),
         ('share/bin', ['../../common/scripts/mesh-11s.sh']),
+       # ('share/bin', ['../../common/scripts/mesh-11s-mr.sh']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
