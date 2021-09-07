@@ -14,6 +14,6 @@ RUN rm -r /opt/mesh_com
 RUN sed -i "95s+--recursive+common/security/cryptolib/+" /opt/install.sh
 RUN /bin/bash /opt/install.sh
 WORKDIR /opt/mesh_com/
+RUN git checkout feature/docker
 RUN git submodule update --init common/security/cryptolib
-RUN /etc/init.d/dbus start; sleep 2; /etc/init.d/avahi-daemon start
 WORKDIR /opt/mesh_com/modules/sc-mesh-secure-deployment/

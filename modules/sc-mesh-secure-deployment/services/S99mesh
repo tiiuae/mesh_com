@@ -1,7 +1,7 @@
 DAEMON="mesh-init.sh"
 PIDFILE="/var/run/$DAEMON.pid"
-WLANDEV=$1
-MESHIPADDR=$2
+WLANDEV=$2
+MESHIPADDR=$3
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
 MYMESH_ARGS="${MESHIPADDR} 00:11:22:33:44:55 1234567890 mymesh 2412 ${WLANDEV}"

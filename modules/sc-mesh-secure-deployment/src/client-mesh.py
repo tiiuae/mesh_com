@@ -188,15 +188,24 @@ def create_config_ubuntu(response):
     # Copy mesh service to /etc/systemd/system/
     if conf['mesh_service']:
         mesh_interface = get_interface(conf['mesh_inf'])
-        subprocess.call('cp ../../common/scripts/mesh-' + res['type'] + '.sh /usr/sbin/.', shell=True)
-        subprocess.call('chmod 744 /usr/sbin/mesh-' + res['type'] + '.sh', shell=True)
-        subprocess.call('cp services/S99mesh /etc/init.d/S99mesh', shell=True)
-        subprocess.call('chmod 664 /etc/init.d/S99mesh', shell=True)
-        subprocess.call('/etc/init.d/S99mesh ' + mesh_interface + ' ' + address, shell=True)
+        # subprocess.call('sudo cp ../../common/scripts/mesh-' + res['type'] + '.sh /usr/local/bin/.', shell=True)
+        # subprocess.call('sudo chmod 744 /usr/local/bin/mesh-' + res['type'] + '.sh', shell=True)
+        # subprocess.call('sudo cp services/mesh@.service /etc/systemd/system/.', shell=True)
+        # subprocess.call('sudo chmod 664 /etc/systemd/system/mesh@.service', shell=True)
+        # subprocess.call('sudo systemctl enable mesh@' + mesh_interface + '.service', shell=True)
+        # # Ensure our nameserver persists as 8.8.8.8
+        # # subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True) # FIXME: I don't actually think we need this any more...
+        # time.sleep(2)
+        # subprocess.call('reboot', shell=True)
+        subprocess.call('cp ../../common/scripts/mesh-init.sh' ' /usr/local/bin/.', shell=True)
+        subprocess.call('chmod 744 /usr/local/bin/mesh-init.sh', shell=True)
+        subprocess.call('cp services/S99mesh /etc/init.d/.', shell=True)
+        subprocess.call('chmod 777 /etc/init.d/S99mesh', shell=True)
+        subprocess.call('/etc/init.d/S99mesh start ' + mesh_interface + ' ' + address , shell=True)
         # Ensure our nameserver persists as 8.8.8.8
         # subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True) # FIXME: I don't actually think we need this any more...
         time.sleep(2)
-        #subprocess.call('reboot', shell=True)
+        subprocess.call('reboot', shell=True)
 
 
 if __name__ == "__main__":

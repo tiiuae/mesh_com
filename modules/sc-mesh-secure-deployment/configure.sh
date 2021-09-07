@@ -242,6 +242,11 @@ function server {
 function client {
   echo '> Configuring the client...'
   # Make the server
+  /etc/init.d/dbus stop
+  /etc/init.d/dbus start
+  sleep 2
+  /etc/init.d/avahi-daemon stop
+  /etc/init.d/avahi-daemon start
   pushd .
   cd ../..
   make mesh_tb_client
