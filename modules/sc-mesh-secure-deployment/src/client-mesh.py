@@ -175,7 +175,7 @@ def create_config_ubuntu(response):
     # Copy mesh service to /etc/systemd/system/
     if conf['mesh_service']:
         mesh_interface = get_interface(conf['mesh_inf'])
-        subprocess.call('src/bash/conf-mesh.sh ' + mesh_interface + ' ' + address, shell=True)
+        subprocess.call('src/bash/conf-mesh.sh ' + mesh_interface, shell=True)
 
 
 if __name__ == "__main__":
