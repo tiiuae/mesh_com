@@ -122,27 +122,13 @@ def get_interface(pattern):
 def ubuntu_gw(gw_inf):
     print('> Configuring Ubuntu gateway node with gw_inf:' + str(gw_inf) + '...')
     # Create Gateway Service
-    subprocess.call('sudo cp ../../common/scripts/mesh-gw.sh /usr/local/bin/.', shell=True)
-    subprocess.call('sudo chmod 744 /usr/local/bin/mesh-gw.sh', shell=True)
-    subprocess.call('sudo cp services/gw@.service /etc/systemd/system/.', shell=True)
-    subprocess.call('sudo chmod 644 /etc/systemd/system/gw@.service', shell=True)
-    subprocess.call('sudo systemctl enable gw@' + str(gw_inf) + '.service', shell=True)
-    # IF inf is wl, auto connect wlx to AP at boot using wpa_supplicant
-    if "wl" in str(gw_inf):
-        subprocess.call('sudo cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-' + str(gw_inf) + '.conf', shell=True)
-        subprocess.call('chmod 600 /etc/wpa_supplicant/wpa_supplicant-' + str(gw_inf) + '.conf', shell=True)
-        subprocess.call('sudo systemctl enable wpa_supplicant@' + str(gw_inf) + '.service', shell=True)
+    subprocess.call('src/bash/conf-gw.sh ' + gw_inf, shell=True)
 
 
 def ubuntu_node(gateway):
     print('> Configuring Ubuntu mesh node...')
     # Create default route service
-    subprocess.call('route add default gw ' + gateway + ' bat0', shell=True)  # FIXME: Is this line necessary?
-    subprocess.call('sudo cp ../../common/scripts/mesh-default-gw.sh /usr/local/bin/.', shell=True)
-    subprocess.call('sudo chmod 744 /usr/local/bin/mesh-default-gw.sh', shell=True)
-    subprocess.call('sudo cp services/default@.service /etc/systemd/system/.', shell=True)
-    subprocess.call('sudo chmod 644 /etc/systemd/system/default@.service', shell=True)
-    subprocess.call('sudo systemctl enable default@' + gateway + '.service', shell=True)
+    subprocess.call('src/bash/conf-route.sh ' + gateway, shell=True)
 
 
 def create_config_ubuntu(response):
@@ -179,33 +165,17 @@ def create_config_ubuntu(response):
         nodeId = int(res['addr'].split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
         subprocess.call('sudo hostnamectl set-hostname node' + str(nodeId), shell=True)
         subprocess.call('echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts', shell=True)
-    # Final settings
-    if conf['disable_networking']:
-        subprocess.call('sudo nmcli networking off', shell=True)
-        subprocess.call('sudo systemctl stop network-manager.service', shell=True)
-        subprocess.call('sudo systemctl disable network-manager.service', shell=True)
-        subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
+    # not available in secure OS
+    # # Final settings
+    # if conf['disable_networking']:
+    #     subprocess.call('sudo nmcli networking off', shell=True)
+    #     subprocess.call('sudo systemctl stop network-manager.service', shell=True)
+    #     subprocess.call('sudo systemctl disable network-manager.service', shell=True)
+    #     subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
     # Copy mesh service to /etc/systemd/system/
     if conf['mesh_service']:
         mesh_interface = get_interface(conf['mesh_inf'])
-        # subprocess.call('sudo cp ../../common/scripts/mesh-' + res['type'] + '.sh /usr/local/bin/.', shell=True)
-        # subprocess.call('sudo chmod 744 /usr/local/bin/mesh-' + res['type'] + '.sh', shell=True)
-        # subprocess.call('sudo cp services/mesh@.service /etc/systemd/system/.', shell=True)
-        # subprocess.call('sudo chmod 664 /etc/systemd/system/mesh@.service', shell=True)
-        # subprocess.call('sudo systemctl enable mesh@' + mesh_interface + '.service', shell=True)
-        # # Ensure our nameserver persists as 8.8.8.8
-        # # subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True) # FIXME: I don't actually think we need this any more...
-        # time.sleep(2)
-        # subprocess.call('reboot', shell=True)
-        subprocess.call('cp ../../common/scripts/mesh-init.sh' ' /usr/local/bin/.', shell=True)
-        subprocess.call('chmod 744 /usr/local/bin/mesh-init.sh', shell=True)
-        subprocess.call('cp services/S99mesh /etc/init.d/.', shell=True)
-        subprocess.call('chmod 777 /etc/init.d/S99mesh', shell=True)
-        subprocess.call('/etc/init.d/S99mesh start ' + mesh_interface + ' ' + address , shell=True)
-        # Ensure our nameserver persists as 8.8.8.8
-        # subprocess.call('sudo cp conf/resolved.conf /etc/systemd/resolved.conf', shell=True) # FIXME: I don't actually think we need this any more...
-        time.sleep(2)
-        subprocess.call('reboot', shell=True)
+        subprocess.call('src/bash/conf-mesh.sh ' + mesh_interface + ' ' + address, shell=True)
 
 
 if __name__ == "__main__":
