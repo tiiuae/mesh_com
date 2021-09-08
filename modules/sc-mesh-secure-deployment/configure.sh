@@ -83,8 +83,7 @@ if [ "$wlan_if_count" = "1" ]; then
   STATUS="$(systemctl is-active $mesh_service)"
   if [ "${STATUS}" = "active" ]; then
     echo "Disabling" $mesh_service
-    sudo systemctl stop $mesh_service
-    sudo systemctl disable $mesh_service
+    /etc/init.d/S90 mesh stop
     sudo ifconfig bat0 down
     sudo rmmod batman_adv
     killall wpa_supplicant
