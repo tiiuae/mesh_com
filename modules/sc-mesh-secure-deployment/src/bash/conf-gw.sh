@@ -1,10 +1,10 @@
 #!/bin/bash
 gw_info=$2
 meshcom_path=$(pwd | cut -d'/' -f-3)
-
+sc_path=$(pwd | cut -d'/' -f-5)
 cp $meshcom_path/common/scripts/mesh-gw.sh /usr/sbin/.
 chmod 744 /usr/sbin/mesh-gw.sh
-cp $meshcom_path/services/initd/S92gw /etc/init.d/.
+cp $sc_path/services/initd/S92gw /etc/init.d/.
 chmod 777 /etc/init.d/S92gw
 /etc/init.d/S92gw start
 # IF inf is wl, auto connect wlx to AP at boot using wpa_supplicant
