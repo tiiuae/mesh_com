@@ -57,27 +57,27 @@ find_mesh_wifi_device()
 # 1      2    3      4        5     6       7      8         9         10
 # <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface>
 
-echo "Solving wifi device name.."
-if [[ -z "${10}" ]]; then
-  rfkill unblock all
-  # multiple wifi options --> can be detected as follows:
-  # manufacturer 0x168c = Qualcomm
-  # devices = 0x0034 0x003c 9462/988x
-  #           0x003e        6174
-  find_mesh_wifi_device 0x168c "0x003e 0x0034 0x003c"
-
-  if [ "$retval_phy" != "" ]; then
-      phyname=$retval_phy
-      wifidev=$retval_name
-  else
-      echo "ERROR! Can't find correct wifi device!"
-      exit 1
-  fi
-else
-  wifidev=${10}
-  phyname=${11}
-fi
-echo "Found: $wifidev $phyname"
+#echo "Solving wifi device name.."
+#if [[ -z "${10}" ]]; then
+#  rfkill unblock all
+#  # multiple wifi options --> can be detected as follows:
+#  # manufacturer 0x168c = Qualcomm
+#  # devices = 0x0034 0x003c 9462/988x
+#  #           0x003e        6174
+#  find_mesh_wifi_device 0x168c "0x003e 0x0034 0x003c"
+#
+#  if [ "$retval_phy" != "" ]; then
+#      phyname=$retval_phy
+#      wifidev=$retval_name
+#  else
+#      echo "ERROR! Can't find correct wifi device!"
+#      exit 1
+#  fi
+#else
+#  wifidev=${10}
+#  phyname=${11}
+#fi
+#echo "Found: $wifidev $phyname"
 
 case "$1" in
 
@@ -89,6 +89,8 @@ echo "sudo mesh $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11}"
           echo "check arguments..."
         help
       fi
+wifidev=${10}
+phyname=${11}
 
 cat <<EOF >/var/run/wpa_supplicant-adhoc.conf
 ctrl_interface=DIR=/var/run/wpa_supplicant

@@ -1,11 +1,12 @@
-DAEMON="mesh-init.sh"
+DAEMON="mesh-ibss.sh"
 PIDFILE="/var/run/$DAEMON.pid"
 WLANDEV=$2
 source /etc/mesh_com/mesh.conf
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-MYMESH_ARGS="${IP} ${MAC} ${KEY} ${ESSID} ${FREQ} ${WLANDEV}"
+MYMESH_ARGS="${MODE} ${IP} ${SUBNET} ${MAC} ${KEY} ${ESSID} ${FREQ} ${TX_POWER} ${COUNTRY} ${WLANDEV} phy1"
 start() {
+    echo $MYMESH_ARGS
     printf 'Starting %s: ' "$DAEMON"
     start-stop-daemon -b -m -S -q -p "$PIDFILE" -x "/usr/sbin/$DAEMON" \
         -- $MYMESH_ARGS
