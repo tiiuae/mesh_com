@@ -24,7 +24,7 @@ if [[ -z "$1" || -z "$2" || -z "$3" || -z "$4" || -z "$5" ]]
 fi
 
 echo "Killing wpa_supplicant..."
-killall wpa_supplicant 2>/dev/null
+pkill wpa_supplicant 2>/dev/null
 
 
 
