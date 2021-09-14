@@ -1,7 +1,7 @@
 #!/bin/bash
 gw_info=$2
-meshcom_path=$(pwd | cut -d'/' -f-3)
-sc_path=$(pwd | cut -d'/' -f-5)
+meshcom_path=$(pwd | awk -F 'mesh_com' '{print $1 FS "/"}')
+sc_path=$(pwd | awk -F 'sc-mesh-secure-deployment' '{print $1 FS "/"}')
 cp $meshcom_path/common/scripts/mesh-gw.sh /usr/sbin/.
 chmod 744 /usr/sbin/mesh-gw.sh
 cp $sc_path/services/initd/S92gw /etc/init.d/.

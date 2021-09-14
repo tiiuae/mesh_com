@@ -1,7 +1,8 @@
 #!/bin/bash
 gateway=$1
-meshcom_path=$(pwd | cut -d'/' -f-3)
-sc_path=$(pwd | cut -d'/' -f-5)
+meshcom_path=$(pwd | awk -F 'mesh_com' '{print $1 FS "/"}')
+sc_path=$(pwd | awk -F 'sc-mesh-secure-deployment' '{print $1 FS "/"}')
+
 
 route add default gw $gateway bat0
 cp $meshcom_path/common/scripts/mesh-default-gw.sh /usr/sbin/.

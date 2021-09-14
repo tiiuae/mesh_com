@@ -1,6 +1,6 @@
 #! /bin/bash
-meshcom_path=$(pwd | cut -d'/' -f-3)
-sc_path=$(pwd | cut -d'/' -f-5)
+meshcom_path=$(pwd | awk -F 'mesh_com' '{print $1 FS "/"}')
+sc_path=$(pwd | awk -F 'sc-mesh-secure-deployment' '{print $1 FS "/"}')
 
 mesh_interface=$1
 mesh_address=$2
