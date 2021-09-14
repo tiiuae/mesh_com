@@ -156,6 +156,8 @@ EOF
       # ensures wpa_supplicant doesn't start when this script is run as a process.
       # This is likely due to the interface not being up in time, and will
       # require some fiddling with the systemd startup order.
+      rm -fr /var/run/wpa_supplicant/"$wifidev"
+      rm -fr /var/run/wpa_supplicant/*
       if [[ -z "${10}" ]]; then
         wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
       else

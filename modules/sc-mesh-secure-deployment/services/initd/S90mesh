@@ -4,7 +4,7 @@ WLANDEV=$2
 source /etc/mesh_com/mesh.conf
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-MYMESH_ARGS="${MODE} ${IP} ${SUBNET} ${MAC} ${KEY} ${ESSID} ${FREQ} ${TX_POWER} ${COUNTRY} ${WLANDEV} phy1"
+MYMESH_ARGS="${MODE} ${IP} ${MASK} ${MAC} ${KEY} ${ESSID} ${FREQ} ${TXPOWER} ${COUNTRY} ${WLANDEV} ${PHY}"
 start() {
     echo $MYMESH_ARGS
     printf 'Starting %s: ' "$DAEMON"
