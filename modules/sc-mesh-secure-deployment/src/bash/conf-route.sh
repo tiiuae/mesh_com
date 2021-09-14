@@ -9,4 +9,4 @@ cp $meshcom_path/common/scripts/mesh-default-gw.sh /usr/sbin/.
 chmod 744 /usr/sbin/mesh-default-gw.sh
 cp $sc_path/services/initd/S91defaultroute /etc/init.d/.
 chmod 777 /etc/init.d/S91defaultroute
-/etc/initd/S91defaultroute start $gateway
+/etc/init.d/S91defaultroute start $gateway
