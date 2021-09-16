@@ -163,7 +163,7 @@ def create_config_ubuntu(response):
     if conf['set_hostname']:
         print('> Setting hostname...')
         nodeId = int(res['addr'].split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
-        subprocess.call('sudo hostnamectl set-hostname node' + str(nodeId), shell=True)
+        subprocess.call('hostname node' + str(nodeId), shell=True)
         subprocess.call('echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts', shell=True)
     # not available in secure OS
     # # Final settings
