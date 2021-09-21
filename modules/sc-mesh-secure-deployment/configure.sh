@@ -121,19 +121,20 @@ EOF
 #        create duplicate lines
 echo "INTERFACES=$1" >> /etc/default/isc-dhcp-server
 if [ ! -d "/etc/mesh_com" ]; then
-  sudo mkdir /etc/mesh_com
+   mkdir /etc/mesh_com
 fi
 echo "AP_INF=$choice" >> /etc/mesh_com/ap.conf
 # Create Gateway Service
-sudo cp ../../common/scripts/mesh-ap.sh /usr/local/bin/.
-sudo chmod 744 /usr/local/bin/mesh-ap.sh
-sudo cp services/ap@.service /etc/systemd/system/.
-sudo chmod 644 /etc/systemd/system/ap@.service
-sudo systemctl enable ap@$ip.service
+cp ../../common/scripts/mesh-ap.sh /usr/sbin/.
+chmod 744 /usr/sbin/mesh-ap.sh
+cp services/initd/S93meshAP /etc/init.d/.
+chmod 700 /etc/init.d/S93meshAP
+/etc/init.d/S93meshAP start $choice
+# systemctl enable ap@$ip.service
 # Setup wlx at boot using wpa_supplicant
-sudo cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-$choice.conf
-sudo chmod 600 /etc/wpa_supplicant/wpa_supplicant-$choice.conf
-sudo systemctl enable wpa_supplicant@$choice.service
+cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+#sudo chmod 600 /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+#sudo systemctl enable wpa_supplicant@$choice.service
 #sleep 2
 #reboot
 }
@@ -143,11 +144,11 @@ function ap_remove {
   echo '> Please choose from the list of available interfaces...'
   interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
   menu_from_array "${interfaces_arr[@]}"
-  sudo systemctl disable wpa_supplicant@$choice.service
+  /etc/init.d/S93meshAP stop
   # sudo systemctl enable ap@$ip.service
   sudo rm /etc/wpa_supplicant/wpa_supplicant-$choice.conf
-  sudo rm /usr/local/bin/mesh-ap.sh
-  sudo rm /etc/systemd/system/ap@.service
+  sudo rm /usr/sbin/mesh-ap.sh
+  sudo rm /etc/init.d/S93meshAP
   sudo rm /etc/mesh_com/ap.conf
 #  reboot
 }
