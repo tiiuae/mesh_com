@@ -225,7 +225,7 @@ EOF
 
 	    # set bat0 ipaddr
       if [ -z "$DRONE_DEVICE_ID" ]
-        then 
+        then
           # DRONE_DEVICE_ID not available set default
           ifconfig bat0 192.168.1.1 netmask 255.255.255.0
         else
@@ -261,4 +261,3 @@ off)
       help
       ;;
 esac
-

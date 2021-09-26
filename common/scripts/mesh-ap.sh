@@ -1,9 +1,9 @@
 #! /bin/bash
-
 ################################################################################
-# Creates dhcp conf, configures interface ip, and vonfigures routing for mesh AP
+# Creates dhcp conf, configures interface ip, and configures routing for mesh AP
 ################################################################################
 # Configure dhcp
+wpa_supplicant -i $1 -c /etc/wpa_supplicant/wpa_supplicant-$1.conf
 cat <<EOF > /etc/dhcp/dhcpd.conf
 subnet $2.10.0.0 netmask 255.255.255.0 {
   range $2.10.0.2 $2.10.0.16;
