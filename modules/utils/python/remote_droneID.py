@@ -28,10 +28,35 @@ def update_vendor_ie(drone_id):
     cmd="hostapd_cli ENABLE"
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,shell=True)
 
+
+def prepare_ble_dri_uuid(drone_id):
+    return ' '.join([drone_id[i:i+2] for i in range(0, len(drone_id), 2)])
+
+def ble_dri_tx(drone_id):
+    global bt_if
+    # allow rfkill to bring up bluetooth hci interface
+    cmd="rfkill unblock bluetooth"
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,shell=True)
+    # bring up bluetooth interface.
+    # To do: use bluez python lib
+    cmd="hciconfig " + str(bt_if) + " up"
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,shell=True)
+
+    # enable ble advertising, To do: dynamically detect connection vs connectionless adv
+    cmd="hciconfig " + str(bt_if) + " leadv 3"
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,shell=True)
+
+    sd = prepare_ble_dri_uuid(drone_id)
+    # To do: generate dynamic UUID and remove hardcoded tx power(get from conf)
+    cmd="hcitool -i " + str(bt_if) + " cmd 0x08 0x0008 1E 02 01 1A 1A FF 4C 00 02 15 " + str(sd) + " 00 00 00 00 " + "C5 00"
+    print(cmd)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,shell=True)
+
 def dri_thread():
     global dri_data_file
     global dri_update_int
     global debug
+    global tx_mode
 
     while True:
         f = open(dri_data_file, 'r')
@@ -39,10 +64,13 @@ def dri_thread():
         if debug:
             print(dri_data)
         f.close()
-        beacon_vendor_ie=prepare_vendor_ie(dri_data)
-        if debug:
-            print(beacon_vendor_ie)
-        update_vendor_ie(beacon_vendor_ie)
+        if (tx_mode == 'wifi'):
+            beacon_vendor_ie=prepare_vendor_ie(dri_data)
+            if debug:
+                print(beacon_vendor_ie)
+            update_vendor_ie(beacon_vendor_ie)
+        elif (tx_mode == 'bt'):
+            ble_dri_tx(dri_data)
         sleep(dri_update_int)
 
 if __name__=='__main__':
@@ -51,5 +79,6 @@ if __name__=='__main__':
     debug = conf['debug']
     dri_update_int = conf['dri_ie_update_interval']
     dri_data_file = conf['dri_file_name']
+    bt_if = conf['bt_if_name']
+    tx_mode = conf['mode']
     Thread(target=dri_thread).start()
-
