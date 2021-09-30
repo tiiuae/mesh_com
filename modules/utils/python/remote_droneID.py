@@ -16,7 +16,7 @@ def prepare_vendor_ie(drone_id):
    # 3 byte for OUI
    length=length/2 + 3
    len_tag=format(int(length), '#04x')[2:]
-   vendor_ie="dd" + oui + len_tag + drone_id
+   vendor_ie="dd" + len_tag + oui + drone_id
    return vendor_ie
 
 
