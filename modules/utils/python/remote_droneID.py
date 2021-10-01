@@ -19,7 +19,6 @@ def prepare_vendor_ie(drone_id):
    vendor_ie="dd" + len_tag + oui + drone_id
    return vendor_ie
 
-
 def update_vendor_ie(drone_id):
     cmd="hostapd_cli SET vendor_elements " + str(drone_id)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,shell=True)
@@ -52,6 +51,13 @@ def ble_dri_tx(drone_id):
     print(cmd)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,shell=True)
 
+def get_wifi_beacon_list():
+    cmd="iw wlan0 scan -u | grep 'SSID\|Vendor specific'"
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,shell=True)
+    dri_oui_list = proc.communicate()[0].decode('utf-8').strip()
+    if debug:
+        print(dri_oui_list)
+
 def dri_thread():
     global dri_data_file
     global dri_update_int
@@ -73,12 +79,31 @@ def dri_thread():
             ble_dri_tx(dri_data)
         sleep(dri_update_int)
 
+def observer_thread():
+    global dri_update_int
+    global debug
+    global tx_mode
+
+    while True:
+        if (tx_mode == 'wifi'):
+            get_wifi_beacon_list()
+        sleep(dri_update_int)
+
 if __name__=='__main__':
     print('> Loading yaml conf... ')
     conf = yaml.safe_load(open("dri.conf", 'r'))
     debug = conf['debug']
     dri_update_int = conf['dri_ie_update_interval']
     dri_data_file = conf['dri_file_name']
-    bt_if = conf['bt_if_name']
     tx_mode = conf['mode']
-    Thread(target=dri_thread).start()
+    dri_role = conf['dri_role']
+
+    if (dri_role == "uav"):
+        if (tx_mode == 'wifi'):
+            dri_if = conf['dri_if']
+        elif (tx_mode == 'bt'):
+            bt_if = conf['bt_if_name']
+        Thread(target=dri_thread).start()
+    elif (dri_role == "observer"):
+        obs_if = conf['obs_if']
+        Thread(target=observer_thread).start()
