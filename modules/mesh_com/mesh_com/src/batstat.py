@@ -220,7 +220,7 @@ class Batman:
         self._update_iw_type()
         self._update_iw_reg()
         self._update_survey_dump()
-        self._solve_device_name()  # HW info
+        self.hw_name = "Wi-Fi"  # needs implementation if radio is not Wi-Fi
 
     def _create_template(self):
         """
@@ -247,19 +247,6 @@ class Batman:
                                 'ls': '',  # last-seen
                                 'q': '',  # quality
                                 'nh': ''}  # next-hop
-
-    def _solve_device_name(self):
-        try:
-            proc = subprocess.Popen(['lshw', '-class', 'network', '-json'], stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE).stdout.read()
-            json_obj = json.loads(proc.decode('utf8'))
-
-            for json_string in json_obj:
-                if json_string['logicalname'] == self.network_interface:
-                    self.hw_name = json_string['product']
-
-        except IndexError:
-            self.hw_name = self.mesh_status.not_avail
 
     def update_stat_data(self):
         """
