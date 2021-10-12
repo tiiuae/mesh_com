@@ -8,3 +8,6 @@
 [submodule "common/core/os/openwrt"]
 	path = common/core/os/openwrt
 	url = git@github.com:tiiuae/openwrt.git
+[submodule "common/core/os/ubuntu/wifi-firmware"]
+	path = common/core/os/ubuntu/wifi-firmware
+	url = https://github.com/tiiuae/wifi-firmware.git

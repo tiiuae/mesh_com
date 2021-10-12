@@ -1,0 +1,52 @@
+DAEMON="mesh-ibss.sh"
+PIDFILE="/var/run/$DAEMON.pid"
+WLANDEV=$2
+source /etc/mesh_com/mesh.conf
+# shellcheck source=/dev/null
+[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
+MYMESH_ARGS="${MODE} ${IP} ${MASK} ${MAC} ${KEY} ${ESSID} ${FREQ} ${TXPOWER} ${COUNTRY} ${WLANDEV} ${PHY}"
+start() {
+    echo $MYMESH_ARGS
+    printf 'Starting %s: ' "$DAEMON"
+    start-stop-daemon -b -m -S -q -p "$PIDFILE" -x "/usr/sbin/$DAEMON" \
+        -- $MYMESH_ARGS
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+stop() {
+#/etc/init.d/S90mesh stop <interface>
+    printf 'Stopping %s: ' "$DAEMON"
+    NEW_PID=$(ps ax|grep wpa_supplicant |grep adhoc | awk {'print $1'})
+    kill -9 $NEW_PID
+    ifconfig $WLANDEV down
+    ifconfig $WLANDEV up
+    start-stop-daemon -K -q -p "$PIDFILE"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        rm -f "$PIDFILE"
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+restart() {
+    stop
+    sleep 1
+    start
+}
+case "$1" in
+    start|stop|restart)
+        "$1";;
+    reload)
+        # Restart, since there is no true "reload" feature.
+        restart;;
+    *)
+        echo "Usage: $0 {start|stop|restart|reload}"
+        exit 1
+esac
