@@ -155,9 +155,9 @@ EOF
       # This is likely due to the interface not being up in time, and will
       # require some fiddling with the systemd startup order.
       if [[ -z "${10}" ]]; then
-        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B
+        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B -f /tmp/wpa_supplicant_ibss.log
       else
-        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/
+        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_ibss.log
       fi
       ;;
 
@@ -244,7 +244,7 @@ EOF
       #TODO
       # dhserver
 
-      wpa_supplicant -B -i "$wifidev" -c /var/run/wpa_supplicant-ap.conf -D nl80211 -C /var/run/wpa_supplicant/
+      wpa_supplicant -B -i "$wifidev" -c /var/run/wpa_supplicant-ap.conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_ap.log
 
       ;;
 
