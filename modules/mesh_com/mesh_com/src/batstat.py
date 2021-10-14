@@ -135,7 +135,7 @@ class Batman:
 
     def _update_iw_type(self):
         """
-        Update device self.country code
+        Update device self.status code
 
         :return: None
         """
@@ -234,7 +234,7 @@ class Batman:
         self.topology = {'status': self.status,  # "MESH/OFF/NO_CONFIG/ONGOING/AP/"
                          'my_mac': self._get_my_mac,  # e.g. 00:11:22:33:44:55
                          'noise': self.device_noise_dict[self.freq]
-                         if self.freq != self.mesh_status.not_avail
+                         if self.freq in self.device_noise_dict
                          else self.mesh_status.not_avail,
                          'freq': self.freq,
                          'txpower': self.txpower,
