@@ -1,6 +1,6 @@
 FROM ubuntu
 
-ENV TZ=Asia/Dubai
+ENV TZ=Asia/Dubai EXECUTION_CTX=docker
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 ARG DEBIAN_FRONTEND=noninteractive
 RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections
