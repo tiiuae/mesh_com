@@ -38,6 +38,7 @@ class Batman:
         self.network_interface = self.mesh_status.not_avail
         self.freq = self.mesh_status.not_avail
         self.txpower = self.mesh_status.not_avail
+        self.iw_state = self.mesh_status.not_avail
         self.country = self.mesh_status.not_avail
         self.hw_name = self.mesh_status.not_avail
         self.thread_running = True
@@ -132,6 +133,7 @@ class Batman:
         except (IndexError, TypeError):
             self.freq = self.mesh_status.not_avail
             self.txpower = self.mesh_status.not_avail
+            self.iw_state = self.mesh_status.not_avail
 
     def _update_iw_type(self):
         """
