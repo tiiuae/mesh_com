@@ -152,6 +152,7 @@ def create_config_ubuntu(response):
         mesh_config.write('FREQ=' + str(res['frequency']) + '\n')
         mesh_config.write('TXPOWER=' + str(res['tx_power']) + '\n')
         mesh_config.write('COUNTRY=fi\n')
+        mesh_config.write('MESH_VIF=' + mesh_vif + '\n')
         mesh_config.write('PHY=' + phy_name + '\n')
     # Are we a gateway node? If we are we need to set up the routes
     if res['gateway'] and conf['gw_service']:
