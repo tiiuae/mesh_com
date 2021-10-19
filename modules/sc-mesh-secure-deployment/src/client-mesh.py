@@ -135,6 +135,11 @@ def create_config_ubuntu(response):
     res = json.loads(response)
     print('> Interfaces: ' + str(res))
     address = res['addr']
+    if conf['mesh_service']:
+        mesh_vif = get_interface(conf['mesh_inf'])
+        cmd="iw dev " + mesh_vif + " info | awk '/wiphy/ {printf \"phy\" $2}'"
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+        phy_name = proc.communicate()[0].decode('utf-8').strip()
     # Create mesh service config
     Path("/etc/mesh_com").mkdir(parents=True, exist_ok=True)
     with open('/etc/mesh_com/mesh.conf', 'w') as mesh_config:
@@ -147,7 +152,7 @@ def create_config_ubuntu(response):
         mesh_config.write('FREQ=' + str(res['frequency']) + '\n')
         mesh_config.write('TXPOWER=' + str(res['tx_power']) + '\n')
         mesh_config.write('COUNTRY=fi\n')
-        mesh_config.write('PHY=phy1\n')
+        mesh_config.write('PHY=' + phy_name + '\n')
     # Are we a gateway node? If we are we need to set up the routes
     if res['gateway'] and conf['gw_service']:
         print("============================================")
