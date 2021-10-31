@@ -1,12 +1,23 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          S90mesh
+# Should-Start:      $syslog
+# Should-Stop:       $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: start S90mesh during boot time
+# Description:       wifi mesh daemon for configuring mesh network
+#                    automatically
+### END INIT INFO
+
 DAEMON="mesh-ibss.sh"
 DIR="/usr/sbin/"
 PIDFILE="/var/run/$DAEMON.pid"
-WLANDEV=$2
 LOG_FILE=/var/log/mesh.log
 source /etc/mesh_com/mesh.conf
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-MYMESH_ARGS="${MODE} ${IP} ${MASK} ${MAC} ${KEY} ${ESSID} ${FREQ} ${TXPOWER} ${COUNTRY} ${WLANDEV} ${PHY}"
+MYMESH_ARGS="${MODE} ${IP} ${MASK} ${MAC} ${KEY} ${ESSID} ${FREQ} ${TXPOWER} ${COUNTRY} ${MESH_VIF} ${PHY}"
 start() {
     echo $MYMESH_ARGS
     printf 'Starting %s: ' "$DAEMON"
@@ -25,8 +36,8 @@ stop() {
     printf 'Stopping %s: ' "$DAEMON"
     NEW_PID=$(ps ax|grep wpa_supplicant |grep adhoc | awk {'print $1'})
     kill -9 $NEW_PID
-    ifconfig $WLANDEV down
-    ifconfig $WLANDEV up
+    ifconfig $MESH_VIF down
+    ifconfig $MESH_VIF up
     start-stop-daemon -K -q -p "$PIDFILE"
     status=$?
     if [ "$status" -eq 0 ]; then
@@ -52,3 +63,5 @@ case "$1" in
         echo "Usage: $0 {start|stop|restart|reload}"
         exit 1
 esac
+
+exit 0
