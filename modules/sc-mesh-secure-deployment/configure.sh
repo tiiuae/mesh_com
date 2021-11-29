@@ -60,6 +60,7 @@ echo '> Please choose from the list of available interfaces...'
 interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
 menu_from_array "${interfaces_arr[@]}"
 sta_if=$choice
+ifconfig $choice up
 get_SSID <<< "$(iw $sta_if scan)"
 echo '> scanning available Access Point, select ssid from scan list...'
 menu_from_array "${ssid_array[@]}"
