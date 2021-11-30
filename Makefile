@@ -15,7 +15,7 @@ mesh_tb_root:=$(module_root)/sc-mesh-secure-deployment
 
 mesh_com_bloom:
 	cd $(module_root)/mesh_com
-	bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy && fakeroot debian/rules binary
+	bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro galactic && fakeroot debian/rules binary
 	cd $(root_dir)
 
 mesh_tb_client:

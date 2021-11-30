@@ -57,7 +57,7 @@ jobs:
           set -exu
           jfrog rt c import "$ARTIFACTORY_TOKEN"
           jfrog rt ping
-          pkg=$(find bin -name 'ros-foxy-mesh-com*.deb')
+          pkg=$(find bin -name 'ros-galactic-mesh-com*.deb')
           jfrog rt u --deb "$DISTRIBUTION/$COMPONENT/$ARCHITECTURE" \
                      --target-props COMMIT="$GITHUB_SHA" \
                      --build-name "$BUILD_NAME" \
