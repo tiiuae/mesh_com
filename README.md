@@ -6,7 +6,7 @@ Every module has own instructions about their usage:
 https://github.com/tiiuae/mesh_com/modules/mesh_com
 
 - sc-mesh-secure-deployment module usage instructions:
-https://github.com/tiiuae/mesh_com/modules/sc-mesh-secure-deployment
+https://github.com/tiiuae/mesh_com/tree/main/modules
 
 ## Install & Clone
 

@@ -25,6 +25,7 @@ sudo apt-get install docker-ce docker-ce-cli containerd.io
 dockervar=$(ls /etc/init.d/ |grep docker)
 
 /etc/init.d/$dockervar stop
+sleep 2
 /etc/init.d/$dockervar start
 else
 echo '> Type the gateway IP address...'

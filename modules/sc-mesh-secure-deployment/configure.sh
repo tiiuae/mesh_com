@@ -244,17 +244,14 @@ function server {
 
 function client {
   echo '> Configuring the client...'
-  # Make the server
-  #! /bin/bash
 
-  if grep 'docker\|lxc' /proc/1/cgroup >/dev/null
-  then
+ if [ -f /.dockerenv ]; then
     /etc/init.d/dbus stop
     /etc/init.d/dbus start
     sleep 2
     /etc/init.d/avahi-daemon stop
     /etc/init.d/avahi-daemon start;
-  fi
+ fi
 
   pushd .
   cd ../..
