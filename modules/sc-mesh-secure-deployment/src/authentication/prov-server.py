@@ -27,9 +27,9 @@ def create_table():
     columns = ['ID', 'MAC', 'IP', 'PubKey_fpr']
     if not path.isfile('auth/dev.csv'):
         table = pd.DataFrame(columns=columns)
-        table.to_csv('auth/dev.csv', header=columns)
+        table.to_csv('auth/dev.csv', header=columns, index=False)
     else:
-        table = pd.read_csv('auth/dev.csv', index=False)
+        table = pd.read_csv('auth/dev.csv')
     return table
 
 
