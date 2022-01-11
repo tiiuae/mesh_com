@@ -1,19 +1,19 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          S90mesh
+# Provides:          S9011sMesh
 # Should-Start:      $syslog
 # Should-Stop:       $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: start S90mesh during boot time
+# Short-Description: start S9011sMesh during boot time
 # Description:       wifi mesh daemon for configuring mesh network
 #                    automatically
 ### END INIT INFO
 
-DAEMON="mesh-ibss.sh"
+DAEMON="mesh-11s.sh"
 DIR="/usr/sbin/"
 PIDFILE="/var/run/$DAEMON.pid"
-LOG_FILE=/var/log/mesh.log
+LOG_FILE=/var/log/mesh_11s.log
 source /etc/mesh_com/mesh.conf
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
@@ -32,7 +32,7 @@ start() {
     return "$status"
 }
 stop() {
-#/etc/init.d/S90mesh stop <interface>
+#/etc/init.d/S9011sMesh stop <interface>
     printf 'Stopping %s: ' "$DAEMON"
     NEW_PID=$(ps ax|grep wpa_supplicant |grep adhoc | awk {'print $1'})
     kill -9 $NEW_PID

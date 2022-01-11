@@ -7,7 +7,7 @@ import subprocess
 import time
 import hashlib
 import re
-
+import os as osh
 import netifaces
 from getmac import get_mac_address
 import requests
@@ -135,6 +135,11 @@ def create_config_ubuntu(response):
     res = json.loads(response)
     print('> Interfaces: ' + str(res))
     address = res['addr']
+    if conf['mesh_service']:
+        mesh_vif = get_interface(conf['mesh_inf'])
+        cmd="iw dev " + mesh_vif + " info | awk '/wiphy/ {printf \"phy\" $2}'"
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+        phy_name = proc.communicate()[0].decode('utf-8').strip()
     # Create mesh service config
     Path("/etc/mesh_com").mkdir(parents=True, exist_ok=True)
     with open('/etc/mesh_com/mesh.conf', 'w') as mesh_config:
@@ -147,7 +152,8 @@ def create_config_ubuntu(response):
         mesh_config.write('FREQ=' + str(res['frequency']) + '\n')
         mesh_config.write('TXPOWER=' + str(res['tx_power']) + '\n')
         mesh_config.write('COUNTRY=fi\n')
-        mesh_config.write('PHY=phy1\n')
+        mesh_config.write('MESH_VIF=' + mesh_vif + '\n')
+        mesh_config.write('PHY=' + phy_name + '\n')
     # Are we a gateway node? If we are we need to set up the routes
     if res['gateway'] and conf['gw_service']:
         print("============================================")
@@ -165,17 +171,24 @@ def create_config_ubuntu(response):
         nodeId = int(res['addr'].split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
         subprocess.call('hostname node' + str(nodeId), shell=True)
         subprocess.call('echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts', shell=True)
-    # not available in secure OS
-    # # Final settings
-    # if conf['disable_networking']:
-    #     subprocess.call('sudo nmcli networking off', shell=True)
-    #     subprocess.call('sudo systemctl stop network-manager.service', shell=True)
-    #     subprocess.call('sudo systemctl disable network-manager.service', shell=True)
-    #     subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
+    execution_ctx = osh.environ.get('EXECUTION_CTX')
+    print("EXECUTION CTX:")
+    print(execution_ctx)
+    if execution_ctx!="docker":
+        if conf['disable_networking']:
+            subprocess.call('sudo nmcli networking off', shell=True)
+            subprocess.call('sudo systemctl stop network-manager.service', shell=True)
+            subprocess.call('sudo systemctl disable network-manager.service', shell=True)
+            subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
+            #subprocess.call('pkill wpa_supplicant', shell=True)
+            #subprocess.call('pkill -f "/var/run/wpa_supplicant-" 2>/dev/null', shell=True)
     # Copy mesh service to /etc/systemd/system/
     if conf['mesh_service']:
         mesh_interface = get_interface(conf['mesh_inf'])
-        subprocess.call('src/bash/conf-mesh.sh ' + mesh_interface, shell=True)
+        if res['type'] == '11s':
+            subprocess.call('src/bash/conf-11s-mesh.sh ' + mesh_interface, shell=True)
+        if res['type'] == 'ibss':
+            subprocess.call('src/bash/conf-mesh.sh ' + mesh_interface, shell=True)
 
 
 if __name__ == "__main__":
