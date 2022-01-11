@@ -71,7 +71,7 @@ Description="Mesh Service"
 User=root
 Group=root
 Type=idle
-ExecStart=/bin/sh -c ". /opt/ros/foxy/setup_fog.sh;/opt/ros/foxy/share/bin/mesh-ibss.sh ap; ros2 launch mesh_com mesh_com.launch"
+ExecStart=/bin/sh -c ". /opt/ros/galactic/setup_fog.sh;/opt/ros/galactic/share/bin/mesh-ibss.sh ap; ros2 launch mesh_com mesh_com.launch"
 
 [Install]
 WantedBy=multi-user.target
@@ -80,7 +80,7 @@ WantedBy=multi-user.target
 Bloom-generate integration to package.sh:
 ```
 $ pushd ../ros2_ws/src/mesh_com/modules/mesh_com
-$ bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy &&\
+$ bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro galactic &&\
     fakeroot debian/rules binary && mv ../*.deb ../../../../../packaging/
 $ popd
 ```
@@ -100,7 +100,7 @@ $ popd
 Bloom-generate (generate rosdebian package):
 ```
 $ cd ros2_ws/src/mesh_com/modules/mesh_com
-$ bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro foxy &&\
+$ bloom-generate rosdebian --os-name ubuntu --os-version focal --ros-distro galactic &&\
     fakeroot debian/rules binary
 ```
 

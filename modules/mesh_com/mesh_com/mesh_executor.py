@@ -48,8 +48,8 @@ class MeshNetwork:
         self.settings = self.MeshSettings()
         self.host = '127.0.0.1'  # Standard loopback interface address (localhost)
         self.port = 33221  # Port to listen on (non-privileged ports are > 1023)
-        self.script_path_1 = "/opt/ros/foxy/share/bin/mesh-ibss.sh"
-        self.script_path_2 = "/opt/ros/foxy/share/bin/mesh-11s.sh"
+        self.script_path_1 = "/opt/ros/galactic/share/bin/mesh-ibss.sh"
+        self.script_path_2 = "/opt/ros/galactic/share/bin/mesh-11s.sh"
         self.batman_visual = BatAdvVis()
         self.batman = Batman()
         self.status = STATUS()
