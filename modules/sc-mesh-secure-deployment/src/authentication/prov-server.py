@@ -7,6 +7,16 @@ import hashlib
 import gnupg
 import pandas as pd
 import netifaces
+import paramiko
+import glob
+import argparse
+
+
+# Construct the argument parser
+ap = argparse.ArgumentParser()
+# Add the arguments to the parser
+ap.add_argument("-c", "--clean", help='clean all (delete all keys and files)', required=False)
+args = ap.parse_args()
 
 
 def folder():
@@ -40,10 +50,10 @@ def update_table(info):
     table = create_table()
     if info['ID'] not in set(table['ID']):
         table = table.append(info, ignore_index=True)
-        table.to_csv('auth/dev.csv', mode='a', header=False)
+        table.to_csv('auth/dev.csv', mode='a', header=False, index=False)
     elif table.loc[table['ID'] == info['ID']]['PubKey_fpr'] != info['PubKey_fpr']:
         table = table.append(info, ignore_index=True)
-        table.to_csv('auth/dev.csv', mode='a', header=False)
+        table.to_csv('auth/dev.csv', mode='a', header=False, index=False)
 
 
 def exporting(ID, key, sign=True):
@@ -56,7 +66,7 @@ def exporting(ID, key, sign=True):
     ascii_armored_private_keys = gpg.export_keys(key, True, expect_passphrase=False)
     file_keys = ID + '.asc'
     if ID != 'provServer':
-        file_keys = 'node' + ID + '.asc'
+        file_keys = 'auth/node' + ID + '.asc'
     with open(file_keys, 'w') as f:
         f.write(ascii_armored_public_keys)
         f.write(ascii_armored_private_keys)
@@ -75,6 +85,20 @@ def exporting(ID, key, sign=True):
     print(ascii_armored_private_keys)
     print('\n---------------------------\n')
     print('Key pair stored in: ' + file_keys)
+    sent = input("Would you like to send the certificates to a node? (yes/no): ")
+    if sent in ['yes', 'YES', 'Yes', 'y', 'Y']:
+        transfer(file_keys)
+
+
+def clean_all():
+    keys = gpg.list_keys(True)
+    for key in keys:
+        gpg.delete_keys(key['fingerprint'], True, expect_passphrase=False) # for private
+        gpg.delete_keys(key['fingerprint'], expect_passphrase=False)  # for public
+    files = glob.glob('auth/*.asc')
+    for fi in files:
+        os.remove(fi)
+    os.remove('auth/dev.csv')
 
 
 def exist(ID, verbose=True):
@@ -140,10 +164,26 @@ def get_mac():
             return mac[0]['addr']
 
 
+def transfer(FILE):
+    server = input('Enter node IP address: ')
+    username = 'root'
+    password = 'root'
+    ssh = paramiko.SSHClient()
+    ssh.load_host_keys(os.path.expanduser(os.path.join("~", ".ssh", "known_hosts")))
+    ssh.connect(server, username=username, password=password)
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    sftp = ssh.open_sftp()
+    sftp.put(FILE, 'hsm/'+FILE.split('auth/')[1])
+    sftp.close()
+    ssh.close()
+
+
 if __name__ == "__main__":
     '''
     The node ID is entered manually. Later this should be modified to receive it from provisioning
     '''
+    if args.clean:
+        clean_all()
     if not exist('provServer', False):
         input_data = gpg.gen_key_input(name_real='provServer',
                                        passphrase='',
@@ -171,6 +211,7 @@ if __name__ == "__main__":
         TODO: 
         * Managing keys: Delete in case they are compromised (manually?)
         * Sign provisioning file??      
-        * How IP will be 
+        * How IP will be obtained?? provided by the server?
+        * Convert to der certificates?
           
         '''
