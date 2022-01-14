@@ -15,7 +15,9 @@ import argparse
 # Construct the argument parser
 ap = argparse.ArgumentParser()
 # Add the arguments to the parser
-ap.add_argument("-c", "--clean", help='clean all (delete all keys and files)', required=False)
+ap.add_argument("-c", "--clean", help='clean all (delete all keys and files)', required=False,
+                default=False, const=True, nargs='?')
+ap.set_defaults(clean=False)
 args = ap.parse_args()
 
 
@@ -64,41 +66,45 @@ def exporting(ID, key, sign=True):
     '''
     ascii_armored_public_keys = gpg.export_keys(key)
     ascii_armored_private_keys = gpg.export_keys(key, True, expect_passphrase=False)
-    file_keys = ID + '.asc'
+    file_keys = 'auth/'+ID + '.asc'
     if ID != 'provServer':
         file_keys = 'auth/node' + ID + '.asc'
-    with open(file_keys, 'w') as f:
-        f.write(ascii_armored_public_keys)
-        f.write(ascii_armored_private_keys)
-    if sign:
-        '''
-        Unfortunately python gnupg does not has key signing, only messages and files
-        That's why it is implemented with a bash command.
-        '''
-        ascii_armored_public_keys = gpg.export_keys(key)
-        command = 'gpg --batch --yes --default-key provServer --sign-key ' + ID
-        subprocess.call(command, shell=True)
         with open(file_keys, 'w') as f:
             f.write(ascii_armored_public_keys)
             f.write(ascii_armored_private_keys)
-    print(ascii_armored_public_keys)
-    print(ascii_armored_private_keys)
-    print('\n---------------------------\n')
-    print('Key pair stored in: ' + file_keys)
-    sent = input("Would you like to send the certificates to a node? (yes/no): ")
-    if sent in ['yes', 'YES', 'Yes', 'y', 'Y']:
-        transfer(file_keys)
+        if sign:
+            '''
+            Unfortunately python gnupg does not has key signing, only messages and files
+            That's why it is implemented with a bash command.
+            '''
+            command = 'gpg --batch --yes --default-key provServer --sign-key ' + ID
+            subprocess.call(command, shell=True)
+            ascii_armored_public_keys = gpg.export_keys(key)
+            with open(file_keys, 'w') as f:
+                f.write(ascii_armored_public_keys)
+                f.write(ascii_armored_private_keys)
+        print(ascii_armored_public_keys)
+        print(ascii_armored_private_keys)
+        print('\n---------------------------\n')
+        print('Key pair stored in: ' + file_keys)
+        sent = input("Would you like to send the certificates to a node? (yes/no): ")
+        if sent in ['yes', 'YES', 'Yes', 'y', 'Y']:
+            transfer(file_keys)
+    else:
+        with open(file_keys, 'w') as f:
+            f.write(ascii_armored_public_keys)
 
 
 def clean_all():
     keys = gpg.list_keys(True)
     for key in keys:
-        gpg.delete_keys(key['fingerprint'], True, expect_passphrase=False) # for private
+        gpg.delete_keys(key['fingerprint'], True, expect_passphrase=False)  # for private
         gpg.delete_keys(key['fingerprint'], expect_passphrase=False)  # for public
     files = glob.glob('auth/*.asc')
     for fi in files:
         os.remove(fi)
     os.remove('auth/dev.csv')
+    exit()
 
 
 def exist(ID, verbose=True):
@@ -115,7 +121,7 @@ def exist(ID, verbose=True):
         return False
     index = public_keys.uids.index(realID)
     valid = float(public_keys[index]['expires'])
-    if valid - time.time() > 0:
+    if valid > time.time():
         if verbose:
             print('A key pair exist for node ' + ID + ' and it is valid until: ' +
                   str(datetime.datetime.utcfromtimestamp(valid)))
@@ -128,18 +134,20 @@ def exist(ID, verbose=True):
         return False
 
 
-def generate(input_data, export=True, sign=True):
+def generate(input_data,  sign=True):
     '''
     Generate new keys based on the input data
     '''
     key = gpg.gen_key(input_data)
     fingerprint = key.fingerprint
-    if export:
-        print('Key pair generated with fingerprint ' + fingerprint)
-        if not sign:
-            exporting(ID, fingerprint, False)
-        else:
-            exporting(ID, fingerprint)
+    ID = input_data.split('Name-Real: ')[1].split('\n')[0]
+    if 'node' in ID:
+      ID = ID.split('node')[1]
+      print('Key pair generated with fingerprint ' + fingerprint)
+    if not sign:
+        exporting(ID, fingerprint, False)
+    else:
+        exporting(ID, fingerprint)
     return fingerprint
 
 
@@ -164,16 +172,39 @@ def get_mac():
             return mac[0]['addr']
 
 
+def encrypt_conf(ID):
+    '''
+    Encrypt the mesh configuration file with the public key from the node (recipients)
+    Save at auth/nodeID_conf.conf.gpg
+    '''
+    real = ID + ' <' + ID.split('node')[1] + '>'
+    recipients = [
+        ids['fingerprint'] for ids in gpg.list_keys() if real in ids['uids']
+    ]
+    output = 'auth/'+ID+'_conf.conf.gpg'
+    with open('../mesh_com.conf', 'rb') as f:
+        gpg.encrypt_file(f, recipients=recipients,
+                         output=output)
+    return output
+
+
 def transfer(FILE):
+    '''
+    Transfer via scp the node certificate, server public key, and encrypted mesh_conf.
+    '''
     server = input('Enter node IP address: ')
     username = 'root'
-    password = 'root'
+    password = 'root' # assuming secure OS
     ssh = paramiko.SSHClient()
     ssh.load_host_keys(os.path.expanduser(os.path.join("~", ".ssh", "known_hosts")))
     ssh.connect(server, username=username, password=password)
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     sftp = ssh.open_sftp()
-    sftp.put(FILE, 'hsm/'+FILE.split('auth/')[1])
+    only_node = FILE.split('auth/')[1]
+    sftp.put(FILE, 'hsm/'+only_node)
+    sftp.put('auth/provServer.asc', 'hsm/provServer.asc')
+    encrypted_conf = encrypt_conf(FILE)
+    sftp.put(encrypted_conf, 'hsm/'+encrypt_conf.split('auth/')[1])
     sftp.close()
     ssh.close()
 
@@ -191,7 +222,7 @@ if __name__ == "__main__":
                                        name_email='provServer',
                                        expire_date='1m'
                                        )
-        fpr = generate(input_data, False, False)
+        fpr = generate(input_data, False)
         mac = get_mac()  # only for server
         info = {'ID': 'provServer', 'mac': mac, 'IP': '0.0.0.0', 'PubKey_fpr': fpr}
         update_table(info)
