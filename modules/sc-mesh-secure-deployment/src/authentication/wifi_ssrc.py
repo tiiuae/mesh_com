@@ -4,6 +4,7 @@ import socket
 import fcntl
 import struct
 
+
 def scan_wifi():
     '''
     Scan wifi with the AuthAP pattern.

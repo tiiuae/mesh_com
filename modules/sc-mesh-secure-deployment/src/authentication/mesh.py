@@ -6,7 +6,6 @@ import string
 import netifaces
 
 
-
 def get_interface(pattern):
     '''
     Using this function from previous script, to obtain the mesh_interface.
@@ -33,6 +32,17 @@ def update_password(password):
     yaml.indent(mapping=ind, sequence=ind, offset=bsi)
     with open('src/mesh_conf.conf', 'w') as fp:
         yaml.dump(config, fp)
+
+
+def get_password():
+    file_name = 'src/mesh_com.conf'
+    config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(file_name))
+    instances = config['server']['ubuntu']
+    if instances['key']:
+        password = instances['key']
+    else:
+        password = ''
+    return password
 
 
 def create_mesh(ID):    # Get the mesh_com config

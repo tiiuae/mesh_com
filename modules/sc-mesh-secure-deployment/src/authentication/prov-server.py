@@ -177,11 +177,12 @@ def encrypt_conf(ID):
     Encrypt the mesh configuration file with the public key from the node (recipients)
     Save at auth/nodeID_conf.conf.gpg
     '''
-    real = ID + ' <' + ID.split('node')[1] + '>'
+    node = ID.split('auth/')[1].split('.asc')[0]
+    real = node + ' <' + node.split('node')[1] + '>'
     recipients = [
         ids['fingerprint'] for ids in gpg.list_keys() if real in ids['uids']
     ]
-    output = 'auth/'+ID+'_conf.conf.gpg'
+    output = ID+'_conf.conf.gpg'
     with open('../mesh_com.conf', 'rb') as f:
         gpg.encrypt_file(f, recipients=recipients,
                          output=output)
@@ -204,7 +205,7 @@ def transfer(FILE):
     sftp.put(FILE, 'hsm/'+only_node)
     sftp.put('auth/provServer.asc', 'hsm/provServer.asc')
     encrypted_conf = encrypt_conf(FILE)
-    sftp.put(encrypted_conf, 'hsm/'+encrypt_conf.split('auth/')[1])
+    sftp.put(encrypted_conf, 'hsm/'+encrypted_conf.split('auth/')[1])
     sftp.close()
     ssh.close()
 
@@ -224,7 +225,7 @@ if __name__ == "__main__":
                                        )
         fpr = generate(input_data, False)
         mac = get_mac()  # only for server
-        info = {'ID': 'provServer', 'mac': mac, 'IP': '0.0.0.0', 'PubKey_fpr': fpr}
+        info = {'ID': 'provServer', 'MAC': mac, 'IP': '0.0.0.0', 'PubKey_fpr': fpr}
         update_table(info)
     ID, mac = get_id()
     if not exist(ID):
@@ -235,13 +236,12 @@ if __name__ == "__main__":
                                        expire_date='1d'
                                        )
         fpr = generate(input_data)
-        info = {'ID': ID, 'mac': mac, 'IP': '0.0.0.0', 'PubKey fpr': fpr}
+        info = {'ID': ID, 'MAC': mac, 'IP': '0.0.0.0', 'PubKey_fpr': fpr}
         update_table(info)
 
         '''
         TODO: 
         * Managing keys: Delete in case they are compromised (manually?)
-        * Sign provisioning file??      
         * How IP will be obtained?? provided by the server?
         * Convert to der certificates?
           
