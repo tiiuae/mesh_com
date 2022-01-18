@@ -33,22 +33,23 @@ def init():
     '''
     print('loading keys')
     files = glob.glob('hsm/*.asc')
-    for fi in files:
-        aux = open(fi, 'rb')  # assuming it's the first and only certificate
-        fi2 = aux.read()
-        gpg.import_keys(fi2)
-    for ky in gpg.list_keys():
-        if ky["uids"] == ["provServer <provServer>"]:
-            fp = ky["fingerprint"]
-    gpg.trust_keys(fp, 'TRUST_FULLY')  # trusting the server key
-    try:
+    if not files:
+        print('no keys in hsm folder')
+    else:
+        for fi in files:
+            aux = open(fi, 'rb')  # assuming it's the first and only certificate
+            fi2 = aux.read()
+            gpg.import_keys(fi2)
+        for ky in gpg.list_keys():
+            if ky["uids"] == ["provServer <provServer>"]:
+                fp = ky["fingerprint"]
+        gpg.trust_keys(fp, 'TRUST_FULLY')  # trusting the server key
         for i in gpg.list_keys():
             if 'node' in i['uids'][0]:
                 ID = i['uids'][0].split(' <')[0]
                 fpr = fp
-    except UnboundLocalError:
-        print('no keys in hsm folder')
-    return ID, fpr
+
+        return ID, fpr
 
 
 def decrypt_conf(ID):

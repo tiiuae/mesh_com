@@ -11,6 +11,7 @@ def scan_wifi():
     If more than one, select the best quality one.
     If none, return false.
     '''
+    print('Scanning APs')
     possible = False
     aps = Cell.all('wlan0')
     max = 0
@@ -37,6 +38,7 @@ def create_ap(ID):
     If none AuthAP is available, then create a new one.
     Using apmanager.sh
     '''
+    subprocess.call('kilall wpa_supplicant', shell=True)
     command = '/bin/bash apmanager.sh -ap_create ' + ID
     subprocess.call(command, shell=True)
 
