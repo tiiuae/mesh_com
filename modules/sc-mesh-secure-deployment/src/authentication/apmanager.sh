@@ -1,21 +1,22 @@
+#!/bin/bash
 #-----------------------------------------------------------------------------#
+[ ! -d "conf" ] && mkdir conf
 function ap_connect {
-#read -p "- Password: " password
-cat <<EOF > conf/ap.conf
-network={
-  ssid="$1"
-  psk="ssrcpassword"
-}
+  #read -p "- Password: " password
+  cat <<EOF > conf/ap.conf
+  network={
+    ssid="$1"
+    psk="ssrcpassword"
+  }
 EOF
-echo '> Connecting to Access Point:'
-echo $ssid
-sudo wpa_supplicant -B -i wlan0 -c conf/ap.conf
-sudo dhclient -v wlan0 #to change to uhdpd on secure OS
+  echo '> Connecting to Access Point:'
+  echo $ssid
+  sudo wpa_supplicant -B -i wlan0 -c conf/ap.conf
+  sudo dhclient -v wlan0 #to change to uhdpd on secure OS
 }
 function ap_create {
 echo '> Creating an Access Point...'
 cat <<EOF > conf/ap.conf
-
   network={
     ssid="AuthAP_$1"
     mode=2
@@ -26,18 +27,18 @@ cat <<EOF > conf/ap.conf
 EOF
 # FIXME: Each time you echo this it's gonna add to the end of the files and
 #        create duplicate lines
-echo "INTERFACES=$1" >> /etc/default/isc-dhcp-server
-if [ ! -d "/etc/mesh_com" ]; then
-   mkdir /etc/mesh_com
-fi
-echo "AP_INF=$choice" >> /etc/mesh_com/ap.conf
-# Create Gateway Service
-cp mesh-ap.sh /usr/sbin/.
-chmod 744 /usr/sbin/mesh-ap.sh
-cp services/initd/S93meshAP /etc/init.d/.
-chmod 700 /etc/init.d/S93meshAP
-/etc/init.d/S93meshAP start $choice
-cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+  echo "INTERFACES=$1" >> /etc/default/isc-dhcp-server
+  if [ ! -d "/etc/mesh_com" ]; then
+     mkdir /etc/mesh_com
+  fi
+  #echo "AP_INF=$choice" >> /etc/mesh_com/ap.conf
+  # Create Gateway Service
+  cp mesh-ap.sh /usr/sbin/.
+  chmod 744 /usr/sbin/mesh-ap.sh
+  cp ../../services/initd/S93meshAP /etc/init.d/.
+  chmod 700 /etc/init.d/S93meshAP
+  /etc/init.d/S93meshAP start wlan0
+  cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
 }
 function ap_remove {
   echo '> Remove an Access Point...'

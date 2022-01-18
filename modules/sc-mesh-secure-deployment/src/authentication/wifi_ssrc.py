@@ -37,6 +37,7 @@ def create_ap(ID):
     If none AuthAP is available, then create a new one.
     Using apmanger.sh
     '''
+    subprocess.call('source apmanager.sh', shell=True)
     command = '. ./apmanager.sh && ap_create ' + ID
     subprocess.call(command, shell=True)
 

@@ -7,7 +7,7 @@ RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-
 
 
 WORKDIR /opt
-RUN apt update -y && apt install batctl net-tools sudo git nano gcc python3-dev python3-yaml iproute2 iw wireless-tools isc-dhcp-client inetutils-ping lsb-release systemd iptables wget -y
+RUN apt update -y && apt install batctl net-tools sudo git nano gcc python3-dev python3-yaml iproute2 iw wireless-tools isc-dhcp-client inetutils-ping lsb-release systemd iptables wget python3-gnupg -y
 
 RUN /bin/sh -c 'set -ex && \
     ARCH=`uname -m` && \

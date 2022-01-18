@@ -31,6 +31,7 @@ def init():
     Import the keys: node Pub,Priv and server pub.
     Returns ID of the node: obtained from the certificate.
     '''
+    print('loading keys')
     files = glob.glob('hsm/*.asc')
     for fi in files:
         aux = open(fi, 'rb')  # assuming it's the first and only certificate
@@ -193,5 +194,6 @@ if __name__ == "__main__":
             client(nodeID, addr, gpg.encrypt(password, fpr, armor=False).data)
             create_mesh(myID)
     else:  # no wifi available need to start mesh by itself
+        print('No AP available, creating one')
         wf.create_ap(myID)  # create AuthAPnodeID for authentication
 
