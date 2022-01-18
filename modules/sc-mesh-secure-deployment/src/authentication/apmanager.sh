@@ -40,10 +40,12 @@ EOF
   /etc/init.d/S93meshAP start wlan0
   cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
 }
+
+# shellcheck disable=SC1073
 function ap_remove {
   echo '> Remove an Access Point...'
   echo '> Please choose from the list of available interfaces...'
-  interfaces_arr=($(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}'))
+  interfaces_arr=$(ip link | awk -F: '$0 !~ "lo|vir|doc|eth|bat|^[^0-9]"{print $2}')
   menu_from_array "${interfaces_arr[@]}"
   /etc/init.d/S93meshAP stop
   # sudo systemctl enable ap@$ip.service
@@ -53,3 +55,24 @@ function ap_remove {
   sudo rm /etc/mesh_com/ap.conf
 #  reboot
 }
+PARAMS=''
+while (( "$#" )); do
+  case "$1" in
+    -ap_remove)
+      ap_remove
+      shift
+      ;;
+    -ap_connect)
+      ap_connect $2
+      shift
+      ;;
+    -ap_create)
+      ap_create $2
+      shift
+      ;;
+    *) # preserve positional arguments
+      PARAMS="$PARAMS $1"
+      shift
+      ;;
+  esac
+done

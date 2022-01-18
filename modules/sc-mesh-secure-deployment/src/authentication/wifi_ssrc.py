@@ -28,17 +28,16 @@ def connect_wifi(candidate):
     Connect to the best Ap selected in scan_wifi()
     we are using apmanager.sh for this
     '''
-    command = '. ./apmanager.sh && ap_connect ' + candidate
+    command = '/bin/bash apmanager.sh  -ap_connect ' + candidate
     subprocess.call(command, shell=True)
 
 
 def create_ap(ID):
     '''
     If none AuthAP is available, then create a new one.
-    Using apmanger.sh
+    Using apmanager.sh
     '''
-    subprocess.call('source apmanager.sh', shell=True)
-    command = '. ./apmanager.sh && ap_create ' + ID
+    command = '/bin/bash apmanager.sh -ap_create ' + ID
     subprocess.call(command, shell=True)
 
 

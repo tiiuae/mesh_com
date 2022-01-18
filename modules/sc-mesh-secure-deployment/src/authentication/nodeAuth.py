@@ -41,10 +41,13 @@ def init():
         if ky["uids"] == ["provServer <provServer>"]:
             fp = ky["fingerprint"]
     gpg.trust_keys(fp, 'TRUST_FULLY')  # trusting the server key
-    for i in gpg.list_keys():
-        if 'node' in i['uids'][0]:
-            ID = i['uids'][0].split(' <')[0]
-            fpr = fp
+    try:
+        for i in gpg.list_keys():
+            if 'node' in i['uids'][0]:
+                ID = i['uids'][0].split(' <')[0]
+                fpr = fp
+    except UnboundLocalError:
+        print('no keys in hsm folder')
     return ID, fpr
 
 
