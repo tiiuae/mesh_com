@@ -5,6 +5,8 @@ if [ "${ROS_DISTRO}" = "" ]; then
    exit 1
 fi
 
+export DEB_BUILD_OPTIONS=nocheck
+
 build_nbr=$1
 git_version_string=$2
 
