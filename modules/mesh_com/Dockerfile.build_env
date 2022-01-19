@@ -31,8 +31,6 @@ RUN echo "deb [trusted=yes] https://ssrc.jfrog.io/artifactory/ssrc-debian-public
 
 WORKDIR /$PACKAGE_NAME
 
-#COPY modules/mesh_com/entrypoint.sh* /$PACKAGE_NAME/
-
 RUN chown -R builder:builder /$PACKAGE_NAME
 
 USER builder

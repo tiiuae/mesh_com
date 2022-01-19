@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 if [ "${ROS_DISTRO}" = "" ]; then
    echo "ROS_DISTRO not set!!"
