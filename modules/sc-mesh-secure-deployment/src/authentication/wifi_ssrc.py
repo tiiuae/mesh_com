@@ -33,12 +33,18 @@ def connect_wifi(candidate):
     subprocess.call(command, shell=True)
 
 
+def killall():
+    subprocess.call('pkill wpa_supplicant', shell=True)
+    subprocess.call('ifconfig wlan0 down', shell=True)
+    subprocess.call('ifconfig wlan0 up', shell=True)
+
+
 def create_ap(ID):
     '''
     If none AuthAP is available, then create a new one.
     Using apmanager.sh
     '''
-    subprocess.call('kilall wpa_supplicant', shell=True)
+    killall()
     command = '/bin/bash apmanager.sh -ap_create ' + ID
     subprocess.call(command, shell=True)
 

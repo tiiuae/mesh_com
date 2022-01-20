@@ -31,7 +31,7 @@ def init():
     Import the keys: node Pub,Priv and server pub.
     Returns ID of the node: obtained from the certificate.
     '''
-    print('loading keys')
+    print('Loading keys')
     files = glob.glob('hsm/*.asc')
     if not files:
         print('no keys in hsm folder')
@@ -68,6 +68,7 @@ def decrypt_conf(ID):
 def client(ID, ser_ip, message):
     HOST = ser_ip  # The server's hostname or IP address
     PORT = int(ID.split('node')[1])  # Port to listen on (non-privileged ports are > 1023)
+    print('Starting client Auth with on ' + str(HOST) + ':' + str(PORT))
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((HOST, PORT))
         s.sendall(message)
@@ -83,6 +84,7 @@ def server_auth(ID, interface='wlan0'):
     ip = wf.get_ip_address(interface)  # assuming that wlan0 will be (or connected to) the 'AP'
     HOST = ip
     PORT = int(ID.split('node')[1])  # Port to listen on (non-privileged ports are > 1023)
+    print('Starting server Auth with on ' + str(HOST) + ':' + str(PORT))
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((HOST, PORT))
         s.listen()
@@ -180,24 +182,26 @@ def update_table(info):
 
 if __name__ == "__main__":
     myID, my_fpr = init()
+    wf.killall()
     candidate = wf.scan_wifi()  # scan wifi to authenticate with
     key_data = get_my_key(my_fpr)
     if candidate:
+        print('AP available: ' + candidate)
         wf.connect_wifi(candidate)
-        level, fpr, addr = authentication(ID)
-        if level > 3:
-            nodeID = get_id_from_frp(fpr)
-            info = {'ID': 'provServer', 'mac': 'mac', 'IP': '0.0.0.0', 'PubKey_fpr': fpr, 'trust_level': level}
-            update_table(info)
-            client(nodeID, addr, key_data)
-            password = get_password()
-            if password == '':  #this means still not connected with anyone
-                decrypt_conf(myID)  # decrypt config provided by server
-                password = create_password()  # create a password (only if no mesh exist)
-                update_password(password)  # update password in config file
-            client(nodeID, addr, gpg.encrypt(password, fpr, armor=False).data)
-            create_mesh(myID)
     else:  # no wifi available need to start mesh by itself
         print('No AP available, creating one')
         wf.create_ap(myID)  # create AuthAPnodeID for authentication
+    level, fpr, addr = authentication(myID)
+    if level > 3:
+        nodeID = get_id_from_frp(fpr)
+        info = {'ID': 'provServer', 'mac': 'mac', 'IP': '0.0.0.0', 'PubKey_fpr': fpr, 'trust_level': level}
+        update_table(info)
+        client(nodeID, addr, key_data)
+        password = get_password()
+        if password == '':  # this means still not connected with anyone
+            decrypt_conf(myID)  # decrypt config provided by server
+            password = create_password()  # create a password (only if no mesh exist)
+            update_password(password)  # update password in config file
+        client(nodeID, addr, gpg.encrypt(password, fpr, armor=False).data)
+        create_mesh(myID)
 

@@ -27,7 +27,7 @@ cat <<EOF > conf/ap.conf
 EOF
 # FIXME: Each time you echo this it's gonna add to the end of the files and
 #        create duplicate lines
-  echo "INTERFACES=$1" >> /etc/default/isc-dhcp-server
+  echo "INTERFACES=wlan0" >> /etc/default/isc-dhcp-server
   if [ ! -d "/etc/mesh_com" ]; then
      mkdir /etc/mesh_com
   fi

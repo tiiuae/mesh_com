@@ -1,3 +1,5 @@
+#!/bin/python3 
+
 import datetime
 import os
 import time
