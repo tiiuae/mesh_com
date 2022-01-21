@@ -10,6 +10,17 @@ import time
 import numpy as np
 import pandas as pd
 from provServer import clean_all
+import argparse
+
+
+# Construct the argument parser
+ap = argparse.ArgumentParser()
+# Add the arguments to the parser
+ap.add_argument("-c", "--clean", help='clean all (delete all keys and files)', required=False,
+                default=False, const=True, nargs='?')
+ap.set_defaults(clean=False)
+args = ap.parse_args()
+
 
 def folder():
     if not path.isdir(PATH):
@@ -32,7 +43,6 @@ def init():
     Import the keys: node Pub,Priv and server pub.
     Returns ID of the node: obtained from the certificate.
     '''
-    clean_all()
     print('Loading keys')
     files = glob.glob('hsm/*.asc')
     if not files:
@@ -185,6 +195,8 @@ def update_table(info):
 
 
 if __name__ == "__main__":
+    if args.clean:
+        clean_all()
     sent = False
     myID, my_fpr = init()
     print('Im node ' + str(myID))
