@@ -24,18 +24,18 @@ def update_password(password):
     '''
     Update the mesh_conf file with the password.
     '''
-    file_name = 'src/mesh_com.conf'
+    file_name = '../mesh_com.conf'
     config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(file_name))
     instances = config['server']['ubuntu']
     instances['key'] = password
     yaml = ruamel.yaml.YAML()
     yaml.indent(mapping=ind, sequence=ind, offset=bsi)
-    with open('src/mesh_conf.conf', 'w') as fp:
+    with open('../mesh_conf.conf', 'w') as fp:
         yaml.dump(config, fp)
 
 
 def get_password():
-    file_name = 'src/mesh_com.conf'
+    file_name = '../mesh_com.conf'
     config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(file_name))
     instances = config['server']['ubuntu']
     if instances['key']:

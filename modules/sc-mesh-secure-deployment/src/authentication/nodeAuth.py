@@ -1,3 +1,4 @@
+#!/bin/python3
 import gnupg
 import os
 from os import path
@@ -8,7 +9,7 @@ import socket
 import time
 import numpy as np
 import pandas as pd
-
+from provServer import clean_all
 
 def folder():
     if not path.isdir(PATH):
@@ -31,6 +32,7 @@ def init():
     Import the keys: node Pub,Priv and server pub.
     Returns ID of the node: obtained from the certificate.
     '''
+    clean_all()
     print('Loading keys')
     files = glob.glob('hsm/*.asc')
     if not files:
@@ -42,12 +44,11 @@ def init():
             gpg.import_keys(fi2)
         for ky in gpg.list_keys():
             if ky["uids"] == ["provServer <provServer>"]:
-                fp = ky["fingerprint"]
-        gpg.trust_keys(fp, 'TRUST_FULLY')  # trusting the server key
-        for i in gpg.list_keys():
-            if 'node' in i['uids'][0]:
-                ID = i['uids'][0].split(' <')[0]
-                fpr = fp
+                fpS = ky["fingerprint"]
+                gpg.trust_keys(fpS, 'TRUST_FULLY')  # trusting the server key
+            if 'node' in ky['uids'][0]:
+                ID = ky['uids'][0].split(' <')[0]
+                fpr = ky["fingerprint"]
 
         return ID, fpr
 
@@ -56,7 +57,7 @@ def decrypt_conf(ID):
     '''
     Decrypt the mesh_conf file
     '''
-    with open("hsm/" + ID + "_conf.conf.gpg", "rb") as f:
+    with open("hsm/" + ID + ".asc_conf.conf.gpg", "rb") as f:
         status = gpg.decrypt_file(f, output="src/mesh_conf.conf")  # status has some info from the signer
         if status.ok:
             print("Mesh_conf file decrypt successful ")
@@ -66,9 +67,13 @@ def decrypt_conf(ID):
 
 
 def client(ID, ser_ip, message):
+    '''
+    Socket client to send message to specific server.
+    '''
+
     HOST = ser_ip  # The server's hostname or IP address
     PORT = int(ID.split('node')[1])  # Port to listen on (non-privileged ports are > 1023)
-    print('Starting client Auth with on ' + str(HOST) + ':' + str(PORT))
+    print('Starting client Auth with ' + str(HOST) + ':' + str(PORT))
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((HOST, PORT))
         s.sendall(message)
@@ -84,7 +89,7 @@ def server_auth(ID, interface='wlan0'):
     ip = wf.get_ip_address(interface)  # assuming that wlan0 will be (or connected to) the 'AP'
     HOST = ip
     PORT = int(ID.split('node')[1])  # Port to listen on (non-privileged ports are > 1023)
-    print('Starting server Auth with on ' + str(HOST) + ':' + str(PORT))
+    print('Starting server Auth on ' + str(HOST) + ':' + str(PORT))
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((HOST, PORT))
         s.listen()
@@ -99,19 +104,19 @@ def server_auth(ID, interface='wlan0'):
                 return data, addr
 
 
-def authentication(ID):
+def authentication(client_key):
     '''
     first import the key (I think this can be improved without importing the key, only scanning)
     Then we will check if the key has been signed for the Server(level 3), or another authenticated node (level 3)
     or for the server and for another authenticated node (level 4).
     If not, delete key.
     '''
-    client_key, addr = server_auth(ID)
     ck = gpg.import_keys(client_key)
-    fpr = ck.fingerprint
+    print(ck.results)
+    fpr = ck.fingerprints
     level = 0
     for ky in gpg.list_keys(sigs=True):  # checking if key was signed by Server
-        if ky["fingerprint"] == fpr[0] and len(ky['sigs']) > 1:  # this avoid self signed certificate
+        if ky["fingerprint"] == fpr[0] and len(ky['sigs']) > 1:  # this avoids self signed certificate
             for sig in ky["sigs"]:
                 if ("provServer" in sig[1]  # signed by server
                         and float(ky['expires']) > time.time()):  # not expired
@@ -135,9 +140,8 @@ def authentication(ID):
                         if count_level_signs[0] > 1:  # more than one and all trusted
                             level = 4
                             gpg.trust_keys(fpr, 'TRUST_ULTIMATE')  # trusting the imported key
-        else:
-            gpg.delete_keys(fpr, expect_passphrase=False)  # for public
-    return level, fpr, addr
+    print('PubKey authenticated with level ' + str(level))
+    return level, fpr
 
 
 def get_my_key(my_fpr):
@@ -181,22 +185,32 @@ def update_table(info):
 
 
 if __name__ == "__main__":
+    sent = False
     myID, my_fpr = init()
+    print('Im node ' + str(myID))
     wf.killall()
     candidate = wf.scan_wifi()  # scan wifi to authenticate with
-    key_data = get_my_key(my_fpr)
+    my_key = get_my_key(my_fpr)
     if candidate:
         print('AP available: ' + candidate)
         wf.connect_wifi(candidate)
+        serverIP = ".".join(wf.get_ip_address("wlan0").split(".")[0:3]) + ".1"  # assuming we're conected ip will be .1
+        client(candidate, serverIP, my_key)
+        client_key, addr = server_auth(myID)
+        sent = True
     else:  # no wifi available need to start mesh by itself
-        print('No AP available, creating one')
+        print('No AP available to connect with. Creating one')
         wf.create_ap(myID)  # create AuthAPnodeID for authentication
-    level, fpr, addr = authentication(myID)
-    if level > 3:
-        nodeID = get_id_from_frp(fpr)
+        time.sleep(2)
+        client_key, addr = server_auth(myID)
+    level, fpr = authentication(client_key)
+    if level >= 3:
+        print('Authenticated, now send my pubkey')
+        nodeID = get_id_from_frp(fpr[0])
         info = {'ID': 'provServer', 'mac': 'mac', 'IP': '0.0.0.0', 'PubKey_fpr': fpr, 'trust_level': level}
         update_table(info)
-        client(nodeID, addr, key_data)
+        if not sent:
+            client(nodeID, addr[0], my_key)
         password = get_password()
         if password == '':  # this means still not connected with anyone
             decrypt_conf(myID)  # decrypt config provided by server
