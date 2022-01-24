@@ -98,9 +98,11 @@ def exporting(ID, key, sign=True):
     ascii_armored_private_keys = gpg.export_keys(key, True, expect_passphrase=False)
     file_keys = 'auth/' + ID + '.asc'
     if ID != 'provServer':
-        file_keys = 'auth/node' + ID + '.asc'
-        with open(file_keys, 'w') as f:
+        file_keys_pub = 'auth/node' + ID + 'pb.asc'
+        with open(file_keys_pub, 'w') as f:
             f.write(ascii_armored_public_keys)
+        file_keys_pri = 'auth/node' + ID + 'pr.asc'
+        with open(file_keys_pri, 'w') as f:
             f.write(ascii_armored_private_keys)
         if sign:
             '''
@@ -110,9 +112,8 @@ def exporting(ID, key, sign=True):
             command = 'gpg --batch --yes --default-key provServer --sign-key ' + ID
             subprocess.call(command, shell=True)
             ascii_armored_public_keys = gpg.export_keys(key)
-            with open(file_keys, 'w') as f:
+            with open(file_keys_pub, 'w') as f:
                 f.write(ascii_armored_public_keys)
-                f.write(ascii_armored_private_keys)
         print(ascii_armored_public_keys)
         print(ascii_armored_private_keys)
         print('\n---------------------------\n')

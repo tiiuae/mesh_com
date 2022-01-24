@@ -3,6 +3,7 @@ import subprocess
 import socket
 import fcntl
 import struct
+import time
 
 
 def scan_wifi():
@@ -11,6 +12,7 @@ def scan_wifi():
     If more than one, select the best quality one.
     If none, return false.
     '''
+    killall()
     print('Scanning APs')
     possible = False
     aps = Cell.all('wlan0')
@@ -45,6 +47,7 @@ def create_ap(ID):
     Using apmanager.sh
     '''
     killall()
+    time.sleep(2)
     command = '/bin/bash apmanager.sh -ap_create ' + ID
     subprocess.call(command, shell=True)
 

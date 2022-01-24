@@ -9,7 +9,6 @@ import socket
 import time
 import numpy as np
 import pandas as pd
-from provServer import clean_all
 import argparse
 
 
@@ -31,10 +30,10 @@ def folder():
 PATH = 'auth/'
 folder()
 try:
-    gpg = gnupg.GPG(gnupghome='.')
+    gpg = gnupg.GPG(gnupghome='/opt')
 except TypeError:
-    gpg = gnupg.GPG(homedir='.')
-os.environ['GNUPGHOME'] = 'auth/'
+    gpg = gnupg.GPG(homedir='/opt')
+os.environ['GNUPGHOME'] = '/opt'
 
 
 # def __init__():
@@ -63,16 +62,24 @@ def init():
         return ID, fpr
 
 
+def clean_all():
+    keys = gpg.list_keys()
+    for key in keys:
+        gpg.trust_keys(key['fingerprint'], "TRUST_UNDEFINED")
+        gpg.delete_keys(key['fingerprint'], True, expect_passphrase=False)  # for private
+        gpg.delete_keys(key['fingerprint'], expect_passphrase=False)  # for public
+
+
 def decrypt_conf(ID):
     '''
     Decrypt the mesh_conf file
     '''
     with open("hsm/" + ID + ".asc_conf.conf.gpg", "rb") as f:
-        status = gpg.decrypt_file(f, output="src/mesh_conf.conf")  # status has some info from the signer
+        status = gpg.decrypt_file(f, output="../mesh_conf.conf")  # status has some info from the signer
         if status.ok:
             print("Mesh_conf file decrypt successful ")
         else:
-            print("Mesh_conf file decrypt successful error")
+            print("Mesh_conf file decrypt error")
             print("status: ", status.status)
 
 
@@ -200,7 +207,6 @@ if __name__ == "__main__":
     sent = False
     myID, my_fpr = init()
     print('Im node ' + str(myID))
-    wf.killall()
     candidate = wf.scan_wifi()  # scan wifi to authenticate with
     my_key = get_my_key(my_fpr)
     if candidate:
@@ -228,6 +234,11 @@ if __name__ == "__main__":
             decrypt_conf(myID)  # decrypt config provided by server
             password = create_password()  # create a password (only if no mesh exist)
             update_password(password)  # update password in config file
-        client(nodeID, addr, gpg.encrypt(password, fpr, armor=False).data)
+        client(nodeID, addr[0], gpg.encrypt(password, fpr, armor=False).data)
         create_mesh(myID)
 
+''''
+todo: see clean imported keys
+see what's happening with the socket in decrypt file
+verify if node has been already imported on init
+'''
