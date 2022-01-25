@@ -31,6 +31,8 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     iw \
     batctl \
     alfred \
+    rfkill \
+    iproute2 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PACKAGE_NAME mesh_com
