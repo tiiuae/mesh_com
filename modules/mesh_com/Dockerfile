@@ -23,11 +23,14 @@ RUN modules/mesh_com/package.sh 0 focal
 # tii-mesh-com image
 FROM ros:galactic-ros-core
 
+ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+
 RUN echo "deb [trusted=yes] https://ssrc.jfrog.io/artifactory/ssrc-debian-public-remote focal fog-sw" >> /etc/apt/sources.list
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     wpasupplicant \
     wifi-firmware \
+    ros-galactic-rmw-fastrtps-cpp \
     iw \
     batctl \
     alfred \
