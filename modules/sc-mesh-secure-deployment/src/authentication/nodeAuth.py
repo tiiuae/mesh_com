@@ -27,13 +27,13 @@ def folder():
 
 
 # always install it with python3 gnupg, do not use pip3 install gnupg (different libraries)
-PATH = 'auth/'
+PATH = 'auth'
 folder()
 try:
-    gpg = gnupg.GPG(gnupghome='/opt')
+    gpg = gnupg.GPG(gnupghome='.')
 except TypeError:
-    gpg = gnupg.GPG(homedir='/opt')
-os.environ['GNUPGHOME'] = '/opt'
+    gpg = gnupg.GPG(homedir='.')
+os.environ['GNUPGHOME'] = '.'
 
 
 # def __init__():
@@ -54,7 +54,7 @@ def init():
         for ky in gpg.list_keys():
             if ky["uids"] == ["provServer <provServer>"]:
                 fpS = ky["fingerprint"]
-                gpg.trust_keys(fpS, 'TRUST_FULLY')  # trusting the server key
+                gpg.trust_keys(fpS, 'TRUST_ULTIMATE')  # trusting the server key
             if 'node' in ky['uids'][0]:
                 ID = ky['uids'][0].split(' <')[0]
                 fpr = ky["fingerprint"]
@@ -63,11 +63,21 @@ def init():
 
 
 def clean_all():
+    keys = gpg.list_keys(True)
+    for key in keys:
+        gpg.trust_keys(key['fingerprint'], "TRUST_UNDEFINED")
+        gpg.delete_keys(key['fingerprint'], True, expect_passphrase=False)  # for private
+        gpg.delete_keys(key['fingerprint'], expect_passphrase=False)  # for public
     keys = gpg.list_keys()
     for key in keys:
         gpg.trust_keys(key['fingerprint'], "TRUST_UNDEFINED")
         gpg.delete_keys(key['fingerprint'], True, expect_passphrase=False)  # for private
         gpg.delete_keys(key['fingerprint'], expect_passphrase=False)  # for public
+    try:
+        os.remove('auth/dev.csv')
+    except FileNotFoundError:
+        print('Nothing to clean')
+    exit()
 
 
 def decrypt_conf(ID):
@@ -75,7 +85,7 @@ def decrypt_conf(ID):
     Decrypt the mesh_conf file
     '''
     with open("hsm/" + ID + ".asc_conf.conf.gpg", "rb") as f:
-        status = gpg.decrypt_file(f, output="../mesh_conf.conf")  # status has some info from the signer
+        status = gpg.decrypt_file(f, output="../mesh_com.conf")  # status has some info from the signer
         if status.ok:
             print("Mesh_conf file decrypt successful ")
         else:
@@ -96,7 +106,7 @@ def client(ID, ser_ip, message):
         s.sendall(message)
         data = s.recv(1024)
 
-    print('Received', repr(data))
+    print('Sent: ', repr(data))
 
 
 def server_auth(ID, interface='wlan0'):
@@ -108,6 +118,7 @@ def server_auth(ID, interface='wlan0'):
     PORT = int(ID.split('node')[1])  # Port to listen on (non-privileged ports are > 1023)
     print('Starting server Auth on ' + str(HOST) + ':' + str(PORT))
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((HOST, PORT))
         s.listen()
         conn, addr = s.accept()
@@ -118,6 +129,8 @@ def server_auth(ID, interface='wlan0'):
                 if not data:
                     break
                 conn.sendall(data)
+                s.close()
+                print('Received: ', repr(data))
                 return data, addr
 
 
@@ -132,18 +145,18 @@ def authentication(client_key):
     print(ck.results)
     fpr = ck.fingerprints
     level = 0
+    levels = []
     for ky in gpg.list_keys(sigs=True):  # checking if key was signed by Server
         if ky["fingerprint"] == fpr[0] and len(ky['sigs']) > 1:  # this avoids self signed certificate
             for sig in ky["sigs"]:
-                if ("provServer" in sig[1]  # signed by server
+                if ("provServer" in sig[1]  # signed by server #note: if the server signed the keys in a different 'moment' this will fail
                         and float(ky['expires']) > time.time()):  # not expired
-                    level = 3
-                    gpg.trust_keys(fpr, 'TRUST_FULLY')  # trusting the server key
+                    levels.append(3)
+                    gpg.trust_keys(fpr, 'TRUST_ULTIMATE')  # trusting the server key
                 for key_id in range(1, len(ky['sigs'])):
-                    levels = []
                     for key in gpg.list_keys():
                         if ky['sigs'][key_id][0] == key["keyid"] and (
-                                key["ownertrust"] == 'f'  # signed by a trusted node
+                                key["ownertrust"] == 'f' or key["ownertrust"] == 'u' # signed by a trusted node fully or ultimate
                                 and float(ky['expires']) > time.time()
                         ):  # not expired
                             levels.append(3)
@@ -153,7 +166,7 @@ def authentication(client_key):
                     else:
                         if count_level_signs[0] == 1:  # case only one signed and trusted
                             level = 3
-                            gpg.trust_keys(fpr, 'TRUST_FULLY')  # trusting the imported key
+                            gpg.trust_keys(fpr, 'TRUST_ULTIMATE')  # trusting the imported key
                         if count_level_signs[0] > 1:  # more than one and all trusted
                             level = 4
                             gpg.trust_keys(fpr, 'TRUST_ULTIMATE')  # trusting the imported key
@@ -196,7 +209,7 @@ def update_table(info):
     if info['ID'] not in set(table['ID']):
         table = table.append(info, ignore_index=True)
         table.to_csv('auth/dev.csv', mode='a', header=False, index=False)
-    elif table.loc[table['ID'] == info['ID']]['PubKey_fpr'] != info['PubKey_fpr']:
+    elif table.loc[table['ID'] == info['ID']]['PubKey_fpr'].all() != info['PubKey_fpr']:
         table = table.append(info, ignore_index=True)
         table.to_csv('auth/dev.csv', mode='a', header=False, index=False)
 
@@ -204,7 +217,8 @@ def update_table(info):
 if __name__ == "__main__":
     if args.clean:
         clean_all()
-    sent = False
+    set_mesh = False
+    cli = False
     myID, my_fpr = init()
     print('Im node ' + str(myID))
     candidate = wf.scan_wifi()  # scan wifi to authenticate with
@@ -212,30 +226,48 @@ if __name__ == "__main__":
     if candidate:
         print('AP available: ' + candidate)
         wf.connect_wifi(candidate)
-        serverIP = ".".join(wf.get_ip_address("wlan0").split(".")[0:3]) + ".1"  # assuming we're conected ip will be .1
+        serverIP = ".".join(wf.get_ip_address("wlan0").split(".")[0:3]) + ".1"  # assuming we're connected ip will be .1
+        print('2) send my key')
         client(candidate, serverIP, my_key)
+        print('3) get node key')
         client_key, addr = server_auth(myID)
-        sent = True
+        cli = True
     else:  # no wifi available need to start mesh by itself
         print('No AP available to connect with. Creating one')
         wf.create_ap(myID)  # create AuthAPnodeID for authentication
         time.sleep(2)
+        print('1) server default')
         client_key, addr = server_auth(myID)
-    level, fpr = authentication(client_key)
+    level, client_fpr = authentication(client_key)
     if level >= 3:
         print('Authenticated, now send my pubkey')
-        nodeID = get_id_from_frp(fpr[0])
-        info = {'ID': 'provServer', 'mac': 'mac', 'IP': '0.0.0.0', 'PubKey_fpr': fpr, 'trust_level': level}
+        nodeID = get_id_from_frp(client_fpr[0])
+        info = {'ID': 'provServer', 'MAC': 'mac', 'IP': '0.0.0.0', 'PubKey_fpr': client_fpr[0], 'trust_level': level}
         update_table(info)
-        if not sent:
+        if not cli:
+            print('4) server key')
             client(nodeID, addr[0], my_key)
-        password = get_password()
-        if password == '':  # this means still not connected with anyone
+            password = get_password()
             decrypt_conf(myID)  # decrypt config provided by server
-            password = create_password()  # create a password (only if no mesh exist)
-            update_password(password)  # update password in config file
-        client(nodeID, addr[0], gpg.encrypt(password, fpr, armor=False).data)
-        create_mesh(myID)
+            if password == '':  # this means still not connected with anyone
+                password = create_password()  # create a password (only if no mesh exist)
+                print(password)
+                encrpt_file = gpg.encrypt(password, client_fpr[0], armor=False).data
+                print('encrypted file: ' + str(encrpt_file))
+                try:
+                    client(nodeID, addr[0], encrpt_file)
+                except ConnectionRefusedError:
+                    time.sleep(10)
+                    client(nodeID, addr[0], encrpt_file)
+        else:
+            print('5) get password')
+            password, b = server_auth(myID)
+            print(password)
+        update_password(password)  # update password in config file
+        if not set_mesh:
+            print('creating mesh')
+            create_mesh(myID.split('node')[1])
+            set_mesh = True
 
 ''''
 todo: see clean imported keys

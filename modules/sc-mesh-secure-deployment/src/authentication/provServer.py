@@ -84,7 +84,7 @@ def update_conf_file(ip):
     instances['ip'] = ip
     yaml = ruamel.yaml.YAML()
     yaml.indent(mapping=ind, sequence=ind, offset=bsi)
-    with open('../mesh_conf.conf', 'w') as fp:
+    with open('../mesh_com.conf', 'w') as fp:
         yaml.dump(config, fp)
 
 
@@ -235,8 +235,9 @@ def transfer(FILE):
     ssh.connect(server, username=username, password=password)
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     sftp = ssh.open_sftp()
-    only_node = FILE.split('auth/')[1]
-    sftp.put(FILE, 'hsm/' + only_node)
+    only_node = FILE.split('auth/')[1].split('.asc')[1]
+    sftp.put(FILE.split('.asc')[0]+'pr.asc', 'hsm/' + only_node+'pr.asc')
+    sftp.put(FILE.split('.asc')[0]+'pb.asc', 'hsm/' + only_node + 'pb.asc')
     sftp.put('auth/provServer.asc', 'hsm/provServer.asc')
     encrypted_conf = encrypt_conf(FILE)
     sftp.put(encrypted_conf, 'hsm/' + encrypted_conf.split('auth/')[1])
