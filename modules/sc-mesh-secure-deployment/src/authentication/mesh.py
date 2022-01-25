@@ -122,7 +122,7 @@ def create_password(WPA=False):
     '''
     if WPA:
         characters: str = string.ascii_letters + string.digits
-        return ''.join(random.choice(characters) for i in range(8))
+        return ''.join(random.choice(characters) for i in range(10))
     else: #WEP
         characters: str = string.digits
-        return ''.join(random.choice(characters) for i in range(8))
+        return ''.join(random.choice(characters) for i in range(10))

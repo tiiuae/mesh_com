@@ -243,27 +243,29 @@ if __name__ == "__main__":
         print('Authenticated, now send my pubkey')
         nodeID = get_id_from_frp(client_fpr[0])
         info = {'ID': 'provServer', 'MAC': 'mac', 'IP': '0.0.0.0', 'PubKey_fpr': client_fpr[0], 'trust_level': level}
-        update_table(info)
-        if not cli:
+        update_table(info)  # #update csv file
+        decrypt_conf(myID)  # decrypt config provided by server
+        if not cli:  # initial server
             print('4) server key')
             client(nodeID, addr[0], my_key)
             password = get_password()
-            decrypt_conf(myID)  # decrypt config provided by server
             if password == '':  # this means still not connected with anyone
                 password = create_password()  # create a password (only if no mesh exist)
-                print(password)
-                encrpt_file = gpg.encrypt(password, client_fpr[0], armor=False).data
-                print('encrypted file: ' + str(encrpt_file))
-                try:
-                    client(nodeID, addr[0], encrpt_file)
-                except ConnectionRefusedError:
-                    time.sleep(10)
-                    client(nodeID, addr[0], encrpt_file)
-        else:
-            print('5) get password')
-            password, b = server_auth(myID)
+                update_password(password)  # update password in config file
             print(password)
-        update_password(password)  # update password in config file
+            encrpt_pass = gpg.encrypt(password, client_fpr[0], armor=False).data
+            print('encrypted pass: ' + str(encrpt_pass))
+            try:
+                client(nodeID, addr[0], encrpt_pass)
+            except ConnectionRefusedError:
+                time.sleep(7)
+                client(nodeID, addr[0], encrpt_pass)
+        else:  #client
+            print('5) get password')
+            enc_pass, b = server_auth(myID)
+            password = gpg.decrypt(enc_pass)
+            print(password)
+            update_password(str(password))  # update password in config file
         if not set_mesh:
             print('creating mesh')
             create_mesh(myID.split('node')[1])
