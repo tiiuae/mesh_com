@@ -1,5 +1,11 @@
 #!/bin/bash -e
 
+. /enclave/drone_device_id
+
+export DRONE_DEVICE_ID
+
+source /opt/ros/galactic/setup.bash
+
 # I don't know what we're doing wrong, but Python isn't able to resolve mesh packages without this.
 # (other Python packages seem to reside under /usr/lib/python3/dist-packages)
 export PYTHONPATH=/opt/ros/galactic/lib/python3.8/site-packages
@@ -12,10 +18,8 @@ if [ "$1" == "init" ]; then
     /opt/ros/galactic/lib/mesh_com/mesh_executor
 
 else
-
     echo "Start mesh pub&sub"
 
-    source /opt/ros/galactic/setup.bash
     mkdir -p ~/.ros/log
 
     # Start mesh publisher
