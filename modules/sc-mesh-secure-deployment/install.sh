@@ -85,14 +85,15 @@ command_exists "git make python3-pip batctl ssh clang libssl-dev net-tools \
                 bmon isc-dhcp-server alfred batctl resolvconf"
 # Clone this repo
 echo "> Cloning..."
-git clone https://github.com/tiiuae/mesh_com.git
+git clone git://github.com/tiiuae/mesh_com
 if [ $? -ne 0 ]; then
     echo "ERROR: Couldn't clone the git repo! Exiting.."
     exit 0
 fi
 if [ "$1" == "1.5" ]; then
+  mkdir /hsm
   cd mesh_com
-  git checkout feature/develop_gpg
+  git checkout feature/develop_pgp
 fi
 echo "> Init submodules..."
 cd mesh_com

@@ -49,6 +49,7 @@ date -s "$date $ctime"
 dockervar=$(ls /etc/init.d/ |grep docker)
 
 /etc/init.d/$dockervar stop
+sleep 2
 /etc/init.d/$dockervar start
 
 #verify if wlan0 (onboard is working)

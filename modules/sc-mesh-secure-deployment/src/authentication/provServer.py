@@ -235,12 +235,12 @@ def transfer(FILE):
     ssh.connect(server, username=username, password=password)
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     sftp = ssh.open_sftp()
-    only_node = FILE.split('auth/')[1].split('.asc')[1]
-    sftp.put(FILE.split('.asc')[0]+'pr.asc', 'hsm/' + only_node+'pr.asc')
-    sftp.put(FILE.split('.asc')[0]+'pb.asc', 'hsm/' + only_node + 'pb.asc')
-    sftp.put('auth/provServer.asc', 'hsm/provServer.asc')
+    only_node = FILE.split('auth/')[1].split('.asc')[0]
+    sftp.put(FILE.split('.asc')[0]+'pr.asc', '/hsm/' + only_node+'pr.asc')
+    sftp.put(FILE.split('.asc')[0]+'pb.asc', '/hsm/' + only_node + 'pb.asc')
+    sftp.put('auth/provServer.asc', '/hsm/provServer.asc')
     encrypted_conf = encrypt_conf(FILE)
-    sftp.put(encrypted_conf, 'hsm/' + encrypted_conf.split('auth/')[1])
+    sftp.put(encrypted_conf, '/hsm/' + encrypted_conf.split('auth/')[1])
     sftp.close()
     ssh.close()
 
