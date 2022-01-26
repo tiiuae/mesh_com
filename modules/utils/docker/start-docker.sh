@@ -1,3 +1,2 @@
 docker build -t seccomms .
-docker run -it --privileged --net="host" --rm seccomms /bin/bash
-#docker run -it test /bin/bash
+docker run -it --privileged --net="host"  -v /hsm:/opt:/opt/mesh_com/modules/sc-mesh-secure-deployment/src/authentication/hsm  --rm seccomms /bin/bash

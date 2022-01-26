@@ -24,5 +24,8 @@ RUN /bin/sh -c 'set -ex && \
 
 RUN wget -L https://github.com/tiiuae/mesh_com/raw/develop/modules/sc-mesh-secure-deployment/install.sh
 RUN chmod 777 install.sh
-RUN /bin/bash /opt/install.sh
-WORKDIR /opt/mesh_com/modules/sc-mesh-secure-deployment/
+RUN /bin/bash /opt/install.sh 1.5
+WORKDIR /opt/mesh_com/modules/sc-mesh-secure-deployment/src/authentication
+RUN pip3 install -r requirements
+RUN mkdir hsm
+

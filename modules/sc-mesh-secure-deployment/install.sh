@@ -90,6 +90,10 @@ if [ $? -ne 0 ]; then
     echo "ERROR: Couldn't clone the git repo! Exiting.."
     exit 0
 fi
+if [ "$1" == "1.5" ]; then
+  cd mesh_com
+  git checkout feature/develop_gpg
+fi
 echo "> Init submodules..."
 cd mesh_com
 #git submodule update --init --recursive
