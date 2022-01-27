@@ -3,8 +3,8 @@ import gnupg
 import os
 from os import path
 import glob
-import wifi_ssrc as wf
-from mesh import *
+import utils.wifi_ssrc as wf
+import utils.mesh as mesh
 import socket
 import time
 import numpy as np
@@ -27,7 +27,7 @@ def folder():
 
 
 # always install it with python3 gnupg, do not use pip3 install gnupg (different libraries)
-PATH = 'auth'
+PATH = '../auth'
 folder()
 try:
     gpg = gnupg.GPG(gnupghome='.')
@@ -43,7 +43,7 @@ def init():
     Returns ID of the node: obtained from the certificate.
     '''
     print('Loading keys')
-    files = glob.glob('hsm/*.asc')
+    files = glob.glob('../hsm/*.asc')
     if not files:
         print('no keys in hsm folder')
     else:
@@ -74,7 +74,7 @@ def clean_all():
         gpg.delete_keys(key['fingerprint'], True, expect_passphrase=False)  # for private
         gpg.delete_keys(key['fingerprint'], expect_passphrase=False)  # for public
     try:
-        os.remove('auth/dev.csv')
+        os.remove('../auth/dev.csv')
     except FileNotFoundError:
         print('Nothing to clean')
     exit()
@@ -84,7 +84,7 @@ def decrypt_conf(ID):
     '''
     Decrypt the mesh_conf file
     '''
-    with open("hsm/" + ID + ".asc_conf.conf.gpg", "rb") as f:
+    with open("../hsm/" + ID + ".asc_conf.conf.gpg", "rb") as f:
         status = gpg.decrypt_file(f, output="../mesh_com.conf")  # status has some info from the signer
         if status.ok:
             print("Mesh_conf file decrypt successful ")
@@ -193,11 +193,11 @@ def create_table():
     Function to create table of authenticated devices
     '''
     columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'trust_level']
-    if not path.isfile('auth/dev.csv'):
+    if not path.isfile('../auth/dev.csv'):
         table = pd.DataFrame(columns=columns)
         table.to_csv('auth/dev.csv', header=columns, index=False)
     else:
-        table = pd.read_csv('auth/dev.csv')
+        table = pd.read_csv('../auth/dev.csv')
     return table
 
 
@@ -220,9 +220,10 @@ if __name__ == "__main__":
     set_mesh = False
     cli = False
     myID, my_fpr = init()
-    print('Im node ' + str(myID))
-    candidate = wf.scan_wifi()  # scan wifi to authenticate with
+    decrypt_conf(myID)  # decrypt config provided by server
     my_key = get_my_key(my_fpr)
+    print("I'm node " + str(myID))
+    candidate = wf.scan_wifi()  # scan wifi to authenticate with
     if candidate:
         print('AP available: ' + candidate)
         wf.connect_wifi(candidate)
@@ -244,14 +245,13 @@ if __name__ == "__main__":
         nodeID = get_id_from_frp(client_fpr[0])
         info = {'ID': 'provServer', 'MAC': 'mac', 'IP': '0.0.0.0', 'PubKey_fpr': client_fpr[0], 'trust_level': level}
         update_table(info)  # #update csv file
-        decrypt_conf(myID)  # decrypt config provided by server
         if not cli:  # initial server
             print('4) server key')
             client(nodeID, addr[0], my_key)
-            password = get_password()
+            password = mesh.get_password()
             if password == '':  # this means still not connected with anyone
-                password = create_password()  # create a password (only if no mesh exist)
-                update_password(password)  # update password in config file
+                password = mesh.create_password()  # create a password (only if no mesh exist)
+                mesh.update_password(password)  # update password in config file
             print(password)
             encrpt_pass = gpg.encrypt(password, client_fpr[0], armor=False).data
             print('encrypted pass: ' + str(encrpt_pass))
@@ -265,14 +265,12 @@ if __name__ == "__main__":
             enc_pass, b = server_auth(myID)
             password = gpg.decrypt(enc_pass)
             print(password)
-            update_password(str(password))  # update password in config file
+            mesh.update_password(str(password))  # update password in config file
         if not set_mesh:
             print('creating mesh')
-            create_mesh(myID.split('node')[1])
+            mesh.create_mesh(myID.split('node')[1])
             set_mesh = True
 
 ''''
-todo: see clean imported keys
-see what's happening with the socket in decrypt file
-verify if node has been already imported on init
+TODO: verify how to send MAC as ack
 '''

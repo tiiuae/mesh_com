@@ -7,7 +7,7 @@ import netifaces
 from pathlib import Path
 
 
-mesh_file_name = '../mesh_com.conf'
+mesh_file_name = '../../../../mesh_com.conf'  #maybe it's better to add the absolute path
 
 
 def get_interface(pattern):
