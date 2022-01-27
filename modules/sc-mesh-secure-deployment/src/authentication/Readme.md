@@ -17,14 +17,16 @@ The second step is the authentication itself. This step can be executed multiple
 
 
 
-##Installation 
+## Installation 
 
 It is necessary to execute the Docker environment.
 
-`
+
+```
 cd mesh_com/modules/utils/docker
+
 ./start-docker.sh
-`
+``
 Once the docker compiles go to the different steps
 
 ## Run Program

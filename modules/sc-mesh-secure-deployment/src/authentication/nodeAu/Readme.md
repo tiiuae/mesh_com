@@ -18,7 +18,7 @@ Finally, when all the parameters are ready, another code on utils (mesh.py) will
 ### Protocol 
 
 The following image shows the protocol of the mutual authentication:
-<img src="../images/protocol.png" width="60%" height="60%"> 
+<img src="../images/protocol.png" width="40%" height="40%"> 
 
 ## Run Program
 ### Normal Execution 
