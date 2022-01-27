@@ -29,7 +29,7 @@ RUN /bin/sh -c 'set -ex && \
 #RUN chmod 777 install.sh
 #RUN /bin/bash /opt/install.sh 1.5
 RUN git clone git://github.com/tiiuae/mesh_com
-RUN cd mesh_com;  git checkout feature/develop_pgp
+RUN git checkout feature/develop_pgp
 RUN cd  /opt/mesh_com/modules/sc-mesh-secure-deployment;  chmod 777 install.sh;  /bin/bash install.sh 1.5
 WORKDIR /opt/mesh_com/modules/sc-mesh-secure-deployment/src/authentication
 RUN pip3 install -r requirements.txt
