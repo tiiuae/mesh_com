@@ -33,9 +33,9 @@ EOF
   fi
   #echo "AP_INF=$choice" >> /etc/mesh_com/ap.conf
   # Create Gateway Service
-  cp mesh-ap.sh /usr/sbin/.
+  cp utils/mesh-ap.sh /usr/sbin/.
   chmod 744 /usr/sbin/mesh-ap.sh
-  cp ../../services/initd/S93meshAP /etc/init.d/.
+  cp ../../../services/initd/S93meshAP /etc/init.d/.
   chmod 700 /etc/init.d/S93meshAP
   /etc/init.d/S93meshAP start wlan0
   cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-wlan0.conf

@@ -195,7 +195,7 @@ def create_table():
     columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'trust_level']
     if not path.isfile('../auth/dev.csv'):
         table = pd.DataFrame(columns=columns)
-        table.to_csv('auth/dev.csv', header=columns, index=False)
+        table.to_csv('../auth/dev.csv', header=columns, index=False)
     else:
         table = pd.read_csv('../auth/dev.csv')
     return table
@@ -208,10 +208,10 @@ def update_table(info):
     table = create_table()
     if info['ID'] not in set(table['ID']):
         table = table.append(info, ignore_index=True)
-        table.to_csv('auth/dev.csv', mode='a', header=False, index=False)
+        table.to_csv('../auth/dev.csv', mode='a', header=False, index=False)
     elif table.loc[table['ID'] == info['ID']]['PubKey_fpr'].all() != info['PubKey_fpr']:
         table = table.append(info, ignore_index=True)
-        table.to_csv('auth/dev.csv', mode='a', header=False, index=False)
+        table.to_csv('../auth/dev.csv', mode='a', header=False, index=False)
 
 
 if __name__ == "__main__":

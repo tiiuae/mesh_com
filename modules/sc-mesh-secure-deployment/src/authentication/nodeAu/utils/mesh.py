@@ -7,7 +7,7 @@ import netifaces
 from pathlib import Path
 
 
-mesh_file_name = '../../../../mesh_com.conf'  #maybe it's better to add the absolute path
+mesh_file_name = '../../mesh_com.conf'  #maybe it's better to add the absolute path
 
 
 def get_interface(pattern):
@@ -111,9 +111,9 @@ def create_mesh(ID):    # Get the mesh_com config
     if confc['mesh_service']:
         mesh_interface = get_interface(confc['mesh_inf'])
         if confs['ubuntu']['type'] == '11s':
-            subprocess.call('../bash/conf-11s-mesh.sh ' + mesh_interface, shell=True)
+            subprocess.call('../../bash/conf-11s-mesh.sh ' + mesh_interface, shell=True)
         if confs['ubuntu']['type'] == 'ibss':
-            subprocess.call('../bash/conf-mesh.sh ' + mesh_interface, shell=True)
+            subprocess.call('../../bash/conf-mesh.sh ' + mesh_interface, shell=True)
 
 
 def create_password(WPA=False):

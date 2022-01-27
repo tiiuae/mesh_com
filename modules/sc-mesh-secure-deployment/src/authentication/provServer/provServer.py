@@ -32,7 +32,7 @@ def folder():
 PATH = '../auth/'
 folder()
 gpg = gnupg.GPG(gnupghome=PATH)
-os.environ['GNUPGHOME'] = 'auth/'
+os.environ['GNUPGHOME'] = '../auth/'
 
 
 def create_table():

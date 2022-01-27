@@ -31,7 +31,7 @@ def connect_wifi(candidate):
     Connect to the best Ap selected in scan_wifi()
     we are using apmanager.sh for this
     '''
-    command = '/bin/bash apmanager.sh  -ap_connect ' + candidate
+    command = '/bin/bash utils/apmanager.sh  -ap_connect ' + candidate
     subprocess.call(command, shell=True)
 
 
@@ -48,7 +48,7 @@ def create_ap(ID):
     '''
     killall()
     time.sleep(2)
-    command = '/bin/bash apmanager.sh -ap_create ' + ID
+    command = '/bin/bash utils/apmanager.sh -ap_create ' + ID
     subprocess.call(command, shell=True)
 
 
