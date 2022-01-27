@@ -37,4 +37,4 @@ This will clean all the keys generated as well as the files.
 ![Conceptual Diagram](../images/node-auth.png)
 
 ## Utils folder
-Contains the utils for wifi management (wifi_ssrc.py) and for mesh creation and handling (mesh.py) 
+Contains the utils for wifi management [wifi_ssrc.py](utils/wifi_ssrc.py) and for mesh creation and handling [mesh.py](utils/mesh.py) 
