@@ -15,7 +15,7 @@ Also, the server creates a comma-separated value (csv) of all seen nodes. This f
 ![Conceptual Diagram](../images/mutual-authentication.png)
 
 ## Run Program
-###Normal Execution 
+### Normal Execution 
 ```
 ./provServer.py
 ```
@@ -29,7 +29,7 @@ and then the IP address for transferring the files:
 
 `Enter node IP address: 192.168.1.100`
 
-###Cleaning Execution
+### Cleaning Execution
 This will clean all the keys generated as well as the files.
 
 ```

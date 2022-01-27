@@ -15,18 +15,18 @@ After the connection/creation with the AP, the program starts some server and cl
 Once both nodes are authenticated by themselves, the mesh will be established. Initially, the provisioning server provides the parameters with an empty password. Thus, it is the function of the authenticator to create a password and shared it with the receiver. For this, the authenticator generates a 10 digits random string (only numbers for WEP, or characters +numbers for WPA), encrypts it with the receiver's pub key, and shared it with it. 
 
 Finally, when all the parameters are ready, another code on utils (mesh.py) will implement the mesh as requested. 
-###Protocol 
+### Protocol 
 
 The following image shows the protocol of the mutual authentication:
-![Conceptual Diagram](../images/protocol.png)
+<img src="../images/protocol.png" width="60%" height="60%"> 
 
 ## Run Program
-###Normal Execution 
+### Normal Execution 
 ```
 ./nodeAuth.py
 ```
 
-###Cleaning Execution
+### Cleaning Execution
 This will clean all the keys generated as well as the files.
 
 ```
