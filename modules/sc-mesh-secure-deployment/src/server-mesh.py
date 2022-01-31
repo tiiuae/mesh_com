@@ -4,7 +4,8 @@ from flask import Flask, request, json
 from getmac import get_mac_address
 import subprocess
 import netifaces
-import pandas as pd
+#Enable pandas after availablity of _bz2 shared lib
+#import pandas as pd
 import yaml
 import json
 import argparse

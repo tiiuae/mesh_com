@@ -295,11 +295,11 @@ function client {
     echo '> Fetching certificate from server...'
     read -p "- Server Username: " server_user
     # pull the key from the server
-    scp $server_user@$server_ip:/home/$server_user/mesh_com/modules/sc-mesh-secure-deployment/src/ecc_key.der src/ecc_key.der
+    scp $server_user@$server_ip:/opt/mesh_com/modules/sc-mesh-secure-deployment/src/ecc_key.der src/ecc_key.der
   fi
 
   echo '> Configuring the client and connecting to server...'
-  sudo python3 src/client-mesh.py -c src/ecc_key.der -s http://$server_ip:5000
+  python3 src/client-mesh.py -c src/ecc_key.der -s http://$server_ip:5000
 }
 
 #-----------------------------------------------------------------------------#
