@@ -55,7 +55,7 @@ def is_sec_os():
     execution_ctx = osh.environ.get('EXECUTION_CTX')
     if execution_ctx=="docker":
         if osh.environ.get('HOSTNAME')=="br_hardened":
-            os = "SECOS_COMMS_VM"
+            os = "secos"
         else:
             os = get_os()
     return os
@@ -211,7 +211,7 @@ if __name__ == "__main__":
         print(colored('> Valid Server Certificate', 'green'))
         mac = get_mac_address(interface=get_interface(conf['mesh_inf']))
         response = requests.post(URL + '/mac/' + mac)
-        if os == 'Ubuntu':
+        if os == 'Ubuntu' or 'secos':
             create_config_ubuntu(res)
     else:
         print(colored("Not Valid Server Certificate", 'red'))
