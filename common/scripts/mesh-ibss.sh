@@ -121,7 +121,11 @@ EOF
       killall batadv-vis 2>/dev/null
       rm -f /var/run/alfred.sock
 
-      modprobe batman-adv
+      #Check if batman_adv is built-in module
+      modname=$(ls /sys/module | grep batman_adv)
+      if [[ -z $modname ]]; then
+        modprobe batman-adv
+      fi
 
       echo "$wifidev down.."
       iw dev "$wifidev" del
