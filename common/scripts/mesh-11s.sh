@@ -97,6 +97,7 @@ ctrl_interface=DIR=/var/run/wpa_supplicant
 ap_scan=1
 country=$9
 p2p_disabled=1
+mesh_max_inactivity=50
 network={
     ssid="$6"
     bssid=$4
@@ -122,11 +123,18 @@ EOF
       killall batadv-vis 2>/dev/null
       rm -f /var/run/alfred.sock
 
-      modprobe batman-adv
+      #Check if batman_adv is built-in module
+      modname=$(ls /sys/module | grep batman_adv)
+      if [[ -z $modname ]]; then
+        modprobe batman-adv
+      fi
 
       echo "$wifidev down.."
       iw dev "$wifidev" del
       iw phy "$phyname" interface add "$wifidev" type mp
+  
+      echo "Longer range tweak.."
+      iw phy "$phyname" set distance 1000
 
       echo "$wifidev create 11s.."
       ifconfig "$wifidev" mtu 1560
