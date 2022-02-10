@@ -5,7 +5,7 @@ submodules = "mesh_com/src"
 
 setup(
     name=package_name,
-    version='0.0.0',
+    version='0.4.3',
     packages=[package_name, submodules],
     data_files=[
         ('share/ament_index/resource_index/packages',
