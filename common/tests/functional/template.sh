@@ -15,6 +15,7 @@ description="test case description from excel"
 #  result
 #  device_list
 # Arguments:
+#  $1 = ipaddress
 #######################################
 _init() {
 
@@ -40,8 +41,6 @@ _init() {
 # Test
 # Globals:
 #  result
-#  wifidev
-#  channel_list
 # Arguments:
 #######################################
 _test() {
@@ -88,10 +87,34 @@ _result() {
 # Arguments:
 #######################################
 main() {
+
+  help_text=0
+
+  while getopts ":i:h" flag
+  do
+    case "${flag}" in
+      i) ipaddress=${OPTARG};;
+      h) help_text=1;;
+      *) help_text=1;;
+    esac
+  done
+
+  if [ "$help_text" -eq 1 ]; then
+    echo "
+        Usage: sudo $0 [-i ipaddress] [-h]
+
+        -i ipaddress    IP address to be used for node
+
+        For Example: sudo $0 -i 192.168.1.2
+
+        -H              Help"
+        return
+  fi
+
   echo "### Test Case: $test_case" | print_log result
   echo "### Test Description: $description" | print_log result
 
-  _init
+  _init "$ipaddress"
 
   if [ "$result" -eq "$FAIL" ]; then
   	echo "FAILED  _init: $test_case" | print_log result
@@ -116,4 +139,4 @@ main() {
   fi
 }
 
-main
+main "$@"
