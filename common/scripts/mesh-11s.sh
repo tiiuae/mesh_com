@@ -3,7 +3,7 @@
 function help
 {
     echo
-    echo "Usage: sudo ./mesh_11s.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> [<interface>] [<phyname>]"
+    echo "Usage: sudo $0 <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> [<interface>] [<phyname>]"
     echo "Parameters:"
     echo "	<mode>"
     echo "	<ip>"
@@ -18,8 +18,8 @@ function help
     echo "	<phyname>"   - optional
     echo
     echo "example:"
-    echo "sudo ./mesh.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi wlan1 phy1"
-    echo "sudo mesh.sh ap"
+    echo "sudo $0 mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi wlan1 phy1"
+    echo "sudo $0 ap"
     exit
 }
 
@@ -64,7 +64,8 @@ if [[ -z "${10}" ]]; then
   # manufacturer 0x168c = Qualcomm
   # devices = 0x0034 0x003c 9462/988x  11s
   #           0x003e        6174       adhoc
-  find_mesh_wifi_device 0x168c "0x0034 0x003c 0x003e"
+  #           0x0033        9590       doodle
+  find_mesh_wifi_device 0x168c "0x0034 0x003c 0x003e 0x0033"
 
   if [ "$retval_phy" != "" ]; then
       phyname=$retval_phy
@@ -97,6 +98,7 @@ ctrl_interface=DIR=/var/run/wpa_supplicant
 ap_scan=1
 country=$9
 p2p_disabled=1
+mesh_max_inactivity=50
 network={
     ssid="$6"
     bssid=$4
@@ -122,11 +124,18 @@ EOF
       killall batadv-vis 2>/dev/null
       rm -f /var/run/alfred.sock
 
-      modprobe batman-adv
+      #Check if batman_adv is built-in module
+      modname=$(ls /sys/module | grep batman_adv)
+      if [[ -z $modname ]]; then
+        modprobe batman-adv
+      fi
 
       echo "$wifidev down.."
       iw dev "$wifidev" del
       iw phy "$phyname" interface add "$wifidev" type mp
+  
+      echo "Longer range tweak.."
+      iw phy "$phyname" set distance 1000
 
       echo "$wifidev create 11s.."
       ifconfig "$wifidev" mtu 1560
@@ -151,6 +160,9 @@ EOF
       echo "started alfred"
       (batadv-vis -i bat0 -s)&
       echo "started batadv-vis"
+
+      # Radio parameters
+      iw dev "$wifidev" set txpower limit "$8"00
 
       # FIXME: Like the comment above - we need to figure out how to handle
       # multiple Wi-Fi interfaces better. For some reason the background setting
