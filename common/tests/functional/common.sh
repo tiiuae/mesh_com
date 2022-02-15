@@ -5,19 +5,20 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-PASS=1
-FAIL=0
-result=$PASS
+# Global constants
+readonly log_file="./functional_tests_debug.log"
+readonly results_file="./functional_tests_results.log"
+readonly NEEDED_EXECUTABLES="wpa_supplicant iw iwlist iperf3 ping uniq grep ip ifconfig batctl bc"
+readonly iperf3_port="30001" # constant port number used for iperf3
+readonly PASS=1     # constant for PASS value
+readonly FAIL=0     # constant for FAIL value
 
-phyname=0
-wifidev=0
-device_list=0     # includes wifi phy list when detect is called
-channel_list=0    # includes supported wifi channels when update function is called
-
-log_file="./functional_tests_debug.log"
-results_file="./functional_tests_results.log"
-
-NEEDED_EXECUTABLES="wpa_supplicant iw iwlist"
+# Global variables which should be used from test script
+result=$PASS        # Should be updated from test script as a result
+phyname=0           # Should be updated from test script
+wifidev=0           # Should be updated from test script
+device_list=0       # includes wifi phy list when find_wifi_device() is called
+channel_list=0      # includes supported wifi channels when update_channel_list() is called
 
 #######################################
 # Add date prefix to line and write to log
@@ -47,6 +48,36 @@ print_log() {
 update_channel_list() {
   channel_list=$(iwlist "$1" frequency | awk 'NR>1{print $4*1000}' | tr '\n' ' ')
   export channel_list
+}
+
+#######################################
+# create wpa_supplicant configuration
+# Globals:
+#  channel_list
+# Arguments:
+#  $1 = config file name
+#  $2 = frequency
+#  $3 = NONE/SAE
+#######################################
+create_wpa_supplicant_config() {
+  cat <<EOF > "$1"
+ctrl_interface=DIR=/var/run/wpa_supplicant
+# use 'ap_scan=2' on all devices connected to the network
+# this is unnecessary if you only want the network to be created when no other networks..
+ap_scan=1
+country=AE
+p2p_disabled=1
+network={
+  ssid="test_case_run"
+  bssid=00:11:22:33:44:55
+  mode=5
+  frequency=$2
+  psk="1234567890"
+  key_mgmt=$3
+  ieee80211w=2
+  beacon_int=100
+}
+EOF
 }
 
 #######################################
@@ -94,6 +125,36 @@ find_wifi_device()
       device_list=""
       ;;
   esac
+}
+
+#######################################
+# Execute command and print command to log
+# Globals:
+# Arguments:
+#  $@ = command to be executed
+#######################################
+exe() {
+  echo + "$@"
+  $@ | print_log
+}
+
+#######################################
+# Wait IP address until it is online
+# Globals:
+# Arguments:
+#  $1 = IP address to wait
+#######################################
+wait_ip(){
+  server_wait=1
+  echo -n "waiting for $1 ..."
+  while [ "$server_wait" -eq 1 ]; do
+    if ping -c 1 -w 2 $1 &> /dev/null; then
+      echo "$1 is online!"
+      server_wait=0
+    else
+      echo -n "."
+    fi
+  done
 }
 
 ################### MAIN ####################
