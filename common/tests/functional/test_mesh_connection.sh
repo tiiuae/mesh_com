@@ -136,13 +136,13 @@ _result() {
   echo -e "# UDP result:\n$udp_result" | print_log result
   udp_avg=$(awk -F " " '($NF=="sender") {print $7}' logs/udp.log)
 
-  ping_result=$(grep rtt -B1 logs/ping.log)
+  ping_result=$(grep -e rtt -e round-trip -B1 logs/ping.log)
   echo -e "# ping result:\n$ping_result" | print_log result
-  ping_avg=$(echo "$ping_result" | grep rtt | cut -d '/' -f 5)
+  ping_avg=$(echo "$ping_result" | grep -e rtt -e round-trip | cut -d ' ' -f 4 | cut -d '/' -f 2)
 
 	#2 make decision ($PASS or $FAIL)
 
-  # ping limit 4.0milliseconds
+  # ping limit 3.0milliseconds
   if (( $(echo "$ping_avg < 3.0" |bc -l) )); then
     result=$PASS
   else
