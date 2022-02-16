@@ -181,12 +181,15 @@ exe() {
 
 #######################################
 # Wait IP address until it is online
+#  - will timeout after ~60seconds
 # Globals:
 # Arguments:
 #  $1 = IP address to wait
 #######################################
 wait_ip(){
   server_wait=1
+  timeout=0;
+
   echo -n "waiting for $1 ..."
   while [ "$server_wait" -eq 1 ]; do
     if ping -c 1 -w 2 "$1" &> /dev/null; then
@@ -194,6 +197,11 @@ wait_ip(){
       server_wait=0
     else
       echo -n "."
+      ((timeout=timeout+2))
+      if [ "$timeout" -gt 60 ]; then
+        echo "Timeout when waiting $1!"
+        exit 0  # no reason to continue as target IP is not in network
+      fi
     fi
   done
 }
