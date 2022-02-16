@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./common.sh
+source ./common/common.sh
 
 test_case="check BSS list in scan results of 2.4/5GHZ MBSS"
 

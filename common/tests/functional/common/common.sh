@@ -39,7 +39,9 @@ function ctrl_c() {
 # Arguments:
 #######################################
 set_batman_orig_interval() {
-  if ! batctl orig_interval $1; then
+  batctl orig_interval "$1"
+  ret=$?
+  if [ "$ret" != 0 ]; then
     echo "Batman orig_interval setting failed!!"
   fi
 }
@@ -50,7 +52,9 @@ set_batman_orig_interval() {
 # Arguments:
 #######################################
  set_batman_routing_algo(){
-  if ! batctl ra $1; then
+  batctl ra "$1"
+  ret=$?
+  if [ "$ret" != 0 ]; then
     echo "Batman routing algo setting failed!!"
     echo "Batman-adv Kernel configuration might not be correct."
   fi
@@ -185,7 +189,7 @@ wait_ip(){
   server_wait=1
   echo -n "waiting for $1 ..."
   while [ "$server_wait" -eq 1 ]; do
-    if ping -c 1 -w 2 $1 &> /dev/null; then
+    if ping -c 1 -w 2 "$1" &> /dev/null; then
       echo "$1 is online!"
       server_wait=0
     else

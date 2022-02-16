@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./common.sh
+source ./common/common.sh
 
 test_case="test case name from excel"
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./common.sh
+source ./common/common.sh
 
 test_case="Mesh connection and Iperf/ping-N hop"
 
@@ -234,7 +234,7 @@ main() {
      [ "$ipaddress" = "255.255.255.255" ] || \
      [ "$encryption" = "NA" ]; then
     echo "
-        Usage: sudo $0 [-i ipaddress] [-e encryption] [-f freq] [-m mode] [-h]
+        Usage: sudo $0 [-i ipaddress] [-e encryption] [-f freq] [-m mode] [-c country] [-o orig_int] [-r ra] [-h]
 
         -i ipaddress    IP address to be used for node
         -e encryption   SAE or NONE

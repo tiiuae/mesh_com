@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./common.sh
+source ./common/common.sh
 
 test_case="check available channels in 2.4/5GHZ"
 
