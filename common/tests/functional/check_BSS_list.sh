@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./common.sh
+source ./common/common.sh
 
 test_case="check BSS list in scan results of 2.4/5GHZ MBSS"
 
@@ -16,7 +16,7 @@ uniq_frequencies=""
 # Arguments:
 #######################################
 _init() {
-
+  _deinit
   echo "$0, init called" | print_log
 	# detect_wifi
 	# multiple wifi options --> can be detected as follows:
@@ -31,6 +31,8 @@ _init() {
     result=$FAIL
     return
   fi
+
+  ifconfig $wifidev up
 
 	# Create wpa_supplicant.conf here if needed
 }
@@ -98,6 +100,19 @@ _result() {
 }
 
 #######################################
+# DeInit
+# Globals:
+#  device_list
+# Arguments:
+#######################################
+_deinit() {
+  echo "$0, deinit called" | print_log
+
+  killall iperf3
+  killall wpa_supplicant
+}
+
+#######################################
 # main
 # Globals:
 #  result
@@ -130,6 +145,8 @@ main() {
   	echo "PASSED  : $test_case" | print_log result
    	exit 0
   fi
+
+  _deinit
 }
 
 main

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./common.sh
+source ./common/common.sh
 
 test_case="test case name from excel"
 
@@ -26,9 +26,9 @@ _init() {
 	# devices = 0x0034 0x003c 9462/988x  11s
 	#           0x003e        6174       adhoc
 	#           0x0033        Doodle
-	find_wifi_device "pci" 0x168c "0x0034 0x003c 0x003e"
-	phyname=${device_list[0]}  # only first pci device is used here
-	wifidev="mesh0"
+  find_wifi_device "pci" 0x168c "0x0034 0x003c 0x003e"
+  phyname=${device_list[0]}  # only first pci device is used here
+  wifidev="mesh0"
   if ! iw phy $phyname interface add $wifidev type mp; then
     result=$FAIL
     return
@@ -50,13 +50,12 @@ _test() {
 
   # my_command executed and pass logs to logs/-folder
   ret=$?
-	if [ "$ret" != 0 ]; then
-	  result=$FAIL
-	  return
-	else
-	  result=$PASS
-	fi
-
+  if [ "$ret" != 0 ]; then
+    result=$FAIL
+    return
+  else
+    result=$PASS
+  fi
 }
 
 #######################################
@@ -73,11 +72,11 @@ _result() {
   # add here
 
 	#2 make decision ($PASS or $FAIL)
-	if [ 1 -gt 0 ]; then
-		result=$PASS
-	else
-	  result=$FAIL
-	fi
+  if [ 1 -gt 0 ]; then
+    result=$PASS
+  else
+    result=$FAIL
+  fi
 }
 
 #######################################
@@ -117,15 +116,15 @@ main() {
   _init "$ipaddress"
 
   if [ "$result" -eq "$FAIL" ]; then
-  	echo "FAILED  _init: $test_case" | print_log result
-  	exit 0
+    echo "FAILED  _init: $test_case" | print_log result
+   exit 0
   fi
 
   _test
 
   if [ "$result" -eq "$FAIL" ]; then
-  	echo "FAILED  _test: $test_case" | print_log result
-  	exit 0
+    echo "FAILED  _test: $test_case" | print_log result
+    exit 0
   fi
 
   _result
@@ -134,7 +133,7 @@ main() {
    	echo "FAILED  : $test_case" | print_log result
    	exit 0
   else
-  	echo "PASSED  : $test_case" | print_log result
+    echo "PASSED  : $test_case" | print_log result
    	exit 0
   fi
 }
