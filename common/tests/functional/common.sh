@@ -5,6 +5,9 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+# trap ctrl-c and call ctrl_c()
+trap ctrl_c INT
+
 # Global constants
 readonly log_file="./functional_tests_debug.log"
 readonly results_file="./functional_tests_results.log"
@@ -20,6 +23,39 @@ wifidev=0           # Should be updated from test script
 device_list=0       # includes wifi phy list when find_wifi_device() is called
 channel_list=0      # includes supported wifi channels when update_channel_list() is called
 
+#######################################
+# ctrl-c trap
+# Globals:
+# Arguments:
+#######################################
+function ctrl_c() {
+  echo "** Trapped CTRL-C"
+  exit 0
+}
+
+#######################################
+# Set Batman OGM interval
+# Globals:
+# Arguments:
+#######################################
+set_batman_orig_interval() {
+  if ! batctl orig_interval $1; then
+    echo "Batman orig_interval setting failed!!"
+  fi
+}
+
+#######################################
+# Set Batman routing algorithm
+# Globals:
+# Arguments:
+#######################################
+ set_batman_routing_algo(){
+  if ! batctl ra $1; then
+    echo "Batman routing algo setting failed!!"
+    echo "Batman-adv Kernel configuration might not be correct."
+  fi
+
+ }
 #######################################
 # Add date prefix to line and write to log
 # Globals:
@@ -58,6 +94,7 @@ update_channel_list() {
 #  $1 = config file name
 #  $2 = frequency
 #  $3 = NONE/SAE
+#  $4 = country
 #######################################
 create_wpa_supplicant_config() {
   cat <<EOF > "$1"
@@ -65,7 +102,7 @@ ctrl_interface=DIR=/var/run/wpa_supplicant
 # use 'ap_scan=2' on all devices connected to the network
 # this is unnecessary if you only want the network to be created when no other networks..
 ap_scan=1
-country=AE
+country=$4
 p2p_disabled=1
 network={
   ssid="test_case_run"
