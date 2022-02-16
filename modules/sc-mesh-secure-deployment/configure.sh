@@ -95,8 +95,13 @@ fi
 
 echo '> Connecting to Access Point:'
 echo $ssid
-sudo wpa_supplicant -B -i $sta_if -c conf/ap.conf
-sudo dhclient -v $sta_if
+wpa_supplicant -B -i $sta_if -c conf/ap.conf
+execution_ctx=$(echo $HOSTNAME)
+if [ $execution_ctx = "br_hardened" ]; then
+    udhcpc -i $sta_if
+else
+    dhclient -v $sta_if
+fi
 }
 
 function ap_create {
