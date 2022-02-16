@@ -24,6 +24,15 @@ def get_interface(pattern):
         return pre[0]
 
 
+def get_mac(pattern):
+    for interf in netifaces.interfaces():
+        # TODO: what it if doesn't start with wlan???
+        if interf.startswith(pattern):
+            interface = interf
+            mac = netifaces.ifaddresses(interface)[netifaces.AF_LINK]
+            return mac[0]['addr']
+
+
 def update_password(password):
     '''
     Update the mesh_conf file with the password.
@@ -38,14 +47,15 @@ def update_password(password):
         yaml.dump(config, fp)
 
 
+def get_auth_role():
+    config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(mesh_file_name))
+    config['client']['auth_role']
+
+
 def get_password():
     config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(mesh_file_name))
     instances = config['server']['ubuntu']
-    if instances['key']:
-        password = instances['key']
-    else:
-        password = ''
-    return password
+    return instances['key'] or ''
 
 
 def create_mesh(ID):    # Get the mesh_com config
@@ -70,11 +80,13 @@ def create_mesh(ID):    # Get the mesh_com config
         cmd = "iw dev " + mesh_vif + " info | awk '/wiphy/ {printf \"phy\" $2}'"
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
         phy_name = proc.communicate()[0].decode('utf-8').strip()
+    mesh_ip = confs['ubuntu']['ip']
+    mesh_mac = get_mac(mesh_vif)
     # Create mesh service config
     Path("/etc/mesh_com").mkdir(parents=True, exist_ok=True)
     with open('/etc/mesh_com/mesh.conf', 'w') as mesh_config:
         mesh_config.write('MODE=mesh\n')
-        mesh_config.write('IP=' + confs['ubuntu']['ip'] + '\n')
+        mesh_config.write('IP=' + mesh_ip + '\n')
         mesh_config.write('MASK=255.255.255.0\n')
         mesh_config.write('MAC=' + config_mesh['ap_mac'] + '\n')
         mesh_config.write('KEY=' + config_mesh['key'] + '\n')
@@ -114,6 +126,7 @@ def create_mesh(ID):    # Get the mesh_com config
             subprocess.call('../../bash/conf-11s-mesh.sh ' + mesh_interface, shell=True)
         if confs['ubuntu']['type'] == 'ibss':
             subprocess.call('../../bash/conf-mesh.sh ' + mesh_interface, shell=True)
+    return mesh_ip, mesh_mac
 
 
 def create_password(WPA=False):
@@ -122,7 +135,6 @@ def create_password(WPA=False):
     '''
     if WPA:
         characters: str = string.ascii_letters + string.digits
-        return ''.join(random.choice(characters) for i in range(10))
     else: #WEP
         characters: str = string.digits
-        return ''.join(random.choice(characters) for i in range(10))
+    return ''.join(random.choice(characters) for i in range(10))
