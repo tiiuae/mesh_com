@@ -7,7 +7,7 @@ import netifaces
 from pathlib import Path
 
 
-mesh_file_name = '../../mesh_com.conf'  #maybe it's better to add the absolute path
+mesh_file_name = '../mesh_com.conf'  #maybe it's better to add the absolute path
 
 
 def get_interface(pattern):
@@ -49,7 +49,7 @@ def update_password(password):
 
 def get_auth_role():
     config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(mesh_file_name))
-    config['client']['auth_role']
+    return config['client']['auth_role']
 
 
 def get_password():

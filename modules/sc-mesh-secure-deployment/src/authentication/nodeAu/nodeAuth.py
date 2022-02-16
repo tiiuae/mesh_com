@@ -76,7 +76,7 @@ def clean_all():
     try:
         os.remove('../auth/dev.csv')
     except FileNotFoundError:
-        print('Nothing to clean')
+        print('Done')
     exit()
 
 
@@ -223,8 +223,16 @@ if __name__ == "__main__":
     decrypt_conf(myID)  # decrypt config provided by server
     my_key = get_my_key(my_fpr)
     print("I'm node " + str(myID))
-    candidate = wf.scan_wifi()  # scan wifi to authenticate with
-    if candidate:
+    auth_role = mesh.get_auth_role()
+    if auth_role == 'server':
+        print("I'm an authentication Server. Creating AP")
+        wf.create_ap(myID)  # create AuthAPnodeID for authentication
+        time.sleep(2)
+        print('1) server default')
+        client_key, addr = server_auth(myID)
+    else:  #Client role
+        time.sleep(7)
+        candidate = wf.scan_wifi()  # scan wifi to authenticate with
         print('AP available: ' + candidate)
         wf.connect_wifi(candidate)
         serverIP = ".".join(wf.get_ip_address("wlan0").split(".")[0:3]) + ".1"  # assuming we're connected ip will be .1
@@ -233,21 +241,17 @@ if __name__ == "__main__":
         print('3) get node key')
         client_key, addr = server_auth(myID)
         cli = True
-    else:  # no wifi available need to start mesh by itself
-        print('No AP available to connect with. Creating one')
-        wf.create_ap(myID)  # create AuthAPnodeID for authentication
-        time.sleep(2)
-        print('1) server default')
-        client_key, addr = server_auth(myID)
     level, client_fpr = authentication(client_key)
     if level >= 3:
         print('Authenticated, now send my pubkey')
         nodeID = get_id_from_frp(client_fpr[0])
-        info = {'ID': 'provServer', 'MAC': 'mac', 'IP': '0.0.0.0', 'PubKey_fpr': client_fpr[0], 'trust_level': level}
-        update_table(info)  # #update csv file
+        if not set_mesh:
+            print('creating mesh')
+            my_mesh_ip, my_mac_mesh = mesh.create_mesh(myID.split('node')[1])
+            set_mesh = True
         if not cli:  # initial server
             print('4) server key')
-            client(nodeID, addr[0], my_key)
+            client(nodeID, addr[0], my_key)  # send my public key
             password = mesh.get_password()
             if password == '':  # this means still not connected with anyone
                 password = mesh.create_password()  # create a password (only if no mesh exist)
@@ -256,21 +260,44 @@ if __name__ == "__main__":
             encrpt_pass = gpg.encrypt(password, client_fpr[0], armor=False).data
             print('encrypted pass: ' + str(encrpt_pass))
             try:
-                client(nodeID, addr[0], encrpt_pass)
+                time.sleep(2)
+                client(nodeID, addr[0], encrpt_pass)  # send mesh password
             except ConnectionRefusedError:
                 time.sleep(7)
                 client(nodeID, addr[0], encrpt_pass)
+            client_mesh_ip, _ = server_auth(myID)
+            print('Client Mesh IP: ' + str(client_mesh_ip))
+            try:
+                time.sleep(2)
+                client(nodeID, addr[0], my_mac_mesh.encode())  # send my mac
+            except ConnectionRefusedError:
+                time.sleep(7)
+                client(nodeID, addr[0], my_mac_mesh.encode())
+            client_mac, _ = server_auth(myID)
+            try:
+                client(nodeID, addr[0], my_mesh_ip.encode())  # send my mesh ip
+            except ConnectionRefusedError:
+                time.sleep(7)
+                client(nodeID, addr[0], my_mesh_ip.encode())
         else:  #client
             print('5) get password')
-            enc_pass, b = server_auth(myID)
+            enc_pass, _ = server_auth(myID)
             password = gpg.decrypt(enc_pass)
             print(password)
             mesh.update_password(str(password))  # update password in config file
-        if not set_mesh:
-            print('creating mesh')
-            mesh.create_mesh(myID.split('node')[1])
-            set_mesh = True
-
-''''
-TODO: verify how to send MAC as ack
-'''
+            try:
+                client(nodeID, addr[0], my_mesh_ip.encode())  # send my mesh ip
+            except ConnectionRefusedError:
+                time.sleep(7)
+                client(nodeID, addr[0], my_mesh_ip.encode())
+            client_mac, _ = server_auth(myID)
+            print('Client MAC: ' + str(client_mac))
+            try:
+                time.sleep(2)
+                client(nodeID, addr[0], my_mac_mesh.encode())  # send my mac
+            except ConnectionRefusedError:
+                time.sleep(7)
+                client(nodeID, addr[0], my_mac_mesh.encode())
+            client_mesh_ip, _ = server_auth(myID)
+        info = {'ID': 'provServer', 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(), 'PubKey_fpr': client_fpr[0], 'trust_level': level}
+        update_table(info)  # #update csv file

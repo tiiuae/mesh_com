@@ -56,6 +56,7 @@ def set_auth_role():
     file_name = '../../mesh_com.conf'
     config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(file_name))
     config['client']['auth_role'] = 'server'
+    print(config['client']['auth_role'])
     yaml = ruamel.yaml.YAML()
     yaml.indent(mapping=ind, sequence=ind, offset=bsi)
     with open('../../mesh_com.conf', 'w') as fp:
@@ -69,7 +70,8 @@ def update_table(info):
     Finally, it calls the transfer function.
     '''
     table = create_table()
-    if table.empty : # first node to be added, then it will be server.
+    print(table)
+    if len(table) == 1:  # first node to be added, then it will be server. == 1 means that provserver is there
         set_auth_role()
     if info['ID'] not in set(table['ID']):
         while info['IP'] in set(table['IP']):
