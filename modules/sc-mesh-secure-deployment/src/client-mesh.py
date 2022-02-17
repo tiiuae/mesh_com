@@ -41,7 +41,6 @@ args = ap.parse_args()
 URL = args.server
 print('> Connecting to server: ' + str(URL))
 
-
 def get_os():
     proc = subprocess.Popen(['lsb_release', '-a'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
@@ -49,6 +48,16 @@ def get_os():
         aux = element.decode('utf-8')
         if 'Ubuntu' in aux:
             os = aux
+    return os
+
+def is_sec_os():
+    os = ""
+    execution_ctx = osh.environ.get('EXECUTION_CTX')
+    if execution_ctx=="docker":
+        if osh.environ.get('HOSTNAME')=="br_hardened":
+            os = "secos"
+        else:
+            os = get_os()
     return os
 
 def get_data(cert_file, os):
@@ -66,7 +75,7 @@ def get_data(cert_file, os):
 
 
 def decrypt_response():  # assuming that data is on a file called payload.enc generated on the function get_data
-    proc = subprocess.Popen(['src/ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(['ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
     aux_list = [element.decode() for element in out.split()]
     # print(aux_list)
@@ -97,7 +106,7 @@ def verify_certificate(old, new):
     for this we need to use x509 certificates.
 
     """
-    proc = subprocess.Popen(['src/ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(['ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
     old = [element.decode() for element in out.split()]
     local_cert = old[:39]
@@ -141,8 +150,8 @@ def create_config_ubuntu(response):
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
         phy_name = proc.communicate()[0].decode('utf-8').strip()
     # Create mesh service config
-    Path("/etc/mesh_com").mkdir(parents=True, exist_ok=True)
-    with open('/etc/mesh_com/mesh.conf', 'w') as mesh_config:
+    Path("/opt/mesh_com").mkdir(parents=True, exist_ok=True)
+    with open('/opt/mesh.conf', 'w') as mesh_config:
         mesh_config.write('MODE=mesh\n')
         mesh_config.write('IP=' + address + '\n')
         mesh_config.write('MASK=255.255.255.0\n')
@@ -158,7 +167,7 @@ def create_config_ubuntu(response):
     if res['gateway'] and conf['gw_service']:
         print("============================================")
         gw_inf = get_interface(conf['gw_inf'])
-        ubuntu_gw(gw_inf)
+        #ubuntu_gw(gw_inf)
     elif conf['dflt_service']:
         # We aren't a gateway node, set up the default route (to gw) service
         prefix = address.split('.')[:-1]
@@ -192,7 +201,9 @@ def create_config_ubuntu(response):
 
 
 if __name__ == "__main__":
-    os = get_os()
+    os = is_sec_os()
+    if not os:
+        os = get_os()
     local_cert = args.certificate
     get_data(local_cert, os)
     res, server_cert = decrypt_response()
@@ -200,7 +211,7 @@ if __name__ == "__main__":
         print(colored('> Valid Server Certificate', 'green'))
         mac = get_mac_address(interface=get_interface(conf['mesh_inf']))
         response = requests.post(URL + '/mac/' + mac)
-        if os == 'Ubuntu':
+        if os == 'Ubuntu' or 'secos':
             create_config_ubuntu(res)
     else:
         print(colored("Not Valid Server Certificate", 'red'))

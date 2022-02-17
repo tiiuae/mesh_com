@@ -4,7 +4,8 @@ from flask import Flask, request, json
 from getmac import get_mac_address
 import subprocess
 import netifaces
-import pandas as pd
+#Enable pandas after availablity of _bz2 shared lib
+#import pandas as pd
 import yaml
 import json
 import argparse
@@ -63,7 +64,7 @@ def add_message(uuid):
             print('> Unencrypted message: ', end='')
             print(msg_json)
         # Encrypt message use .call() to block and avoid race condition with open()
-        proc = subprocess.call(['src/ecies_encrypt',
+        proc = subprocess.call(['ecies_encrypt',
                                 SERVER_CERT, msg_json],
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         enc = open('payload.enc', 'rb')
