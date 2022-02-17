@@ -88,13 +88,18 @@ _result() {
   echo -e "# ping result:\n$ping_result" | print_log result
   ping_avg=$(echo "$ping_result" | grep -e rtt -e round-trip | cut -d ' ' -f 4 | cut -d '/' -f 2)
 
-  # compare requested CC to set CC
-  iw_reg_country=$(iw phy $phyname reg get | grep global -A1 | awk 'END{print $2}')
-  iw_reg_country=${iw_reg_country::-1}
-  echo -e "# Regulatory check:\nRequested=${1^^} and iw reg get=$iw_reg_country" | print_log result
-  if [ "$iw_reg_country" != "${1^^}" ]; then
-    result=$FAIL
-    echo "FAILED  : Regulatory setting failed" | print_log result
+  # with skip-setup phyname is unknown as _init() is not executed
+  if [ "$net_setup" = "skip" ]; then
+    echo "SKIPPED   : Regulatory setting test skipped as no _init()" | print_log result
+  else
+    # compare requested CC to set CC
+    iw_reg_country=$(iw phy $phyname reg get | grep global -A1 | awk 'END{print $2}')
+    iw_reg_country=${iw_reg_country::-1}
+    echo -e "# Regulatory check:\nRequested=${1^^} and iw reg get=$iw_reg_country" | print_log result
+    if [ "$iw_reg_country" != "${1^^}" ]; then
+      result=$FAIL
+      echo "FAILED  : Regulatory setting failed" | print_log result
+    fi
   fi
 
 	#2 make decision ($PASS or $FAIL)
@@ -162,7 +167,7 @@ main() {
         -i ipaddress    IP address to be used for node
         -e encryption   SAE or NONE
         -f frequency    Wi-Fi frequency in MHz
-        -c country      2-letter country code e.g. fi, ae, us..
+        -c country      2-letter country code e.g. fi, ae, us..  (default:fi)
         -m mode         server or client.
                         server = test node which provides iperf3
                         client = test node which runs iperf3/ping tests against server
@@ -208,7 +213,9 @@ main() {
     "mesh_vlan")
     _init_vlan "$ipaddress" "$encryption" "$frequency" "$country" "$orig_interval" "$routing_algo"
     ;;
-    "skip")
+    "skip") # some other service is taking care of network setup
+    killall iperf3 2>/dev/null
+    iperf3 -s -D -p "$iperf3_port" --forceflush
     ;;
     *)
     echo "Network Setup option: $net_setup not implemented" | print_log

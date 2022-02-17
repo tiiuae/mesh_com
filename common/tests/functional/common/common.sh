@@ -11,7 +11,7 @@ trap ctrl_c INT
 # Global constants
 readonly log_file="./functional_tests_debug.log"
 readonly results_file="./functional_tests_results.log"
-readonly NEEDED_EXECUTABLES="wpa_supplicant iw iwlist iperf3 ping uniq grep ip ifconfig batctl bc"
+readonly NEEDED_EXECUTABLES="wpa_supplicant iw iwlist iperf3 ping uniq grep ip ifconfig batctl bc brctl iptables"
 readonly iperf3_port="30001" # constant port number used for iperf3
 readonly PASS=1     # constant for PASS value
 readonly FAIL=0     # constant for FAIL value
@@ -211,7 +211,7 @@ wait_ip(){
 main() {
   echo "Common checks before tests.." | print_log
   for e in $NEEDED_EXECUTABLES; do
-    if [ ! $(which "$e") ]; then
+    if ! command -v "$e"; then
       echo FAIL: missing "$e" | print_log
       exit
     fi

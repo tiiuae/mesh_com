@@ -39,7 +39,7 @@ _init() {
 
   batctl if add "$wifidev"
   set_batman_routing_algo "$6"
-  batctl -m bat0 interface destroy  # needed for possible algo selection
+  batctl bat0 interface destroy  # needed for possible algo selection
   batctl if add "$wifidev"
   set_batman_orig_interval "$5"
   ifconfig bat0 up
@@ -118,7 +118,7 @@ _init_vlan() {
 
   batctl if add "$wifidev"
   set_batman_routing_algo "$6"
-  batctl -m bat0 interface destroy  # needed for possible algo selection
+  batctl bat0 interface destroy  # needed for possible algo selection
   batctl if add "$wifidev"
   set_batman_orig_interval "$5"
   ifconfig bat0 up
