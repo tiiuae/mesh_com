@@ -36,11 +36,14 @@ _init() {
 
   ifconfig "$wifidev" mtu 1560
   ip link set "$wifidev" up
+
+  batctl if add "$wifidev"
+  set_batman_routing_algo "$6"
+  batctl -m bat0 interface destroy  # needed for possible algo selection
   batctl if add "$wifidev"
   set_batman_orig_interval "$5"
-  set_batman_routing_algo "$6"
-
   ifconfig bat0 up
+
   # Create static mac addr for Batman if
   mac_eth0="$(ip -brief link | grep "$wifidev" | awk '{print $3; exit}')"
   mac_bat0="00:00:$(echo "$mac_eth0" | cut -b 7-17)"
@@ -112,9 +115,12 @@ _init_vlan() {
 
   ifconfig "$wifidev" mtu 1560
   ip link set "$wifidev" up
+
+  batctl if add "$wifidev"
+  set_batman_routing_algo "$6"
+  batctl -m bat0 interface destroy  # needed for possible algo selection
   batctl if add "$wifidev"
   set_batman_orig_interval "$5"
-  set_batman_routing_algo "$6"
   ifconfig bat0 up
   ifconfig bat0 mtu 1460
 

@@ -89,7 +89,7 @@ _result() {
   ping_avg=$(echo "$ping_result" | grep -e rtt -e round-trip | cut -d ' ' -f 4 | cut -d '/' -f 2)
 
   # compare requested CC to set CC
-  iw_reg_country=$(iw phy phy3 reg get | grep global -A1 | awk 'END{print $2}')
+  iw_reg_country=$(iw phy $phyname reg get | grep global -A1 | awk 'END{print $2}')
   iw_reg_country=${iw_reg_country::-1}
   echo -e "# Regulatory check:\nRequested=${1^^} and iw reg get=$iw_reg_country" | print_log result
   if [ "$iw_reg_country" != "${1^^}" ]; then
@@ -230,16 +230,20 @@ main() {
 
     _result "$country"
 
-    mesh_hop=$(("${server_ipaddress##*.}"-"${ipaddress##*.}"))
+    if [ "$net_setup" = "mesh_vlan" ]; then
+      mesh_hop=$(("${server_ipaddress##*.}"-"${ipaddress##*.}"))
+      echo "Hop count: ${mesh_hop#-}" | print_log result
+    fi
+
     if [ "$result" -eq "$FAIL" ]; then
-      echo "FAILED  : $test_case: ${mesh_hop#-}" | print_log result
+      echo "FAILED  : $test_case" | print_log result
       echo "        : " | print_log result
       echo "HOX!!   : Throughput/ping depends on distance and hop count. Even
         : test case is set as Failed, more analysis needed for the reason. e.g
         : if multihops were tested this can be a PASS." | print_log result
       exit 0
     else
-      echo "PASSED  : $test_case: ${mesh_hop#-}" | print_log result
+      echo "PASSED  : $test_case" | print_log result
       exit 0
     fi
   else
