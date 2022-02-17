@@ -192,14 +192,14 @@ wait_ip(){
 
   echo -n "waiting for $1 ..."
   while [ "$server_wait" -eq 1 ]; do
-    if ping -c 1 -w 2 "$1" &> /dev/null; then
+    if ping -c 1 -W 2 "$1" &> /dev/null; then
       echo "$1 is online!"
       server_wait=0
     else
       echo -n "."
       ((timeout=timeout+2))
       if [ "$timeout" -gt 60 ]; then
-        echo "Timeout when waiting $1!"
+        echo "FAILED: Timeout when waiting $1!" | print_log result
         exit 0  # no reason to continue as target IP is not in network
       fi
     fi
@@ -219,5 +219,3 @@ main() {
 }
 
 main
-
-
