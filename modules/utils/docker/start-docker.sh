@@ -42,7 +42,11 @@ elif [ "$OS" == "Buildroot" ]; then
             mkdir -p /opt/container-data/mesh
         fi
         # change rootfs location once its mounted in dedicated partation
-        docker import - comms_vm < /rootfs.tar
+        if [ -f "/root/rootfs.tgz" ]; then
+            cat /root/rootfs.tgz | docker import - comms_vm
+        else
+            docker import - comms_vm < /rootfs.tar
+        fi
         docker run --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm /bin/bash
         #Add restart policy of the container if it stops or device rebooted
         docker update --restart unless-stopped comms_vm
