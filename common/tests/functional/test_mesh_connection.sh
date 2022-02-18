@@ -156,7 +156,12 @@ main() {
     esac
   done
 
-  if [ "$help_text" -eq 1 ] || \
+
+  if [ "$net_setup" = "skip" ] && \
+     [ "$ipaddress" != "255.255.255.255" ]; then
+    frequency="skip"
+    encryption="skip"
+  elif [ "$help_text" -eq 1 ] || \
      [ "$mode" = "NA" ] || \
      [ "$frequency" -eq 0 ] || \
      [ "$ipaddress" = "255.255.255.255" ] || \

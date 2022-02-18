@@ -176,6 +176,7 @@ find_wifi_device()
 #######################################
 exe() {
   echo + "$@"
+  # shellcheck disable=SC2068
   $@ | print_log
 }
 
@@ -211,7 +212,7 @@ wait_ip(){
 main() {
   echo "Common checks before tests.." | print_log
   for e in $NEEDED_EXECUTABLES; do
-    if ! command -v "$e"; then
+    if ! command -v "$e" >/dev/null; then
       echo FAIL: missing "$e" | print_log
       exit
     fi
