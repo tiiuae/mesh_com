@@ -27,7 +27,7 @@ _init() {
 	#           0x0033        Doodle
 	find_wifi_device "pci" 0x168c "0x0034 0x003c 0x003e"
 	phyname=${device_list[0]}  # only first pci device is used here
-	wifidev="mesh0"
+	wifidev="wlp1s0"
   if ! iw phy $phyname interface add $wifidev type mp; then
     result=$FAIL
     return
