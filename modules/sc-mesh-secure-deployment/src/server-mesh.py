@@ -12,11 +12,14 @@ import argparse
 from termcolor import colored
 import pathlib
 import hashlib
+import os
 
 # Get the mesh_com config
+print(os.getenv("MESH_COM_ROOT", ""))
+config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
 print('> Loading yaml conf... ')
 try:
-    yaml_conf = yaml.safe_load(open('src/mesh_com.conf', 'r'))
+    yaml_conf = yaml.safe_load(open(config_path, 'r'))
     conf = yaml_conf['server']
     debug = yaml_conf['debug']
 except (IOError, yaml.YAMLError) as error:

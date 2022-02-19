@@ -150,8 +150,8 @@ def create_config_ubuntu(response):
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
         phy_name = proc.communicate()[0].decode('utf-8').strip()
     # Create mesh service config
-    Path("/opt/mesh_com").mkdir(parents=True, exist_ok=True)
-    with open('/opt/mesh.conf', 'w') as mesh_config:
+    Path("/etc/mesh_com").mkdir(parents=True, exist_ok=True)
+    with open('/etc/mesh_com/mesh.conf', 'w') as mesh_config:
         mesh_config.write('MODE=mesh\n')
         mesh_config.write('IP=' + address + '\n')
         mesh_config.write('MASK=255.255.255.0\n')
