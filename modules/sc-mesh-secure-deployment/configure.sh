@@ -312,7 +312,7 @@ function client {
     echo '> Fetching certificate from server...'
     read -p "- Server Username: " server_user
     # pull the key from the server
-    scp $server_user@$server_ip:/opt/mesh_com/modules/sc-mesh-secure-deployment/src/ecc_key.der $MESH_COM_ROOT$KEY_PATH
+    scp $server_user@$server_ip:/opt/container-data/mesh/mesh_com/modules/sc-mesh-secure-deployment/src/ecc_key.der $MESH_COM_ROOT$KEY_PATH
   fi
 
   echo '> Configuring the client and connecting to server...'
