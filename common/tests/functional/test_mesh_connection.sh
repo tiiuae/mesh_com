@@ -179,7 +179,7 @@ main() {
         -s address      server address to be used for test connection.
 
         -n net_setup    mesh      = normal Batman mesh node (default)
-                        mesh+ap   = Batman mesh node + Access-point in same channel (not implemented)
+                        mesh_ap   = Batman mesh node + Access-point in same channel (not implemented)
                         mesh_vlan = Batman mesh node using VLAN (easy chain setup)
                         skip      = skip network setup and just execute tests
 
@@ -217,6 +217,9 @@ main() {
     ;;
     "mesh_vlan")
     _init_vlan "$ipaddress" "$encryption" "$frequency" "$country" "$orig_interval" "$routing_algo"
+    ;;
+    "mesh_ap")
+    _init_mesh_ap "$ipaddress" "$encryption" "$frequency" "$country" "$orig_interval" "$routing_algo"
     ;;
     "skip") # some other service is taking care of network setup
     killall iperf3 2>/dev/null

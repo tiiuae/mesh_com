@@ -122,6 +122,48 @@ EOF
 }
 
 #######################################
+# Create hostapd configuration
+# Globals:
+#  retval_channel, retval_band
+# Arguments:
+#  $1 = config file name
+#  $2 = frequency
+#  $3 = NONE/SAE
+#  $4 = country
+#  $5 = interface
+#  $6 = ssid
+#######################################
+create_hostapd_config() {
+  # Calculate frequency band and channel from given frequency
+  calculate_wifi_channel "$2"
+
+  cat <<EOF > "$1"
+ctrl_interface=/var/run/hostapd
+interface=$5
+hw_mode=$retval_band
+channel=$retval_channel
+ieee80211h=1
+ieee80211d=1
+ieee80211w=1
+country_code=$4
+ssid=$6
+auth_algs=1
+wpa=2
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+wpa_passphrase=1234567899
+wmm_enabled=1
+beacon_int=100
+### IEEE 802.11n
+ieee80211n=1
+ht_capab=[HT40+][LDPC][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1][DSSS_CCK-40]
+### IEEE 802.11ac
+#ieee80211ac=1
+#vht_capab=[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]
+EOF
+}
+
+#######################################
 # Find wifi device
 # Globals:
 # Arguments:
@@ -150,7 +192,9 @@ find_wifi_device()
             retval_phy=$phy
             retval_name=$(ls /sys/class/ieee80211/"$phy"/device/net/ 2>/dev/null)
             if [ "$retval_name" != "" ]; then
-              iw dev "$retval_name" del
+               for val in $retval_name; do
+                 iw dev "$val" del
+               done
             fi
 
             # add "phy,name" pair to device_list (space as separator for pairs)
@@ -166,6 +210,27 @@ find_wifi_device()
       device_list=""
       ;;
   esac
+}
+
+#######################################
+# Calculate wifi channel and frequency band
+# Globals: retval_channel, retval_band
+# Arguments:
+#  $1 = frequency
+#######################################
+calculate_wifi_channel()
+{
+  # Calculate 2.4/5GHz frequency band and channel number
+  if [ "$1" -ge  "5160" ] && [ "$1" -le  "5885" ]; then
+      retval_band="a"
+      retval_channel=$((("$1"-5000)/5))
+  elif [ "$1" -ge  "2412" ] && [ "$1" -le  "2472" ]; then
+      retval_band="g"
+      retval_channel=$((("$1"-2407)/5))
+  else
+      echo "ERROR! frequency out of range!"
+      exit 1
+  fi
 }
 
 #######################################
