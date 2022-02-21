@@ -92,8 +92,8 @@ _result() {
 _deinit() {
   echo "$0, deinit called" | print_log
 
-  killall iperf3
-  killall wpa_supplicant
+  killall iperf3 2>/dev/null
+  killall wpa_supplicant 2>/dev/null
 }
 
 #######################################
