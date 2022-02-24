@@ -1,82 +1,12 @@
 #!/bin/bash
 
-source ./common/common.sh
+source ./common/common.sh   # common tools
+source ./common/init.sh     # network init
+source ./common/deinit.sh   # network de-init
 
 test_case="Mesh connection and Iperf/ping-N hop"
 
 description="Able to connect and ping in N hop topology."
-
-#######################################
-# Init
-# Globals:
-#  result
-#  device_list
-# Arguments:
-#  $1 = ipaddress
-#  $2 = encryption
-#  $3 = frequency
-#  $4 = country
-#  $5 = Batman orig_interval
-#  $6 = Batman routing algo
-#######################################
-_init() {
-  _deinit
-  echo "$0, init called" | print_log
-
-	# detect_wifi
-	# multiple wifi options --> can be detected as follows:
-	# manufacturer 0x168c = Qualcomm
-	# devices = 0x0034 0x003c 9462/988x  11s
-	#           0x003e        6174       adhoc
-	#           0x0033        Doodle
-  find_wifi_device "pci" 0x168c "0x0034 0x003c 0x003e 0x0033"
-  phyname=${device_list[0]}  # only first pci device is used here
-  wifidev="mesh0"
-  if ! iw phy $phyname interface add $wifidev type mp; then
-    result=$FAIL
-    return
-  fi
-
-  # setup iperf3 server
-  iperf3 -s -p "$iperf3_port"&
-
-  ifconfig "$wifidev" mtu 1560
-  ip link set "$wifidev" up
-  batctl if add "$wifidev"
-  set_batman_orig_interval "$5"
-  set_batman_routing_algo "$6"
-  ifconfig bat0 up
-  ifconfig bat0 "$1" netmask 255.255.255.0
-  ifconfig bat0 mtu 1460
-
-  conf_filename="./tmp/wpa_supplicant_11s_$3_$2.conf"
-  log_filename="./logs/wpa_supplicant_11s_$3_$2.log"
-
-  # Create wpa_supplicant.conf here
-  create_wpa_supplicant_config "$conf_filename" "$3" "$2" "$4"
-
-  # start wpa_supplicant
-  wpa_supplicant -Dnl80211 -B -i"$wifidev" -C /var/run/wpa_supplicant/ -c "$conf_filename" -f "$log_filename"
-  sleep 5
-  iw dev "$wifidev" set mesh_param mesh_fwding 0
-  iw dev "$wifidev" set mesh_param mesh_ttl 1
-
-  sleep 5
-  wifi_type=$(iw dev mesh0 info | grep type)
-  echo "$wifi_type mode" | print_log
-  case $wifi_type in
-    *"managed"*)
-    result=$FAIL
-    ;;
-    *"mesh"*)
-    result=$PASS
-    ;;
-    *)
-    result=$FAIL
-    return
-    ;;
-  esac
-}
 
 #######################################
 # Test
@@ -126,13 +56,14 @@ _test() {
 # Globals:
 #  result
 # Arguments:
+#  $1 = requested country code
 #######################################
 _result() {
   echo "$0, result called" | print_log
 
-  sub_result=$PASS
-
   #1 analyse logs from logs/ - folder
+
+  # analyse TCP log file
   if ! grep "connection refused" logs/tcp.log; then
     tcp_result=$(grep sender -B1 logs/tcp.log)
     echo -e "# TCP result:\n$tcp_result" | print_log result
@@ -142,6 +73,7 @@ _result() {
     tcp_avg="0"
   fi
 
+  # analyse UDP log file
   if ! grep "connection refused" logs/udp.log; then
     udp_result=$(grep sender -B1 logs/udp.log)
     echo -e "# UDP result:\n$udp_result" | print_log result
@@ -151,47 +83,41 @@ _result() {
     udp_avg="0"
   fi
 
+  # analyse ping results
   ping_result=$(grep -e rtt -e round-trip -B1 logs/ping.log)
   echo -e "# ping result:\n$ping_result" | print_log result
   ping_avg=$(echo "$ping_result" | grep -e rtt -e round-trip | cut -d ' ' -f 4 | cut -d '/' -f 2)
 
-	#2 make decision ($PASS or $FAIL)
-
-  # ping limit 3.0milliseconds
-  if (( $(echo "$ping_avg < 3.0" |bc -l) )); then
-    result=$PASS
+  # with skip-setup phyname is unknown as _init() is not executed
+  if [ "$net_setup" = "skip" ]; then
+    echo "SKIPPED   : Regulatory setting test skipped as no _init()" | print_log result
   else
-    sub_result=$FAIL
+    # compare requested CC to set CC
+    iw_reg_country=$(iw phy $phyname reg get | grep global -A1 | awk 'END{print $2}')
+    iw_reg_country=${iw_reg_country::-1}
+    echo -e "# Regulatory check:\nRequested=${1^^} and iw reg get=$iw_reg_country" | print_log result
+    if [ "$iw_reg_country" != "${1^^}" ]; then
+      result=$FAIL
+      echo "FAILED  : Regulatory setting failed" | print_log result
+    fi
+  fi
+
+	#2 make decision ($PASS or $FAIL)
+  # ping limit 3.0milliseconds
+  if (( $(echo "$ping_avg > 3.0" |bc -l) )); then
+    result=$FAIL
     echo "FAILED  : in ping test" | print_log result
   fi
 
-  if (( $(echo "$tcp_avg > 75.0" |bc -l) )); then
-    result=$PASS
-  else
-    sub_result=$FAIL
+  if (( $(echo "$tcp_avg < 75.0" |bc -l) )); then
+    result=$FAIL
     echo "FAILED  : in tcp test" | print_log result
   fi
 
-  if (( $(echo "$udp_avg > 75.0" |bc -l) )); then
-    result=$PASS
-  else
-    sub_result=$FAIL
+  if (( $(echo "$udp_avg < 75.0" |bc -l) )); then
+    result=$FAIL
     echo "FAILED  : in udp test" | print_log result
   fi
-  result=$sub_result
-}
-
-#######################################
-# DeInit
-# Globals:
-#  device_list
-# Arguments:
-#######################################
-_deinit() {
-  echo "$0, deinit called" | print_log
-
-  killall iperf3
-  killall wpa_supplicant
 }
 
 #######################################
@@ -211,8 +137,9 @@ main() {
   ipaddress="255.255.255.255"
   server_ipaddress="255.255.255.255"
   mode="NA"
+  net_setup="mesh"
 
-  while getopts ":m:s:r:o:c:e:f:i:h" flag
+  while getopts ":m:s:r:n:o:c:e:f:i:h" flag
   do
     case "${flag}" in
       e) encryption=${OPTARG};;
@@ -223,12 +150,18 @@ main() {
       m) mode=${OPTARG};;
       r) routing_algo=${OPTARG};;
       o) orig_interval=${OPTARG};;
+      n) net_setup=${OPTARG};;
       h) help_text=1;;
       *) help_text=1;;
     esac
   done
 
-  if [ "$help_text" -eq 1 ] || \
+
+  if [ "$net_setup" = "skip" ] && \
+     [ "$ipaddress" != "255.255.255.255" ]; then
+    frequency="skip"
+    encryption="skip"
+  elif [ "$help_text" -eq 1 ] || \
      [ "$mode" = "NA" ] || \
      [ "$frequency" -eq 0 ] || \
      [ "$ipaddress" = "255.255.255.255" ] || \
@@ -239,11 +172,16 @@ main() {
         -i ipaddress    IP address to be used for node
         -e encryption   SAE or NONE
         -f frequency    Wi-Fi frequency in MHz
-        -c country      2-letter country code e.g. fi, ae, us..
+        -c country      2-letter country code e.g. fi, ae, us..  (default:fi)
         -m mode         server or client.
                         server = test node which provides iperf3
                         client = test node which runs iperf3/ping tests against server
         -s address      server address to be used for test connection.
+
+        -n net_setup    mesh      = normal Batman mesh node (default)
+                        mesh_ap   = Batman mesh node + Access-point in same channel (not implemented)
+                        mesh_vlan = Batman mesh node using VLAN (easy chain setup)
+                        skip      = skip network setup and just execute tests
 
         Optional Batman-adv tweaks:
         -o orig_int     OGM (orig) interval tuning in milliseconds (default:1000)
@@ -258,13 +196,14 @@ main() {
 
   echo "### Test Case: $test_case" | print_log result
   echo "### Test Description: $description" | print_log result
-  echo "### Test Settings: | print_log result
+  echo "### Test Settings:
         Node IP address:          $ipaddress
         Iperf3 port:              $iperf3_port
         Encryption:               $encryption
         Wifi Frequency:           $frequency
         Wifi Country Regulatory:  $country
         mode:                     $mode
+        Network Setup:            $net_setup
         Batman orig_interval:     $orig_interval
         Batman routing algorithm: $routing_algo" | print_log result
 
@@ -272,7 +211,24 @@ main() {
     echo "        Server IP address:        $server_ipaddress" | print_log result
   fi
 
-  _init "$ipaddress" "$encryption" "$frequency" "$country" "$orig_interval" "$routing_algo"
+  case $net_setup in
+    "mesh")
+    _init "$ipaddress" "$encryption" "$frequency" "$country" "$orig_interval" "$routing_algo"
+    ;;
+    "mesh_vlan")
+    _init_vlan "$ipaddress" "$encryption" "$frequency" "$country" "$orig_interval" "$routing_algo"
+    ;;
+    "mesh_ap")
+    _init_mesh_ap "$ipaddress" "$encryption" "$frequency" "$country" "$orig_interval" "$routing_algo"
+    ;;
+    "skip") # some other service is taking care of network setup
+    killall iperf3 2>/dev/null
+    iperf3 -s -D -p "$iperf3_port" --forceflush
+    ;;
+    *)
+    echo "Network Setup option: $net_setup not implemented" | print_log
+    ;;
+  esac
 
   if [ "$result" -eq "$FAIL" ]; then
     echo "FAILED  _init: $test_case" | print_log result
@@ -287,7 +243,12 @@ main() {
       exit 0
     fi
 
-    _result
+    _result "$country"
+
+    if [ "$net_setup" = "mesh_vlan" ]; then
+      mesh_hop=$(("${server_ipaddress##*.}"-"${ipaddress##*.}"))
+      echo "Hop count: ${mesh_hop#-}" | print_log result
+    fi
 
     if [ "$result" -eq "$FAIL" ]; then
       echo "FAILED  : $test_case" | print_log result

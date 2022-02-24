@@ -1,6 +1,8 @@
 #!/bin/bash
 
-source ./common/common.sh
+source ./common/common.sh   # common tools
+# source ./common/init.sh     # network init
+# source ./common/deinit.sh   # network de-init
 
 test_case="test case name from excel"
 
@@ -106,7 +108,7 @@ main() {
 
         For Example: sudo $0 -i 192.168.1.2
 
-        -H              Help"
+        -h              Help"
         return
   fi
 
