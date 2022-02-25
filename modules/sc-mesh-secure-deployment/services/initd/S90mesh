@@ -11,10 +11,10 @@
 ### END INIT INFO
 
 DAEMON="mesh-ibss.sh"
-DIR="/usr/sbin/"
+DIR="/opt/"
 PIDFILE="/var/run/$DAEMON.pid"
-LOG_FILE=/var/log/mesh.log
-source /etc/mesh_com/mesh.conf
+LOG_FILE=/opt/mesh.log
+source /opt/mesh.conf
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
 MYMESH_ARGS="${MODE} ${IP} ${MASK} ${MAC} ${KEY} ${ESSID} ${FREQ} ${TXPOWER} ${COUNTRY} ${MESH_VIF} ${PHY}"

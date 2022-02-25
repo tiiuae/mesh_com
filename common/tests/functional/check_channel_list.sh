@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./common.sh
+source ./common/common.sh
 
 test_case="check available channels in 2.4/5GHZ"
 
@@ -17,7 +17,7 @@ used_channels="2412 2417 2422 2427 2432 2437 2442 2447 2452 2457 2462 5180 5200 
 # Arguments:
 #######################################
 _init() {
-
+  _deinit
   echo "$0, init called" | print_log
 	# detect_wifi
 	# multiple wifi options --> can be detected as follows:
@@ -27,7 +27,7 @@ _init() {
 	#           0x0033        Doodle
 	find_wifi_device "pci" 0x168c "0x0034 0x003c 0x003e"
 	phyname=${device_list[0]}  # only first pci device is used here
-	wifidev="mesh0"
+	wifidev="wlp1s0"
   if ! iw phy $phyname interface add $wifidev type mp; then
     result=$FAIL
     return
@@ -84,6 +84,19 @@ _result() {
 }
 
 #######################################
+# DeInit
+# Globals:
+#  device_list
+# Arguments:
+#######################################
+_deinit() {
+  echo "$0, deinit called" | print_log
+
+  killall iperf3 2>/dev/null
+  killall wpa_supplicant 2>/dev/null
+}
+
+#######################################
 # main
 # Globals:
 #  result
@@ -116,6 +129,8 @@ main() {
   	echo "PASSED  : $test_case" | print_log result
    	exit 0
   fi
+
+  _deinit
 }
 
 main
