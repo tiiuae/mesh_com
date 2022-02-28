@@ -45,6 +45,7 @@ def add_message(uuid):
     key = request.files['key']
     receivedKey = key.read()
     localCert = open(SERVER_CERT, 'rb')
+    f = open("testclient.txt", "w")
     # Do we need the ubuntu or openwrt setup?
     aux = conf[str(uuid).lower()]
     # Requester a new IP
@@ -54,6 +55,8 @@ def add_message(uuid):
     mac = get_mac_address(ip=ip_address)
     if verify_certificate(localCert, receivedKey):
         print(colored('> Valid Client Certificate', 'green'))
+        f.write("True")
+        f.close()
         ip_mesh = verify_addr(ip_address)
         print('> Assigned mesh IP: ' + ip_mesh)
         if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
@@ -79,6 +82,8 @@ def add_message(uuid):
     else:
         NOT_AUTH[mac] = ip_address
         print(colored("Not Valid Client Certificate", 'red'))
+         f.write("Flase")
+        f.close()
         return 'Not Valid Certificate'
 
 
