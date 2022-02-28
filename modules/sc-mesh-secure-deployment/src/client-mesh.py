@@ -7,7 +7,7 @@ import subprocess
 import time
 import hashlib
 import re
-import os as osh
+import os
 import netifaces
 from getmac import get_mac_address
 import requests
