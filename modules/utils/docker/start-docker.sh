@@ -32,7 +32,8 @@ if [ "$OS" == "Ubuntu" ]; then
     docker run -it --privileged --net="host" --rm comms_vm /bin/bash
 elif [ "$OS" == "Buildroot" ]; then
     if [ "$docker_exec_env" == "sec_os" ]; then
-        if [ ! -f "/opt/container-data/mesh" ]; then
+        if [ ! -d "/opt/container-data/mesh" ]; then
+            echo "create persist mesh container data partation"
             # create persist mesh container data partation
             # data/container-data/mesh
             # ├── state.json
@@ -40,9 +41,11 @@ elif [ "$OS" == "Buildroot" ]; then
             # └── wpa_supplicant_sta.conf
             # └── wpa_supplicant_ap.conf
             mkdir -p /opt/container-data/mesh
+            mv /opt/mesh_com-main /opt/container-data/mesh/
         fi
         # change rootfs location once its mounted in dedicated partation
         if [ -f "/root/rootfs.tgz" ]; then
+            echo "import rootfs.tgz commms vm"
             cat /root/rootfs.tgz | docker import - comms_vm
         else
             docker import - comms_vm < /rootfs.tar
