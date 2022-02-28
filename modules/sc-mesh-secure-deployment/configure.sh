@@ -96,6 +96,7 @@ fi
 echo '> Connecting to Access Point:'
 echo $ssid
 wpa_supplicant -B -i $sta_if -c conf/ap.conf
+sleep 2
 execution_ctx=$(echo $HOSTNAME)
 if [ $execution_ctx = "br_hardened" ]; then
     udhcpc -i $sta_if

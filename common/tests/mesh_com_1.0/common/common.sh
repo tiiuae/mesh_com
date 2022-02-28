@@ -54,3 +54,9 @@ start_mesh_server()
   source ./$MESH_COM_ROOTDIR/modules/sc-mesh-secure-deployment/configure.sh -s & 2>&1 |& tee logs/"$0".log
 }
 
+start_mesh_client()
+{
+  source ./$MESH_COM_ROOTDIR/modules/sc-mesh-secure-deployment/configure.sh -c & 2>&1 |& tee logs/"$0".log
+}
+
+
