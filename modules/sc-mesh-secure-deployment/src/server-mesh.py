@@ -82,7 +82,7 @@ def add_message(uuid):
     else:
         NOT_AUTH[mac] = ip_address
         print(colored("Not Valid Client Certificate", 'red'))
-         f.write("Flase")
+        f.write("Flase")
         f.close()
         return 'Not Valid Certificate'
 
