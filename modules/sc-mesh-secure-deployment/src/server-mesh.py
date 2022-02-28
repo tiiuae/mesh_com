@@ -45,7 +45,7 @@ def add_message(uuid):
     key = request.files['key']
     receivedKey = key.read()
     localCert = open(SERVER_CERT, 'rb')
-    f = open("testclient.txt", "w")
+    f = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient.txt", "w")
     # Do we need the ubuntu or openwrt setup?
     aux = conf[str(uuid).lower()]
     # Requester a new IP

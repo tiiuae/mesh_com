@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import argparse
 import json
@@ -7,7 +7,8 @@ import subprocess
 import time
 import hashlib
 import re
-import os
+import os as osh
+from os import getenv
 import netifaces
 from getmac import get_mac_address
 import requests
@@ -16,8 +17,9 @@ from pathlib import Path
 
 
 # Get the mesh_com config
-print(os.getenv("MESH_COM_ROOT", ""))
-config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
+print("THIS IS THE STEP!!!")
+print(getenv("MESH_COM_ROOT", ""))
+config_path=osh.path.join(getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
 print('> Loading yaml conf... ')
 try:
     yaml_conf = yaml.safe_load(open(config_path, 'r'))
@@ -54,9 +56,9 @@ def get_os():
 
 def is_sec_os():
     os = ""
-    execution_ctx = os.environ.get('EXECUTION_CTX')
+    execution_ctx = osh.environ.get('EXECUTION_CTX')
     if execution_ctx=="docker":
-        if os.environ.get('HOSTNAME')=="br_hardened":
+        if osh.environ.get('HOSTNAME')=="br_hardened":
             os = "secos"
         else:
             os = get_os()
@@ -182,7 +184,7 @@ def create_config_ubuntu(response):
         nodeId = int(res['addr'].split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
         subprocess.call('hostname node' + str(nodeId), shell=True)
         subprocess.call('echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts', shell=True)
-    execution_ctx = os.environ.get('EXECUTION_CTX')
+    execution_ctx = osh.environ.get('EXECUTION_CTX')
     print("EXECUTION CTX:")
     print(execution_ctx)
     if execution_ctx!="docker":
@@ -196,30 +198,34 @@ def create_config_ubuntu(response):
     # Copy mesh service to /etc/systemd/system/
     if conf['mesh_service']:
         mesh_interface = get_interface(conf['mesh_inf'])
+        config_11s_mesh_path=osh.path.join(getenv("MESH_COM_ROOT", ""), "src/bash/conf-11s-mesh.sh")
+        config_mesh_path=osh.path.join(getenv("MESH_COM_ROOT", ""), "src/bash/conf-mesh.sh")
+        print(config_mesh_path)
+        print("THIS IS THE PATH!")
         if res['type'] == '11s':
-            subprocess.call('os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/bash/conf-11s-mesh.sh")' + mesh_interface, shell=True) 
+            subprocess.call(config_11s_mesh_path + " " + mesh_interface, shell=True) 
         if res['type'] == 'ibss':
-            subprocess.call('os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/bash/conf-mesh.sh") ' + mesh_interface, shell=True)
+            subprocess.call(config_mesh_path + " " + mesh_interface, shell=True)
 
 
 if __name__ == "__main__":
-    os_env = is_sec_os()
+    os = is_sec_os()
     if not os:
-        os_env = get_os()
+        os = get_os()
     local_cert = args.certificate
-    f = open("testclient1.txt","w")
-    t = open("tesclientmac","w")
-    get_data(local_cert, os_env)
+    f = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient1.txt","w")
+    t = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclientmac.txt","w")
+    get_data(local_cert, os)
     res, server_cert = decrypt_response()
     if verify_certificate(local_cert, server_cert):
         print(colored('> Valid Server Certificate', 'green'))
         f.write("True")
         f.close()
         mac = get_mac_address(interface=get_interface(conf['mesh_inf']))
-        t.write("True")
+        t.write(mac)
         t.close()
         response = requests.post(URL + '/mac/' + mac)
-        if os_env == 'Ubuntu' or 'secos':
+        if os == 'Ubuntu' or 'secos':
             create_config_ubuntu(res)
     else:
         print(colored("Not Valid Server Certificate", 'red'))
