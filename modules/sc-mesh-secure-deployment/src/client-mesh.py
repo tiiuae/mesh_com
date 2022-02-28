@@ -197,9 +197,9 @@ def create_config_ubuntu(response):
     if conf['mesh_service']:
         mesh_interface = get_interface(conf['mesh_inf'])
         if res['type'] == '11s':
-            subprocess.call('src/bash/conf-11s-mesh.sh ' + mesh_interface, shell=True)
+            subprocess.call('os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/bash/conf-11s-mesh.sh")' + mesh_interface, shell=True) 
         if res['type'] == 'ibss':
-            subprocess.call('src/bash/conf-mesh.sh ' + mesh_interface, shell=True)
+            subprocess.call('os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/bash/conf-mesh.sh") ' + mesh_interface, shell=True)
 
 
 if __name__ == "__main__":
