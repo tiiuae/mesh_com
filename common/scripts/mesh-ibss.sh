@@ -140,6 +140,8 @@ EOF
       echo "$wifidev down.."
       iw dev "$wifidev" del
       iw phy "$phyname" interface add "$wifidev" type ibss
+      # same MTU as for $wifidev. without this the kernel warned that 1500 is too small to handle batman
+      ifconfig "$phyname" mtu 1560
 
       echo "$wifidev create adhoc.."
       ifconfig "$wifidev" mtu 1560
