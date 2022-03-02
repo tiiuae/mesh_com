@@ -3,7 +3,7 @@
 function help
 {
     echo
-    echo "Usage: sudo ./mesh-ibss.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface> <phyname>"
+    echo "Usage: sudo ./mesh-ibss.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface> <phyname> <mtu_size> <log_dir>"
     echo "Parameters:"
     echo "	<mode>"
     echo "	<ip>"
@@ -15,7 +15,9 @@ function help
     echo "	<txpower>"
     echo "	<country>"
     echo "	<interface>" - optional
-    echo "	<phyname>"   - optional
+    echo "	<interface>" - optional
+    echo "	<mtu_dir>"   - optional
+    echo "	<log_dir>"   - optional
     echo
     echo "example:"
     echo "sudo ./mesh-ibss.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh 5220 30 fi wlan1 phy1"
@@ -79,6 +81,14 @@ else
 fi
 echo "Found: $wifidev $phyname"
 
+if [[ -z "${12}" || -z "${13}" ]]; then
+    mtu_size="1560"
+    log_dir="/tmp/"
+else
+    mtu_size=${12}
+    log_dir=${13}
+fi
+
 case "$1" in
 
 mesh)
@@ -121,7 +131,11 @@ EOF
       killall batadv-vis 2>/dev/null
       rm -f /var/run/alfred.sock
 
-      modprobe batman-adv
+      #Check if batman_adv is built-in module
+      modname=$(ls /sys/module | grep batman_adv)
+      if [[ -z $modname ]]; then
+        modprobe batman-adv
+      fi
 
       echo "$wifidev down.."
       iw dev "$wifidev" del
@@ -157,9 +171,9 @@ EOF
       # This is likely due to the interface not being up in time, and will
       # require some fiddling with the systemd startup order.
       if [[ -z "${10}" ]]; then
-        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B -f /tmp/wpa_supplicant_ibss.log
+        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -B -f $log_dir/wpa_supplicant_ibss.log
       else
-        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_ibss.log
+        wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-adhoc.conf -D nl80211 -C /var/run/wpa_supplicant/ -f $log_dir/wpa_supplicant_ibss.log
       fi
       ;;
 
@@ -246,7 +260,7 @@ EOF
       #TODO
       # dhserver
 
-      wpa_supplicant -B -i "$wifidev" -c /var/run/wpa_supplicant-ap.conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_ap.log
+      wpa_supplicant -B -i "$wifidev" -c /var/run/wpa_supplicant-ap.conf -D nl80211 -C /var/run/wpa_supplicant/ -f $log_dir/wpa_supplicant_ap.log
 
       ;;
 

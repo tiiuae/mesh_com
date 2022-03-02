@@ -4,18 +4,22 @@ from flask import Flask, request, json
 from getmac import get_mac_address
 import subprocess
 import netifaces
-import pandas as pd
+#Enable pandas after availablity of _bz2 shared lib
+#import pandas as pd
 import yaml
 import json
 import argparse
 from termcolor import colored
 import pathlib
 import hashlib
+import os
 
 # Get the mesh_com config
+print(os.getenv("MESH_COM_ROOT", ""))
+config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
 print('> Loading yaml conf... ')
 try:
-    yaml_conf = yaml.safe_load(open('src/mesh_com.conf', 'r'))
+    yaml_conf = yaml.safe_load(open(config_path, 'r'))
     conf = yaml_conf['server']
     debug = yaml_conf['debug']
 except (IOError, yaml.YAMLError) as error:
@@ -63,7 +67,7 @@ def add_message(uuid):
             print('> Unencrypted message: ', end='')
             print(msg_json)
         # Encrypt message use .call() to block and avoid race condition with open()
-        proc = subprocess.call(['src/ecies_encrypt',
+        proc = subprocess.call(['ecies_encrypt',
                                 SERVER_CERT, msg_json],
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         enc = open('payload.enc', 'rb')
