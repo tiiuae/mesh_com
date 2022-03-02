@@ -122,6 +122,7 @@ def get_interface(pattern):
     if pre := list(interface):
         return pre[0]
     print(f'> ERROR: Interface {pattern} not found!')
+    return None
 
 
 def ubuntu_node(gateway):
