@@ -26,7 +26,7 @@ _init() {
 # Arguments:
 #######################################
 _test() {
-  echo "$0, test called" | print_log
+  echo "$0, test called" | print_log log_client
 
   if ! [ "$result" -eq "$FAIL" ]; then
     start_mesh_client
@@ -40,14 +40,14 @@ _test() {
 # Arguments:
 #######################################
 _result() {
-  echo "$0, result called" | print_log
+  echo "$0, result called" | print_log log_client
 
 	SERVER_VALID=$(cat "$MESH_COM_ROOTDIR/modules/sc-mesh-secure-deployment/src/testclient.txt")
 	CLIENT_VALID=$(cat "$MESH_COM_ROOTDIR/modules/sc-mesh-secure-deployment/src/testclient1.txt")
 	CLIENT_MAC=$(cat "$MESH_COM_ROOTDIR/modules/sc-mesh-secure-deployment/src/testclientmac.txt")
 
   if [[ "$SERVER_VALID" ]] && [[ "$CLIENT_VALID" ]] ; then
-    echo -e "Client is valid: $CLIENT_MAC" | print_log
+    echo -e "Client is valid: $CLIENT_MAC" | print_log log_client
     result=$PASS
   else
     result=$FAIL
@@ -63,7 +63,7 @@ _result() {
 # Arguments:
 #######################################
 _deinit() {
-  echo "$0, deinit called" | print_log
+  echo "$0, deinit called" | print_log log_client
   #kill flask server
   pid=$(netstat -tlnp | awk '/:5000 */ {split($NF,a,"/"); print a[1]}')
   echo $pid
@@ -80,20 +80,20 @@ _deinit() {
 # Arguments:
 #######################################
 main() {
-  echo "### Test Case: $test_case" | print_log result
-  echo "### Test Description: $description" | print_log result
+  echo "### Test Case: $test_case" | print_log result_client
+  echo "### Test Description: $description" | print_log result_client
 
   _init
 
   if [ "$result" -eq "$FAIL" ]; then
-	echo "FAILED  _init: $test_case" | print_log result
+	echo "FAILED  _init: $test_case" | print_log result_client
 	exit 0
   fi
 
   _test
 
   if [ "$result" -eq "$FAIL" ]; then
-	echo "FAILED  _test: $test_case" | print_log result
+	echo "FAILED  _test: $test_case" | print_log result_client
 	exit 0
   fi
 
@@ -101,10 +101,10 @@ main() {
   _result
 
   if [ "$result" -eq "$FAIL" ]; then
-	echo "FAILED  : $test_case" | print_log result
+	echo "FAILED  : $test_case" | print_log result_client
 	exit 0
   else
-	echo "PASSED  : $test_case" | print_log result
+	echo "PASSED  : $test_case" | print_log result_client
   fi
 
   _deinit

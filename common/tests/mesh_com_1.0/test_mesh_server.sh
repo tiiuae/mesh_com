@@ -27,7 +27,7 @@ _init() {
 # Arguments:
 #######################################
 _test() {
-  echo "$0, test called" | print_log
+  echo "$0, test called" | print_log log_server
 
   if ! [ "$result" -eq "$FAIL" ]; then
     start_mesh_server
@@ -41,7 +41,7 @@ _test() {
 # Arguments:
 #######################################
 _result() {
-  echo "$0, result called" | print_log
+  echo "$0, result called" | print_log log_server
  
   retries=3
 
@@ -52,7 +52,7 @@ _result() {
 	fi
   done 
   if [ "$server_details" ] ; then
-    echo -e "server found: $server_details" | print_log
+    echo -e "server found: $server_details" | print_log log_server
     result=$PASS
   else
     result=$FAIL
@@ -68,7 +68,7 @@ _result() {
 # Arguments:
 #######################################
 _deinit() {
-  echo "$0, deinit called" | print_log
+  echo "$0, deinit called" | print_log log_server
   #kill flask server
   pid=$(netstat -tlnp | awk '/:5000 */ {split($NF,a,"/"); print a[1]}')
   echo $pid
@@ -85,20 +85,20 @@ _deinit() {
 # Arguments:
 #######################################
 main() {
-  echo "### Test Case: $test_case" | print_log result
-  echo "### Test Description: $description" | print_log result
+  echo "### Test Case: $test_case" | print_log result_server
+  echo "### Test Description: $description" | print_log result_server
 
   _init
 
   if [ "$result" -eq "$FAIL" ]; then
-	echo "FAILED  _init: $test_case" | print_log result
+	echo "FAILED  _init: $test_case" | print_log result_server
 	exit 0
   fi
 
   _test
 
   if [ "$result" -eq "$FAIL" ]; then
-	echo "FAILED  _test: $test_case" | print_log result
+	echo "FAILED  _test: $test_case" | print_log result_server
 	exit 0
   fi
 
@@ -106,10 +106,10 @@ main() {
   _result
 
   if [ "$result" -eq "$FAIL" ]; then
-	echo "FAILED  : $test_case" | print_log result
+	echo "FAILED  : $test_case" | print_log result_server
 	exit 0
   else
-	echo "PASSED  : $test_case" | print_log result
+	echo "PASSED  : $test_case" | print_log result_server
   fi
 
   _deinit

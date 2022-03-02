@@ -26,11 +26,24 @@ except (IOError, yaml.YAMLError) as error:
     print(error)
     exit()
 
+#Function for test case
+def Server_Test(**arg):
+    if args.test:
+        f = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient.txt", "w")
+        if arg["color"] == "Green":
+            f.write("True")
+            f.close()
+        elif arg["Color"] == "Red":
+            f.write("False")
+            f.close()
+
+
 # Construct the argument parser
 ap = argparse.ArgumentParser()
 
 # Add the arguments to the parser
 ap.add_argument("-c", "--certificate", required=True)
+ap.add_argument("-t","--test",required=False)
 args = ap.parse_args()
 app = Flask(__name__)
 IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
@@ -45,7 +58,6 @@ def add_message(uuid):
     key = request.files['key']
     receivedKey = key.read()
     localCert = open(SERVER_CERT, 'rb')
-    f = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient.txt", "w")
     # Do we need the ubuntu or openwrt setup?
     aux = conf[str(uuid).lower()]
     # Requester a new IP
@@ -55,8 +67,7 @@ def add_message(uuid):
     mac = get_mac_address(ip=ip_address)
     if verify_certificate(localCert, receivedKey):
         print(colored('> Valid Client Certificate', 'green'))
-        f.write("True")
-        f.close()
+        Server_Test(color="Green")
         ip_mesh = verify_addr(ip_address)
         print('> Assigned mesh IP: ' + ip_mesh)
         if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
@@ -82,8 +93,7 @@ def add_message(uuid):
     else:
         NOT_AUTH[mac] = ip_address
         print(colored("Not Valid Client Certificate", 'red'))
-        f.write("Flase")
-        f.close()
+        Server_Test(color="Red")
         return 'Not Valid Certificate'
 
 
