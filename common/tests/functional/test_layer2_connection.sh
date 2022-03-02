@@ -27,6 +27,9 @@ _test() {
   # my_command executed and pass logs to logs/-folder
   wait_ip "$1"
 
+  # collect OGM packets for orig_interval check
+  (batctl td wlp1s0 -p1 |tee ${log_dir}tcp_dump_ogm.log 2>/dev/null)&
+
   mac_address_list=$(batctl n | awk '/\t/{print$2}')
   echo "MAC addresses found from Mesh network: $mac_address_list" | print_log result
   if [ -z "$mac_address_list" ]; then
@@ -59,6 +62,37 @@ _test() {
     fi
     echo "${mac}_end" >> ${log_dir}batctl_traceroute.log
   done
+
+  killall batctl
+}
+
+#######################################
+# Check OGM interval from TCP dump
+# Globals:
+# Arguments:
+#  $1 = from mac
+#  $2 = to mac
+#  $3 = timestamps
+#######################################
+check_ogm_interval() {
+  # variables for calculation
+  count=0; first=0; sum=0
+
+  # find time stamps from mymac to mac
+  ogm_time_stamps=$(grep -e "^[0-9]" ${log_dir}tcp_dump_ogm.log |grep "${1}: OGM IV via neigh $2" | cut -d ' ' -f 1)
+  for stamp in $ogm_time_stamps; do
+    value=$(date --date "$stamp" +%s%N) # convert time stamp to nanoseconds
+    if [ $first -eq 0 ]; then
+      first=$value
+    else
+      # timestamp difference to previous stamp
+      ((diff=value-first)); first=$value
+      # calculate sum and count for average
+      ((sum=sum+diff)); ((count=count+1))
+    fi
+  done
+  ((average=(sum/count)/1000000)) # from nanos to millis
+  echo "*** Measured OGM interval from $1 to $2 = $average ms" | print_log result
 }
 
 #######################################
@@ -73,10 +107,11 @@ _result() {
 
   #1 analyse logs from logs/ - folder
   log_dir="logs/"
+  my_mac=$(cat /sys/class/net/"$wifidev"/address)
 
   # analyse ping results
   for mac in $mac_address_list; do
-    echo "***"
+    echo "***" | print_log result
     ping_result=$(grep -e "$mac" -A1 ${log_dir}batctl_ping.log)
     echo "Result for $ping_result" | print_log result
     #echo -e "# ping result:\n$ping_result" | print_log result
@@ -85,18 +120,25 @@ _result() {
       result=$FAIL
       echo "FAILED  : in ping test $mac average $ping_avg ms" | print_log result
     else
-      echo "   Average ping $ping_avg" | print_log result
+      echo "Average ping $ping_avg" | print_log result
     fi
   done
 
   for mac in $mac_address_list; do
-    echo "***"
+    echo "***" | print_log result
     trace_route=$(sed -n "/${mac}_start/,/${mac}_end/p" "${log_dir}batctl_traceroute.log" |grep -e "^ ")
     trace_route_hops=$(echo "$trace_route" | wc -l)
-    echo "Result for route: $trace_route" | print_log result
+    echo "Result for route to $mac : $trace_route" | print_log result
     echo "Result for route hops: $trace_route_hops" | print_log result
   done
-  echo "***"
+  echo "***" | print_log result
+
+  for mac in $mac_address_list; do
+    average=0
+    check_ogm_interval "$my_mac" "$mac"
+    check_ogm_interval "$mac" "$my_mac"
+  done
+  echo "***" | print_log result
 }
 
 #######################################
