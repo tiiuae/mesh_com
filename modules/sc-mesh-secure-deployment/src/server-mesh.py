@@ -10,21 +10,22 @@ import yaml
 import json
 import argparse
 from termcolor import colored
-import pathlib
 import hashlib
 import os
+import sys
 
 # Get the mesh_com config
 print(os.getenv("MESH_COM_ROOT", ""))
-config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
+config_path = os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
 print('> Loading yaml conf... ')
-try:
-    yaml_conf = yaml.safe_load(open(config_path, 'r'))
-    conf = yaml_conf['server']
-    debug = yaml_conf['debug']
-except (IOError, yaml.YAMLError) as error:
-    print(error)
-    exit()
+with open(config_path, 'r', encoding='UTF-8') as yamlfile:
+    try:
+        yaml_conf = yaml.safe_load(yamlfile)
+        conf = yaml_conf['server']
+        debugging = yaml_conf['debug']
+    except (IOError, yaml.YAMLError) as error:
+        print(error)
+        sys.exit()
 
 # Construct the argument parser
 ap = argparse.ArgumentParser()
@@ -44,39 +45,38 @@ NOT_AUTH = {}
 def add_message(uuid):
     key = request.files['key']
     receivedKey = key.read()
-    localCert = open(SERVER_CERT, 'rb')
-    # Do we need the ubuntu or openwrt setup?
-    aux = conf[str(uuid).lower()]
-    # Requester a new IP
-    ip_address = request.remote_addr
-    print("> Requester IP: " + ip_address)
-    # Get MAC
-    mac = get_mac_address(ip=ip_address)
-    if verify_certificate(localCert, receivedKey):
-        print(colored('> Valid Client Certificate', 'green'))
-        ip_mesh = verify_addr(ip_address)
-        print('> Assigned mesh IP: ' + ip_mesh)
-        if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
-            aux['gateway'] = True
-            add_default_route(ip_address)  # we will need to add the default route to communicate
-        else:
-            aux['gateway'] = False
-        aux['addr'] = ip_mesh
-        msg_json = json.dumps(aux)
-        if debug:
-            print('> Unencrypted message: ', end='')
-            print(msg_json)
-        # Encrypt message use .call() to block and avoid race condition with open()
-        proc = subprocess.call(['ecies_encrypt',
-                                SERVER_CERT, msg_json],
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        enc = open('payload.enc', 'rb')
-        encrypt_all = enc.read()
-        print('> Sending encrypted message...')
-        if debug:
-            print(encrypt_all)
-        return encrypt_all + localCert.read()
-    else:
+    with open(SERVER_CERT, 'rb', encoding='UTF-8') as localCert:
+        # Do we need the ubuntu or openwrt setup?
+        aux = conf[str(uuid).lower()]
+        # Requester a new IP
+        ip_address = request.remote_addr
+        print("> Requester IP: " + ip_address)
+        # Get MAC
+        mac = get_mac_address(ip=ip_address)
+        if verify_certificate(localCert, receivedKey):
+            print(colored('> Valid Client Certificate', 'green'))
+            ip_mesh = verify_addr(ip_address)
+            print('> Assigned mesh IP: ' + ip_mesh)
+            if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
+                aux['gateway'] = True
+                add_default_route(ip_address)  # we will need to add the default route to communicate
+            else:
+                aux['gateway'] = False
+            aux['addr'] = ip_mesh
+            msg_json = json.dumps(aux)
+            if debugging:
+                print('> Unencrypted message: ', end='')
+                print(msg_json)
+            # Encrypt message use .call() to block and avoid race condition with open()
+            subprocess.call(['ecies_encrypt',
+                                    SERVER_CERT, msg_json],
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            with open('payload.enc', 'rb', encoding='UTF-8') as enc:
+                encrypt_all = enc.read()
+                print('> Sending encrypted message...')
+                if debugging:
+                    print(encrypt_all)
+                return encrypt_all + localCert.read()
         NOT_AUTH[mac] = ip_address
         print(colored("Not Valid Client Certificate", 'red'))
         return 'Not Valid Certificate'
@@ -98,7 +98,6 @@ def verify_certificate(old, new):
 def add_default_route(ip_gateway):
     try:
         for interf in netifaces.interfaces():
-            # TODO: what it if doesn't start with wlan???
             if interf.startswith(conf['mesh_inf']):
                 interface = interf
         command = 'ip route add ' + IP_PREFIX + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface
@@ -106,7 +105,7 @@ def add_default_route(ip_gateway):
         subprocess.call(command, shell=True)
     except:
         print("ERROR: No available interface for default route!")
-        exit()
+        sys.exit()
 
 
 def verify_addr(wan_ip):
