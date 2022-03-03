@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 import argparse
+#from asyncio.windows_events import NULL
 import json
+#from turtle import color
 import yaml
 import subprocess
 import time
@@ -14,10 +16,9 @@ from getmac import get_mac_address
 import requests
 from termcolor import colored
 from pathlib import Path
-
+import sys
 
 # Get the mesh_com config
-print("THIS IS THE STEP!!!")
 print(getenv("MESH_COM_ROOT", ""))
 config_path=osh.path.join(getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
 print('> Loading yaml conf... ')
@@ -38,8 +39,27 @@ ap = argparse.ArgumentParser()
 # Add the arguments to the parser
 ap.add_argument("-s", "--server", required=True, help="Server IP:Port Address. Ex: 'http://192.168.15.14:5000'")
 ap.add_argument("-c", "--certificate", required=True)
+ap.add_argument("-t","--test",required=False,default=False,action='store_true')
 args = ap.parse_args()
 
+
+#Function for test case
+def Client_Test(**arg):
+    if args.test:
+        f = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient1.txt","w")
+        if arg["color"] == "Green":
+            f.write("True")
+            f.close()
+        elif arg["Color"] == "Red":
+            f.write("False")
+            f.close()
+
+def Client_Mac(**arg):
+    if args.test:
+        t = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclientmac.txt","w")
+        if arg["macs"] is not None:
+            t.write(str(arg["macs"]))
+            t.close()
 
 # Connect to server
 URL = args.server
@@ -201,7 +221,6 @@ def create_config_ubuntu(response):
         config_11s_mesh_path=osh.path.join(getenv("MESH_COM_ROOT", ""), "src/bash/conf-11s-mesh.sh")
         config_mesh_path=osh.path.join(getenv("MESH_COM_ROOT", ""), "src/bash/conf-mesh.sh")
         print(config_mesh_path)
-        print("THIS IS THE PATH!")
         if res['type'] == '11s':
             subprocess.call(config_11s_mesh_path + " " + mesh_interface, shell=True) 
         if res['type'] == 'ibss':
@@ -213,23 +232,17 @@ if __name__ == "__main__":
     if not os:
         os = get_os()
     local_cert = args.certificate
-    f = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient1.txt","w")
-    t = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclientmac.txt","w")
     get_data(local_cert, os)
     res, server_cert = decrypt_response()
     if verify_certificate(local_cert, server_cert):
         print(colored('> Valid Server Certificate', 'green'))
-        f.write("True")
-        f.close()
+        Client_Test(color = "Green")
         mac = get_mac_address(interface=get_interface(conf['mesh_inf']))
-        t.write(mac)
-        t.close()
+        Client_Mac(macs = mac)
         response = requests.post(URL + '/mac/' + mac)
         if os == 'Ubuntu' or 'secos':
             create_config_ubuntu(res)
     else:
         print(colored("Not Valid Server Certificate", 'red'))
-        f.write("False")
-        f.close()
-        t.close()
+        Client_Test(color = "Red")
         exit(0)

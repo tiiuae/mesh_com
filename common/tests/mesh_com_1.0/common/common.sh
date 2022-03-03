@@ -5,8 +5,11 @@ FAIL=0
 result=$PASS
 MESH_COM_ROOTDIR="../../../"
 source ./common/env.sh
-log_file="./mesh_com_1.0_debug.log"
-results_file="./mesh_com_1.0_results.log"
+log_file="./mesh_com_1.0_debug"
+results_file="./mesh_com_1.0_results"
+server="_Server_Case"
+client="_Client_Case"
+log=".log"
 
 #######################################
 # Add date prefix to line and write to log
@@ -18,11 +21,15 @@ print_log() {
 
     time_stamp="$(date +'%Y-%m-%dT%H:%M:%S%z')"
     while IFS= read -r line; do
-       if [ "$1" = "result" ]; then
-          printf '[%s]: %s\n' "$time_stamp" "$line" |& tee -a "$results_file" |& tee -a "$log_file"
-       else
-          printf '[%s]: %s\n' "$time_stamp" "$line" |& tee -a "$log_file"
-       fi
+       if [ "$1" = "result_server" ] ; then
+          printf '[%s]: %s\n' "$time_stamp" "$line" |& tee -a "$results_file$server$log" |& tee -a "$log_file$server$log"
+       elif [ "$1" = "log_server" ] ; then
+          printf '[%s]: %s\n' "$time_stamp" "$line" |& tee -a "$log_file$server$log"
+       elif [ "$1" = "result_client" ] ; then
+          printf '[%s]: %s\n' "$time_stamp" "$line" |& tee -a "$results_file$client$log" |& tee -a "$log_file$client$log"
+       elif [ "$1" = "log_client" ] ; then
+          printf '[%s]: %s\n' "$time_stamp" "$line" |& tee -a "$log_file$client$log"
+        fi
     done
 }
 
@@ -51,12 +58,12 @@ test_mesh_com_1.0_dependencies()
 start_mesh_server()
 {
   # make sure flask server is running in seperate thread
-  source ./$MESH_COM_ROOTDIR/modules/sc-mesh-secure-deployment/configure.sh -s & 2>&1 |& tee logs/"$0".log
+  source ./$MESH_COM_ROOTDIR/modules/sc-mesh-secure-deployment/configure.sh -s -t & 2>&1 |& tee logs/"$0".log
 }
 
 start_mesh_client()
 {
-  source ./$MESH_COM_ROOTDIR/modules/sc-mesh-secure-deployment/configure.sh -c & 2>&1 |& tee logs/"$0".log
+  source ./$MESH_COM_ROOTDIR/modules/sc-mesh-secure-deployment/configure.sh -c -t & 2>&1 |& tee logs/"$0".log
 }
 
 
