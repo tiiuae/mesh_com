@@ -110,6 +110,7 @@ _result() {
 
   #1 analyse logs from logs/ - folder
   log_dir="logs/"
+  update_wifidev_from_batctl_if
   my_mac=$(cat /sys/class/net/"$wifidev"/address)
 
   # analyse ping results

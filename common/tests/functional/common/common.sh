@@ -91,6 +91,18 @@ update_channel_list() {
 }
 
 #######################################
+# update wifidev from batctl status
+# Globals:
+#  channel_list
+# Arguments:
+#  $1 = wifidev name
+#######################################
+update_wifidev_from_batctl_if() {
+  data=$(sudo batctl if | cut -d ' ' -f 1)
+  wifidev=${data::-1}
+}
+
+#######################################
 # create wpa_supplicant configuration
 # Globals:
 #  channel_list
