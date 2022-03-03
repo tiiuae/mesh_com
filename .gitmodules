@@ -11,3 +11,6 @@
 [submodule "common/core/os/ubuntu/wifi-firmware"]
 	path = common/core/os/ubuntu/wifi-firmware
 	url = https://github.com/tiiuae/wifi-firmware.git
+[submodule "common/core/framework"]
+	path = common/core/framework
+	url = https://github.com/tiiuae/opendroneid-core-c.git
