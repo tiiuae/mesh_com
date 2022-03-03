@@ -4,9 +4,11 @@ source ./common/common.sh   # common tools
 source ./common/init.sh     # network init
 source ./common/deinit.sh   # network de-init
 
-test_case="batman-adv:  Layer2 Traceroute/Ping"
+test_case="batman-adv:  Layer2 Traceroute/Ping/OGM_verification"
 
-description="Trace route to another device in static topology between > 3 nodes (batctl)"
+description="""
+Traceroute/ping to another device in static topology
+between > 3 nodes (batctl) and verify OGM interval from tcpdump"""
 
 # global
 mac_address_list=""
@@ -72,7 +74,7 @@ _test() {
 # Arguments:
 #  $1 = from mac
 #  $2 = to mac
-#  $3 = timestamps
+#  $3 = orig_interval
 #######################################
 check_ogm_interval() {
   # variables for calculation
@@ -92,7 +94,7 @@ check_ogm_interval() {
     fi
   done
   ((average=(sum/count)/1000000)) # from nanos to millis
-  echo "*** Measured OGM interval from $1 to $2 = $average ms" | print_log result
+  echo "*** Measured OGM interval from $1 to $2 = $average ms (set value: $3 ms)" | print_log result
 }
 
 #######################################
@@ -101,6 +103,7 @@ check_ogm_interval() {
 #  result
 # Arguments:
 #  $1 = requested country code
+#  $2 = orig_interval
 #######################################
 _result() {
   echo "$0, result called" | print_log
@@ -130,13 +133,25 @@ _result() {
     trace_route_hops=$(echo "$trace_route" | wc -l)
     echo "Result for route to $mac : $trace_route" | print_log result
     echo "Result for route hops: $trace_route_hops" | print_log result
+    if [ "$trace_route_hops" -lt 3 ]; then
+      echo "FAILED  : less than 3 hops to $mac" | print_log result
+    fi
   done
   echo "***" | print_log result
 
+
+  ((high_limit=$2+500))
+  ((low_limit=$2-500))
+
   for mac in $mac_address_list; do
     average=0
-    check_ogm_interval "$my_mac" "$mac"
-    check_ogm_interval "$mac" "$my_mac"
+    check_ogm_interval "$my_mac" "$mac" "$2"
+    if [ "$average" -ge "$high_limit" ] || [ "$average" -le "$low_limit" ] ; then
+      result=$FAIL
+      echo "FAILED  : OGM interval verification test from $my_mac to $mac: $average ms (set value $2 )" | print_log result
+    fi
+    check_ogm_interval "$mac" "$my_mac" "unknown"
+
   done
   echo "***" | print_log result
 }
@@ -264,7 +279,7 @@ main() {
       exit 0
     fi
 
-    _result "$country"
+    _result "$country" "$orig_interval"
 
     if [ "$net_setup" = "mesh_vlan" ]; then
       mesh_hop=$(("${server_ipaddress##*.}"-"${ipaddress##*.}"))
@@ -282,7 +297,7 @@ main() {
       echo "PASSED  : $test_case" | print_log result
       exit 0
     fi
-  else
+  else # server activity
     echo "###" | print_log result
     echo "###: Please start tests in Client node" | print_log result
     echo "###" | print_log result
