@@ -41,7 +41,7 @@ elif [ "$OS" == "Buildroot" ]; then
             # └── wpa_supplicant_sta.conf
             # └── wpa_supplicant_ap.conf
             mkdir -p /opt/container-data/mesh
-            mv /opt/mesh_com-main /opt/container-data/mesh/
+            mv /opt/mesh_com* /opt/container-data/mesh/
         fi
         # change rootfs location once its mounted in dedicated partation
         if [ -f "/root/rootfs.tgz" ]; then

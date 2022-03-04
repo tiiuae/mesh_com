@@ -15,18 +15,6 @@ from termcolor import colored
 from pathlib import Path
 
 
-# Get the mesh_com config
-print('> Loading yaml conf... ')
-try:
-    yaml_conf = yaml.safe_load(open('src/mesh_com.conf', 'r'))
-    conf = yaml_conf['client']
-    debug = yaml_conf['debug']
-    print(conf)
-except (IOError, yaml.YAMLError) as error:
-    print(error)
-    exit()
-
-
 # Construct the argument parser
 ap = argparse.ArgumentParser()
 
@@ -34,8 +22,26 @@ ap = argparse.ArgumentParser()
 # Add the arguments to the parser
 ap.add_argument("-s", "--server", required=True, help="Server IP:Port Address. Ex: 'http://192.168.15.14:5000'")
 ap.add_argument("-c", "--certificate", required=True)
+ap.add_argument("-m", "--mode", required=True)
 args = ap.parse_args()
+# Get the mesh_com config
+mesh_mode = args.mode
 
+# Get the mesh_com config
+if mesh_mode == '11s':
+    config_path = "src/mesh_com.conf"
+elif mesh_mode == 'ibss':
+    config_path = "src/mesh_com_11s.conf"
+
+print('> Loading yaml conf... ')
+try:
+    yaml_conf = yaml.safe_load(open(config_path, 'r'))
+    conf = yaml_conf['client']
+    debug = yaml_conf['debug']
+    print(conf)
+except (IOError, yaml.YAMLError) as error:
+    print(error)
+    exit()
 
 # Connect to server
 URL = args.server
