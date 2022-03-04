@@ -14,9 +14,7 @@ import glob
 import argparse
 import random
 import ruamel.yaml
-from typing import Any, Dict, List, Tuple
-ID: str
-mac: str
+
 
 # Construct the argument parser
 ap = argparse.ArgumentParser()
@@ -27,7 +25,7 @@ ap.set_defaults(clean=False)
 args: argparse.Namespace = ap.parse_args()
 
 
-def folder() -> None:
+def folder():
     if not path.isdir(PATH):
         os.mkdir(PATH)
 
@@ -51,7 +49,7 @@ def create_table():
     return table
 
 
-def set_auth_role() -> None:
+def set_auth_role():
     """
     To set the serve/client auth role.
     TODO: think a way to add more servers
@@ -66,7 +64,7 @@ def set_auth_role() -> None:
         yaml.dump(config, fp)
 
 
-def update_table(info) -> None:
+def update_table(info):
     '''
     this function update the table with the node's info.
     Then, it updates mesh_conf_file with ip address.
@@ -95,7 +93,7 @@ def update_table(info) -> None:
             transfer(file_keys)
 
 
-def update_conf_file(ip) -> None:
+def update_conf_file(ip):
     '''
     Update the mesh_conf file with the new ip address.
     '''
@@ -109,7 +107,7 @@ def update_conf_file(ip) -> None:
         yaml.dump(config, fp)
 
 
-def exporting(ID, key, sign: bool=True) -> None:
+def exporting(ID, key, sign=True):
     '''
     This function export the public and private keys in a .asc file;
     If the ID is the server, it won't export.
@@ -144,7 +142,7 @@ def exporting(ID, key, sign: bool=True) -> None:
             f.write(ascii_armored_public_keys)
 
 
-def clean_all() -> None:
+def clean_all():
     keys = gpg.list_keys(True)
     for key in keys:
         gpg.delete_keys(key['fingerprint'], True, expect_passphrase=False)  # for private
@@ -162,7 +160,7 @@ def clean_all() -> None:
     exit()
 
 
-def exist(ID, verbose: bool=True):
+def exist(ID, verbose=True):
     '''
     Verify if the keys are presented in the keyring.
     If not, it will create new pair of keys.
@@ -189,7 +187,7 @@ def exist(ID, verbose: bool=True):
         return False, False
 
 
-def generate(input_data, sign: bool=True):
+def generate(input_data, sign=True):
     '''
     Generate new keys based on the input data
     '''
@@ -206,7 +204,7 @@ def generate(input_data, sign: bool=True):
     return fingerprint
 
 
-def get_id() -> Tuple[str, str]:
+def get_id():
     '''
     Small function to get an ID.
     Determined from the hash of the mac address
@@ -244,7 +242,7 @@ def encrypt_conf(ID):
     return output
 
 
-def transfer(FILE) -> None:
+def transfer(FILE):
     '''
     Transfer via scp the node certificate, server public key, and encrypted mesh_conf.
     '''
@@ -266,7 +264,7 @@ def transfer(FILE) -> None:
     ssh.close()
 
 
-def generate_ip() -> List[int]:
+def generate_ip():
     return random.sample(range(2, 254), 2)
 
 
@@ -287,7 +285,7 @@ if __name__ == "__main__":
         fpr = generate(input_data, False)
 
     mac: str = get_mac()  # only for server
-    info: Dict[str, Any] = {'ID': 'provServer', 'MAC': mac, 'IP': '0.0.0.0', 'PubKey_fpr': fpr}
+    info = {'ID': 'provServer', 'MAC': mac, 'IP': '0.0.0.0', 'PubKey_fpr': fpr}
     update_table(info)
     ID, mac = get_id()
     exists, fpr = exist(ID)
@@ -299,7 +297,7 @@ if __name__ == "__main__":
                                        expire_date='1d'
                                        )
         fpr = generate(input_data)
-    info: Dict[str, Any] = {'ID': ID, 'MAC': mac, 'IP': '10.0.0.' + str(generate_ip().pop()), 'PubKey_fpr': fpr}
+    info = {'ID': ID, 'MAC': mac, 'IP': '10.0.0.' + str(generate_ip().pop()), 'PubKey_fpr': fpr}
     update_table(info)
 
     '''

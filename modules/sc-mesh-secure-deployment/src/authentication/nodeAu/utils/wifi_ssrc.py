@@ -26,7 +26,7 @@ def scan_wifi():
     return possible
 
 
-def connect_wifi(candidate) -> None:
+def connect_wifi(candidate):
     '''
     Connect to the best Ap selected in scan_wifi()
     we are using apmanager.sh for this
@@ -35,13 +35,13 @@ def connect_wifi(candidate) -> None:
     subprocess.call(command, shell=True)
 
 
-def killall() -> None:
+def killall():
     subprocess.call('pkill wpa_supplicant', shell=True)
     subprocess.call('ifconfig wlan0 down', shell=True)
     subprocess.call('ifconfig wlan0 up', shell=True)
 
 
-def create_ap(ID) -> None:
+def create_ap(ID):
     '''
     If none AuthAP is available, then create a new one.
     Using apmanager.sh
@@ -52,7 +52,7 @@ def create_ap(ID) -> None:
     subprocess.call(command, shell=True)
 
 
-def get_ip_address(ifname) -> str:
+def get_ip_address(ifname):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     return socket.inet_ntoa(fcntl.ioctl(
         s.fileno(),

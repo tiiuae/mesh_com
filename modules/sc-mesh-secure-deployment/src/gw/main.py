@@ -7,7 +7,7 @@ from src.tools import setup_logger, \
 
 
 class AutoGateway:
-    def __init__(self, init_gw_mode: str="server") -> None:
+    def __init__(self, init_gw_mode: str="server"):
 
         self.old_mesh_gateway_mac_and_ip = ("", "")
         self.masquerade_set = None
@@ -35,7 +35,7 @@ class AutoGateway:
         self.logger.debug("Make a clean and start...")
         self.clean_and_start()
 
-    def clean_and_start(self) -> None:
+    def clean_and_start(self):
         return_code, null = run_shell_command(
             f"sysctl net.ipv4.ip_forward=1")
         if return_code != 0:
@@ -58,7 +58,7 @@ class AutoGateway:
             run_shell_command("batctl gw_mode server")
             self.set_local_gateway(self.wan_iface)
 
-    def find_wwan_iface(self, wifi) -> str:
+    def find_wwan_iface(self, wifi):
         # use  "$wifi_device" and update wwan_name
         ret, value = run_shell_command("ifconfig")
         if ret != 0:
@@ -85,7 +85,7 @@ class AutoGateway:
         return ""
 
     # server
-    def set_local_gateway(self, wwan) -> None:
+    def set_local_gateway(self, wwan):
         # todo can this setting be done somewhere else
         ret, val = run_shell_command("iptables -P FORWARD ACCEPT")
         if ret != 0:
@@ -102,7 +102,7 @@ class AutoGateway:
             self.old_mesh_gateway_mac_and_ip = ("", "")
 
     # client
-    def configure_mesh_gateway(self, wifi, subnet) -> None:
+    def configure_mesh_gateway(self, wifi, subnet):
         ret, val = run_shell_command("iptables -t nat -F")
         if ret != 0:
             self.logger.error("Error in iptables -t nat -F")
@@ -152,7 +152,7 @@ class AutoGateway:
         else:
             self.logger.error("No gateway MAC available")
 
-    def find_mesh_ipv4_subnet(self) -> str:
+    def find_mesh_ipv4_subnet(self):
         ret, value = run_shell_command("ip -o -f inet addr show | grep -e bat0 -e br-lan | awk '{print $4}'")
 
         if ret != 0:
@@ -161,7 +161,7 @@ class AutoGateway:
         interface = ipaddress.IPv4Interface(value.strip())
         return str(interface.network)
 
-    def gateway_client_activity(self) -> None:
+    def gateway_client_activity(self):
         self.logger.debug("*** gateway_client_activity")
         self.wan_iface = self.find_wwan_iface(self.wifi_name)
         own_gateway = check_interface_connectivity(self.wan_iface)
@@ -178,7 +178,7 @@ class AutoGateway:
             self.logger.debug("configure_mesh_gateway")
             self.configure_mesh_gateway(self.wifi_name, self.find_mesh_ipv4_subnet())
 
-    def gateway_server_activity(self) -> None:
+    def gateway_server_activity(self):
         self.logger.debug("*** gateway_server_activity")
         self.wan_iface = self.find_wwan_iface(self.wifi_name)
         own_gateway = check_interface_connectivity(self.wan_iface)

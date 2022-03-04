@@ -33,7 +33,7 @@ def get_mac(pattern):
             return mac[0]['addr']
 
 
-def update_password(password) -> None:
+def update_password(password):
     '''
     Update the mesh_conf file with the password.
     '''
@@ -129,7 +129,7 @@ def create_mesh(ID):    # Get the mesh_com config
     return mesh_ip, mesh_mac
 
 
-def create_password(WPA: bool=False) -> str:
+def create_password(WPA=False):
     '''
     get random password pf length 8 with letters, digits
     '''

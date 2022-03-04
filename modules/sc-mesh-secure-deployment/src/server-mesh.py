@@ -83,7 +83,7 @@ def add_message(uuid):
         return 'Not Valid Certificate'
 
 
-def verify_certificate(old, new) -> bool:
+def verify_certificate(old, new):
     """
     Here we are validating the hash of the certificate. This is giving us the integrity of the file, not if the
     certificate is valid. To validate if the certificate is valid, we need to verify the features of the certificate
@@ -96,7 +96,7 @@ def verify_certificate(old, new) -> bool:
     return old_md5 == new_md5
 
 
-def add_default_route(ip_gateway) -> None:
+def add_default_route(ip_gateway):
     try:
         for interf in netifaces.interfaces():
             if interf.startswith(conf['mesh_inf']):
@@ -109,7 +109,7 @@ def add_default_route(ip_gateway) -> None:
         sys.exit()
 
 
-def verify_addr(wan_ip: str) -> str:
+def verify_addr(wan_ip):
     last_ip = IP_ADDRESSES[list(IP_ADDRESSES.keys())[-1]]  # get last ip
     last_octect = int(last_ip.split('.')[-1])  # get last ip octet
     if wan_ip not in IP_ADDRESSES:
@@ -143,7 +143,7 @@ def add_mac_addr(uuid):
 
 
 @app.route('/')
-def debug() -> str:
+def debug():
     addresses_auth = printing_auth()
     table = pd.DataFrame.from_dict(addresses_auth, orient='index', columns=['Mesh IP Address'])
     table['MAC Address'] = table.index

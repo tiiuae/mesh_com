@@ -16,8 +16,6 @@ import sys
 
 sys.path.append("gw")
 from gw import main
-from requests.models import Response
-from typing import Union
 
 # Get the mesh_com config
 print('> Loading yaml conf... ')
@@ -61,7 +59,7 @@ def is_sec_os():
     return ""
 
 
-def get_data(cert_file, oss) -> None:
+def get_data(cert_file, oss):
     message = f'/api/add_message/{oss}'
     with open(cert_file, 'rb', encoding='UTF-8') as stream:
         resp = requests.post(URL + message,
@@ -80,7 +78,6 @@ def decrypt_response():  # assuming that data is on a file called payload.enc ge
     with subprocess.Popen(['ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
         out, _ = proc.communicate()
         aux_list = [element.decode() for element in out.split()]
-        # print(aux_list)
         server_cert = aux_list[:39]
         # Get server configuration json using regex
         new_list = ''.join(aux_list)
@@ -93,12 +90,12 @@ def decrypt_response():  # assuming that data is on a file called payload.enc ge
         return output_dict, server_cert
 
 
-def serializing(new_list) -> str:
+def serializing(new_list):
     joined_list = ''.join(new_list)
     return joined_list.replace("\'", '"')
 
 
-def verify_certificate(new) -> bool:
+def verify_certificate(new):
     """
     Here we are validating the hash of the certificate. This is giving us the integrity of the file, not if the
     certificate is valid. To validate if the certificate is valid, we need to verify the features of the certificate
@@ -127,13 +124,13 @@ def get_interface(pattern):
     return None
 
 
-def ubuntu_node(gateway) -> None:
+def ubuntu_node(gateway):
     print('> Configuring Ubuntu mesh node...')
     # Create default route service
     subprocess.call(f'src/bash/conf-route.sh {gateway}', shell=True)
 
 
-def create_config_ubuntu(response: Union[bytes, str]) -> None:
+def create_config_ubuntu(response):
     res = json.loads(response)
     print('> Interfaces: ' + str(res))
     address = res['addr']
@@ -196,7 +193,7 @@ if __name__ == "__main__":
     if verify_certificate(server_cert):
         print(colored('> Valid Server Certificate', 'green'))
         mac = get_mac_address(interface=get_interface(conf['mesh_inf']))
-        response: Response = requests.post(URL + '/mac/' + mac)
+        response = requests.post(URL + '/mac/' + mac)
         if os == ('Ubuntu', 'secos'):
             create_config_ubuntu(res)
     else:

@@ -1,10 +1,8 @@
 import subprocess
 import logging
-import sys
-from typing import Optional, Tuple
 
 
-def find_batman_wifi_iface() -> str:
+def find_batman_wifi_iface():
     ret, value = run_shell_command("batctl if")
 
     if value != "" and ret == 0:
@@ -13,7 +11,7 @@ def find_batman_wifi_iface() -> str:
     return "no_device"
 
 
-def check_interface_connectivity(interface) -> bool:
+def check_interface_connectivity(interface):
     # todo other tests than ping?
     # cmd = f"curl google.com --interface {interface} --connect-timeout 2"
     cmd = f"ping -c 1 -I {interface} 8.8.8.8 -W 2"
@@ -24,7 +22,7 @@ def check_interface_connectivity(interface) -> bool:
     return False
 
 
-def setup_logger(name: Optional[str]) -> logging.Logger:
+def setup_logger(name):
     formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s',
                                   datefmt='%Y-%m-%d %H:%M:%S')
     handler = logging.FileHandler('gw-log.txt', mode='w')
@@ -39,7 +37,7 @@ def setup_logger(name: Optional[str]) -> logging.Logger:
     return logger
 
 
-def run_shell_command(cmd) -> Tuple[int, str]:
+def run_shell_command(cmd):
     # cmd_split = cmd.split(" ")
     cmd_split = ["bash", "-c", cmd]
     result = subprocess.run(cmd_split, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
