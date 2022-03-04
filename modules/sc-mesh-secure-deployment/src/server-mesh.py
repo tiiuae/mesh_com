@@ -13,6 +13,7 @@ from termcolor import colored
 import hashlib
 import os
 import sys
+from typing import Dict
 
 # Get the mesh_com config
 print(os.getenv("MESH_COM_ROOT", ""))
@@ -32,7 +33,7 @@ ap = argparse.ArgumentParser()
 
 # Add the arguments to the parser
 ap.add_argument("-c", "--certificate", required=True)
-args = ap.parse_args()
+args: argparse.Namespace = ap.parse_args()
 app = Flask(__name__)
 IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
 MAC_ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
@@ -82,7 +83,7 @@ def add_message(uuid):
         return 'Not Valid Certificate'
 
 
-def verify_certificate(old, new):
+def verify_certificate(old, new) -> bool:
     """
     Here we are validating the hash of the certificate. This is giving us the integrity of the file, not if the
     certificate is valid. To validate if the certificate is valid, we need to verify the features of the certificate
@@ -95,7 +96,7 @@ def verify_certificate(old, new):
     return old_md5 == new_md5
 
 
-def add_default_route(ip_gateway):
+def add_default_route(ip_gateway) -> None:
     try:
         for interf in netifaces.interfaces():
             if interf.startswith(conf['mesh_inf']):
@@ -108,7 +109,7 @@ def add_default_route(ip_gateway):
         sys.exit()
 
 
-def verify_addr(wan_ip):
+def verify_addr(wan_ip: str) -> str:
     last_ip = IP_ADDRESSES[list(IP_ADDRESSES.keys())[-1]]  # get last ip
     last_octect = int(last_ip.split('.')[-1])  # get last ip octet
     if wan_ip not in IP_ADDRESSES:
@@ -121,7 +122,7 @@ def verify_addr(wan_ip):
     return ip_mesh
 
 
-def printing_auth():
+def printing_auth() -> Dict[str, str]:
     return MAC_ADDRESSES
 
 
@@ -142,7 +143,7 @@ def add_mac_addr(uuid):
 
 
 @app.route('/')
-def debug():
+def debug() -> str:
     addresses_auth = printing_auth()
     table = pd.DataFrame.from_dict(addresses_auth, orient='index', columns=['Mesh IP Address'])
     table['MAC Address'] = table.index

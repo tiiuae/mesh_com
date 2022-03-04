@@ -16,6 +16,8 @@ import sys
 
 sys.path.append("gw")
 from gw import main
+from requests.models import Response
+from typing import Union
 
 # Get the mesh_com config
 print('> Loading yaml conf... ')
@@ -35,7 +37,7 @@ ap = argparse.ArgumentParser()
 # Add the arguments to the parser
 ap.add_argument("-s", "--server", required=True, help="Server IP:Port Address. Ex: 'http://192.168.15.14:5000'")
 ap.add_argument("-c", "--certificate", required=True)
-args = ap.parse_args()
+args: argparse.Namespace = ap.parse_args()
 
 # Connect to server
 URL = args.server
@@ -59,7 +61,7 @@ def is_sec_os():
     return ""
 
 
-def get_data(cert_file, oss):
+def get_data(cert_file, oss) -> None:
     message = f'/api/add_message/{oss}'
     with open(cert_file, 'rb', encoding='UTF-8') as stream:
         resp = requests.post(URL + message,
@@ -91,12 +93,12 @@ def decrypt_response():  # assuming that data is on a file called payload.enc ge
         return output_dict, server_cert
 
 
-def serializing(new_list):
+def serializing(new_list) -> str:
     joined_list = ''.join(new_list)
     return joined_list.replace("\'", '"')
 
 
-def verify_certificate(new):
+def verify_certificate(new) -> bool:
     """
     Here we are validating the hash of the certificate. This is giving us the integrity of the file, not if the
     certificate is valid. To validate if the certificate is valid, we need to verify the features of the certificate
@@ -125,13 +127,13 @@ def get_interface(pattern):
     return None
 
 
-def ubuntu_node(gateway):
+def ubuntu_node(gateway) -> None:
     print('> Configuring Ubuntu mesh node...')
     # Create default route service
     subprocess.call(f'src/bash/conf-route.sh {gateway}', shell=True)
 
 
-def create_config_ubuntu(response):
+def create_config_ubuntu(response: Union[bytes, str]) -> None:
     res = json.loads(response)
     print('> Interfaces: ' + str(res))
     address = res['addr']
@@ -157,7 +159,6 @@ def create_config_ubuntu(response):
     # Are we a gateway node? If we are we need to set up the routes
     if res['gateway'] and conf['gw_service']:
         print("============================================")
-        gw_inf = get_interface(conf['gw_inf'])
         main.AutoGateway()
     # Set hostname
     if conf['set_hostname']:
@@ -195,7 +196,7 @@ if __name__ == "__main__":
     if verify_certificate(server_cert):
         print(colored('> Valid Server Certificate', 'green'))
         mac = get_mac_address(interface=get_interface(conf['mesh_inf']))
-        response = requests.post(URL + '/mac/' + mac)
+        response: Response = requests.post(URL + '/mac/' + mac)
         if os == ('Ubuntu', 'secos'):
             create_config_ubuntu(res)
     else:

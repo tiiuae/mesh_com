@@ -10,6 +10,7 @@ import time
 import numpy as np
 import pandas as pd
 import argparse
+from typing import Any, Dict
 
 
 # Construct the argument parser
@@ -18,10 +19,10 @@ ap = argparse.ArgumentParser()
 ap.add_argument("-c", "--clean", help='clean all (delete all keys and files)', required=False,
                 default=False, const=True, nargs='?')
 ap.set_defaults(clean=False)
-args = ap.parse_args()
+args: argparse.Namespace = ap.parse_args()
 
 
-def folder():
+def folder() -> None:
     if not path.isdir(PATH):
         os.mkdir(PATH)
 
@@ -62,7 +63,7 @@ def init():
         return ID, fpr
 
 
-def clean_all():
+def clean_all() -> None:
     keys = gpg.list_keys(True)
     for key in keys:
         gpg.trust_keys(key['fingerprint'], "TRUST_UNDEFINED")
@@ -80,7 +81,7 @@ def clean_all():
     exit()
 
 
-def decrypt_conf(ID):
+def decrypt_conf(ID) -> None:
     '''
     Decrypt the mesh_conf file
     '''
@@ -93,7 +94,7 @@ def decrypt_conf(ID):
             print("status: ", status.status)
 
 
-def client(ID, ser_ip, message):
+def client(ID, ser_ip, message) -> None:
     '''
     Socket client to send message to specific server.
     '''
@@ -109,7 +110,7 @@ def client(ID, ser_ip, message):
     print('Sent: ', repr(data))
 
 
-def server_auth(ID, interface='wlan0'):
+def server_auth(ID, interface: str='wlan0'):
     '''
     Create a socket server and get the key information to import it.
     '''
@@ -201,7 +202,7 @@ def create_table():
     return table
 
 
-def update_table(info):
+def update_table(info) -> None:
     '''
     this function update the table with the node's info
     '''
@@ -235,7 +236,7 @@ if __name__ == "__main__":
         candidate = wf.scan_wifi()  # scan wifi to authenticate with
         print('AP available: ' + candidate)
         wf.connect_wifi(candidate)
-        serverIP = ".".join(wf.get_ip_address("wlan0").split(".")[0:3]) + ".1"  # assuming we're connected ip will be .1
+        serverIP: str = ".".join(wf.get_ip_address("wlan0").split(".")[0:3]) + ".1"  # assuming we're connected ip will be .1
         print('2) send my key')
         client(candidate, serverIP, my_key)
         print('3) get node key')
@@ -299,5 +300,5 @@ if __name__ == "__main__":
                 time.sleep(7)
                 client(nodeID, addr[0], my_mac_mesh.encode())
             client_mesh_ip, _ = server_auth(myID)
-        info = {'ID': 'provServer', 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(), 'PubKey_fpr': client_fpr[0], 'trust_level': level}
+        info: Dict[str, Any] = {'ID': 'provServer', 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(), 'PubKey_fpr': client_fpr[0], 'trust_level': level}
         update_table(info)  # #update csv file
