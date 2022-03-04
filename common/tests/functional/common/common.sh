@@ -22,6 +22,8 @@ phyname=0           # Should be updated from test script
 wifidev=0           # Should be updated from test script
 device_list=0       # includes wifi phy list when find_wifi_device() is called
 channel_list=0      # includes supported wifi channels when update_channel_list() is called
+wpa_log_filename=""     # value updated from init functions
+hostapd_log_filename="" # value updated from init functions
 
 #######################################
 # ctrl-c trap
