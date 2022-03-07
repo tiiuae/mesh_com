@@ -2,10 +2,9 @@
 
 source ./common/common.sh
 
-test_case="mesh_com v1.0 server functionality"
+test_case="mesh_com v1.0 client functionality"
 
-description="Test mesh_com server"
-
+description="mesh_com client Test Case"
 #######################################
 # Init
 # Globals:
@@ -22,15 +21,15 @@ _init() {
 # Test
 # Globals:
 #  result
-#  wifidev
+#  wifi dev
 #  channel_list
 # Arguments:
 #######################################
 _test() {
-  echo "$0, test called" | print_log log_server
+  echo "$0, test called" | print_log log_client
 
   if ! [ "$result" -eq "$FAIL" ]; then
-    start_mesh_server
+    start_mesh_client
   fi
 }
 
@@ -41,24 +40,20 @@ _test() {
 # Arguments:
 #######################################
 _result() {
-  echo "$0, result called" | print_log log_server
- 
-  retries=3
+  echo "$0, result called" | print_log log_client
 
-  for ((i=0; i<retries; i++)); do
-    server_details=$(timeout 7 avahi-browse -rptf _http._tcp | awk -F';' '$1 == "=" && $3 == "IPv4" && $4 == "mesh_server" {print $4 " " $8 " " $7}')
-	if [ "$server_details" ] ; then
-	    break
-	fi
-  done 
-  if [ "$server_details" ] ; then
-    echo -e "server found: $server_details" | print_log log_server
+	SERVER_VALID=$(cat "$MESH_COM_ROOTDIR/modules/sc-mesh-secure-deployment/src/testclient.txt")
+	CLIENT_VALID=$(cat "$MESH_COM_ROOTDIR/modules/sc-mesh-secure-deployment/src/testclient1.txt")
+	CLIENT_MAC=$(cat "$MESH_COM_ROOTDIR/modules/sc-mesh-secure-deployment/src/testclientmac.txt")
+
+  if [[ "$SERVER_VALID" ]] && [[ "$CLIENT_VALID" ]] ; then
+    echo -e "Client is valid: $CLIENT_MAC" | print_log log_client
     result=$PASS
   else
     result=$FAIL
   fi
 
-  
+
 }
 
 #######################################
@@ -68,7 +63,7 @@ _result() {
 # Arguments:
 #######################################
 _deinit() {
-  echo "$0, deinit called" | print_log log_server
+  echo "$0, deinit called" | print_log log_client
   #kill flask server
   pid=$(netstat -tlnp | awk '/:5000 */ {split($NF,a,"/"); print a[1]}')
   echo $pid
@@ -85,20 +80,20 @@ _deinit() {
 # Arguments:
 #######################################
 main() {
-  echo "### Test Case: $test_case" | print_log result_server
-  echo "### Test Description: $description" | print_log result_server
+  echo "### Test Case: $test_case" | print_log result_client
+  echo "### Test Description: $description" | print_log result_client
 
   _init
 
   if [ "$result" -eq "$FAIL" ]; then
-	echo "FAILED  _init: $test_case" | print_log result_server
+	echo "FAILED  _init: $test_case" | print_log result_client
 	exit 0
   fi
 
   _test
 
   if [ "$result" -eq "$FAIL" ]; then
-	echo "FAILED  _test: $test_case" | print_log result_server
+	echo "FAILED  _test: $test_case" | print_log result_client
 	exit 0
   fi
 
@@ -106,10 +101,10 @@ main() {
   _result
 
   if [ "$result" -eq "$FAIL" ]; then
-	echo "FAILED  : $test_case" | print_log result_server
+	echo "FAILED  : $test_case" | print_log result_client
 	exit 0
   else
-	echo "PASSED  : $test_case" | print_log result_server
+	echo "PASSED  : $test_case" | print_log result_client
   fi
 
   _deinit
