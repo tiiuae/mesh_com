@@ -10,30 +10,29 @@ import yaml
 import json
 import argparse
 from termcolor import colored
+import pathlib
 import hashlib
 import os
-import sys
-from typing import Dict
 
 # Get the mesh_com config
 print(os.getenv("MESH_COM_ROOT", ""))
-config_path = os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
+config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
 print('> Loading yaml conf... ')
-with open(config_path, 'r', encoding='UTF-8') as yamlfile:
-    try:
-        yaml_conf = yaml.safe_load(yamlfile)
-        conf = yaml_conf['server']
-        debugging = yaml_conf['debug']
-    except (IOError, yaml.YAMLError) as error:
-        print(error)
-        sys.exit()
+try:
+    yaml_conf = yaml.safe_load(open(config_path, 'r'))
+    conf = yaml_conf['server']
+    debug = yaml_conf['debug']
+except (IOError, yaml.YAMLError) as error:
+    print(error)
+    exit()
 
 # Construct the argument parser
 ap = argparse.ArgumentParser()
 
 # Add the arguments to the parser
 ap.add_argument("-c", "--certificate", required=True)
-args: argparse.Namespace = ap.parse_args()
+ap.add_argument("-t","--test",required=False,default=False,action='store_true')
+args = ap.parse_args()
 app = Flask(__name__)
 IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
 MAC_ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
@@ -41,45 +40,58 @@ IP_PREFIX = '10.20.15'
 SERVER_CERT = args.certificate
 NOT_AUTH = {}
 
+def Server_Test(**arg):
+    if args.test:
+        f = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient.txt","w")
+        if arg["color"] == "Green":
+            f.write("True")
+            f.close()
+        elif arg["Color"] == "Red":
+            f.write("False")
+            f.close()
+
 
 @app.route('/api/add_message/<uuid>', methods=['GET', 'POST'])
 def add_message(uuid):
     key = request.files['key']
     receivedKey = key.read()
-    with open(SERVER_CERT, 'rb', encoding='UTF-8') as localCert:
-        # Do we need the ubuntu or openwrt setup?
-        aux = conf[str(uuid).lower()]
-        # Requester a new IP
-        ip_address = request.remote_addr
-        print("> Requester IP: " + ip_address)
-        # Get MAC
-        mac = get_mac_address(ip=ip_address)
-        if verify_certificate(localCert, receivedKey):
-            print(colored('> Valid Client Certificate', 'green'))
-            ip_mesh = verify_addr(ip_address)
-            print('> Assigned mesh IP: ' + ip_mesh)
-            if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
-                aux['gateway'] = True
-                add_default_route(ip_address)  # we will need to add the default route to communicate
-            else:
-                aux['gateway'] = False
-            aux['addr'] = ip_mesh
-            msg_json = json.dumps(aux)
-            if debugging:
-                print('> Unencrypted message: ', end='')
-                print(msg_json)
-            # Encrypt message use .call() to block and avoid race condition with open()
-            subprocess.call(['ecies_encrypt',
-                                    SERVER_CERT, msg_json],
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            with open('payload.enc', 'rb', encoding='UTF-8') as enc:
-                encrypt_all = enc.read()
-                print('> Sending encrypted message...')
-                if debugging:
-                    print(encrypt_all)
-                return encrypt_all + localCert.read()
+    localCert = open(SERVER_CERT, 'rb')
+    # Do we need the ubuntu or openwrt setup?
+    aux = conf[str(uuid).lower()]
+    # Requester a new IP
+    ip_address = request.remote_addr
+    print("> Requester IP: " + ip_address)
+    # Get MAC
+    mac = get_mac_address(ip=ip_address)
+    if verify_certificate(localCert, receivedKey):
+        print(colored('> Valid Client Certificate', 'green'))
+        Server_Test(color="Green")
+        ip_mesh = verify_addr(ip_address)
+        print('> Assigned mesh IP: ' + ip_mesh)
+        if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
+            aux['gateway'] = True
+            add_default_route(ip_address)  # we will need to add the default route to communicate
+        else:
+            aux['gateway'] = False
+        aux['addr'] = ip_mesh
+        msg_json = json.dumps(aux)
+        if debug:
+            print('> Unencrypted message: ', end='')
+            print(msg_json)
+        # Encrypt message use .call() to block and avoid race condition with open()
+        proc = subprocess.call(['ecies_encrypt',
+                                SERVER_CERT, msg_json],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        enc = open('payload.enc', 'rb')
+        encrypt_all = enc.read()
+        print('> Sending encrypted message...')
+        if debug:
+            print(encrypt_all)
+        return encrypt_all + localCert.read()
+    else:
         NOT_AUTH[mac] = ip_address
         print(colored("Not Valid Client Certificate", 'red'))
+        Server_Test(color="Red")
         return 'Not Valid Certificate'
 
 
@@ -99,6 +111,7 @@ def verify_certificate(old, new):
 def add_default_route(ip_gateway):
     try:
         for interf in netifaces.interfaces():
+            # TODO: what it if doesn't start with wlan???
             if interf.startswith(conf['mesh_inf']):
                 interface = interf
         command = 'ip route add ' + IP_PREFIX + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface
@@ -106,7 +119,7 @@ def add_default_route(ip_gateway):
         subprocess.call(command, shell=True)
     except:
         print("ERROR: No available interface for default route!")
-        sys.exit()
+        exit()
 
 
 def verify_addr(wan_ip):
@@ -122,7 +135,7 @@ def verify_addr(wan_ip):
     return ip_mesh
 
 
-def printing_auth() -> Dict[str, str]:
+def printing_auth():
     return MAC_ADDRESSES
 
 
