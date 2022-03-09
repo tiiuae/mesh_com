@@ -7,7 +7,10 @@ RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-
 
 
 WORKDIR /opt
-RUN apt update -y && apt install batctl net-tools sudo git nano gcc python3-dev python3-yaml iproute2 iw wireless-tools isc-dhcp-client inetutils-ping lsb-release systemd iptables wget -y
+RUN apt update -y && apt \
+    install batctl net-tools sudo git nano gcc \
+    python3-dev python3-yaml iproute2 iw wireless-tools\
+    isc-dhcp-client inetutils-ping lsb-release systemd iptables wget python3-gnupg python3-pip -y
 
 RUN /bin/sh -c 'set -ex && \
     ARCH=`uname -m` && \
@@ -22,7 +25,13 @@ RUN /bin/sh -c 'set -ex && \
        dpkg -i wpasupplicant_2.9.0-20-6~git20210701.43d8971_amd64.deb; \
     fi'
 
-RUN wget -L https://github.com/tiiuae/mesh_com/raw/develop/modules/sc-mesh-secure-deployment/install.sh
-RUN chmod 777 install.sh
-RUN /bin/bash /opt/install.sh
-WORKDIR /opt/mesh_com/modules/sc-mesh-secure-deployment/
+#RUN wget -L https://github.com/tiiuae/mesh_com/raw/develop/modules/sc-mesh-secure-deployment/install.sh
+#RUN chmod 777 install.sh
+#RUN /bin/bash /opt/install.sh 1.5
+RUN git clone git://github.com/tiiuae/mesh_com
+RUN cd mesh_com; git checkout feature/develop_pgp
+RUN cd  /opt/mesh_com/modules/sc-mesh-secure-deployment;  chmod 777 install.sh;  /bin/bash install.sh 1.5
+WORKDIR /opt/mesh_com/modules/sc-mesh-secure-deployment/src/authentication
+RUN pip3 install -r requirements.txt
+RUN mkdir hsm
+
