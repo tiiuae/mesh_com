@@ -47,10 +47,11 @@ elif [ "$OS" == "Buildroot" ]; then
         if [ -f "/root/rootfs.tgz" ]; then
             echo "import rootfs.tgz commms vm"
             cat /root/rootfs.tgz | docker import - comms_vm
+            docker build -t comms_vm .
         else
             docker import - comms_vm < /rootfs.tar
         fi
-        docker run --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm /bin/bash
+        docker -D run --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm
         #Add restart policy of the container if it stops or device rebooted
         docker update --restart unless-stopped comms_vm
     elif [ "$docker_exec_env" == "ubuntu" ]; then
