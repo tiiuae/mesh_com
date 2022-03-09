@@ -5,7 +5,6 @@ import re
 from pexpect import pxssh
 
 
-
 def get_macs():
     macs = []
     proc = subprocess.Popen(['batctl', 'n'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
