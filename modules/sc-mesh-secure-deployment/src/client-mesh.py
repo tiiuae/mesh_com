@@ -18,9 +18,6 @@ from termcolor import colored
 from pathlib import Path
 import sys
 
-sys.path.append("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw")
-from gw import main
-
 # Get the mesh_com config
 print(getenv("MESH_COM_ROOT", ""))
 config_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
@@ -158,10 +155,10 @@ def get_interface(pattern):
         return pre[0]
 
 
-def ubuntu_gw(gw_inf):
-    print('> Configuring Ubuntu gateway node with gw_inf:' + str(gw_inf) + '...')
+def conf_gw():
+    print('> Configuring gateway node ')
     # Create Gateway Service
-    subprocess.call('src/bash/conf-gw.sh ' + gw_inf, shell=True)
+    subprocess.call('/opt/mesh_com/modules/sc-mesh-secure-deployment/src/bash/conf-gw.sh', shell=False)
 
 
 def ubuntu_node(gateway):
@@ -193,10 +190,7 @@ def create_config_ubuntu(response):
         mesh_config.write('COUNTRY=fi\n')
         mesh_config.write('MESH_VIF=' + mesh_vif + '\n')
         mesh_config.write('PHY=' + phy_name + '\n')
-    # Are we a gateway node? If we are we need to set up the routes
-    if res['gateway'] and conf['gw_service']:
-        print("============================================")
-        main.AutoGateway()
+        conf_gw()
     # Set hostname
     if conf['set_hostname']:
         print('> Setting hostname...')
