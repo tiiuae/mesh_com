@@ -18,7 +18,7 @@ from termcolor import colored
 from pathlib import Path
 import sys
 
-sys.path.append("gw")
+sys.path.append("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw")
 from gw import main
 
 # Get the mesh_com config
