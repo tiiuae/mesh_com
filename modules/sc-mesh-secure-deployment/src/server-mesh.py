@@ -132,6 +132,10 @@ def verify_addr(wan_ip):
         ip_mesh = IP_ADDRESSES[wan_ip]
     print('> All addresses: ', end='')
     print(IP_ADDRESSES)
+    json_object = json.dumps(IP_ADDRESSES,indent = 4)
+
+    with open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/file.json","w") as outfile:
+        outfile.write(json_object)
     return ip_mesh
 
 
