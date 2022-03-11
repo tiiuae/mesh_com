@@ -19,6 +19,7 @@ ap = argparse.ArgumentParser()
 
 # Add the arguments to the parser
 ap.add_argument("-c", "--certificate", required=True)
+ap.add_argument("-t","--test",required=False,default=False,action='store_true')
 ap.add_argument("-m", "--mode", required=True)
 args = ap.parse_args()
 # Get the mesh_com config
@@ -37,12 +38,23 @@ try:
 except (IOError, yaml.YAMLError) as error:
     print(error)
     exit()
+
 app = Flask(__name__)
 IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
 MAC_ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
 IP_PREFIX = '10.20.15'
 SERVER_CERT = args.certificate
 NOT_AUTH = {}
+
+def Server_Test(**arg):
+    if args.test:
+        f = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient.txt","w")
+        if arg["color"] == "Green":
+            f.write("True")
+            f.close()
+        elif arg["Color"] == "Red":
+            f.write("False")
+            f.close()
 
 
 @app.route('/api/add_message/<uuid>', methods=['GET', 'POST'])
@@ -59,6 +71,7 @@ def add_message(uuid):
     mac = get_mac_address(ip=ip_address)
     if verify_certificate(localCert, receivedKey):
         print(colored('> Valid Client Certificate', 'green'))
+        Server_Test(color="Green")
         ip_mesh = verify_addr(ip_address)
         print('> Assigned mesh IP: ' + ip_mesh)
         if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
@@ -84,6 +97,7 @@ def add_message(uuid):
     else:
         NOT_AUTH[mac] = ip_address
         print(colored("Not Valid Client Certificate", 'red'))
+        Server_Test(color="Red")
         return 'Not Valid Certificate'
 
 
@@ -124,6 +138,10 @@ def verify_addr(wan_ip):
         ip_mesh = IP_ADDRESSES[wan_ip]
     print('> All addresses: ', end='')
     print(IP_ADDRESSES)
+    json_object = json.dumps(IP_ADDRESSES,indent = 4)
+
+    with open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/file.json","w") as outfile:
+        outfile.write(json_object)
     return ip_mesh
 
 
