@@ -51,9 +51,10 @@ elif [ "$OS" == "Buildroot" ]; then
         else
             docker import - comms_vm < /rootfs.tar
         fi
-        docker -D run --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm
+        docker rm -f mesh_comms_vm
+        docker run --name mesh_comms_vm -d --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm
         #Add restart policy of the container if it stops or device rebooted
-        docker update --restart unless-stopped comms_vm
+        docker update --restart unless-stopped mesh_comms_vm
     elif [ "$docker_exec_env" == "ubuntu" ]; then
         docker build -t comms_vm .
         docker run -it --privileged --net="host" --rm comms_vm /bin/bash

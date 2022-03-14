@@ -15,3 +15,6 @@ else
     sleep 2
   fi
 fi
+
+#start gw manager
+nohup python -u /opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw/main.py
