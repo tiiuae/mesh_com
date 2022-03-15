@@ -34,13 +34,13 @@ args = ap.parse_args()
 mesh_mode = args.mode
 
 # Get the mesh_com config
-if mesh_mode == '11s':
+if mesh_mode == 'ibss':
     conf_path = "src/mesh_com.conf"
-elif mesh_mode == 'ibss':
+elif mesh_mode == '11s':
     conf_path = "src/mesh_com_11s.conf"
 
 print(getenv("MESH_COM_ROOT", ""))
-config_path = osh.path.join(getenv("MESH_COM_ROOT", ""), config_path)
+config_path = osh.path.join(getenv("MESH_COM_ROOT", ""), conf_path)
 print('> Loading yaml conf... ')
 try:
     yaml_conf = yaml.safe_load(open(config_path, 'r'))
@@ -201,10 +201,6 @@ def create_config_ubuntu(response):
         mesh_config.write('COUNTRY=fi\n')
         mesh_config.write('MESH_VIF=' + mesh_vif + '\n')
         mesh_config.write('PHY=' + phy_name + '\n')
-    # Are we a gateway node? If we are we need to set up the routes
-    if res['gateway'] and conf['gw_service']:
-        print("============================================")
-        main.AutoGateway()
     # Set hostname
     if conf['set_hostname']:
         print('> Setting hostname...')
@@ -232,7 +228,10 @@ def create_config_ubuntu(response):
             subprocess.call(config_11s_mesh_path + " " + mesh_interface, shell=True)
         if res['type'] == 'ibss':
             subprocess.call(config_mesh_path + " " + mesh_interface, shell=True)
-
+    # Are we a gateway node? If we are we need to set up the routes
+    if res['gateway'] and conf['gw_service']:
+        print("============================================")
+        main.AutoGateway()
 
 if __name__ == "__main__":
     os = is_sec_os()

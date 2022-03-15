@@ -26,9 +26,9 @@ args = ap.parse_args()
 print(os.getenv("MESH_COM_ROOT", ""))
 mesh_mode = args.mode
 if mesh_mode == '11s':
-    config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
-elif mesh_mode == 'ibss':
     config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com_11s.conf")
+elif mesh_mode == 'ibss':
+    config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
 
 print('> Loading yaml conf... ')
 try:
