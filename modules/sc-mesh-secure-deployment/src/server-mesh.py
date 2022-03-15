@@ -14,9 +14,22 @@ import pathlib
 import hashlib
 import os
 
+# Construct the argument parser
+ap = argparse.ArgumentParser()
+
+# Add the arguments to the parser
+ap.add_argument("-c", "--certificate", required=True)
+ap.add_argument("-t","--test",required=False,default=False,action='store_true')
+ap.add_argument("-m", "--mode", required=True)
+args = ap.parse_args()
 # Get the mesh_com config
 print(os.getenv("MESH_COM_ROOT", ""))
-config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
+mesh_mode = args.mode
+if mesh_mode == '11s':
+    config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com_11s.conf")
+elif mesh_mode == 'ibss':
+    config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
+
 print('> Loading yaml conf... ')
 try:
     yaml_conf = yaml.safe_load(open(config_path, 'r'))
@@ -26,13 +39,6 @@ except (IOError, yaml.YAMLError) as error:
     print(error)
     exit()
 
-# Construct the argument parser
-ap = argparse.ArgumentParser()
-
-# Add the arguments to the parser
-ap.add_argument("-c", "--certificate", required=True)
-ap.add_argument("-t","--test",required=False,default=False,action='store_true')
-args = ap.parse_args()
 app = Flask(__name__)
 IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
 MAC_ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
