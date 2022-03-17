@@ -4,34 +4,31 @@ from flask import Flask, request, json
 from getmac import get_mac_address
 import subprocess
 import netifaces
-#Enable pandas after availablity of _bz2 shared lib
-#import pandas as pd
+import pandas as pd
 import yaml
 import json
 import argparse
 from termcolor import colored
 import pathlib
-import hashlib
 import os
+import primitives as pri
 
 # Get the mesh_com config
-print(os.getenv("MESH_COM_ROOT", ""))
-config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
 print('> Loading yaml conf... ')
 try:
-    yaml_conf = yaml.safe_load(open(config_path, 'r'))
+    yaml_conf = yaml.safe_load(open('src/mesh_com.conf', 'r'))
     conf = yaml_conf['server']
     debug = yaml_conf['debug']
 except (IOError, yaml.YAMLError) as error:
     print(error)
     exit()
 
+
 # Construct the argument parser
 ap = argparse.ArgumentParser()
 
 # Add the arguments to the parser
 ap.add_argument("-c", "--certificate", required=True)
-ap.add_argument("-t","--test",required=False,default=False,action='store_true')
 args = ap.parse_args()
 app = Flask(__name__)
 IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
@@ -40,72 +37,66 @@ IP_PREFIX = '10.20.15'
 SERVER_CERT = args.certificate
 NOT_AUTH = {}
 
-def Server_Test(**arg):
-    if args.test:
-        f = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient.txt","w")
-        if arg["color"] == "Green":
-            f.write("True")
-            f.close()
-        elif arg["Color"] == "Red":
-            f.write("False")
-            f.close()
+
+
+@app.route('/signature', methods=['GET', 'POST'])
+def signature():
+    _, sig = pri.hashSig(SERVER_CERT)
+    if debug:
+        print(f'> Signature: {bytes(sig)}')
+    return bytes(sig)
+
+
+@app.route('/digest', methods=['GET', 'POST'])
+def digest():
+    dig, _ = pri.hashSig(SERVER_CERT)
+    if debug:
+        print(f'> Digest: {dig}')
+    return dig
 
 
 @app.route('/api/add_message/<uuid>', methods=['GET', 'POST'])
 def add_message(uuid):
-    key = request.files['key']
-    receivedKey = key.read()
-    localCert = open(SERVER_CERT, 'rb')
+    client_key = request.files['key']
+    sig = request.files['sig']
+    dig_received = request.files['dig']
     # Do we need the ubuntu or openwrt setup?
     aux = conf[str(uuid).lower()]
     # Requester a new IP
     ip_address = request.remote_addr
-    print("> Requester IP: " + ip_address)
+    print(f"> Requester IP: {ip_address}")
+    # saving node cert
+    node_name = ip_address.replace('.', '_')
+    pri.import_cert(client_key, node_name)
     # Get MAC
     mac = get_mac_address(ip=ip_address)
-    if verify_certificate(localCert, receivedKey):
+    if pri.verify_certificate(sig.read(), node_name, dig_received.read(), SERVER_CERT):
         print(colored('> Valid Client Certificate', 'green'))
-        Server_Test(color="Green")
         ip_mesh = verify_addr(ip_address)
-        print('> Assigned mesh IP: ' + ip_mesh)
-        if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
-            aux['gateway'] = True
-            add_default_route(ip_address)  # we will need to add the default route to communicate
-        else:
-            aux['gateway'] = False
+        print(f'> Assigned mesh IP: {ip_mesh}')
+        #This is commented because it will be managed by the dynamic GW script
+        # if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
+        #     aux['gateway'] = True
+        #     add_default_route(ip_address)  # we will need to add the default route to communicate
+        # else:
+        #     aux['gateway'] = False
         aux['addr'] = ip_mesh
         msg_json = json.dumps(aux)
         if debug:
             print('> Unencrypted message: ', end='')
             print(msg_json)
-        # Encrypt message use .call() to block and avoid race condition with open()
-        proc = subprocess.call(['ecies_encrypt',
-                                SERVER_CERT, msg_json],
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        enc = open('payload.enc', 'rb')
-        encrypt_all = enc.read()
+        enc = pri.encrypt_response(msg_json, node_name)
         print('> Sending encrypted message...')
         if debug:
-            print(encrypt_all)
-        return encrypt_all + localCert.read()
+            print(enc)
+        return enc
     else:
         NOT_AUTH[mac] = ip_address
         print(colored("Not Valid Client Certificate", 'red'))
-        Server_Test(color="Red")
+        pri.delete_key(node_name)
+        os.remove()
+        # delete via os
         return 'Not Valid Certificate'
-
-
-def verify_certificate(old, new):
-    """
-    Here we are validating the hash of the certificate. This is giving us the integrity of the file, not if the
-    certificate is valid. To validate if the certificate is valid, we need to verify the features of the certificate
-    such as NotBefore, notAfter, crl file and its signature, issuer validity, if chain is there then this for all but
-    for this we need to use x509 certificates.
-
-    """
-    old_md5 = hashlib.md5(old.read()).hexdigest()
-    new_md5 = hashlib.md5(new).hexdigest()
-    return old_md5 == new_md5
 
 
 def add_default_route(ip_gateway):
@@ -114,9 +105,10 @@ def add_default_route(ip_gateway):
             # TODO: what it if doesn't start with wlan???
             if interf.startswith(conf['mesh_inf']):
                 interface = interf
-        command = 'ip route add ' + IP_PREFIX + '.0/24 ' + 'via ' + ip_gateway + ' dev ' + interface
+        interf = f'{IP_PREFIX}.0/24 '
+        command = ['ip', 'route', 'add', interf, 'via', ip_gateway, 'dev', interface]
         print('> Adding default route to mesh... \'' + command + '\'')
-        subprocess.call(command, shell=True)
+        subprocess.call(command, shell=False)
     except:
         print("ERROR: No available interface for default route!")
         exit()
@@ -126,16 +118,12 @@ def verify_addr(wan_ip):
     last_ip = IP_ADDRESSES[list(IP_ADDRESSES.keys())[-1]]  # get last ip
     last_octect = int(last_ip.split('.')[-1])  # get last ip octet
     if wan_ip not in IP_ADDRESSES:
-        ip_mesh = IP_PREFIX + '.' + str(last_octect + 1)
+        ip_mesh = f'{IP_PREFIX}.{str(last_octect + 1)}'
         IP_ADDRESSES[wan_ip] = ip_mesh
     else:
         ip_mesh = IP_ADDRESSES[wan_ip]
     print('> All addresses: ', end='')
     print(IP_ADDRESSES)
-    json_object = json.dumps(IP_ADDRESSES,indent = 4)
-
-    with open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/file.json","w") as outfile:
-        outfile.write(json_object)
     return ip_mesh
 
 
@@ -173,7 +161,12 @@ def debug():
     table.reset_index(drop=True, inplace=True)
     bes2 = table.to_html(classes='table table-striped', header=True, index=False)
 
-    return '<h3>Authenticated Nodes</h3>' + bes + '\n' + "<h3>Not Valid Certificate Nodes</h3>" + bes2
+    return (
+        f'<h3>Authenticated Nodes</h3>{bes}'
+        + '\n'
+        + "<h3>Not Valid Certificate Nodes</h3>"
+        + bes2
+    )
 
 
 if __name__ == '__main__':

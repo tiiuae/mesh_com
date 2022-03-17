@@ -14,16 +14,18 @@ import requests
 from termcolor import colored
 from pathlib import Path
 import sys
+import primitives as pri
+
 
 # Get the mesh_com config
 print(getenv("MESH_COM_ROOT", ""))
 config_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
 print('> Loading yaml conf... ')
 try:
-    with yaml.safe_load(open(config_path, 'r', encoding='UTF-8')) as yaml_conf:
-        conf = yaml_conf['client']
-        debug = yaml_conf['debug']
-        print(conf)
+    yaml_conf = yaml.safe_load(open(config_path, 'r'))
+    conf = yaml_conf['client']
+    debug = yaml_conf['debug']
+    print(conf)
 except (IOError, yaml.YAMLError) as error:
     print(error)
     sys.exit()
@@ -37,11 +39,17 @@ ap.add_argument("-c", "--certificate", required=True)
 ap.add_argument("-t", "--test", required=False, default=False, action='store_true')
 args = ap.parse_args()
 
+# Connect to server
+URL = args.server
+print('> Connecting to server: ' + str(URL))
+local_cert = args.certificate
+root_cert = 'src/root_cert.der'
 
 # Function for test case
 def Client_Test(**arg):
     if args.test:
-        with open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient1.txt", "w", encoding='UTF-8') as testfile:
+        with open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient1.txt", "w",
+                  encoding='UTF-8') as testfile:
             if arg["color"] == "Green":
                 testfile.write("True")
                 testfile.close()
@@ -52,18 +60,14 @@ def Client_Test(**arg):
 
 def Client_Mac(**arg):
     if args.test:
-        with open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclientmac.txt", "w", encoding='UTF-8') as testfile:
+        with open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclientmac.txt", "w",
+                  encoding='UTF-8') as testfile:
             if arg["macs"] is not None:
                 testfile.write(str(arg["macs"]))
                 testfile.close()
 
 
-# Connect to server
-URL = args.server
-print('> Connecting to server: ' + str(URL))
-
-
-def get_os():
+def get_os(): #this is not being used
     with subprocess.Popen(['lsb_release', '-a'], stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
         out, _ = proc.communicate()
         for element in out.split():
@@ -73,68 +77,45 @@ def get_os():
         return oss
 
 
-def is_sec_os():
+def is_sec_os(): #this is not being used
     execution_ctx = osh.environ.get('EXECUTION_CTX')
     if execution_ctx == "docker":
         return "secos" if osh.environ.get('HOSTNAME') == "br_hardened" else get_os()
     return ""
 
 
-def get_data(cert_file, oss):
+def get_data(oss='secos'):
     message = f'/api/add_message/{oss}'
-    with open(cert_file, 'rb', encoding='UTF-8' ) as stream:
+    dig, sig = pri.hashSig(root_cert)
+    with open(local_cert, 'rb') as lo_cert:
         resp = requests.post(URL + message,
-                                 files={'key': stream})
+                             files={'key': lo_cert,
+                                    'sig': bytes(sig),
+                                    'dig': dig})
         if resp.content == b'Not Valid Certificate':
             print(colored('Not Valid Certificate', 'red'))
             sys.exit()
-        else:
-            if debug:
-                print(f'> Encrypted message: {str(response.content)}')
-            with open('payload.enc', 'wb', encoding='UTF-8') as file:
-                file.write(response.content)
+        elif debug:
+            print(f'> Encrypted message: {str(resp.content)}')
+    return pri.decrypt_response(resp.content)
 
 
-def decrypt_response():  # assuming that data is on a file called payload.enc generated on the function get_data
-    with subprocess.Popen(['ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
-        out, _ = proc.communicate()
-        aux_list = [element.decode() for element in out.split()]
-        # print(aux_list)
-        servercert = aux_list[:39]
-        # Get server configuration json using regex
-        new_list = ''.join(aux_list)
-        pattern = re.compile(r'\{(?:[^{}])*\}')
-        new_list = pattern.findall(new_list)
-        output_dict = serializing(new_list)
-        if debug:
-            print('> Decrypted Message: ', output_dict)
+def get_signature():
+    message = '/signature'
+    resp = requests.post(URL + message)
+    return resp.content
 
-        return output_dict, servercert
+
+def get_digest():
+    message = '/digest'
+    resp = requests.post(URL + message)
+    return resp.content
 
 
 def serializing(new_list):
     joined_list = ''.join(new_list)
     return joined_list.replace("\'", '"')
 
-
-def verify_certificate(old, new):
-    """
-    Here we are validating the hash of the certificate. This is giving us the integrity of the file, not if the
-    certificate is valid. To validate if the certificate is valid, we need to verify the features of the certificate
-    such as NotBefore, notAfter, crl file and its signature, issuer validity, if chain is there then this for all but
-    for this we need to use x509 certificates.
-
-    """
-    with subprocess.Popen(['ecies_decrypt', args.certificate], stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
-        out, _ = proc.communicate()
-        old = [element.decode() for element in out.split()]
-        localcert = old[:39]
-        old_aux = serializing(localcert)
-        new_aux = serializing(new)
-        old_md5 = hashlib.md5(old_aux.encode('utf-8')).hexdigest()
-        new_md5 = hashlib.md5(new_aux.encode('utf-8')).hexdigest()
-
-        return old_md5 == new_md5
 
 
 def get_interface(pattern):
@@ -152,13 +133,14 @@ def conf_gw():
     subprocess.call('/opt/mesh_com/modules/sc-mesh-secure-deployment/src/bash/conf-gw.sh', shell=False)
 
 
-def ubuntu_node(gateway):
+def ubuntu_node(gateway): #this is not being used
     print('> Configuring Ubuntu mesh node...')
     # Create default route service
-    subprocess.call(f'src/bash/conf-route.sh {gateway}', shell=True)
+    command = ['src/bash/conf-route.sh', gateway]
+    subprocess.call(command, shell=False)
 
 
-def create_config_ubuntu(respo):
+def create_config(respo):
     resp = json.loads(respo)
     print('> Interfaces: ' + str(resp))
     address = resp['addr']
@@ -186,7 +168,8 @@ def create_config_ubuntu(respo):
     if conf['set_hostname']:
         print('> Setting hostname...')
         nodeId = int(resp['addr'].split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
-        subprocess.call('hostname node' + str(nodeId), shell=True)
+        command = ['hostname', 'node', str(nodeId)]
+        subprocess.call(command, shell=False)
         subprocess.call('echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts', shell=True)
     execution_ctx = osh.environ.get('EXECUTION_CTX')
     print("EXECUTION CTX:")
@@ -212,20 +195,14 @@ def create_config_ubuntu(respo):
 
 
 if __name__ == "__main__":
-    os = is_sec_os()
-    if not os:
-        os = get_os()
-    local_cert = args.certificate
-    get_data(local_cert, os)
-    res, server_cert = decrypt_response()
-    if verify_certificate(local_cert, server_cert):
+    res = get_data('secos')
+    if pri.verify_certificate(get_signature(), 'root', get_digest(), root_cert):
         print(colored('> Valid Server Certificate', 'green'))
         Client_Test(color="Green")
         mac = get_mac_address(interface=get_interface(conf['mesh_inf']))
         Client_Mac(macs=mac)
         response = requests.post(URL + '/mac/' + mac)
-        if os == ('Ubuntu', 'secos'):
-            create_config_ubuntu(res)
+        create_config(res)
     else:
         print(colored("Not Valid Server Certificate", 'red'))
         Client_Test(color="Red")
