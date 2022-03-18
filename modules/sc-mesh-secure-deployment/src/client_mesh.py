@@ -4,8 +4,6 @@ import argparse
 import json
 import yaml
 import subprocess
-import hashlib
-import re
 import os as osh
 from os import getenv
 import netifaces
@@ -15,7 +13,6 @@ from termcolor import colored
 from pathlib import Path
 import sys
 import primitives as pri
-
 
 # Get the mesh_com config
 print(getenv("MESH_COM_ROOT", ""))
@@ -43,12 +40,13 @@ args = ap.parse_args()
 URL = args.server
 print('> Connecting to server: ' + str(URL))
 local_cert = args.certificate
-root_cert = 'src/root_cert.der'
+root_cert = "/etc/ssl/certs/root_cert.der"
+
 
 # Function for test case
 def Client_Test(**arg):
     if args.test:
-        with open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient1.txt", "w",
+        with open("/opt/container-data/mesh/mesh_com/modules/sc-mesh-secure-deployment/src/testclient1.txt", "w",
                   encoding='UTF-8') as testfile:
             if arg["color"] == "Green":
                 testfile.write("True")
@@ -60,14 +58,14 @@ def Client_Test(**arg):
 
 def Client_Mac(**arg):
     if args.test:
-        with open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclientmac.txt", "w",
+        with open("/opt/container-data/mesh/mesh_com/modules/sc-mesh-secure-deployment/src/testclientmac.txt", "w",
                   encoding='UTF-8') as testfile:
             if arg["macs"] is not None:
                 testfile.write(str(arg["macs"]))
                 testfile.close()
 
 
-def get_os(): #this is not being used
+def get_os():  # this is not being used
     with subprocess.Popen(['lsb_release', '-a'], stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
         out, _ = proc.communicate()
         for element in out.split():
@@ -77,7 +75,7 @@ def get_os(): #this is not being used
         return oss
 
 
-def is_sec_os(): #this is not being used
+def is_sec_os():  # this is not being used
     execution_ctx = osh.environ.get('EXECUTION_CTX')
     if execution_ctx == "docker":
         return "secos" if osh.environ.get('HOSTNAME') == "br_hardened" else get_os()
@@ -117,7 +115,6 @@ def serializing(new_list):
     return joined_list.replace("\'", '"')
 
 
-
 def get_interface(pattern):
     interface_list = netifaces.interfaces()
     interface = filter(lambda x: pattern in x, interface_list)
@@ -130,10 +127,10 @@ def get_interface(pattern):
 def conf_gw():
     print('> Configuring gateway node ')
     # Create Gateway Service
-    subprocess.call('/opt/mesh_com/modules/sc-mesh-secure-deployment/src/bash/conf-gw.sh', shell=False)
+    subprocess.call('/opt/container-data/mesh/mesh_com/modules/sc-mesh-secure-deployment/src/bash/conf-gw.sh', shell=False)
 
 
-def ubuntu_node(gateway): #this is not being used
+def ubuntu_node(gateway):  # this is not being used
     print('> Configuring Ubuntu mesh node...')
     # Create default route service
     command = ['src/bash/conf-route.sh', gateway]

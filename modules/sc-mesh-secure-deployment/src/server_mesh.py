@@ -9,7 +9,6 @@ import yaml
 import json
 import argparse
 from termcolor import colored
-import pathlib
 import os
 import primitives as pri
 
@@ -23,12 +22,12 @@ except (IOError, yaml.YAMLError) as error:
     print(error)
     exit()
 
-
 # Construct the argument parser
 ap = argparse.ArgumentParser()
 
 # Add the arguments to the parser
 ap.add_argument("-c", "--certificate", required=True)
+ap.add_argument("-t", "--test", required=False, default=False, action='store_true')
 args = ap.parse_args()
 app = Flask(__name__)
 IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
@@ -37,6 +36,16 @@ IP_PREFIX = '10.20.15'
 SERVER_CERT = args.certificate
 NOT_AUTH = {}
 
+
+def Server_Test(**arg):
+    if args.test:
+        f = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient.txt","w")
+        if arg["color"] == "Green":
+            f.write("True")
+            f.close()
+        elif arg["Color"] == "Red":
+            f.write("False")
+            f.close()
 
 
 @app.route('/signature', methods=['GET', 'POST'])
@@ -74,7 +83,7 @@ def add_message(uuid):
         print(colored('> Valid Client Certificate', 'green'))
         ip_mesh = verify_addr(ip_address)
         print(f'> Assigned mesh IP: {ip_mesh}')
-        #This is commented because it will be managed by the dynamic GW script
+        # This is commented because it will be managed by the dynamic GW script
         # if ip_mesh == IP_PREFIX + '.2':  # First node, then gateway
         #     aux['gateway'] = True
         #     add_default_route(ip_address)  # we will need to add the default route to communicate
@@ -94,7 +103,7 @@ def add_message(uuid):
         NOT_AUTH[mac] = ip_address
         print(colored("Not Valid Client Certificate", 'red'))
         pri.delete_key(node_name)
-        os.remove()
+        os.remove(node_name + '.der')
         # delete via os
         return 'Not Valid Certificate'
 
@@ -162,12 +171,13 @@ def debug():
     bes2 = table.to_html(classes='table table-striped', header=True, index=False)
 
     return (
-        f'<h3>Authenticated Nodes</h3>{bes}'
-        + '\n'
-        + "<h3>Not Valid Certificate Nodes</h3>"
-        + bes2
+            f'<h3>Authenticated Nodes</h3>{bes}'
+            + '\n'
+            + "<h3>Not Valid Certificate Nodes</h3>"
+            + bes2
     )
 
 
 if __name__ == '__main__':
+    pri.clean_all()
     app.run(host='0.0.0.0', debug=True)

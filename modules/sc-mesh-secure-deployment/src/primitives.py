@@ -1,12 +1,36 @@
 from PyKCS11 import *
 import subprocess
 import hashlib
+import argparse
 
 BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
 LIB = "/usr/lib/softhsm/libsofthsm2.so"
 os.environ['PYKCS11LIB'] = LIB
 
 debug = True
+
+'''
+TODO:create a function to verify if keys exist and are valid
+'''
+
+ap = argparse.ArgumentParser()
+ap.add_argument("-cl", "--clean", required=False, default=False, help='Delete all keys', action='store_false')
+args = ap.parse_args()
+
+
+def clean_all():
+    pkcs11 = PyKCS11Lib()
+    pkcs11.load()  # define environment variable PYKCS11LIB=YourPKCS11Lib
+
+    # get 1st slot
+    slot = pkcs11.getSlotList(tokenPresent=True)[0]
+
+    session = pkcs11.openSession(slot, CKF_SERIAL_SESSION | CKF_RW_SESSION)
+    session.login("1234")
+
+    keys = session.findObjects()
+    for key in range(len(keys)):
+        session.destroyObject(keys[key])
 
 
 def encrypt_response(message,
@@ -117,10 +141,8 @@ def verify_certificate(sig_received, node_name, dig_received, cert):
                 break
             blk.update(data)
     dig = blk.hexdigest()
-    if dig == dig_received:
-        verify_hsm(dig_received, sig_received, node_name)
-
-    return verify_hsm(dig_received, sig_received, node_name)
+    if dig == dig_received.decode('UTF-8'):
+        return verify_hsm(dig_received, sig_received, node_name)
 
 
 def hashSig(cert):
@@ -134,3 +156,8 @@ def hashSig(cert):
         dig = blk.hexdigest()
         sig = sign_hsm(dig)
         return dig, sig
+
+
+if __name__ == "__main__":
+    if args.clean:
+        clean_all()
