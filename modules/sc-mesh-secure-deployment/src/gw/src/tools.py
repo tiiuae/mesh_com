@@ -1,8 +1,17 @@
 import subprocess
 import logging
+import time
 
+def is_batman_if_ready():
+    return_code, bat_if = run_shell_command("ifconfig | grep bat0 | awk '{print $1}'")
+    if bat_if.strip()  == 'bat0:':
+        return True
+    else:
+        return False
 
 def find_batman_wifi_iface():
+    while is_batman_if_ready() == False:
+        time.sleep(5)
     ret, value = run_shell_command("batctl if")
 
     if value != "" and ret == 0:
