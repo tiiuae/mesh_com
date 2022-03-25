@@ -27,8 +27,9 @@ _init() {
 		echo "Device already in monitor mode"
 	
 	else
-		airmon-ng check kill
-		airmon-ng start $interface
+		ifconfig $interface down
+		iwconfig $interface mode monitor
+		ifconfig $interface up
 	fi
 	
 	# Check with Monitor mode initialization was sucessfull
@@ -63,7 +64,9 @@ _deinit() {
 
 	# Take the interface out of monitor mode
 
-	airmon-ng stop $interface
+	ifconfig $interface down
+	iwconfig $interface mode managed
+	ifconfig $interface up
 
 }
 
@@ -85,6 +88,8 @@ python3 ${PWD}/python_scripts/flood_pr.py $interface
 
 main(){
 
+	interface=$1
+	
 	_init
 
 	_test

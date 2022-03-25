@@ -130,6 +130,8 @@ _test(){
 
 main(){
 
+	interface=$1
+	
 	_init
 
 	_test
