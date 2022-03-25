@@ -45,5 +45,5 @@ try:
     while True:
         sendp(pr_pkt,iface=interface)
 except KeyboardInterrupt:
-    print("Stopped transmetting fake ProbeRequest frames")
+    print("Stopped transmitting fake ProbeRequest frames")
             

@@ -12,7 +12,7 @@ _init() {
 
 	addr=$(iw $interface info | grep addr | awk '{print $2}')
 	if [ ${add:0:8}=="00:c0:ca" ]; then
-		echo "Given Interface has a ALFA device, we can proced"
+		echo "Given Interface has a ALFA device, we can proceed"
 	else
 		echo "Given Interface is not a ALFA device, check your connection"
 		exit 1
@@ -131,7 +131,7 @@ _test(){
 main(){
 
 	interface=$1
-	
+
 	_init
 
 	_test
