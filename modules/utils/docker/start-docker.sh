@@ -32,7 +32,8 @@ if [ "$OS" == "Ubuntu" ]; then
     docker run -it --privileged --net="host" --rm comms_vm /bin/bash
 elif [ "$OS" == "Buildroot" ]; then
     if [ "$docker_exec_env" == "sec_os" ]; then
-        if [ ! -f "/opt/container-data/mesh" ]; then
+        if [ ! -d "/opt/container-data/mesh" ]; then
+            echo "create persist mesh container data partation"
             # create persist mesh container data partation
             # data/container-data/mesh
             # ├── state.json
@@ -40,16 +41,20 @@ elif [ "$OS" == "Buildroot" ]; then
             # └── wpa_supplicant_sta.conf
             # └── wpa_supplicant_ap.conf
             mkdir -p /opt/container-data/mesh
+            mv /opt/mesh_com* /opt/container-data/mesh/
         fi
         # change rootfs location once its mounted in dedicated partation
         if [ -f "/root/rootfs.tgz" ]; then
+            echo "import rootfs.tgz commms vm"
             cat /root/rootfs.tgz | docker import - comms_vm
+            docker build -t comms_vm .
         else
             docker import - comms_vm < /rootfs.tar
         fi
-        docker run --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm /bin/bash
+        docker rm -f mesh_comms_vm
+        docker run --name mesh_comms_vm -d --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm
         #Add restart policy of the container if it stops or device rebooted
-        docker update --restart unless-stopped comms_vm
+        docker update --restart unless-stopped mesh_comms_vm
     elif [ "$docker_exec_env" == "ubuntu" ]; then
         docker build -t comms_vm .
         docker run -it --privileged --net="host" --rm comms_vm /bin/bash

@@ -11,7 +11,7 @@
 ### END INIT INFO
 
 DAEMON="mesh-11s.sh"
-DIR="/usr/sbin/"
+DIR="/opt/"
 PIDFILE="/var/run/$DAEMON.pid"
 LOG_FILE=/opt/mesh_11s.log
 source /opt/mesh.conf
