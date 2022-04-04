@@ -10,25 +10,26 @@ import socket
 from .src.socket_helper import send_msg
 from px4_msgs . msg import SensorGps
 
+
 class DRILocSubscriber(Node):
     def __init__(self):
-        super().__init__('dri_loc_subscriber')
+        super().__init__('dri_location_subscriber')
         qos = QoSProfile(
             depth=1,
             reliability=QoSReliabilityPolicy.RELIABLE,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
-        if __MOCAP__:
-            self.subscription = self.create_subscription(
-                String,
-                'uaeci01/fmu/sensor_gps/in',
-                self.listener_callback,
-                qos)
-        else:
-            self.subscription = self.create_subscription(
-                String,
-                'fmu/vehicle_gps_position/out',
-                self.listener_callback,
-                qos)
+        # if __MOCAP__:
+        #     self.subscription = self.create_subscription(
+        #         String,
+        #         'uaeci01/fmu/sensor_gps/in',
+        #         self.listener_callback,
+        #         qos)
+        # else:
+        self.subscription = self.create_subscription(
+            String,
+            'fmu/vehicle_gps_position/out',
+            self.listener_callback,
+            qos)
         self.subscription  # prevent unused variable warning
         self.HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
         self.PORT = 33222  # Port to listen on (non-privileged ports are > 1023)
@@ -43,7 +44,8 @@ class DRILocSubscriber(Node):
         self.dri_loc_socket.settimeout(1)
 
     def extract_loc_data(self):
-        #https://github.com/PX4/px4_msgs/blob/master/msg/SensorGps.msg
+        # https://github.com/PX4/px4_msgs/blob/master/msg/SensorGps.msg
+        pass
 
     def listener_callback(self, msg):
         self.get_logger().info('listener_callback')
