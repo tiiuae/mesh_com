@@ -8,7 +8,6 @@ def get_macs():
         i += 1
         if i > 2:
             macs.append((aux[1]).decode("utf-8"))
-    #print("Neighbour MAC Address list :", macs)
     count= len(macs)
     print(len(macs))
 if __name__ == '__main__':
