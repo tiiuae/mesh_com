@@ -22,6 +22,16 @@ RUN /packaging/build.sh
 
 #  ▲               runtime ──┐
 #  └── build                 ▼
+WORKDIR /mesh_com/src
+ADD . /mesh_com/src
+
+RUN modules/mesh_com/packaging/rosdep.sh modules/mesh_com
+
+RUN rosdep update
+
+RUN modules/mesh_com/packaging/build_deps.sh modules/mesh_com
+
+RUN modules/mesh_com/package.sh 0 focal
 
 FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-3dcb78d
 
