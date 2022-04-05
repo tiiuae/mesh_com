@@ -17,6 +17,9 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
 WORKDIR /mesh_com/src
 ADD . /mesh_com/src
 
+COPY modules/mesh_com/packaging/rosdep.yaml* modules/mesh_com/packaging/rosdep.sh modules/mesh_com/packaging/build_deps.sh modules/mesh_com/packaging/
+COPY modules/mesh_com/underlay.repos modules/mesh_com/package.xml modules/mesh_com/packaging/
+
 RUN modules/mesh_com/packaging/rosdep.sh modules/mesh_com
 
 RUN rosdep update
