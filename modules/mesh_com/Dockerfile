@@ -20,7 +20,16 @@ ADD . /mesh_com/src
 COPY modules/mesh_com/packaging/rosdep.yaml* modules/mesh_com/packaging/rosdep.sh modules/mesh_com/packaging/build_deps.sh modules/mesh_com/packaging/
 COPY modules/mesh_com/underlay.repos modules/mesh_com/package.xml modules/mesh_com/packaging/
 
-RUN modules/mesh_com/packaging/rosdep.sh modules/mesh_com
+USER root
+
+RUN modules/mesh_com/packaging/rosdep.sh /mesh_com/modules/mesh_com
+
+RUN groupadd -g 1000 builder && \
+    useradd -m -u 1000 -g 1000 -g builder builder && \
+    usermod -aG sudo builder && \
+    echo 'builder ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+USER builder
 
 RUN rosdep update
 
