@@ -1,16 +1,13 @@
-"""
-Batman stats helper
-"""
+"""Batman stats helper."""
 import subprocess
 import re
 import json
 import netifaces
 from time import sleep
 
+
 class STATUS:  # pylint: disable=too-few-public-methods
-    """
-    Status values
-    """
+    """Status values."""
 
     def __init__(self):
         self.mesh = "MESH"  # Mesh configuration in use
@@ -23,9 +20,7 @@ class STATUS:  # pylint: disable=too-few-public-methods
 
 
 class Batman:
-    """
-    Batman mesh class
-    """
+    """Batman mesh class."""
 
     def __init__(self):
         self.topology = {}
@@ -46,7 +41,7 @@ class Batman:
 
     def _update_interface_name(self):
         """
-        Update wifi device name ti self.network_interface
+        Update wifi device name to self.network_interface.
 
         :return: None
         """
@@ -58,7 +53,7 @@ class Batman:
 
     def _update_survey_dump(self):
         """
-        Update survey dump info, self.freq, self.noise
+        Update survey dump info, self.freq, self.noise.
 
         :return: None
         """
@@ -89,7 +84,7 @@ class Batman:
 
     def _update_station_dump_info(self):
         """
-        Update station dump info, self.device_rssi_list
+        Update station dump info, self.device_rssi_list.
 
         :return: None
         """
@@ -113,11 +108,10 @@ class Batman:
 
     def _update_iw_info(self):
         """
-        Update device self.freq and self.txpower info
+        Update device self.freq and self.txpower info.
 
         :return: None
         """
-
         dump = subprocess.Popen(['iw', 'dev', self.network_interface, 'info'],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
@@ -137,11 +131,10 @@ class Batman:
 
     def _update_iw_type(self):
         """
-        Update device self.status code
+        Update device self.status code.
 
         :return: None
         """
-
         if self.iw_state == "managed":
             self.status = self.mesh_status.no_config
         elif self.iw_state == "AP":
@@ -157,11 +150,10 @@ class Batman:
 
     def _update_iw_reg(self):
         """
-        Update device self.country code
+        Update device self.country code.
 
         :return: None
         """
-
         dump = subprocess.Popen(['iw', 'reg', 'get'], stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
         try:
@@ -175,7 +167,7 @@ class Batman:
     @property
     def _get_my_mac(self):
         """
-        Get device mac
+        Get device mac.
 
         :return: mac or not_avail
         """
@@ -187,7 +179,7 @@ class Batman:
 
     def _get_my_rssi(self, mac):
         """
-        Get device rssi values
+        Get device rssi values.
 
         :return: rssi value or not_avail
         """
@@ -200,7 +192,7 @@ class Batman:
     @property
     def status(self):
         """
-        Status getter
+        Status getter.
 
         :return: status
         """
@@ -209,7 +201,7 @@ class Batman:
     @status.setter
     def status(self, new_status):
         """
-        Status setter
+        Status setter.
 
         :return: None
         """
@@ -226,11 +218,10 @@ class Batman:
 
     def _create_template(self):
         """
-        Create report template
+        Create report template.
 
         :return: None
         """
-
         self._update_device_info()
 
         self.topology = {'status': self.status,  # "MESH/OFF/NO_CONFIG/ONGOING/AP/"
@@ -252,7 +243,7 @@ class Batman:
 
     def update_stat_data(self):
         """
-        Update topology as JSON
+        Update topology as JSON.
 
         :return: None
         """
@@ -261,7 +252,9 @@ class Batman:
         route = []
 
         try:
-            proc = subprocess.Popen(['batctl', 'o'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            proc = subprocess.Popen(['batctl', 'o'],
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
 
             for line in proc.stdout:
                 device = dict(self.device_template)
@@ -285,14 +278,15 @@ class Batman:
 
             self.topology['devices'] = route
         except FileNotFoundError:
-            self.topology['devices'] = self.device_template  # if not succeed, return empty template
+            # if not succeed, return empty template
+            self.topology['devices'] = self.device_template
             print("ERROR")
 
         return self.topology
 
     def get_stat(self):
         """
-        Get stat as JSON
+        Get stat as JSON.
 
         :return: self.topology in json compatible str
         """

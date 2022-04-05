@@ -3,7 +3,6 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile
 from rclpy.qos import QoSReliabilityPolicy
 from rclpy.qos import QoSDurabilityPolicy
-from rclpy.qos import QoSHistoryPolicy
 from std_msgs.msg import String
 import socket
 

@@ -1,15 +1,12 @@
-"""
-batadv-vis helper for python
-"""
+"""batadv-vis helper for python."""
 import subprocess
 import json
 import time
 
 
 class BatAdvVis:
-    """
-    batadv-vis helper class
-    """
+    """batadv-vis helper class."""
+
     command = 'batadv-vis'
 
     def __init__(self):
@@ -19,7 +16,7 @@ class BatAdvVis:
     @staticmethod
     def remove_interfaces(visual_lines):
         """
-        remove unwanted TT lines
+        Remove unwanted TT lines.
 
         :return: str
         """
@@ -36,7 +33,8 @@ class BatAdvVis:
 
     def get(self, format_type="jsondoc"):
         """
-        get topology
+        Get topology.
+
         :return: str
         """
         if format_type in ("dot", "jsondoc", "json"):
@@ -45,7 +43,7 @@ class BatAdvVis:
                 raw_data = subprocess.check_output([self.command,
                                                     '-f',
                                                     format_type],
-                                                    stderr=subprocess.DEVNULL)
+                                                   stderr=subprocess.DEVNULL)
                 if raw_data == 255:
                     raw_data = b'{}'
             except (FileNotFoundError, subprocess.CalledProcessError):

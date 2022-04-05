@@ -1,6 +1,4 @@
-"""
-mesh executor with root rights
-"""
+"""Mesh executor with root rights."""
 import json
 from shlex import quote
 import socket
@@ -22,14 +20,10 @@ except ImportError:
 
 
 class MeshNetwork:
-    """
-    Mesh network executor
-    """
+    """Mesh network executor."""
 
     class MeshSettings:  # pylint: disable=too-few-public-methods
-        """
-        Settings class
-        """
+        """Settings class."""
 
         def __init__(self):
             self.api_version = 1
@@ -131,7 +125,7 @@ class MeshNetwork:
 
     def run(self):
         """
-        Run method for executor
+        Run method for executor.
 
         :return: never
         """
@@ -195,9 +189,7 @@ class MeshNetwork:
 
 
 def main():
-    """
-    main
-    """
+    """Create and run mesh network."""
     mesh_network = MeshNetwork()
     mesh_network.run()
 

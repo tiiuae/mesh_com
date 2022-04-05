@@ -1,16 +1,13 @@
-"""
-Simple socket helper to handle large data frames and
-ensure complete data frames are received.
-"""
+"""Socket helper to handle large data frames and ensure complete data frames are received."""
 import struct
 
 
 def send_msg(sock, msg):
     """
+    Send data packet with length prefix.
+
     sock: socket
     msg: byte string
-
-    send data packet with length prefix
     """
     # Prefix each message with a 4-byte length (network byte order)
     msg = struct.pack('>I', len(msg)) + msg
@@ -20,9 +17,10 @@ def send_msg(sock, msg):
 
 def recv_msg(sock):
     """
+    Receive data packet with length prefix.
+
     sock: socket
 
-    receive data packet with length prefix
     :return: bytearray
     """
     # Read message length and unpack it into an integer
@@ -37,10 +35,10 @@ def recv_msg(sock):
 
 def recvall(sock, n):
     """
+    Receive n-amount of data from socket.
+
     sock: socket
     n: integer, data amount
-
-    receive n-amount of data from socket
 
     :return: bytearray
     """
