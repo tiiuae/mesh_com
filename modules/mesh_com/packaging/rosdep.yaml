@@ -1,0 +1,2 @@
+px4_msgs:
+    ubuntu: ros-ROS_DISTRO-px4-msgs=3.0.0*
