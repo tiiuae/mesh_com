@@ -6,12 +6,13 @@
   <description>ROS Mesh Node</description>
   <maintainer email="mika.joenpera@unikie.com">joenpera</maintainer>
   <license>BSD 3-Clause License</license>
-  
+  <depend>rclcpp</depend>
+  <depend>px4_msgs</depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
-  <test_depend>ament_flake8</test_depend>
+  <!-- test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
-  <test_depend>python3-pytest</test_depend>
+  <test_depend>python3-pytest</test_depend -->
 
   <export>
     <build_type>ament_python</build_type>
