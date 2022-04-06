@@ -17,25 +17,13 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
 WORKDIR /mesh_com/src
 ADD . /mesh_com/src
 
-COPY modules/mesh_com/packaging/rosdep.yaml* modules/mesh_com/packaging/rosdep.sh modules/mesh_com/packaging/build_deps.sh modules/mesh_com/packaging/
-COPY modules/mesh_com/underlay.repos modules/mesh_com/package.xml modules/mesh_com/packaging/
+COPY modules/mesh_com/underlay.repos modules/mesh_com/package.xml /mesh_com/src/modules/mesh_com/packaging/
 
-USER root
-
-RUN modules/mesh_com/packaging/rosdep.sh /mesh_com/modules/mesh_com
-
-RUN groupadd -g 1000 builder && \
-    useradd -m -u 1000 -g 1000 -g builder builder && \
-    usermod -aG sudo builder && \
-    echo 'builder ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-
-USER builder
+RUN /mesh_com/src/modules/mesh_com/packaging/rosdep.sh /mesh_com/src/modules/mesh_com
 
 RUN rosdep update
 
-RUN modules/mesh_com/packaging/build_deps.sh modules/mesh_com
-
-RUN modules/mesh_com/package.sh 0 focal
+RUN /mesh_com/src/modules/mesh_com/package.sh 0 focal
 
 # tii-mesh-com image
 FROM ros:galactic-ros-core
@@ -50,6 +38,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     wpasupplicant=2.9.0-20-6~git20210701.43d8971 \
     wifi-firmware \
     ros-galactic-rmw-fastrtps-cpp \
+    ros-galactic-px4-msgs \
     iw \
     batctl \
     alfred \
