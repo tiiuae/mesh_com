@@ -221,6 +221,10 @@ EOF
         wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s.conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_11s.log
       fi
 
+      ifname_ap="$wifidev-1"
+      pcie_radio_mac="$(ip -brief link | grep "$wifidev" | awk '{print $3; exit}')"
+      iw dev "$wifidev" interface add "$ifname_ap" type managed addr "00:01:$(echo "$pcie_radio_mac" | cut -b 7-17)"
+
 
       # Set frequency band and channel from given frequency
       calculate_wifi_channel "$7"
@@ -251,7 +255,7 @@ vendor_elements=dd0100
 #vendor_elements=dd1EFA0BBC0D00102038000058D6DF1D9055A308820DC10ACF072803D20F0100
 EOF
 
-      /opt/ros/galactic/share/bin/hostapd /var/run/hostapd.conf &
+      /opt/ros/galactic/share/bin/hostapd -B /var/run/hostapd.conf
       sleep 2
       /opt/ros/galactic/share/bin/transmit b p &
       ;;
