@@ -44,7 +44,7 @@ class DRILocSubscriber(Node):
         self.destroy_timer(self.backup_timer)  # resend fresh data only
         #self.get_logger().info('mesh dri location subscriber: "%s"' % msg)
         # refer to https://github.com/PX4/px4_msgs/blob/master/msg/SensorGps.msg
-        gps_msg = (f"{msg.lat} {msg.lon}".encode())
+        gps_msg = (f"{msg.lat};{msg.lon};".encode())
         # gps_msg=(str(msg.timestamp) + ';' + str(msg.device_id) + ';' + str(msg.lat) + ';' + str(msg.lon) + ';' + str(msg.alt) + ';' +
         #         str(msg.alt_ellipsoid) + ';' + str(msg.s_variance_m_s) + ';' + str(msg.c_variance_rad) + ';' + str(msg.fix_type) + ';' + str(msg.eph) + ';' +
         #         str(msg.epv) + ';' + str(msg.hdop) + ';' + str(msg.vdop) + ';' + str(msg.jamming_indicator) + ';' + str(msg.jamming_state) + ';' +
