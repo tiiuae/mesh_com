@@ -9,6 +9,7 @@
   <depend>rclcpp</depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
+  <exec_depend>libnl-3-dev</exec_depend>
   <exec_depend>px4_msgs</exec_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
