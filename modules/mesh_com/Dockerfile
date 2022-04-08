@@ -47,6 +47,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     alfred \
     rfkill \
     iproute2 \
+    libnl-genl-3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 ENTRYPOINT [ "/entrypoint.sh" ]

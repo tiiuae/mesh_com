@@ -8,5 +8,5 @@ Section: misc
 
 Package: ros-galactic-mesh-com   
 Architecture: any
-Depends: ${misc:Depends}, batctl, alfred, ros-galactic-rclpy, ros-galactic-std-msgs, ros-galactic-px4-msgs
+Depends: ${misc:Depends}, batctl, alfred, ros-galactic-rclpy, ros-galactic-std-msgs, ros-galactic-px4-msgs, libnl-genl-3-dev
 Description: Mesh ROS Node
