@@ -14,6 +14,8 @@ setup(
         ('share/' + package_name, ['launch/mesh_com.launch']),
         ('share/bin', ['../../common/scripts/mesh-ibss.sh']),
         ('share/bin', ['../../common/scripts/mesh-11s.sh']),
+        ('share/bin', ['./mesh_com/dri/transmit']),
+        ('share/bin', ['./mesh_com/dri/hostapd']),
        # ('share/bin', ['../../common/scripts/mesh-11s-mr.sh']),
     ],
     install_requires=['setuptools'],
