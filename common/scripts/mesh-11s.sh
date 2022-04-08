@@ -23,6 +23,26 @@ function help
     exit
 }
 
+calculate_wifi_channel()
+{
+    # arguments:
+    # $1 = wifi frequency
+
+    # return values: retval_band, retval_channel as global
+
+    # Set 2.4/5GHz frequency band and channel
+    if [ "$1" -ge  "5160" ] && [ "$1" -le  "5885" ]; then
+        retval_band="a"
+        retval_channel=$((("$1"-5000)/5))
+    elif [ "$1" -ge  "2412" ] && [ "$1" -le  "2472" ]; then
+        retval_band="g"
+        retval_channel=$((("$1"-2407)/5))
+    else
+        echo "ERROR! frequency out of range!"
+        exit 1
+    fi
+}
+
 find_mesh_wifi_device()
 {
   # arguments:
@@ -124,6 +144,8 @@ EOF
       killall alfred 2>/dev/null
       killall batadv-vis 2>/dev/null
       rm -f /var/run/alfred.sock
+      killall hostapd 2>/dev/null
+      killall transmit 2>/dev/null
 
       #Check if batman_adv is built-in module
       modname=$(ls /sys/module | grep batman_adv)
@@ -175,6 +197,40 @@ EOF
       else
         wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s.conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_11s.log
       fi
+
+
+      # Set frequency band and channel from given frequency
+      calculate_wifi_channel "$7"
+
+
+cat <<EOF >/var/run/hostapd.conf
+country_code=FI
+interface=$ifname_ap
+ssid=tii_dri_drone
+hw_mode=$retval_band
+channel=$retval_channel
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=thisisaverylongpassword
+wpa_key_mgmt=WPA-PSK
+wpa_pairwise=TKIP
+rsn_pairwise=CCMP
+ctrl_interface=/var/run/hostapd
+# beacon interval needs to match mesh-point
+# beacon_int=200 # Does this work? Doesn't seem to have any effect?
+
+#This is an empty information element. dd indicates hex. 01 is the length of the data and 00 the actual data:
+vendor_elements=dd0100
+
+#This information element has one fixed Location message:
+#vendor_elements=dd1EFA0BBC0D00102038000058D6DF1D9055A308820DC10ACF072803D20F0100
+EOF
+
+      /opt/ros/galactic/share/bin/hostapd /var/run/hostapd.conf &
+      sleep 2
+      /opt/ros/galactic/share/bin/transmit b p &
       ;;
 
 ap)

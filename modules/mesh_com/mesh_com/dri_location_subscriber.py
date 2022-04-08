@@ -8,23 +8,25 @@ from std_msgs.msg import String
 import socket
 
 from .src.socket_helper import send_msg
-from px4_msgs . msg import SensorGps
+from px4_msgs.msg import VehicleGpsPosition
 
 
 class DRILocSubscriber(Node):
     def __init__(self):
         super().__init__('dri_location_subscriber')
+        # https://docs.ros.org/en/rolling/Concepts/About-Quality-of-Service-Settings.html
+        # need to follow publisher QoS settings in most cases
         qos = QoSProfile(
             depth=1,
-            reliability=QoSReliabilityPolicy.RELIABLE,
-            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            durability=QoSDurabilityPolicy.VOLATILE)
+
         self.subscription = self.create_subscription(
-            SensorGps,
-            #Fix me
-            '/uae05/fmu/sensor_gps/in',
+            String,
+            'fmu/vehicle_gps_position/out',
             self.listener_callback,
-            10)
-        #self.subscription  # prevent unused variable warning
+            qos)  # use QoS
+        self.subscription  # prevent unused variable warning
         self.HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
         self.PORT = 33222  # Port to listen on (non-privileged ports are > 1023)
         self.dri_loc_socket = socket.socket()  # to remove python warning
@@ -42,12 +44,14 @@ class DRILocSubscriber(Node):
         self.destroy_timer(self.backup_timer)  # resend fresh data only
         #self.get_logger().info('mesh dri location subscriber: "%s"' % msg)
         # refer to https://github.com/PX4/px4_msgs/blob/master/msg/SensorGps.msg
-        gps_msg=(str(msg.timestamp) + ';' + str(msg.device_id) + ';' + str(msg.lat) + ';' + str(msg.lon) + ';' + str(msg.alt) + ';' +
-                str(msg.alt_ellipsoid) + ';' + str(msg.s_variance_m_s) + ';' + str(msg.c_variance_rad) + ';' + str(msg.fix_type) + ';' + str(msg.eph) + ';' +
-                str(msg.epv) + ';' + str(msg.hdop) + ';' + str(msg.vdop) + ';' + str(msg.jamming_indicator) + ';' + str(msg.jamming_state) + ';' +
-                str(msg.epv) + ';' + str(msg.hdop) + ';' + str(msg.vdop) + ';' + str(msg.jamming_indicator) + ';' + str(msg.jamming_state) + ';' +
-                str(msg.vel_m_s) + ';' + str(msg.vel_n_m_s) + ';' + str(msg.vel_e_m_s) + ';' + str(msg.vel_d_m_s) + ';' + str(msg.timestamp_time_relative) + ';' +
-                str(msg.time_utc_usec) + ';' + str(msg.satellites_used) + ';' + str(msg.heading) + ';' + str(msg.heading_offset) + ';' + str(msg.heading_accuracy) + ';')
+        gps_msg = (f"{msg.lat} {msg.lon}".encode())
+        # gps_msg=(str(msg.timestamp) + ';' + str(msg.device_id) + ';' + str(msg.lat) + ';' + str(msg.lon) + ';' + str(msg.alt) + ';' +
+        #         str(msg.alt_ellipsoid) + ';' + str(msg.s_variance_m_s) + ';' + str(msg.c_variance_rad) + ';' + str(msg.fix_type) + ';' + str(msg.eph) + ';' +
+        #         str(msg.epv) + ';' + str(msg.hdop) + ';' + str(msg.vdop) + ';' + str(msg.jamming_indicator) + ';' + str(msg.jamming_state) + ';' +
+        #         str(msg.epv) + ';' + str(msg.hdop) + ';' + str(msg.vdop) + ';' + str(msg.jamming_indicator) + ';' + str(msg.jamming_state) + ';' +
+        #         str(msg.vel_m_s) + ';' + str(msg.vel_n_m_s) + ';' + str(msg.vel_e_m_s) + ';' + str(msg.vel_d_m_s) + ';' + str(msg.timestamp_time_relative) + ';' +
+        #         str(msg.time_utc_usec) + ';' + str(msg.satellites_used) + ';' + str(msg.heading) + ';' + str(msg.heading_offset) + ';' + str(msg.heading_accuracy) + ';')
+
         try:
             if gps_msg:
                 self.setup_socket()
