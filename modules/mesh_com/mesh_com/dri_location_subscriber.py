@@ -22,7 +22,7 @@ class DRILocSubscriber(Node):
             durability=QoSDurabilityPolicy.VOLATILE)
 
         self.subscription = self.create_subscription(
-            String,
+            VehicleGpsPosition,
             'fmu/vehicle_gps_position/out',
             self.listener_callback,
             qos)  # use QoS
@@ -32,19 +32,22 @@ class DRILocSubscriber(Node):
         self.dri_loc_socket = socket.socket()  # to remove python warning
         self.backup_timer = 0
         self.backup_data = ""
+        self.setup_socket()
 
     def setup_socket(self):
         self.dri_loc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.dri_loc_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.dri_loc_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.dri_loc_socket.settimeout(1)
+        self.dri_loc_socket.connect((self.HOST, self.PORT))
 
     def listener_callback(self, msg):
         self.get_logger().info('listener_callback')
         self.destroy_timer(self.backup_timer)  # resend fresh data only
         #self.get_logger().info('mesh dri location subscriber: "%s"' % msg)
         # refer to https://github.com/PX4/px4_msgs/blob/master/msg/SensorGps.msg
-        gps_msg = (f"{msg.lat};{msg.lon};".encode())
+        gps_msg = (f"{int(msg.lat)/10000000};{int(msg.lon)/10000000};")
+        self.get_logger().info(gps_msg)
         # gps_msg=(str(msg.timestamp) + ';' + str(msg.device_id) + ';' + str(msg.lat) + ';' + str(msg.lon) + ';' + str(msg.alt) + ';' +
         #         str(msg.alt_ellipsoid) + ';' + str(msg.s_variance_m_s) + ';' + str(msg.c_variance_rad) + ';' + str(msg.fix_type) + ';' + str(msg.eph) + ';' +
         #         str(msg.epv) + ';' + str(msg.hdop) + ';' + str(msg.vdop) + ';' + str(msg.jamming_indicator) + ';' + str(msg.jamming_state) + ';' +
@@ -54,14 +57,13 @@ class DRILocSubscriber(Node):
 
         try:
             if gps_msg:
-                self.setup_socket()
-                self.dri_loc_socket.connect((self.HOST, self.PORT))
                 send_msg(self.dri_loc_socket, str.encode(gps_msg))
-                self.dri_loc_socket.close()
+                self.get_logger().info('sent')
         except (ConnectionRefusedError, socket.timeout, ConnectionResetError):
-            self.backup_data = gps_msg
-            self.backup_timer = self.create_timer(
-                2.0, self.backup_caller)
+            self.get_logger().info('exception')
+            #self.backup_data = gps_msg
+            #self.backup_timer = self.create_timer(
+            #    2.0, self.backup_caller)
 
     def backup_caller(self):
         self.get_logger().info('backup_caller: "%s"' % self.backup_data)
