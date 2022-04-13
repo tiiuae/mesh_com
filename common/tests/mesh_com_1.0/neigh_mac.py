@@ -12,5 +12,3 @@ def get_macs():
 if __name__ == '__main__':
     macs = get_macs()
     print(macs)
-
-
