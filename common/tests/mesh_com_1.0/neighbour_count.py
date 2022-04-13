@@ -8,8 +8,6 @@ def get_macs():
         i += 1
         if i > 2:
             macs.append((aux[1]).decode("utf-8"))
-    count= len(macs)
-    print(len(macs))
+    print(macs)
 if __name__ == '__main__':
     get_macs()
-  
