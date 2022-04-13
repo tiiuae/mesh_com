@@ -64,6 +64,7 @@ if __name__ == '__main__':
     info.update()
 
     ftl.register_logger_function("channel", wifi_stats.get_channel)
+    ftl.register_logger_function("rssi", wifi_stats.get_rssi)
     ftl.register_logger_function("txpower", wifi_stats.get_txpower)
     ftl.register_logger_function("noise", wifi_stats.get_noise)
     ftl.register_logger_function("RX MCS", wifi_stats.get_rx_mcs)
@@ -88,9 +89,9 @@ if __name__ == '__main__':
 
     ftl.create_csv()
 
-    while True:
-        wifi_stats.update()
-        info.update()
-        ftl.append_csv()
-        time.sleep(LOGGING_INTERVAL_SECONDS)
+
+    wifi_stats.update()
+    info.update()
+    ftl.append_csv()
+    #time.sleep(LOGGING_INTERVAL_SECONDS)
 

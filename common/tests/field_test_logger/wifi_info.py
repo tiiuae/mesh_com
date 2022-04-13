@@ -75,12 +75,12 @@ class WifiInfo:
                 txpower = line[line.index(TXPWR_STR) + len(TXPWR_STR):]
                 interface_ok = False
 
-        print(f"channel: {channel}")
-        print(f"txpower: {txpower}")
+       # print(f"channel: {channel}")
+        #print(f"txpower: {txpower}")
 
         return channel, txpower
 
-    def __update_mcs(self) -> tuple[str, str]:
+    def __update_mcs_and_rssi(self) -> tuple[str, str, str]:
 
         iw_cmd = ['iw', 'dev', f"{EXPECTED_INTERFACE}", 'station', 'dump']
         iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
@@ -90,8 +90,12 @@ class WifiInfo:
 
         tx_mcs = ""
         rx_mcs = ""
+        rssi = ""
 
         for line in lines:
+            if "signal:" in line:
+                rssi = line[line.index("signal:")+len("signal:"):].strip()
+
             if "tx bitrate:" in line:
                 if "MCS" in line:
                     tx_mcs = line[line.index("MCS")+4:line.index("MCS")+6]
@@ -99,7 +103,9 @@ class WifiInfo:
                 if "MCS" in line:
                     rx_mcs = line[line.index("MCS")+4:line.index("MCS") + 6]
 
-        return rx_mcs, tx_mcs
+        #print(f"rssi: {rssi}")
+
+        return rx_mcs, tx_mcs, rssi
 
 
     def __update_noise(self):
@@ -164,4 +170,4 @@ class WifiInfo:
         self.channel, self.txpower = self.__update_channel_and_twpower()
         self.noise = self.__update_noise()
         self.country = self.__update_country_code()
-        self.rx_mcs, self.tx_mcs = self.__update_mcs()
+        self.rx_mcs, self.tx_mcs, self.rssi = self.__update_mcs_and_rssi()

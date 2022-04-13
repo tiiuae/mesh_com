@@ -1,5 +1,3 @@
-#from __future__ import annotations
-
 import gpsd
 import subprocess
 
@@ -79,9 +77,9 @@ class InfoParser:
 
     def __get_battery_status(self):
         voltage = read_value_from_file("/sys/class/power_supply/max1726x_battery/voltage_now")
-        current = read_value_from_file("todo")
+        current = read_value_from_file("/sys/class/power_supply/max1726x_battery/current_now")
 
-        print(f"battery voltage: {voltage}")
+        #print(f"battery voltage: {voltage}")
         #print(f"discharging current: {current}")
 
         return voltage, current
@@ -90,14 +88,14 @@ class InfoParser:
         nrf_current = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0040/hwmon/hwmon3/curr1_input")
         nrf_voltage = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0040/hwmon/hwmon3/in1_input")
 
-        print(f"nrf current: {nrf_current}")
-        print(f"nrf voltage: {nrf_voltage}")
+        #print(f"nrf current: {nrf_current}")
+        #print(f"nrf voltage: {nrf_voltage}")
 
         _3v3_current = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0045/hwmon/hwmon4/curr1_input")
         _3v3_voltage = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0045/hwmon/hwmon4/in1_input")
 
-        print(f"3v3 current: {_3v3_current}")
-        print(f"3v3 voltage: {_3v3_voltage}")
+        #print(f"3v3 current: {_3v3_current}")
+        #print(f"3v3 voltage: {_3v3_voltage}")
 
         return nrf_current, nrf_voltage, _3v3_current, _3v3_voltage
 
@@ -106,9 +104,9 @@ class InfoParser:
         tmp100 = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0049/driver/10-0049/hwmon/hwmon5/temp1_input")
         wifi_temp = read_value_from_file("/sys/class/ieee80211/phy0/device/hwmon/hwmon9/temp1_input")
 
-        print(f"cpu_temp: {cpu_temp}")
-        print(f"tmp100: {tmp100}")
-        print(f"wifi_temp: {wifi_temp}")
+       # print(f"cpu_temp: {cpu_temp}")
+        #print(f"tmp100: {tmp100}")
+        #print(f"wifi_temp: {wifi_temp}")
 
         return cpu_temp, tmp100, wifi_temp
 
@@ -130,6 +128,6 @@ class InfoParser:
         self.cpu_temp, self.tmp100, self.wifi_temp = self.__get_temperatures()
         self.battery_voltage, self.battery_current = self.__get_battery_status()
         self.nrf_current, self.nrf_voltage, self._3v3_current, self._3v3_voltage = self.__get_ina209_status()
-        print(f"lat: {self.latitude}")
-        print(f"lon: {self.longitude}")
-        print(f"alt: {self.altitude}")
+        #print(f"lat: {self.latitude}")
+       # print(f"lon: {self.longitude}")
+        #print(f"alt: {self.altitude}")
