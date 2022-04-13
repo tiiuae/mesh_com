@@ -14,7 +14,7 @@ description="mesh_com v1.0 quantifying ping latency between batman-enabled  node
 #######################################
 _init() {
   test_mesh_com_1.0_dependencies
-  mac_addr=`python3 neigh_mac.py`
+  mac_addr=`python3  neighbour_count.py`
   if [ ${#mac_addr[*]} -gt 0 ]
   then
      echo "Neigbours exist and there count is : ${#mac_addr[*]} and addresses are $mac_addr "
