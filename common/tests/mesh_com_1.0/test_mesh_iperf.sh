@@ -16,10 +16,10 @@ _init() {
   test_mesh_com_1.0_dependencies
   _deinit
 
-  count=`python neighbour_count.py`
-  if [ $count -gt 0 ]
+  mac_addr=`python3 neighbour_count.py`
+  if [ ${#mac_addr[*]} -gt 0 ]
   then
-     echo "Neigbours exist and there count is : $count"
+     echo "Neigbours exist and there count is : ${#mac_addr[*]} and the addresses are $mac_addr "
   else
     echo "No neighbours exist, so exiting IPERF test setup"
     exit 1
