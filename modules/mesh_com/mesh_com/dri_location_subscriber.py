@@ -1,14 +1,87 @@
+import socket
+import ctypes
+import struct
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 from rclpy.qos import QoSReliabilityPolicy
 from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSHistoryPolicy
-from std_msgs.msg import String
-import socket
 
-from .src.socket_helper import send_msg
 from px4_msgs.msg import VehicleGpsPosition
+
+
+# Message structure to hold vehicle GPS position data.
+# Reference: https://github.com/PX4/px4_msgs/blob/master/msg/VehicleGpsPosition.msg.
+class VehicleGpsPositionMsg(ctypes.Structure):
+    _fields_ = [("timestamp", ctypes.c_uint64),
+                ("lat", ctypes.c_int32),
+                ("lon", ctypes.c_int32),
+                ("alt", ctypes.c_int32),
+                ("alt_ellipsoid", ctypes.c_int32),
+                ("s_variance_m_s", ctypes.c_float),
+                ("c_variance_rad", ctypes.c_float),
+                ("fix_type", ctypes.c_uint8),
+                ("eph", ctypes.c_float),
+                ("epv", ctypes.c_float),
+                ("hdop", ctypes.c_float),
+                ("vdop", ctypes.c_float),
+                ("noise_per_ms", ctypes.c_int32),
+                ("jamming_indicator", ctypes.c_int32),
+                ("jamming_state", ctypes.c_uint8),
+                ("vel_m_s", ctypes.c_float),
+                ("vel_n_m_s", ctypes.c_float),
+                ("vel_e_m_s", ctypes.c_float),
+                ("vel_d_m_s", ctypes.c_float),
+                ("cog_rad", ctypes.c_float),
+                ("vel_ned_valid", ctypes.c_bool),
+                ("timestamp_time_relative", ctypes.c_int32),
+                ("time_utc_usec", ctypes.c_uint64),
+                ("satellites_used", ctypes.c_uint8),
+                ("heading", ctypes.c_float),
+                ("heading_offset", ctypes.c_float),
+                ("selected", ctypes.c_uint8)]
+
+
+def _cpython_packaging(msg):
+    vehicleGPSMsg = VehicleGpsPositionMsg()
+
+    # msg.<float>* are checked for 'nan' and value replaced with 0 as cpython
+    # is not accepting 'nan'
+
+    vehicleGPSMsg.timestamp = msg.timestamp
+    vehicleGPSMsg.lat = msg.lat
+    vehicleGPSMsg.lon = msg.lon
+    vehicleGPSMsg.alt = msg.alt
+    vehicleGPSMsg.alt_ellipsoid = msg.alt_ellipsoid
+    vehicleGPSMsg.s_variance_m_s = msg.s_variance_m_s \
+        if msg.s_variance_m_s == msg.s_variance_m_s else 0
+    vehicleGPSMsg.c_variance_rad = msg.c_variance_rad \
+        if msg.c_variance_rad == msg.c_variance_rad else 0
+    vehicleGPSMsg.fix_type = msg.fix_type
+    vehicleGPSMsg.eph = msg.eph if msg.eph == msg.eph else 0
+    vehicleGPSMsg.epv = msg.epv if msg.epv == msg.epv else 0
+    vehicleGPSMsg.hdop = msg.hdop if msg.hdop == msg.hdop else 0
+    vehicleGPSMsg.vdop = msg.vdop if msg.vdop == msg.vdop else 0
+    vehicleGPSMsg.noise_per_ms = msg.noise_per_ms
+    vehicleGPSMsg.jamming_indicator = msg.jamming_indicator
+    vehicleGPSMsg.jamming_state = msg.jamming_state
+    vehicleGPSMsg.vel_m_s = msg.vel_m_s if msg.vel_m_s == msg.vel_m_s else 0
+    vehicleGPSMsg.vel_n_m_s = msg.vel_n_m_s if msg.vel_n_m_s == msg.vel_n_m_s else 0
+    vehicleGPSMsg.vel_e_m_s = msg.vel_e_m_s if msg.vel_e_m_s == msg.vel_e_m_s else 0
+    vehicleGPSMsg.vel_d_m_s = msg.vel_d_m_s if msg.vel_d_m_s == msg.vel_d_m_s else 0
+    vehicleGPSMsg.cog_rad = msg.cog_rad if msg.cog_rad == msg.cog_rad else 0
+    vehicleGPSMsg.vel_ned_valid = msg.vel_ned_valid
+    vehicleGPSMsg.timestamp_time_relative = msg.timestamp_time_relative
+    vehicleGPSMsg.time_utc_usec = msg.time_utc_usec
+    vehicleGPSMsg.satellites_used = msg.satellites_used
+    vehicleGPSMsg.heading = msg.heading if msg.heading == msg.heading else 0
+    vehicleGPSMsg.heading_offset = msg.heading_offset \
+        if msg.heading_offset == msg.heading_offset else 0
+    vehicleGPSMsg.selected = msg.selected
+
+    return vehicleGPSMsg
 
 
 class DRILocSubscriber(Node):
@@ -35,48 +108,23 @@ class DRILocSubscriber(Node):
         self.setup_socket()
 
     def setup_socket(self):
-        self.dri_loc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.dri_loc_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.dri_loc_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        self.dri_loc_socket.settimeout(1)
-        self.dri_loc_socket.connect((self.HOST, self.PORT))
+        try:
+            self.get_logger().info('dri socket init')
+            self.dri_loc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.dri_loc_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.dri_loc_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            self.dri_loc_socket.settimeout(1)
+            self.dri_loc_socket.connect((self.HOST, self.PORT))
+        except socket.error as message:
+            print(f"Type Error: {message}")
 
     def listener_callback(self, msg):
-        self.get_logger().info('listener_callback')
-        self.destroy_timer(self.backup_timer)  # resend fresh data only
-        #self.get_logger().info('mesh dri location subscriber: "%s"' % msg)
-        # refer to https://github.com/PX4/px4_msgs/blob/master/msg/SensorGps.msg
-        gps_msg = (f"{int(msg.lat)/10000000};{int(msg.lon)/10000000};")
-        self.get_logger().info(gps_msg)
-        # gps_msg=(str(msg.timestamp) + ';' + str(msg.device_id) + ';' + str(msg.lat) + ';' + str(msg.lon) + ';' + str(msg.alt) + ';' +
-        #         str(msg.alt_ellipsoid) + ';' + str(msg.s_variance_m_s) + ';' + str(msg.c_variance_rad) + ';' + str(msg.fix_type) + ';' + str(msg.eph) + ';' +
-        #         str(msg.epv) + ';' + str(msg.hdop) + ';' + str(msg.vdop) + ';' + str(msg.jamming_indicator) + ';' + str(msg.jamming_state) + ';' +
-        #         str(msg.epv) + ';' + str(msg.hdop) + ';' + str(msg.vdop) + ';' + str(msg.jamming_indicator) + ';' + str(msg.jamming_state) + ';' +
-        #         str(msg.vel_m_s) + ';' + str(msg.vel_n_m_s) + ';' + str(msg.vel_e_m_s) + ';' + str(msg.vel_d_m_s) + ';' + str(msg.timestamp_time_relative) + ';' +
-        #         str(msg.time_utc_usec) + ';' + str(msg.satellites_used) + ';' + str(msg.heading) + ';' + str(msg.heading_offset) + ';' + str(msg.heading_accuracy) + ';')
-
         try:
-            if gps_msg:
-                send_msg(self.dri_loc_socket, str.encode(gps_msg))
-                self.get_logger().info('sent')
-        except (ConnectionRefusedError, socket.timeout, ConnectionResetError):
-            self.get_logger().info('exception')
-            #self.backup_data = gps_msg
-            #self.backup_timer = self.create_timer(
-            #    2.0, self.backup_caller)
-
-    def backup_caller(self):
-        self.get_logger().info('backup_caller: "%s"' % self.backup_data)
-        try:
-            self.destroy_timer(self.backup_timer)
+            byte_data = _cpython_packaging(msg)
+            gps_msg = struct.pack('>I', ctypes.sizeof(byte_data)) + byte_data
+            self.dri_loc_socket.sendall(gps_msg)
+        except (ConnectionRefusedError, socket.timeout, ConnectionResetError, ConnectionRefusedError):
             self.setup_socket()
-            self.dri_loc_socket.connect((self.HOST, self.PORT))
-            send_msg(self.dri_loc_socket, str.encode(self.backup_data))
-            self.dri_loc_socket.close()
-        except (ConnectionRefusedError, socket.timeout, ConnectionResetError):
-            self.get_logger().info('dri loc backup_caller: ##')
-            self.backup_timer = self.create_timer(
-                2.0, self.backup_caller)
 
 
 def main(args=None):
