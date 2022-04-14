@@ -62,7 +62,7 @@ find_mesh_wifi_device()
     for phy in $phynames; do
       device_id="$(cat /sys/bus/pci/devices/*/ieee80211/"$phy"/device/device 2>/dev/null)"
       device_vendor="$(cat /sys/bus/pci/devices/*/ieee80211/"$phy"/device/vendor 2>/dev/null)"
-      if [ "$device_id" = "$device" -a "$device_vendor" = "$1" ]; then
+      if [ "$device_id" = "$device" ] && [ "$device_vendor" = "$1" ]; then
         retval_phy=$phy
         retval_name=$(ls /sys/class/ieee80211/"$phy"/device/net/)
         break 2
@@ -149,8 +149,8 @@ EOF
       fi
 
       if [ "$routing_algo" == "batman-adv" ]; then
-        killall alfred 2>/dev/null
-        killall batadv-vis 2>/dev/null
+        pkill alfred 2>/dev/null
+        pkill batadv-vis 2>/dev/null
         rm -f /var/run/alfred.sock
 
         #Check if batman_adv is built-in module
@@ -159,10 +159,10 @@ EOF
           modprobe batman-adv
         fi
       elif [ "$routing_algo" == "olsr" ]; then
-         killall olsrd 2>/dev/null
+         pkill olsrd 2>/dev/null
       
-      killall hostapd 2>/dev/null
-      killall transmit 2>/dev/null
+      pkill hostapd 2>/dev/null
+      pkill transmit 2>/dev/null
 
       #Check if batman_adv is built-in module
       modname=$(ls /sys/module | grep batman_adv)
@@ -353,11 +353,11 @@ off)
       pkill -f "/var/run/wpa_supplicant-" 2>/dev/null
       rm -fr /var/run/wpa_supplicant/"$wifidev"
       if [ "$routing_algo" == "batman-adv" ]; then
-        killall alfred 2>/dev/null
-        killall batadv-vis 2>/dev/null
+        pkill alfred 2>/dev/null
+        pkill batadv-vis 2>/dev/null
         rm -f /var/run/alfred.sock 2>/dev/null
       elif [ "$routing_algo" == "olsr" ]; then
-        killall olsrd 2>/dev/null
+        pkill olsrd 2>/dev/null
       fi
       ;;
 *)
