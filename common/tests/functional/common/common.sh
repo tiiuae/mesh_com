@@ -11,7 +11,7 @@ trap ctrl_c INT
 # Global constants
 readonly log_file="./functional_tests_debug.log"
 readonly results_file="./functional_tests_results.log"
-readonly NEEDED_EXECUTABLES="wpa_supplicant iw iwlist iperf3 ping uniq grep ip ifconfig batctl bc brctl iptables"
+readonly NEEDED_EXECUTABLES="wpa_supplicant hostapd iw iwlist iperf3 ping uniq grep ip ifconfig batctl bc brctl iptables"
 readonly iperf3_port="30001" # constant port number used for iperf3
 readonly PASS=1     # constant for PASS value
 readonly FAIL=0     # constant for FAIL value
@@ -22,6 +22,8 @@ phyname=0           # Should be updated from test script
 wifidev=0           # Should be updated from test script
 device_list=0       # includes wifi phy list when find_wifi_device() is called
 channel_list=0      # includes supported wifi channels when update_channel_list() is called
+wpa_log_filename=""     # value updated from init functions
+hostapd_log_filename="" # value updated from init functions
 
 #######################################
 # ctrl-c trap
@@ -88,6 +90,18 @@ print_log() {
 update_channel_list() {
   channel_list=$(iwlist "$1" frequency | awk 'NR>1{print $4*1000}' | tr '\n' ' ')
   export channel_list
+}
+
+#######################################
+# update wifidev from batctl status
+# Globals:
+#  channel_list
+# Arguments:
+#  $1 = wifidev name
+#######################################
+update_wifidev_from_batctl_if() {
+  data=$(sudo batctl if | cut -d ' ' -f 1)
+  wifidev=${data::-1}
 }
 
 #######################################
