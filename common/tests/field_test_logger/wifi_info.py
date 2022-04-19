@@ -14,8 +14,12 @@ class WifiInfo:
         #self.snr = ""
         self.tx_mcs = ""
         self.rx_mcs = ""
+        self.rx_throughput = 0
+        self.tx_throughput = 0
         #
         self.__phyname = ""
+        self.__old_rx_bytes = 0
+        self.__old_tx_bytes = 0
 
     def get_channel(self):
         return self.channel
@@ -38,6 +42,11 @@ class WifiInfo:
     def get_noise(self):
         return self.noise
 
+    def get_rx_throughput(self):
+        return self.rx_throughput
+
+    def get_tx_throughput(self):
+        return self.tx_throughput
 
     @staticmethod
     def __update_channel_and_twpower() -> tuple[str, str]:
@@ -75,12 +84,13 @@ class WifiInfo:
                 txpower = line[line.index(TXPWR_STR) + len(TXPWR_STR):]
                 interface_ok = False
 
-       # print(f"channel: {channel}")
+        #print(f"channel: {channel}")
         #print(f"txpower: {txpower}")
 
         return channel, txpower
 
-    def __update_mcs_and_rssi(self) -> tuple[str, str, str]:
+    @staticmethod
+    def __update_mcs_and_rssi() -> tuple[str, str, str]:
 
         iw_cmd = ['iw', 'dev', f"{EXPECTED_INTERFACE}", 'station', 'dump']
         iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
@@ -107,8 +117,8 @@ class WifiInfo:
 
         return rx_mcs, tx_mcs, rssi
 
-
-    def __update_noise(self):
+    @staticmethod
+    def __update_noise() -> str:
 
         iw_cmd = ['iw', 'dev', f"{EXPECTED_INTERFACE}", 'survey', 'dump']
         iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
@@ -128,7 +138,8 @@ class WifiInfo:
 
         return noise.strip()
 
-    def __update_country_code(self):
+    @staticmethod
+    def __update_country_code() -> str:
         iw_cmd = ['iw', 'reg', 'get']
         iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
         out = iw_proc.communicate()[0].decode().rstrip()
@@ -145,6 +156,33 @@ class WifiInfo:
         #print(f"country: {country}")
 
         return country
+
+    def __update_throughputs(self):
+
+        self.rx_throughput = 0
+        self.tx_throughput = 0
+
+        lines = []
+
+        try:
+            with open("/proc/net/dev", 'r') as f:
+                lines = f.readlines()
+
+        except FileNotFoundError:
+            print("cannot read /proc/net/dev")
+
+
+        for line in lines:
+            if EXPECTED_INTERFACE in line:
+                parts = line.split()
+                self.rx_throughput = int(parts[1]) - self.__old_rx_bytes
+                self.tx_throughput = int(parts[9]) - self.__old_tx_bytes
+                self.__old_rx_bytes = int(parts[1])
+                self.__old_tx_bytes = int(parts[9])
+                break
+
+        #print(f"rx throughput: {self.rx_throughput}")
+        #print(f"tx throughput: {self.tx_throughput}")
 
     @staticmethod
     def __get_connected_nodes() -> int:
@@ -171,3 +209,4 @@ class WifiInfo:
         self.noise = self.__update_noise()
         self.country = self.__update_country_code()
         self.rx_mcs, self.tx_mcs, self.rssi = self.__update_mcs_and_rssi()
+        self.__update_throughputs()

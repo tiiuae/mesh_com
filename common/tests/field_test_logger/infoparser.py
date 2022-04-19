@@ -7,7 +7,7 @@ def read_value_from_file(file : str) -> str:
         with open(file, 'r') as f:
             value = f.readline()
 
-            return value
+            return value.strip()
 
     except:
         return "NaN"
@@ -75,7 +75,8 @@ class InfoParser:
 
     # ---------------------------------
 
-    def __get_battery_status(self):
+    @staticmethod
+    def __get_battery_status() -> tuple[str, str]:
         voltage = read_value_from_file("/sys/class/power_supply/max1726x_battery/voltage_now")
         current = read_value_from_file("/sys/class/power_supply/max1726x_battery/current_now")
 
@@ -84,7 +85,8 @@ class InfoParser:
 
         return voltage, current
 
-    def __get_ina209_status(self):
+    @staticmethod
+    def __get_ina209_status() -> tuple[str, str, str, str]:
         nrf_current = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0040/hwmon/hwmon3/curr1_input")
         nrf_voltage = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0040/hwmon/hwmon3/in1_input")
 
@@ -99,7 +101,8 @@ class InfoParser:
 
         return nrf_current, nrf_voltage, _3v3_current, _3v3_voltage
 
-    def __get_temperatures(self) -> tuple[str, str, str]:
+    @staticmethod
+    def __get_temperatures() -> tuple[str, str, str]:
         cpu_temp = read_value_from_file("/sys/class/thermal/thermal_zone0/temp")
         tmp100 = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0049/driver/10-0049/hwmon/hwmon5/temp1_input")
         wifi_temp = read_value_from_file("/sys/class/ieee80211/phy0/device/hwmon/hwmon9/temp1_input")
@@ -110,7 +113,7 @@ class InfoParser:
 
         return cpu_temp, tmp100, wifi_temp
 
-    def __get_location(self) -> tuple[float, float, float]:
+    def __get_location(self) -> tuple[str, str, str]:
         if not self.__gpsdConnected:
             gpsd.connect()
             self.__gpsdConnected = True
@@ -123,11 +126,10 @@ class InfoParser:
 
 
     def update(self):
-
         self.latitude, self.longitude, self.altitude = self.__get_location()
         self.cpu_temp, self.tmp100, self.wifi_temp = self.__get_temperatures()
         self.battery_voltage, self.battery_current = self.__get_battery_status()
         self.nrf_current, self.nrf_voltage, self._3v3_current, self._3v3_voltage = self.__get_ina209_status()
         #print(f"lat: {self.latitude}")
-       # print(f"lon: {self.longitude}")
+        #print(f"lon: {self.longitude}")
         #print(f"alt: {self.altitude}")
