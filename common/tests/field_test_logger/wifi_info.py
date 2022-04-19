@@ -4,8 +4,9 @@ EXPECTED_INTERFACE = "wlp1s0"
 
 class WifiInfo:
 
-    def __init__(self):
+    def __init__(self, interval):
         #
+        self.neighbors = ""
         self.channel = ""
         self.country = ""
         self.rssi = ""
@@ -20,6 +21,10 @@ class WifiInfo:
         self.__phyname = ""
         self.__old_rx_bytes = 0
         self.__old_tx_bytes = 0
+        self.__interval_seconds = interval
+
+    def get_neighbors(self):
+        return self.neighbors
 
     def get_channel(self):
         return self.channel
@@ -171,38 +176,48 @@ class WifiInfo:
         except FileNotFoundError:
             print("cannot read /proc/net/dev")
 
+        rx_bytes = 0
+        tx_bytes = 0
 
         for line in lines:
             if EXPECTED_INTERFACE in line:
                 parts = line.split()
-                self.rx_throughput = int(parts[1]) - self.__old_rx_bytes
-                self.tx_throughput = int(parts[9]) - self.__old_tx_bytes
+                rx_bytes = int(parts[1]) - self.__old_rx_bytes
+                tx_bytes = int(parts[9]) - self.__old_tx_bytes
                 self.__old_rx_bytes = int(parts[1])
                 self.__old_tx_bytes = int(parts[9])
                 break
 
+        # Bytes to Bit/s
+        self.rx_throughput = (rx_bytes * 8) / self.__interval_seconds
+        self.tx_throughput = (tx_bytes * 8) / self.__interval_seconds
+
         #print(f"rx throughput: {self.rx_throughput}")
         #print(f"tx throughput: {self.tx_throughput}")
 
-    @staticmethod
-    def __get_connected_nodes() -> int:
-        """
-        Returns number of connected nodes (including caller) in BATMAN protocol
-        """
+    def __update_batman_neighbors(self):
 
-        batctl_cmd = ['batctl', 'o', '-H', '-t', '1']
-        grep_cmd = ['grep', '-c', '*']
+        batctl_cmd = ['batctl', 'n', '-H']
 
         batctl_proc = subprocess.Popen(batctl_cmd,
                                        stdout=subprocess.PIPE)
 
-        grep_proc = subprocess.Popen(grep_cmd,
-                                     stdin=batctl_proc.stdout,
-                                     stdout=subprocess.PIPE)
+        out = batctl_proc.communicate()[0].decode().rstrip()
 
-        out = grep_proc.communicate()
+        lines = out.split("\n")
 
-        return int(out[0].decode().rstrip()) + 1
+        nodes = ""
+
+        for line in lines:
+            node_stats = line.split()
+            if len(node_stats) == 3:
+                nodes = f"{nodes}{node_stats[1]},{node_stats[2]};"
+
+        # Remove semicolon after last node in list
+        self.neighbors = nodes[:-1]
+        print(self.neighbors)
+
+
 
     def update(self):
         self.channel, self.txpower = self.__update_channel_and_twpower()
@@ -210,3 +225,4 @@ class WifiInfo:
         self.country = self.__update_country_code()
         self.rx_mcs, self.tx_mcs, self.rssi = self.__update_mcs_and_rssi()
         self.__update_throughputs()
+        self.__update_batman_neighbors()

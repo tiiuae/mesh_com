@@ -56,7 +56,7 @@ def timestamp() -> str:
 
 if __name__ == '__main__':
     ftl = FieldTestLogger()
-    wifi_stats = wifi_info.WifiInfo()
+    wifi_stats = wifi_info.WifiInfo(LOGGING_INTERVAL_SECONDS)
     info = infoparser.InfoParser()
 
     ftl.register_logger_function("Timestamp", timestamp)
@@ -71,6 +71,7 @@ if __name__ == '__main__':
     ftl.register_logger_function("TX MCS", wifi_stats.get_tx_mcs)
     ftl.register_logger_function("RX throughput", wifi_stats.get_rx_throughput)
     ftl.register_logger_function("TX throughput", wifi_stats.get_tx_throughput)
+    ftl.register_logger_function("Neighbors", wifi_stats.get_neighbors)
 
     ftl.register_logger_function("latitude", info.get_latitude)
     ftl.register_logger_function("longitude", info.get_longitude)
@@ -86,8 +87,6 @@ if __name__ == '__main__':
     ftl.register_logger_function("nRF current", info.get_nrf_current)
     ftl.register_logger_function("3v3 voltage", info.get_3v3_voltage)
     ftl.register_logger_function("3v3 current", info.get_3v3_current)
-
-
 
     ftl.create_csv()
 
