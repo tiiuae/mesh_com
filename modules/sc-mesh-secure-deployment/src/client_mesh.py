@@ -12,7 +12,7 @@ import requests
 from termcolor import colored
 from pathlib import Path
 import sys
-import primitives as pri
+from primitives import Primitives as pri
 
 # Get the mesh_com config
 print(getenv("MESH_COM_ROOT", ""))
@@ -167,7 +167,8 @@ def create_config(respo):
         nodeId = int(resp['addr'].split('.')[-1]) - 1  # the IP is sequential, then it gives the nodeId.
         command = ['hostname', 'node', str(nodeId)]
         subprocess.call(command, shell=False)
-        subprocess.call('echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts', shell=True)
+        #subprocess.call('echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts', shell=True)
+        subprocess.call(['echo ', address,  'node',  str(nodeId), ' >', '/etc/hosts'], shell=False)
     execution_ctx = osh.environ.get('EXECUTION_CTX')
     print("EXECUTION CTX:")
     print(execution_ctx)
