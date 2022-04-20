@@ -91,7 +91,6 @@ echo "sudo mesh $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11}"
         help
       fi
 
-iw dev "$wifidev" set mesh_param mesh_fwding 0
 cat <<EOF >/var/run/wpa_supplicant-11s.conf
 ctrl_interface=DIR=/var/run/wpa_supplicant
 # use 'ap_scan=2' on all devices connected to the network
@@ -108,7 +107,7 @@ network={
     psk="$5"
     key_mgmt=SAE
     ieee80211w=2
-    #mesh_fwding=0
+    mesh_fwding=0
 }
 EOF
 
