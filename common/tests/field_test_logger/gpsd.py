@@ -86,6 +86,7 @@ class GpsResponse(object):
         self.climb = 0
         self.time = ''
         self.error = {}
+        self.pdop = 0
 
     @classmethod
     def from_json(cls, packet):
@@ -107,6 +108,8 @@ class GpsResponse(object):
         else:
             result.sats = 0;
             result.sats_valid = 0;
+
+        result.pdop = last_sky['pdop']
 
         result.mode = last_tpv['mode']
 

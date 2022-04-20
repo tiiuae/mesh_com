@@ -91,6 +91,7 @@ if __name__ == '__main__':
     ftl.register_logger_function("latitude", info.get_latitude)
     ftl.register_logger_function("longitude", info.get_longitude)
     ftl.register_logger_function("altitude", info.get_altitude)
+    ftl.register_logger_function("PDOP", info.get_pdop)
 
     ftl.register_logger_function("cpu temp [mC]", info.get_cpu_temp)
     ftl.register_logger_function("wifi temp [mC]", info.get_wifi_temp)

@@ -23,6 +23,7 @@ class InfoParser:
         self.latitude = -999999
         self.longitude = -999999
         self.gps_time = "NaN"
+        self.pdop = 0
         #
         self.cpu_temp = "NaN"
         self.wifi_temp = "NaN"
@@ -49,6 +50,9 @@ class InfoParser:
 
     def get_gps_time(self) -> str:
         return self.gps_time
+
+    def get_pdop(self) -> str:
+        return str(self.pdop)
 
     def get_cpu_temp(self):
         return self.cpu_temp
@@ -117,20 +121,28 @@ class InfoParser:
 
         return cpu_temp, tmp100, wifi_temp
 
-    def __get_gpsd_data(self) -> tuple[str, str, str, str]:
+    def __update_gpsd_data(self):
         if not self.__gpsdConnected:
             gpsd.connect()
             self.__gpsdConnected = True
 
         try:
             gps_response = gpsd.get_current()
-            return gps_response.lat, gps_response.lon, gps_response.alt, gps_response.time
+            self.latitude = gps_response.lat
+            self.longitude = gps_response.lon
+            self.altitude = gps_response.alt
+            self.gps_time = gps_response.time
+            self.pdop = gps_response.pdop
         except:
-            return "NaN", "NaN", "NaN"
+            self.latitude = -999999
+            self.longitude = -999999
+            self.altitude = 0
+            self.gps_time ="NaN"
+            self.pdop = 0
 
 
     def update(self):
-        self.latitude, self.longitude, self.altitude, self.gps_time = self.__get_gpsd_data()
+        self.__update_gpsd_data()
         self.cpu_temp, self.tmp100, self.wifi_temp = self.__get_temperatures()
         self.battery_voltage, self.battery_current = self.__get_battery_status()
         self.nrf_current, self.nrf_voltage, self._3v3_current, self._3v3_voltage = self.__get_ina209_status()
