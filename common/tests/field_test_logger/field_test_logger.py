@@ -1,12 +1,23 @@
 import csv
+import os
 import time
 from datetime import datetime
 
 import wifi_info
 import infoparser
 
-LOG_FOLDER_LOCATION = "logs/"
+LOG_FOLDER_LOCATION = r"/root/field_test_logs/"
 LOGGING_INTERVAL_SECONDS = 3
+
+
+def check_log_folder():
+    """
+    Check if default log folder exists and create it if it doesn't
+    """
+    if not os.path.exists(LOG_FOLDER_LOCATION):
+        os.makedirs(LOG_FOLDER_LOCATION)
+        print("Created log directory")
+
 
 class FieldTestLogger:
     def __init__(self):
@@ -19,6 +30,8 @@ class FieldTestLogger:
         now_str = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         self.__filename = f"{now_str}.csv"
         self.__construct_csv_header()
+
+        check_log_folder()
 
         with open(f"{LOG_FOLDER_LOCATION}{self.__filename}", 'w', newline='') as csvfile:
             wr = csv.writer(csvfile, delimiter=',')
@@ -63,30 +76,32 @@ if __name__ == '__main__':
     wifi_stats.update()
     info.update()
 
+    ftl.register_logger_function("GPS time", info.get_gps_time)
+
     ftl.register_logger_function("channel", wifi_stats.get_channel)
-    ftl.register_logger_function("rssi", wifi_stats.get_rssi)
-    ftl.register_logger_function("txpower", wifi_stats.get_txpower)
-    ftl.register_logger_function("noise", wifi_stats.get_noise)
+    ftl.register_logger_function("rssi [dBm]", wifi_stats.get_rssi)
+    ftl.register_logger_function("txpower [dBm]", wifi_stats.get_txpower)
+    ftl.register_logger_function("noise [dBm]", wifi_stats.get_noise)
     ftl.register_logger_function("RX MCS", wifi_stats.get_rx_mcs)
     ftl.register_logger_function("TX MCS", wifi_stats.get_tx_mcs)
-    ftl.register_logger_function("RX throughput", wifi_stats.get_rx_throughput)
-    ftl.register_logger_function("TX throughput", wifi_stats.get_tx_throughput)
+    ftl.register_logger_function("RX throughput [Bits/s]", wifi_stats.get_rx_throughput)
+    ftl.register_logger_function("TX throughput [Bits/s]", wifi_stats.get_tx_throughput)
     ftl.register_logger_function("Neighbors", wifi_stats.get_neighbors)
 
     ftl.register_logger_function("latitude", info.get_latitude)
     ftl.register_logger_function("longitude", info.get_longitude)
     ftl.register_logger_function("altitude", info.get_altitude)
 
-    ftl.register_logger_function("cpu temp", info.get_cpu_temp)
-    ftl.register_logger_function("wifi temp", info.get_wifi_temp)
-    ftl.register_logger_function("tmp100", info.get_tmp100)
+    ftl.register_logger_function("cpu temp [mC]", info.get_cpu_temp)
+    ftl.register_logger_function("wifi temp [mC]", info.get_wifi_temp)
+    ftl.register_logger_function("tmp100 [mC]", info.get_tmp100)
 
-    ftl.register_logger_function("battery voltage", info.get_battery_voltage)
-    ftl.register_logger_function("battery current", info.get_battery_current)
-    ftl.register_logger_function("nRF voltage", info.get_nrf_voltage)
-    ftl.register_logger_function("nRF current", info.get_nrf_current)
-    ftl.register_logger_function("3v3 voltage", info.get_3v3_voltage)
-    ftl.register_logger_function("3v3 current", info.get_3v3_current)
+    ftl.register_logger_function("battery voltage [uV]", info.get_battery_voltage)
+    ftl.register_logger_function("battery current [uA]", info.get_battery_current)
+    ftl.register_logger_function("nRF voltage [mV]", info.get_nrf_voltage)
+    ftl.register_logger_function("nRF current [mA]", info.get_nrf_current)
+    ftl.register_logger_function("3v3 voltage [mV]", info.get_3v3_voltage)
+    ftl.register_logger_function("3v3 current [mA]", info.get_3v3_current)
 
     ftl.create_csv()
 

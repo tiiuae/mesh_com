@@ -87,6 +87,7 @@ class WifiInfo:
 
             elif TXPWR_STR in line and interface_ok:
                 txpower = line[line.index(TXPWR_STR) + len(TXPWR_STR):]
+                txpower = txpower.split()[0]
                 interface_ok = False
 
         #print(f"channel: {channel}")
@@ -110,6 +111,7 @@ class WifiInfo:
         for line in lines:
             if "signal:" in line:
                 rssi = line[line.index("signal:")+len("signal:"):].strip()
+                rssi = rssi.split()[0]
 
             if "tx bitrate:" in line:
                 if "MCS" in line:
@@ -139,6 +141,7 @@ class WifiInfo:
                 found_in_use = True
             if NOISE_STR in line and found_in_use:
                 noise = line[line.index(NOISE_STR) + len(NOISE_STR):]
+                noise = noise.split()[0]
                 break
 
         return noise.strip()
@@ -211,13 +214,11 @@ class WifiInfo:
         for line in lines:
             node_stats = line.split()
             if len(node_stats) == 3:
-                nodes = f"{nodes}{node_stats[1]},{node_stats[2]};"
+                nodes = f"{nodes}{node_stats[1]},{node_stats[2][:-1]};"
 
         # Remove semicolon after last node in list
         self.neighbors = nodes[:-1]
-        print(self.neighbors)
-
-
+        #print(self.neighbors)
 
     def update(self):
         self.channel, self.txpower = self.__update_channel_and_twpower()

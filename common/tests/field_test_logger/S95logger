@@ -3,9 +3,9 @@
 # The daemon's name (to ensure uniqueness and for stop, restart and status)
 name="field_test_logger"
 # The path of the client executable
-command="python3 /usr/local/bin/field_test_logger.py"
+command="/usr/bin/python3"
 # Any command line arguments for the client executable
-command_args=""
+command_args="/usr/local/bin/field_test_logger.py"
 # The path of the daemon executable
 daemon="/usr/bin/daemon"
 
