@@ -1,45 +1,81 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import argparse
+# from asyncio.windows_events import NULL
 import json
+# from turtle import color
 import yaml
 import subprocess
 import time
 import hashlib
 import re
 import os as osh
+from os import getenv
 import netifaces
 from getmac import get_mac_address
 import requests
 from termcolor import colored
 from pathlib import Path
+import sys
 
+sys.path.append("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw")
+from gw import main
+
+# Construct the argument parser
+ap = argparse.ArgumentParser()
+
+# Add the arguments to the parser
+ap.add_argument("-s", "--server", required=True, help="Server IP:Port Address. Ex: 'http://192.168.15.14:5000'")
+ap.add_argument("-c", "--certificate", required=True)
+ap.add_argument("-t", "--test", required=False, default=False, action='store_true')
+ap.add_argument("-m", "--mode", required=True)
+args = ap.parse_args()
+# Get the mesh_com config
+mesh_mode = args.mode
 
 # Get the mesh_com config
+if mesh_mode == 'ibss':
+    conf_path = "src/mesh_com.conf"
+elif mesh_mode == '11s':
+    conf_path = "src/mesh_com_11s.conf"
+
+print(getenv("MESH_COM_ROOT", ""))
+config_path = osh.path.join(getenv("MESH_COM_ROOT", ""), conf_path)
 print('> Loading yaml conf... ')
 try:
-    yaml_conf = yaml.safe_load(open('src/mesh_com.conf', 'r'))
+    yaml_conf = yaml.safe_load(open(config_path, 'r'))
     conf = yaml_conf['client']
     debug = yaml_conf['debug']
     print(conf)
 except (IOError, yaml.YAMLError) as error:
     print(error)
-    exit()
+    sys.exit()
 
 
-# Construct the argument parser
-ap = argparse.ArgumentParser()
+# Function for test case
+def Client_Test(**arg):
+    if args.test:
+        f = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclient1.txt", "w")
+        if arg["color"] == "Green":
+            f.write("True")
+            f.close()
+        elif arg["Color"] == "Red":
+            f.write("False")
+            f.close()
 
 
-# Add the arguments to the parser
-ap.add_argument("-s", "--server", required=True, help="Server IP:Port Address. Ex: 'http://192.168.15.14:5000'")
-ap.add_argument("-c", "--certificate", required=True)
-args = ap.parse_args()
+def Client_Mac(**arg):
+    if args.test:
+        t = open("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/testclientmac.txt", "w")
+        if arg["macs"] is not None:
+            t.write(str(arg["macs"]))
+            t.close()
 
 
 # Connect to server
 URL = args.server
 print('> Connecting to server: ' + str(URL))
+
 
 def get_os():
     proc = subprocess.Popen(['lsb_release', '-a'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -50,15 +86,17 @@ def get_os():
             os = aux
     return os
 
+
 def is_sec_os():
     os = ""
     execution_ctx = osh.environ.get('EXECUTION_CTX')
-    if execution_ctx=="docker":
-        if osh.environ.get('HOSTNAME')=="br_hardened":
+    if execution_ctx == "docker":
+        if osh.environ.get('HOSTNAME') == "br_hardened":
             os = "secos"
         else:
             os = get_os()
     return os
+
 
 def get_data(cert_file, os):
     message = '/api/add_message/' + os
@@ -146,7 +184,7 @@ def create_config_ubuntu(response):
     address = res['addr']
     if conf['mesh_service']:
         mesh_vif = get_interface(conf['mesh_inf'])
-        cmd="iw dev " + mesh_vif + " info | awk '/wiphy/ {printf \"phy\" $2}'"
+        cmd = "iw dev " + mesh_vif + " info | awk '/wiphy/ {printf \"phy\" $2}'"
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
         phy_name = proc.communicate()[0].decode('utf-8').strip()
     # Create mesh service config
@@ -163,17 +201,6 @@ def create_config_ubuntu(response):
         mesh_config.write('COUNTRY=fi\n')
         mesh_config.write('MESH_VIF=' + mesh_vif + '\n')
         mesh_config.write('PHY=' + phy_name + '\n')
-    # Are we a gateway node? If we are we need to set up the routes
-    if res['gateway'] and conf['gw_service']:
-        print("============================================")
-        gw_inf = get_interface(conf['gw_inf'])
-        #ubuntu_gw(gw_inf)
-    elif conf['dflt_service']:
-        # We aren't a gateway node, set up the default route (to gw) service
-        prefix = address.split('.')[:-1]
-        prefix = '.'.join(prefix)
-        mesh_gateway = prefix + '.2'
-        ubuntu_node(mesh_gateway)
     # Set hostname
     if conf['set_hostname']:
         print('> Setting hostname...')
@@ -183,22 +210,28 @@ def create_config_ubuntu(response):
     execution_ctx = osh.environ.get('EXECUTION_CTX')
     print("EXECUTION CTX:")
     print(execution_ctx)
-    if execution_ctx!="docker":
+    if execution_ctx != "docker":
         if conf['disable_networking']:
             subprocess.call('sudo nmcli networking off', shell=True)
             subprocess.call('sudo systemctl stop network-manager.service', shell=True)
             subprocess.call('sudo systemctl disable network-manager.service', shell=True)
             subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
-            #subprocess.call('pkill wpa_supplicant', shell=True)
-            #subprocess.call('pkill -f "/var/run/wpa_supplicant-" 2>/dev/null', shell=True)
+            # subprocess.call('pkill wpa_supplicant', shell=True)
+            # subprocess.call('pkill -f "/var/run/wpa_supplicant-" 2>/dev/null', shell=True)
     # Copy mesh service to /etc/systemd/system/
     if conf['mesh_service']:
         mesh_interface = get_interface(conf['mesh_inf'])
+        config_11s_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "src/bash/conf-11s-mesh.sh")
+        config_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "src/bash/conf-mesh.sh")
+        print(config_mesh_path)
         if res['type'] == '11s':
-            subprocess.call('src/bash/conf-11s-mesh.sh ' + mesh_interface, shell=True)
+            subprocess.call(config_11s_mesh_path + " " + mesh_interface, shell=True)
         if res['type'] == 'ibss':
-            subprocess.call('src/bash/conf-mesh.sh ' + mesh_interface, shell=True)
-
+            subprocess.call(config_mesh_path + " " + mesh_interface, shell=True)
+    # Are we a gateway node? If we are we need to set up the routes
+    if res['gateway'] and conf['gw_service']:
+        print("============================================")
+        main.AutoGateway()
 
 if __name__ == "__main__":
     os = is_sec_os()
@@ -209,10 +242,13 @@ if __name__ == "__main__":
     res, server_cert = decrypt_response()
     if verify_certificate(local_cert, server_cert):
         print(colored('> Valid Server Certificate', 'green'))
+        Client_Test(color="Green")
         mac = get_mac_address(interface=get_interface(conf['mesh_inf']))
+        Client_Mac(macs=mac)
         response = requests.post(URL + '/mac/' + mac)
         if os == 'Ubuntu' or 'secos':
             create_config_ubuntu(res)
     else:
         print(colored("Not Valid Server Certificate", 'red'))
-        exit(0)
+        Client_Test(color="Red")
+        sys.exit(0)

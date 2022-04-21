@@ -55,13 +55,13 @@ _init() {
   iptables -P FORWARD ACCEPT
 
   conf_filename="./tmp/wpa_supplicant_11s_$3_$2.conf"
-  log_filename="./logs/wpa_supplicant_11s_$3_$2.log"
+  wpa_log_filename="./logs/wpa_supplicant_11s_$3_$2.log"
 
   # Create wpa_supplicant.conf here
   create_wpa_supplicant_config "$conf_filename" "$3" "$2" "$4"
 
   # start wpa_supplicant
-  wpa_supplicant -Dnl80211 -B -i"$wifidev" -C /var/run/wpa_supplicant/ -c "$conf_filename" -f "$log_filename"
+  wpa_supplicant -Dnl80211 -B -i"$wifidev" -C /var/run/wpa_supplicant/ -c "$conf_filename" -f "$wpa_log_filename"
   sleep 5
   iw dev "$wifidev" set mesh_param mesh_fwding 0
   iw dev "$wifidev" set mesh_param mesh_ttl 1
@@ -131,7 +131,7 @@ _init_vlan() {
   iptables -P FORWARD ACCEPT
 
   conf_filename="./tmp/wpa_supplicant_11s_$3_$2.conf"
-  log_filename="./logs/wpa_supplicant_11s_$3_$2.log"
+  wpa_log_filename="./logs/wpa_supplicant_11s_$3_$2.log"
 
   # Create wpa_supplicant.conf here
   create_wpa_supplicant_config "$conf_filename" "$3" "$2" "$4"
@@ -164,7 +164,7 @@ _init_vlan() {
   echo "Batman chain bat0.$vbat bat0.$(("$vbat"+1)) done."
 
  # start wpa_supplicant
-  wpa_supplicant -Dnl80211 -B -i"$wifidev" -C /var/run/wpa_supplicant/ -c "$conf_filename" -f "$log_filename"
+  wpa_supplicant -Dnl80211 -B -i"$wifidev" -C /var/run/wpa_supplicant/ -c "$conf_filename" -f "$wpa_log_filename"
   sleep 5
   iw dev "$wifidev" set mesh_param mesh_fwding 0
   iw dev "$wifidev" set mesh_param mesh_ttl 1
@@ -234,7 +234,7 @@ _init_mesh_ap() {
   iptables -P FORWARD ACCEPT
 
   conf_filename="./tmp/wpa_supplicant_11s_$3_$2.conf"
-  log_filename="./logs/wpa_supplicant_11s_$3_$2.log"
+  wpa_log_filename="./logs/wpa_supplicant_11s_$3_$2.log"
 
   # Create wpa_supplicant.conf here
   create_wpa_supplicant_config "$conf_filename" "$3" "$2" "$4"
@@ -248,7 +248,7 @@ _init_mesh_ap() {
   brctl addbr br-lan
 
   # start wpa_supplicant
-  wpa_supplicant -Dnl80211 -B -i"$wifidev" -C /var/run/wpa_supplicant/ -c "$conf_filename" -f "$log_filename"
+  wpa_supplicant -Dnl80211 -B -i"$wifidev" -C /var/run/wpa_supplicant/ -c "$conf_filename" -f "$wpa_log_filename"
   sleep 5
   iw dev "$wifidev" set mesh_param mesh_fwding 0
   iw dev "$wifidev" set mesh_param mesh_ttl 1
@@ -261,13 +261,13 @@ _init_mesh_ap() {
   iw dev "$wifidev" interface add "$apif" type managed addr "00:01:$(echo "$wifimac" | cut -b 7-17)"
 
   conf_filename="./tmp/hostapd_$3_$2.conf"
-  log_filename="./logs/hostapd_$3_$2.log"
+  hostapd_log_filename="./logs/hostapd_$3_$2.log"
 
   # Create wpa_supplicant.conf here
   create_hostapd_config "$conf_filename" "$3" "$2" "$4" "$apif" "$ssid"
 
   # Start AP
-  /usr/sbin/hostapd -B "$conf_filename" -f "$log_filename"
+  /usr/sbin/hostapd -B "$conf_filename" -f "$hostapd_log_filename"
 
   # Bridge AP and Mesh
   brctl addif br-lan bat0 "$apif"

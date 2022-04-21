@@ -1,6 +1,6 @@
 #! /bin/bash
 meshcom_path=$(pwd | awk -F 'mesh_com' '{print $1 FS "/"}')
-sc_path=$(pwd | awk -F 'sc-mesh-secure-deployment' '{print $1 FS "/"}')
+sc_path=$meshcom_path"/modules/sc-mesh-secure-deployment"
 
 cp $meshcom_path/common/scripts/mesh-ibss.sh  /opt/.
 chmod 744 /opt/mesh-ibss.sh
