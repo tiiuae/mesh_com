@@ -91,14 +91,15 @@ EOF
   /usr/sbin/hostapd -B /var/run/hostapd.conf -f /tmp/hostapd.log
   # Bridge AP and Mesh
   brctl addif br-lan bat0 "$ifname_ap"
-  ifconfig br-lan "192.168.1.20" netmask "255.255.255.0"
+  br_lan_ip="192.168.1.20"
+  ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
   ifconfig br-lan up
   echo
   ifconfig br-lan
   # Add forwading rules from AP to bat0 interface
   iptables -P FORWARD ACCEPT
   route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
-  route add -net 192.168.1.0 gw 192.168.1.20 netmask 255.255.255.0 dev br-lan
+  route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
   iptables -A FORWARD --in-interface bat0 -j ACCEPT
   iptables --table nat -A POSTROUTING --out-interface $ifname_ap -j MASQUERADE
 fi
@@ -119,3 +120,6 @@ umurmurd
 
 #start gw manager
 nohup python -u /opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw/main.py
+
+#start comms sleeve web server for companion phone
+nohup python -u /opt/mesh_com/modules/utils/docker/comms_sleeve_server.py -ip $br_lan_ip -ap_if $ifname_ap  -mesh_if bat0
