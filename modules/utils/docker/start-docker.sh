@@ -51,6 +51,20 @@ elif [ "$OS" == "Buildroot" ]; then
         else
             docker import - comms_vm < /rootfs.tar
         fi
+        meshcom_path="/opt/container-data/mesh/mesh_com/"
+        echo $meshcom_path
+        if [ ! -f "/opt/container-data/mesh/mesh.conf" ]; then
+		cp /opt/mesh_default.conf /opt/container-data/mesh/mesh.conf
+		cp $meshcom_path/common/scripts/mesh-ibss.sh  /opt/container-data/mesh/.
+		chmod 755 /opt/container-data/mesh/mesh-ibss.sh
+		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90mesh /opt/container-data/mesh/.
+		chmod 755 /opt/container-data/mesh/S90mesh
+		cp $meshcom_path/common/scripts/mesh-11s.sh  /opt/container-data/mesh/.
+		chmod 755 /opt/container-data/mesh/mesh-11s.sh
+		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S9011sMesh /opt/container-data/mesh/.
+		chmod 755 /opt/container-data/mesh/S9011sMesh
+		cp /etc/umurmur.conf $meshcom_path/modules/utils/docker/umurmur.conf
+        fi
         docker rm -f mesh_comms_vm
         docker run --name mesh_comms_vm -d --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm
         #Add restart policy of the container if it stops or device rebooted
