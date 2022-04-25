@@ -1,8 +1,9 @@
+import glob
 import gpsd
 import subprocess
 
 
-def read_value_from_file(file : str) -> str:
+def read_value(file : str) -> str:
     try:
         with open(file, 'r') as f:
             value = f.readline()
@@ -11,6 +12,11 @@ def read_value_from_file(file : str) -> str:
 
     except:
         return "NaN"
+
+
+def get_hwmon_path(path : str) -> str:
+    # hwmon directory should contain only one entry which is of format hwmon*
+    return glob.glob(path)[0]
 
 
 class InfoParser:
@@ -85,8 +91,8 @@ class InfoParser:
 
     @staticmethod
     def __get_battery_status() -> tuple[str, str]:
-        voltage = read_value_from_file("/sys/class/power_supply/max1726x_battery/voltage_now")
-        current = read_value_from_file("/sys/class/power_supply/max1726x_battery/current_now")
+        voltage = read_value("/sys/class/power_supply/max1726x_battery/voltage_now")
+        current = read_value("/sys/class/power_supply/max1726x_battery/current_now")
 
         #print(f"battery voltage: {voltage}")
         #print(f"discharging current: {current}")
@@ -95,14 +101,14 @@ class InfoParser:
 
     @staticmethod
     def __get_ina209_status() -> tuple[str, str, str, str]:
-        nrf_current = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0040/hwmon/hwmon3/curr1_input")
-        nrf_voltage = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0040/hwmon/hwmon3/in1_input")
+        nrf_current = read_value(get_hwmon_path("/sys/class/i2c-adapter/i2c-10/10-0040/hwmon/hwmon*/curr1_input"))
+        nrf_voltage = read_value(get_hwmon_path("/sys/class/i2c-adapter/i2c-10/10-0040/hwmon/hwmon*/in1_input"))
 
         #print(f"nrf current: {nrf_current}")
         #print(f"nrf voltage: {nrf_voltage}")
 
-        _3v3_current = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0045/hwmon/hwmon4/curr1_input")
-        _3v3_voltage = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0045/hwmon/hwmon4/in1_input")
+        _3v3_current = read_value(get_hwmon_path("/sys/class/i2c-adapter/i2c-10/10-0045/hwmon/hwmon*/curr1_input"))
+        _3v3_voltage = read_value(get_hwmon_path("/sys/class/i2c-adapter/i2c-10/10-0045/hwmon/hwmon*/in1_input"))
 
         #print(f"3v3 current: {_3v3_current}")
         #print(f"3v3 voltage: {_3v3_voltage}")
@@ -111,9 +117,9 @@ class InfoParser:
 
     @staticmethod
     def __get_temperatures() -> tuple[str, str, str]:
-        cpu_temp = read_value_from_file("/sys/class/thermal/thermal_zone0/temp")
-        tmp100 = read_value_from_file("/sys/class/i2c-adapter/i2c-10/10-0049/driver/10-0049/hwmon/hwmon5/temp1_input")
-        wifi_temp = read_value_from_file("/sys/class/ieee80211/phy0/device/hwmon/hwmon9/temp1_input")
+        cpu_temp = read_value("/sys/class/thermal/thermal_zone0/temp")
+        tmp100 = read_value(get_hwmon_path("/sys/class/i2c-adapter/i2c-10/10-0049/driver/10-0049/hwmon/hwmon*/temp1_input"))
+        wifi_temp = read_value(get_hwmon_path("/sys/class/ieee80211/phy0/device/hwmon/hwmon*/temp1_input"))
 
        # print(f"cpu_temp: {cpu_temp}")
         #print(f"tmp100: {tmp100}")
