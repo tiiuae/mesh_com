@@ -16,7 +16,10 @@ def read_value(file : str) -> str:
 
 def get_hwmon_path(path : str) -> str:
     # hwmon directory should contain only one entry which is of format hwmon*
-    return glob.glob(path)[0]
+    try:
+        return glob.glob(path)[0]
+    except:
+        return "NaN"
 
 # ----------------------------------------
 
