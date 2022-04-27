@@ -19,7 +19,7 @@ calculate_wifi_channel()
     fi
 }
 
-if [[ -z "${1}"  || -z "${2}" ]]; then
+if [[ -z "${1}"  && -z "${2}" ]]; then
     mode="ap+mesh"
     ch="2412"
 else
@@ -40,6 +40,20 @@ pip install --no-index --find-links /opt/mesh_com/modules/utils/package/python_p
 #copy libraries for pypcap
 cp /opt/mesh_com/modules/utils/package/python_packages2/libpcap.so.0.8 /usr/lib/.
 cp /opt/mesh_com/modules/utils/package/python_packages2/pcap.cpython-39-aarch64-linux-gnu.so /usr/lib/python3.9/site-packages/.
+
+if [ $mode == "provisioning" ]; then
+   killall hostapd
+   killall wpa_supplicant
+   ifconfig br-lan down
+   brctl delbr br-lan
+   ifname_ap="$(ifconfig -a | grep wlan* | awk -F':' '{ print $1 }')"
+   ifname_mp="$(ifconfig -a | grep wlp1* | awk -F':' '{ print $1 }')"
+   ifconfig $ifname_ap down
+   ifconfig $ifname_mp down
+   ifconfig $ifname_ap up
+   ifconfig $ifname_mp up
+   exit 1
+fi
 
 #start mesh service if mesh provisoning is done
 hw_platform=$(cat /proc/cpuinfo | grep Model | awk '{print $5}')
