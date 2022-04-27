@@ -7,7 +7,7 @@ import wifi_info
 import infoparser
 
 LOG_FOLDER_LOCATION = r"/root/field_test_logs/"
-LOGGING_INTERVAL_SECONDS = 3
+LOGGING_INTERVAL_SECONDS = 1
 
 
 def check_log_folder():
@@ -111,4 +111,3 @@ if __name__ == '__main__':
         info.update()
         ftl.append_csv()
         time.sleep(LOGGING_INTERVAL_SECONDS)
-

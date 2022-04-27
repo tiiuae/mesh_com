@@ -6,56 +6,57 @@ class WifiInfo:
 
     def __init__(self, interval):
         #
-        self.neighbors = ""
-        self.channel = ""
-        self.country = ""
-        self.rssi = ""
-        self.txpower = ""
-        self.noise = ""
-        #self.snr = ""
-        self.tx_mcs = ""
-        self.rx_mcs = ""
-        self.rx_throughput = 0
-        self.tx_throughput = 0
+        self.__neighbors = ""
+        self.__channel = ""
+        self.__country = ""
+        self.__rssi = ""
+        self.__txpower = ""
+        self.__noise = ""
+        self.__tx_mcs = ""
+        self.__rx_mcs = ""
+        self.__rx_throughput = 0
+        self.__tx_throughput = 0
         #
         self.__phyname = ""
         self.__old_rx_bytes = 0
         self.__old_tx_bytes = 0
         self.__interval_seconds = interval
 
+    # ----------------------------------------
+
     def get_neighbors(self):
-        return self.neighbors
+        return self.__neighbors
 
     def get_channel(self):
-        return self.channel
+        return self.__channel
 
     def get_country(self):
-        return self.country
+        return self.__country
 
     def get_rx_mcs(self):
-        return self.rx_mcs
+        return self.__rx_mcs
 
     def get_tx_mcs(self):
-        return self.tx_mcs
+        return self.__tx_mcs
 
     def get_txpower(self):
-        return self.txpower
+        return self.__txpower
 
     def get_rssi(self):
-        return self.rssi
+        return self.__rssi
 
     def get_noise(self):
-        return self.noise
+        return self.__noise
 
     def get_rx_throughput(self):
-        return self.rx_throughput
+        return self.__rx_throughput
 
     def get_tx_throughput(self):
-        return self.tx_throughput
+        return self.__tx_throughput
 
-    @staticmethod
-    def __update_channel_and_twpower() -> tuple[str, str]:
+    # ----------------------------------------
 
+    def __update_channel_and_twpower(self):
         iw_cmd = ['iw', 'dev']
         iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
         out = iw_proc.communicate()[0].decode().rstrip()
@@ -92,26 +93,25 @@ class WifiInfo:
 
         #print(f"channel: {channel}")
         #print(f"txpower: {txpower}")
+        self.__channel = channel
+        self.__txpower = txpower
 
-        return channel, txpower
-
-    @staticmethod
-    def __update_mcs_and_rssi() -> tuple[str, str, str]:
-
+    def __update_mcs_and_rssi(self):
         iw_cmd = ['iw', 'dev', f"{EXPECTED_INTERFACE}", 'station', 'dump']
         iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
         out = iw_proc.communicate()[0].decode().rstrip()
 
         lines = out.split("\n")
 
-        tx_mcs = ""
-        rx_mcs = ""
-        rssi = ""
+        tx_mcs = "NaN"
+        rx_mcs = "NaN"
+        rssi = "NaN"
 
         for line in lines:
-            if "signal:" in line:
+            if "signal:" in line and "]" in line:
                 rssi = line[line.index("signal:")+len("signal:"):].strip()
-                rssi = rssi.split()[0]
+                rssi = rssi[:rssi.index("]")+1]
+
 
             if "tx bitrate:" in line:
                 if "MCS" in line:
@@ -119,14 +119,14 @@ class WifiInfo:
             elif "rx bitrate:" in line:
                 if "MCS" in line:
                     rx_mcs = line[line.index("MCS")+4:line.index("MCS") + 6]
+                    break
 
         #print(f"rssi: {rssi}")
+        self.__rssi = rssi
+        self.__rx_mcs = rx_mcs
+        self.__tx_mcs = tx_mcs
 
-        return rx_mcs, tx_mcs, rssi
-
-    @staticmethod
-    def __update_noise() -> str:
-
+    def __update_noise(self):
         iw_cmd = ['iw', 'dev', f"{EXPECTED_INTERFACE}", 'survey', 'dump']
         iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
         out = iw_proc.communicate()[0].decode().rstrip()
@@ -141,13 +141,12 @@ class WifiInfo:
                 found_in_use = True
             if NOISE_STR in line and found_in_use:
                 noise = line[line.index(NOISE_STR) + len(NOISE_STR):]
-                noise = noise.split()[0]
+                noise = noise.split()[0].strip()
                 break
 
-        return noise.strip()
+        self.__noise = noise
 
-    @staticmethod
-    def __update_country_code() -> str:
+    def __update_country_code(self):
         iw_cmd = ['iw', 'reg', 'get']
         iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
         out = iw_proc.communicate()[0].decode().rstrip()
@@ -163,10 +162,9 @@ class WifiInfo:
 
         #print(f"country: {country}")
 
-        return country
+        self.__country = country
 
     def __update_throughputs(self):
-
         self.rx_throughput = 0
         self.tx_throughput = 0
 
@@ -192,14 +190,13 @@ class WifiInfo:
                 break
 
         # Bytes to Bit/s
-        self.rx_throughput = (rx_bytes * 8) / self.__interval_seconds
-        self.tx_throughput = (tx_bytes * 8) / self.__interval_seconds
+        self.__rx_throughput = (rx_bytes * 8) / self.__interval_seconds
+        self.__tx_throughput = (tx_bytes * 8) / self.__interval_seconds
 
         #print(f"rx throughput: {self.rx_throughput}")
         #print(f"tx throughput: {self.tx_throughput}")
 
     def __update_batman_neighbors(self):
-
         batctl_cmd = ['batctl', 'n', '-H']
 
         batctl_proc = subprocess.Popen(batctl_cmd,
@@ -217,13 +214,18 @@ class WifiInfo:
                 nodes = f"{nodes}{node_stats[1]},{node_stats[2][:-1]};"
 
         # Remove semicolon after last node in list
-        self.neighbors = nodes[:-1]
+        self.__neighbors = nodes[:-1]
         #print(self.neighbors)
 
+    # ----------------------------------------
+
     def update(self):
-        self.channel, self.txpower = self.__update_channel_and_twpower()
-        self.noise = self.__update_noise()
-        self.country = self.__update_country_code()
-        self.rx_mcs, self.tx_mcs, self.rssi = self.__update_mcs_and_rssi()
+        """
+        Update variables with latest info
+        """
+        self.__update_channel_and_twpower()
+        self.__update_noise()
+        self.__update_country_code()
+        self.__update_mcs_and_rssi()
         self.__update_throughputs()
         self.__update_batman_neighbors()
