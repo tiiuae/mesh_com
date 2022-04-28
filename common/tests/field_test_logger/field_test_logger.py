@@ -26,9 +26,9 @@ class FieldTestLogger:
         self.__logger_output = []
         self.__filename = ""
 
-    def create_csv(self):
+    def create_csv(self, suffix : str):
         now_str = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-        self.__filename = f"{now_str}.csv"
+        self.__filename = f"{now_str}_{suffix}.csv"
         self.__construct_csv_header()
 
         check_log_folder()
@@ -52,6 +52,8 @@ class FieldTestLogger:
         """
         self.__logger_functions[name] = function
 
+    # ----------------------------------------
+
     def __run_logger_functions(self):
         self.__logger_output.clear()
         for func in self.__logger_functions.values():
@@ -62,9 +64,14 @@ class FieldTestLogger:
             self.__header.append(name)
 
 
+# ----------------------------------------
+
 def timestamp() -> str:
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return now_str
+
+
+# ----------------------------------------
 
 
 if __name__ == '__main__':
@@ -79,11 +86,11 @@ if __name__ == '__main__':
     ftl.register_logger_function("GPS time", info.get_gps_time)
 
     ftl.register_logger_function("channel", wifi_stats.get_channel)
-    ftl.register_logger_function("rssi [dBm]", wifi_stats.get_rssi)
+    ftl.register_logger_function("rssi [MAC,dBm;MAC,dBm ...]", wifi_stats.get_rssi)
     ftl.register_logger_function("txpower [dBm]", wifi_stats.get_txpower)
     ftl.register_logger_function("noise [dBm]", wifi_stats.get_noise)
-    ftl.register_logger_function("RX MCS", wifi_stats.get_rx_mcs)
-    ftl.register_logger_function("TX MCS", wifi_stats.get_tx_mcs)
+    ftl.register_logger_function("RX MCS [MAC,MCS;MAC,MCS ...]", wifi_stats.get_rx_mcs)
+    ftl.register_logger_function("TX MCS [MAC,MCS;MAC,MCS ...]", wifi_stats.get_tx_mcs)
     ftl.register_logger_function("RX throughput [Bits/s]", wifi_stats.get_rx_throughput)
     ftl.register_logger_function("TX throughput [Bits/s]", wifi_stats.get_tx_throughput)
     ftl.register_logger_function("Neighbors", wifi_stats.get_neighbors)
@@ -104,7 +111,7 @@ if __name__ == '__main__':
     ftl.register_logger_function("3v3 voltage [mV]", info.get_3v3_voltage)
     ftl.register_logger_function("3v3 current [mA]", info.get_3v3_current)
 
-    ftl.create_csv()
+    ftl.create_csv(wifi_stats.get_mac_addr())
 
     while True:
         wifi_stats.update()

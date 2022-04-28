@@ -23,11 +23,11 @@ def get_hwmon_path(path : str) -> str:
 
 # ----------------------------------------
 
+
 class InfoParser:
 
     def __init__(self):
         self.__gpsdConnected = False
-
         #
         self.__altitude = 0
         self.__latitude = -999999

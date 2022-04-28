@@ -5,24 +5,28 @@ EXPECTED_INTERFACE = "wlp1s0"
 class WifiInfo:
 
     def __init__(self, interval):
-        #
         self.__neighbors = ""
         self.__channel = ""
         self.__country = ""
-        self.__rssi = ""
         self.__txpower = ""
         self.__noise = ""
-        self.__tx_mcs = ""
-        self.__rx_mcs = ""
         self.__rx_throughput = 0
         self.__tx_throughput = 0
-        #
+        self.__stations = {}
         self.__phyname = ""
         self.__old_rx_bytes = 0
         self.__old_tx_bytes = 0
         self.__interval_seconds = interval
 
     # ----------------------------------------
+
+    def get_mac_addr(self):
+        try:
+            with open(f"/sys/class/net/{EXPECTED_INTERFACE}/address", 'r') as f:
+                value = f.readline()
+                return value.strip()
+        except:
+            return "NaN"
 
     def get_neighbors(self):
         return self.__neighbors
@@ -33,17 +37,41 @@ class WifiInfo:
     def get_country(self):
         return self.__country
 
+    def get_rssi(self):
+        out = ""
+        for i in self.__stations.keys():
+            # List index 0 contains RSSI
+            out = f"{out}{i},{self.__stations[i][0]};"
+
+        # Remove semicolon after last node in list
+        out = out[:-1]
+
+        return out
+
     def get_rx_mcs(self):
-        return self.__rx_mcs
+        out = ""
+        for i in self.__stations.keys():
+            # List index 2 contains RX_MCS
+            out = f"{out}{i},{self.__stations[i][2]};"
+
+        # Remove semicolon after last node in list
+        out = out[:-1]
+
+        return out
 
     def get_tx_mcs(self):
-        return self.__tx_mcs
+        out = ""
+        for i in self.__stations.keys():
+            # List index 1 contains TX_MCS
+            out = f"{out}{i},{self.__stations[i][1]};"
+
+        # Remove semicolon after last node in list
+        out = out[:-1]
+
+        return out
 
     def get_txpower(self):
         return self.__txpower
-
-    def get_rssi(self):
-        return self.__rssi
 
     def get_noise(self):
         return self.__noise
@@ -103,28 +131,29 @@ class WifiInfo:
 
         lines = out.split("\n")
 
+        station_mac = "NaN"
         tx_mcs = "NaN"
         rx_mcs = "NaN"
         rssi = "NaN"
 
         for line in lines:
+            if "Station" in line:
+                # Line format is 'Station AA:BB:CC:DD:EE:FF (on wlp1s0)'
+                station_mac = line.split()[1]
+
             if "signal:" in line and "]" in line:
+                # Line format is 'signal: -21 [-26, -30, -24] dBm'
                 rssi = line[line.index("signal:")+len("signal:"):].strip()
                 rssi = rssi[:rssi.index("]")+1]
 
-
             if "tx bitrate:" in line:
                 if "MCS" in line:
-                    tx_mcs = line[line.index("MCS")+4:line.index("MCS")+6]
+                    tx_mcs = line[line.index("MCS")+4:line.index("MCS") + 6]
             elif "rx bitrate:" in line:
                 if "MCS" in line:
                     rx_mcs = line[line.index("MCS")+4:line.index("MCS") + 6]
-                    break
 
-        #print(f"rssi: {rssi}")
-        self.__rssi = rssi
-        self.__rx_mcs = rx_mcs
-        self.__tx_mcs = tx_mcs
+                self.__stations[station_mac] = [rssi, tx_mcs, rx_mcs]
 
     def __update_noise(self):
         iw_cmd = ['iw', 'dev', f"{EXPECTED_INTERFACE}", 'survey', 'dump']
