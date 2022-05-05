@@ -19,6 +19,23 @@ def check_log_folder():
         print("Created log directory")
 
 
+def check_log_file(filename):
+    """
+    Check if log file exists and return unique name
+    if needed.
+    """
+
+    count = 0
+    prefix = ""
+
+    while True:
+        if os.path.isfile(f"{LOG_FOLDER_LOCATION}{prefix}{filename}"):
+            count += 1
+            prefix = f"{str(count)}_"
+        else:
+            return f"{prefix}{filename}"
+
+
 class FieldTestLogger:
     def __init__(self):
         self.__logger_functions = {}
@@ -32,6 +49,7 @@ class FieldTestLogger:
         self.__construct_csv_header()
 
         check_log_folder()
+        self.__filename = check_log_file(self.__filename)
 
         with open(f"{LOG_FOLDER_LOCATION}{self.__filename}", 'w', newline='') as csvfile:
             wr = csv.writer(csvfile, delimiter=',')
