@@ -118,8 +118,11 @@ def serializing(new_list):
 def get_interface(pattern):
     interface_list = netifaces.interfaces()
     interface = filter(lambda x: pattern in x, interface_list)
-    if pre := list(interface):
+    pre = list(interface)
+    if pre:
         return str(pre[0])
+    #if pre := list(interface):
+    #    return str(pre[0])
     print(f'> ERROR: Interface {pattern} not found!')
     return False
 
