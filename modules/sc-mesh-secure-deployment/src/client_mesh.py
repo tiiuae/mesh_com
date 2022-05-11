@@ -121,6 +121,7 @@ def get_interface(pattern):
     pre = list(interface)
     if pre:
         return str(pre[0])
+
     print(f'> ERROR: Interface {pattern} not found!')
     return False
 
