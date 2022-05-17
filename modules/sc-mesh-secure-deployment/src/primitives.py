@@ -25,9 +25,7 @@ class Primitives:
         self.session = pkcs11.openSession(slot, CKF_SERIAL_SESSION | CKF_RW_SESSION)
         self.session.login("1234")
 
-        keys = self.session.findObjects()
-        for key in range(len(keys)):
-            self.session.destroyObject(keys[key])
+
 
     def __exit__(self):
         self.session.logout()
@@ -64,7 +62,6 @@ class Primitives:
         subprocess.call(command, shell=False)
 
     def import_cert(self, client_key, node_name):
-        LIB = '/usr/lib/softhsm/libsofthsm2.so'
         filename = f'{node_name}.der'
         id = node_name.split('_')[-1]
         with open(filename, 'wb') as writer:
