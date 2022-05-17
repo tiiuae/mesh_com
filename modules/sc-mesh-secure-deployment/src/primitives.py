@@ -1,6 +1,7 @@
 from PyKCS11 import *
 import subprocess
 import hashlib
+import os
 
 BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
 LIB = "/usr/lib/softhsm/libsofthsm2.so"
@@ -46,7 +47,8 @@ class Primitives:
         # logout
         return bytes(encr)
 
-    def decrypt_response(self, encr):  # assuming that data is on a file called payload.enc generated on the function get_data
+    def decrypt_response(self,
+                         encr):  # assuming that data is on a file called payload.enc generated on the function get_data
         privKey = self.session.findObjects([(CKA_CLASS, CKO_PRIVATE_KEY)])[0]
         dec = self.session.decrypt(privKey, encr)
         if type(dec) == 'PyKCS11.ckbytelist':
@@ -56,7 +58,7 @@ class Primitives:
         # logout
         return dec
 
-    def delete_key(self, node_name): #check if it is possible to delete on python (destroy_objetc)
+    def delete_key(self, node_name):  # check if it is possible to delete on python (destroy_objetc)
         label = f'--label={node_name}'
         command = ['pkcs11-tool', '--module', LIB, '--delete-object', label, '--type=pubkey']
         subprocess.call(command, shell=False)
@@ -73,35 +75,23 @@ class Primitives:
         subprocess.call(command, shell=False)
 
     def verify_hsm(self, msg, sig, name):
-        pkcs11 = PyKCS11Lib()
-        pkcs11.load()  # define environment variable PYKCS11LIB=YourPKCS11Lib
-        # get 1st slot
-        slot = pkcs11.getSlotList(tokenPresent=True)[0]
-        session = pkcs11.openSession(slot, CKF_SERIAL_SESSION | CKF_RW_SESSION)
-        session.login("1234")
-        keys = session.findObjects()
+        keys = self.session.findObjects()
         for key in range(len(keys)):
             aux = keys[key].to_dict()
             if aux['CKA_LABEL'] == name:
                 pubKey = keys[key]  ##check here need to verify if not exported
-        ver = session.verify(pubKey, msg, sig)
+        ver = self.session.verify(pubKey, msg, sig)
         # logout
-        session.logout()
-        session.closeSession()
+        self.session.logout()
+        self.session.closeSession()
         return ver
 
     def sign_hsm(self, msg):
-        pkcs11 = PyKCS11Lib()
-        pkcs11.load()  # define environment variable PYKCS11LIB=YourPKCS11Lib
-        # get 1st slot
-        slot = pkcs11.getSlotList(tokenPresent=True)[0]
-        session = pkcs11.openSession(slot, CKF_SERIAL_SESSION | CKF_RW_SESSION)
-        session.login("1234")
-        privKey = session.findObjects([(CKA_CLASS, CKO_PRIVATE_KEY)])[0]
-        sig = session.sign(privKey, msg)
+        privKey = self.session.findObjects([(CKA_CLASS, CKO_PRIVATE_KEY)])[0]
+        sig = self.session.sign(privKey, msg)
         # logout
-        session.logout()
-        session.closeSession()
+        self.session.logout()
+        self.session.closeSession()
         return sig
 
     def verify_certificate(self, sig_received, node_name, dig_received, cert):
@@ -129,15 +119,6 @@ class Primitives:
             return dig, sig
 
     def clean_all(self):
-        pkcs11 = PyKCS11Lib()
-        pkcs11.load()  # define environment variable PYKCS11LIB=YourPKCS11Lib
-
-        # get 1st slot
-        slot = pkcs11.getSlotList(tokenPresent=True)[0]
-
-        session = pkcs11.openSession(slot, CKF_SERIAL_SESSION | CKF_RW_SESSION)
-        session.login("1234")
-
-        keys = session.findObjects()
+        keys = self.session.findObjects()
         for key in range(len(keys)):
-            session.destroyObject(keys[key])
+            self.session.destroyObject(keys[key])

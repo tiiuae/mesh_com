@@ -10,7 +10,8 @@ import json
 import argparse
 from termcolor import colored
 import os
-from primitives import Primitives as pri
+from primitives import Primitives
+pri = Primitives()
 
 # Get the mesh_com config
 print('> Loading yaml conf... ')

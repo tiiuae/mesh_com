@@ -12,7 +12,8 @@ import requests
 from termcolor import colored
 from pathlib import Path
 import sys
-from primitives import Primitives as pri
+from primitives import Primitives
+pri = Primitives()
 
 # Get the mesh_com config
 print(getenv("MESH_COM_ROOT", ""))

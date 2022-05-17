@@ -235,6 +235,7 @@ function gw_menu {
 #-----------------------------------------------------------------------------#
 function server {
   echo '> Configuring the server...'
+  softhsm2-util --init-token --slot 0 --label MyTestToken1 --pin 1234 --so-pin 1234 ## this is insecure
   CERTS_PATH=/etc/ssl/certs/
   part1=$(dirname "$(pwd)")
   mesh_folder=$(dirname $part1)
@@ -288,6 +289,7 @@ function client {
   $mesh_folder/common/scripts/generate_keys.sh $CERTS_PATH
   KEY_PATH="/etc/ssl/certs/root_cert.der"
   CLIENT_SRC_PATH="src/client_mesh.py"
+  LIB="/usr/lib/softhsm/libsofthsm2.so"
   execution_ctx=$(echo $HOSTNAME)
   if [ $execution_ctx = "br_hardened" ]; then
     /etc/init.d/S30dbus stop
@@ -324,6 +326,7 @@ function client {
   server_details=($(sed -r 's/\b.local\b//g' <<< $server_details))
   server_ip=${server_details[0]}
   server_host=${server_details[1]}
+  softhsm2-util --init-token --slot 0 --label MyTestToken1 --pin 1234 --so-pin 1234 ## this is insecure
   echo "> We will use src/mesh_cert.der if it already exists, or we can try and fetch it..."
   read -p "> Do you want to fetch the certificate from the server $server_host@$server_ip? (Y/N): " confirm
   if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
@@ -331,7 +334,7 @@ function client {
     read -p "- Server Username: " server_user
     # pull the key from the server
     scp $server_user@$server_ip:$KEY_PATH $KEY_PATH
-    pkcs11-tool --module $LIB -l --pin 1234 --write-object $KEY_PATH --type pubkey --id 2222  --label root
+    pkcs11-tool --module $LIB -l --pin 1234 --write-object $KEY_PATH --type pubkey --id 2222  --label root  ## this is insecure
   fi
 
   echo '> Configuring the client and connecting to server...'
