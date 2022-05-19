@@ -68,7 +68,8 @@ menu_from_array "${ssid_array[@]}"
 ssid=$choice
 #ssid should be $ssid in conf/ap.conf
 if [[ "$2" == "-ci" ]]; then
-  password = "root"
+  source conf/var.conf
+  #password = "root"
   echo "- Password: $password"
   cat <<EOF > conf/ap.conf
   network={
@@ -410,3 +411,4 @@ while (( "$#" )); do
       ;;
   esac
 done
+
