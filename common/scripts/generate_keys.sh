@@ -22,8 +22,18 @@ LIB='/usr/lib/softhsm/libsofthsm2.so'
 #intialize token
 softhsm2-util --init-token --slot 0 --label MyTestToken1 --pin 1234 --so-pin 1234 ## this should be done before?
 
-echo "Creating keys"
+#delete keys
+keys=$(pkcs11-tool --module=$LIB -O --login --pin 1234)
+if [ ${#keys} -ne 0  ]
+then
+  echo "Keys Found"
+  echo "Deleting old keys"
+  pkcs11-tool --module=$LIB --login --pin 1234 --delete-object --type privkey --id 01
+  pkcs11-tool --module=$LIB --login --pin 1234 --delete-object --type pubkey --id 01
+fi
+
 #generate keys
+echo "Generating new keys"
 pkcs11-tool --keypairgen --key-type="RSA:4096"  --login --pin=1234 --module=$LIB --label="myKey" --id=01
 #export to der
 pkcs11-tool --read-object --id 01 --type pubkey --module=$LIB --output-file "$1"mesh_cert.der

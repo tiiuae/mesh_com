@@ -12,8 +12,7 @@ import requests
 from termcolor import colored
 from pathlib import Path
 import sys
-from primitives import Primitives
-pri = Primitives()
+import primitives as pri
 
 # Get the mesh_com config
 print(getenv("MESH_COM_ROOT", ""))
@@ -102,6 +101,7 @@ def get_data(oss='secos'):
 def get_signature():
     message = '/signature'
     resp = requests.post(URL + message)
+    print(resp.content)
     return resp.content
 
 
@@ -130,7 +130,7 @@ def get_interface(pattern):
 def conf_gw():
     print('> Configuring gateway node ')
     # Create Gateway Service
-    subprocess.call('/opt/container-data/mesh/mesh_com/modules/sc-mesh-secure-deployment/src/bash/conf-gw.sh', shell=False)
+    subprocess.call('/opt/mesh_com/modules/sc-mesh-secure-deployment/src/bash/conf-gw.sh', shell=False)
 
 
 def ubuntu_node(gateway):  # this is not being used
@@ -141,7 +141,7 @@ def ubuntu_node(gateway):  # this is not being used
 
 
 def create_config(respo):
-    resp = json.loads(respo)
+    resp = json.loads(bytes(respo))
     print('> Interfaces: ' + str(resp))
     address = resp['addr']
     if conf['mesh_service']:
@@ -171,18 +171,19 @@ def create_config(respo):
         command = ['hostname', 'node', str(nodeId)]
         subprocess.call(command, shell=False)
         #subprocess.call('echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts', shell=True)
-        subprocess.call(['echo ', address,  'node',  str(nodeId), ' >', '/etc/hosts'], shell=False)
+        command2 = ['echo', str(address), 'node', str(nodeId), '>', '/etc/hosts']
+        subprocess.call(command2, shell=False)
     execution_ctx = osh.environ.get('EXECUTION_CTX')
     print("EXECUTION CTX:")
     print(execution_ctx)
-    if execution_ctx != "docker":
-        if conf['disable_networking']:
-            subprocess.call('sudo nmcli networking off', shell=True)
-            subprocess.call('sudo systemctl stop network-manager.service', shell=True)
-            subprocess.call('sudo systemctl disable network-manager.service', shell=True)
-            subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
-            # subprocess.call('pkill wpa_supplicant', shell=True)
-            # subprocess.call('pkill -f "/var/run/wpa_supplicant-" 2>/dev/null', shell=True)
+    # if execution_ctx != "docker":
+    #     if conf['disable_networking']:
+    #         subprocess.call('sudo nmcli networking off', shell=True)
+    #         subprocess.call('sudo systemctl stop network-manager.service', shell=True)
+    #         subprocess.call('sudo systemctl disable network-manager.service', shell=True)
+    #         subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
+    #         # subprocess.call('pkill wpa_supplicant', shell=True)
+    #         # subprocess.call('pkill -f "/var/run/wpa_supplicant-" 2>/dev/null', shell=True)
     # Copy mesh service to /etc/systemd/system/
     if conf['mesh_service']:
         mesh_interface = get_interface(conf['mesh_inf'])
@@ -190,14 +191,16 @@ def create_config(respo):
         config_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "src/bash/conf-mesh.sh")
         print(config_mesh_path)
         if resp['type'] == '11s':
-            subprocess.call(config_11s_mesh_path + " " + mesh_interface, shell=True)
+            com = [config_11s_mesh_path, mesh_interface]
         if resp['type'] == 'ibss':
-            subprocess.call(config_mesh_path + " " + mesh_interface, shell=True)
+            com = [config_mesh_path,  mesh_interface]
+        subprocess.call(com, shell=False)
 
 
 if __name__ == "__main__":
     res = get_data('secos')
-    if pri.verify_certificate(get_signature(), 'root', get_digest(), root_cert):
+    sig = get_signature()
+    if pri.verify_certificate(sig, 'root', get_digest(), root_cert):
         print(colored('> Valid Server Certificate', 'green'))
         Client_Test(color="Green")
         mac = get_mac_address(interface=get_interface(conf['mesh_inf']))

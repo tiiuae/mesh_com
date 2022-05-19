@@ -10,8 +10,7 @@ import json
 import argparse
 from termcolor import colored
 import os
-from primitives import Primitives
-pri = Primitives()
+import primitives as pri
 
 # Get the mesh_com config
 print('> Loading yaml conf... ')
@@ -180,5 +179,4 @@ def debug():
 
 
 if __name__ == '__main__':
-    pri.clean_all()
     app.run(host='0.0.0.0', debug=True)
