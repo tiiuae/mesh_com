@@ -1,4 +1,4 @@
-paramiko==2.7.2
+paramiko==2.10.1
 wifi==0.3.8
 pandas==1.1.5
 netifaces==0.10.9
