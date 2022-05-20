@@ -19,6 +19,38 @@ def comms_sleeve_get_serial_no():
 
     return cs_serial
 
+def disable_wifi_powersave():
+    cmd = "iw dev " + str(mesh_if) + " set power_save off"
+    print(cmd)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+
+def enable_wifi_powersave():
+    cmd = "iw dev " + str(mesh_if) + " set power_save on"
+    print(cmd)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+
+def config_amsdu_ampdu_aggregation(amsdu, ampdu):
+    # echo "amsdu ampdu" > /sys/kernel/debug/ieee80211/phy0/ath10k/htt_max_amsdu_ampdu
+    cmd =  "echo " + '"'+ str(amsdu) + " " +  str(ampdu) + '"' + " > /sys/kernel/debug/ieee80211/`iw dev " + str(mesh_if) + " info | gawk '/wiphy/ {printf \"phy\" $2}'`/ath10k/htt_max_amsdu_ampdu"
+    print(cmd)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+
+def set_tx_pwr(tx_pwr):
+    cmd = "iw phy `iw dev " + str(mesh_if) + " info | gawk '/wiphy/ {printf \"phy\" $2}'` set txpower fixed " + str(tx_pwr)
+    print(cmd)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+
+def set_distance(distance):
+    cmd = "iw phy `iw dev " + str(mesh_if) + " info | gawk '/wiphy/ {printf \"phy\" $2}'` set distance " + str(distance)
+    print(cmd)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+
+def set_coverage_class(coverage_class):
+    global mesh_if
+    cmd = "iw phy `iw dev " + str(mesh_if) + " info | gawk '/wiphy/ {printf \"phy\" $2}'` set coverage " + str(coverage_class)
+    print(cmd)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+
 @app.route("/")
 def echo_comms_sleeve():
     echo_output = "ERROR00000000"
@@ -39,6 +71,7 @@ def start_mesh():
 
 @app.route("/mesh_profile/low_latency")
 def enable_low_latency_config():
+        disable_wifi_powersave()
 	return "comms sleeve low latency config enabled!"
 
 @app.route("/mesh_profile/long_range")
@@ -48,7 +81,8 @@ def enable_long_range_config():
 
 @app.route("/mesh_profile/performance")
 def enable_perf_config():
-	return "comms sleeve performance config enabled"
+        disable_wifi_powersave()
+        return "comms sleeve performance config enabled"
 
 @app.route("/comms_sleeve_shutdown")
 def shutdown():
@@ -70,5 +104,6 @@ if __name__ == '__main__':
     comms_sleeve_cfg.add_argument("-ap_if", "--ap_interface", required=True)
     comms_sleeve_cfg.add_argument("-mesh_if", "--mesh_interface", required=True)
     args = comms_sleeve_cfg.parse_args()
-
+    ap_if = args.ap_interface
+    mesh_if = args.mesh_interface
     app.run(host=args.ip_address, port=5000)
