@@ -153,10 +153,17 @@ class AutoGateway:
             self.logger.error("No gateway MAC available")
 
     def find_mesh_ipv4_subnet(self):
-        ret, value = run_shell_command("ip -o -f inet addr show | grep -e bat0 -e br-lan | awk '{print $4}'")
 
-        if ret != 0:
-            self.logger.error("Error ip inet addr show failed")
+        interfaces = ["br-lan", "bat0"]
+
+        for interface in interfaces:
+            ret, value = run_shell_command(f"ip -o -f inet addr show | grep -e {interface} " + "| awk '{print $4}'")
+
+            if ret != 0:
+                self.logger.error("Error ip inet addr show failed")
+            else:
+                if value != '':
+                    break
 
         interface = ipaddress.IPv4Interface(value.strip())
         return str(interface.network)
