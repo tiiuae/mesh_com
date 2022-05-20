@@ -17,13 +17,15 @@ TODO:create a function to verify if keys exist and are valid
 def get_session():
     pkcs11 = PyKCS11Lib()
     pkcs11.load()  # define environment variable PYKCS11LIB=YourPKCS11Lib
-
-    # get 1st slot
     slot = pkcs11.getSlotList(tokenPresent=True)[0]
-
-    session = pkcs11.openSession(slot, CKF_SERIAL_SESSION | CKF_RW_SESSION)
-    session.login("1234")
-    return session
+    try:
+        session = pkcs11.openSession(slot, CKF_SERIAL_SESSION | CKF_RW_SESSION)
+        session.login("1234")
+        return session
+    except PyKCS11Error:
+        print('No previous keys')
+        return False
+    # get 1st slot
 
 
 def exit():
@@ -145,9 +147,10 @@ def hashSig(cert):
 
 def clean_all():
     session = get_session()
-    keys = session.findObjects()
-    for key in range(len(keys)):
-        session.destroyObject(keys[key])
+    if session:
+        keys = session.findObjects()
+        for key in range(len(keys)):
+            session.destroyObject(keys[key])
 
 
 def main():
