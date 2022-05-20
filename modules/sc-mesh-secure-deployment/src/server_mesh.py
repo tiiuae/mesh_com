@@ -4,15 +4,28 @@ from flask import Flask, request, json
 from getmac import get_mac_address
 import subprocess
 import netifaces
-import pandas as pd
+#Enable pandas after availablity of _bz2 shared lib
+#import pandas as pd
 import yaml
 import json
 import argparse
 from termcolor import colored
+import pathlib
+import hashlib
 import os
 import primitives as pri
 
+# Construct the argument parser
+ap = argparse.ArgumentParser()
+
+# Add the arguments to the parser
+ap.add_argument("-c", "--certificate", required=True)
+ap.add_argument("-t","--test",required=False,default=False,action='store_true')
+ap.add_argument("-m", "--mode", required=True)
+args = ap.parse_args()
 # Get the mesh_com config
+print(os.getenv("MESH_COM_ROOT", ""))
+config_path=os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
 print('> Loading yaml conf... ')
 try:
     yaml_conf = yaml.safe_load(open('src/mesh_com.conf', 'r'))
@@ -22,12 +35,6 @@ except (IOError, yaml.YAMLError) as error:
     print(error)
     exit()
 
-# Construct the argument parser
-ap = argparse.ArgumentParser()
-
-# Add the arguments to the parser
-ap.add_argument("-c", "--certificate", required=True)
-ap.add_argument("-t", "--test", required=False, default=False, action='store_true')
 args = ap.parse_args()
 app = Flask(__name__)
 IP_ADDRESSES = {'0.0.0.0': '10.20.15.1'}
@@ -35,7 +42,6 @@ MAC_ADDRESSES = {'00:00:00:00:00:00': '10.20.15.1'}
 IP_PREFIX = '10.20.15'
 SERVER_CERT = args.certificate
 NOT_AUTH = {}
-
 
 def Server_Test(**arg):
     if args.test:
