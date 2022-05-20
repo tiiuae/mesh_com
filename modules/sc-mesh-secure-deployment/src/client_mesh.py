@@ -13,6 +13,9 @@ from termcolor import colored
 from pathlib import Path
 import sys
 import primitives as pri
+sys.path.append("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw")
+from gw import main
+
 
 # Get the mesh_com config
 print(getenv("MESH_COM_ROOT", ""))
@@ -163,7 +166,10 @@ def create_config(respo):
         mesh_config.write('COUNTRY=fi\n')
         mesh_config.write('MESH_VIF=' + mesh_vif + '\n')
         mesh_config.write('PHY=' + phy_name + '\n')
-        conf_gw()
+    # Are we a gateway node? If we are we need to set up the routes
+    if res['gateway'] and conf['gw_service']:
+        print("============================================")
+        main.AutoGateway()
     # Set hostname
     if conf['set_hostname']:
         print('> Setting hostname...')
