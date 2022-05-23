@@ -1,13 +1,23 @@
 import subprocess
 import os as osh
-import ruamel.yaml
+from os import getenv
+import yaml
 import random
 import string
 import netifaces
 from pathlib import Path
+from .gw import main
+
+mesh_file_name = '../mesh_com.conf'  # maybe it's better to add the absolute path
 
 
-mesh_file_name = '../mesh_com.conf'  #maybe it's better to add the absolute path
+def read_yaml():
+    with open(mesh_file_name, 'r') as stream:
+        try:
+            parsed_yaml = yaml.safe_load(stream)
+            return parsed_yaml
+        except yaml.YAMLError as exc:
+            print(exc)
 
 
 def get_interface(pattern):
@@ -38,35 +48,31 @@ def update_password(password):
     Update the mesh_conf file with the password.
     '''
 
-    config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(mesh_file_name))
+    config = read_yaml()
     instances = config['server']['ubuntu']
     instances['key'] = password
-    yaml = ruamel.yaml.YAML()
-    yaml.indent(mapping=ind, sequence=ind, offset=bsi)
     with open(mesh_file_name, 'w') as fp:
         yaml.dump(config, fp)
 
 
 def get_auth_role():
-    config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(mesh_file_name))
+    config = read_yaml()
     return config['client']['auth_role']
 
 
 def get_password():
-    config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(mesh_file_name))
+    config = read_yaml()
     instances = config['server']['ubuntu']
     return instances['key'] or ''
 
 
-def create_mesh(ID):    # Get the mesh_com config
+def create_mesh(ID):  # Get the mesh_com config
     '''
     load mesh_conf as yaml file
     '''
     print('> Loading yaml conf... ')
     try:  # may be this is redundant, since we'll always have the file.
-        yaml = ruamel.yaml.YAML(typ='safe')  # default, if not specified, is 'rt' (round-trip)
-        doc = open(mesh_file_name, 'r')
-        yaml_conf = yaml.load(doc.read())
+        yaml_conf = read_yaml()
         confc = yaml_conf['client']
         confs = yaml_conf['server']
         debug = yaml_conf['debug']
@@ -74,7 +80,7 @@ def create_mesh(ID):    # Get the mesh_com config
     except (IOError, yaml.YAMLError) as error:
         print(error)
         exit()
-    config_mesh = confs['ubuntu']
+    resp = confs['ubuntu']
     if confc['mesh_service']:
         mesh_vif = get_interface(confc['mesh_inf'])
         cmd = "iw dev " + mesh_vif + " info | awk '/wiphy/ {printf \"phy\" $2}'"
@@ -83,49 +89,53 @@ def create_mesh(ID):    # Get the mesh_com config
     mesh_ip = confs['ubuntu']['ip']
     mesh_mac = get_mac(mesh_vif)
     # Create mesh service config
-    Path("/etc/mesh_com").mkdir(parents=True, exist_ok=True)
-    with open('/etc/mesh_com/mesh.conf', 'w') as mesh_config:
+    Path("/opt/mesh_com").mkdir(parents=True, exist_ok=True)
+    with open('/opt/mesh.conf', 'w', encoding='UTF-8') as mesh_config:
         mesh_config.write('MODE=mesh\n')
         mesh_config.write('IP=' + mesh_ip + '\n')
         mesh_config.write('MASK=255.255.255.0\n')
-        mesh_config.write('MAC=' + config_mesh['ap_mac'] + '\n')
-        mesh_config.write('KEY=' + config_mesh['key'] + '\n')
-        mesh_config.write('ESSID=' + config_mesh['ssid'] + '\n')
-        mesh_config.write('FREQ=' + str(config_mesh['frequency']) + '\n')
-        mesh_config.write('TXPOWER=' + str(config_mesh['tx_power']) + '\n')
+        mesh_config.write('MAC=' + resp['ap_mac'] + '\n')
+        mesh_config.write('KEY=' + resp['key'] + '\n')
+        mesh_config.write('ESSID=' + resp['ssid'] + '\n')
+        mesh_config.write('FREQ=' + str(resp['frequency']) + '\n')
+        mesh_config.write('TXPOWER=' + str(resp['tx_power']) + '\n')
         mesh_config.write('COUNTRY=fi\n')
         mesh_config.write('MESH_VIF=' + mesh_vif + '\n')
         mesh_config.write('PHY=' + phy_name + '\n')
     # Are we a gateway node? If we are we need to set up the routes
-    # if confc['gw_service']:
-    #     print("============================================")
-    #     gw_inf = get_interface(confc['gw_inf'])
-    #     ubuntu_gw(gw_inf)
-    # elif confc['dflt_service']:
-    #     # We aren't a gateway node, set up the default route (to gw) service
-    #     prefix = address.split('.')[:-1]
-    #     prefix = '.'.join(prefix)
-    #     mesh_gateway = prefix + '.2'
-    #     ubuntu_node(mesh_gateway)
+    if confc['gw_service']:
+        print("============================================")
+        main.AutoGateway()
+    # Set hostname
     if confc['set_hostname']:
         print('> Setting hostname...')
-        subprocess.call('hostname node' + ID, shell=True)
-        subprocess.call('echo ' + '"' + config_mesh['ip'] + '\t' + 'node' + ID + '"' + ' >' + '/etc/hosts', shell=True)
+        command = ['hostname', 'node', ID]
+        subprocess.call(command, shell=False)
+        #subprocess.call('echo ' + '"' + address + '\t' + 'node' + str(nodeId) + '"' + ' >' + '/etc/hosts', shell=True)
+        command2 = ['echo', mesh_ip, 'node', ID, '>', '/etc/hosts']
+        subprocess.call(command2, shell=False)
     execution_ctx = osh.environ.get('EXECUTION_CTX')
     print("EXECUTION CTX:")
     print(execution_ctx)
-    if execution_ctx != "docker" and confc['disable_networking']:
-        subprocess.call('sudo nmcli networking off', shell=True)
-        subprocess.call('sudo systemctl stop network-manager.service', shell=True)
-        subprocess.call('sudo systemctl disable network-manager.service', shell=True)
-        subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
+    # if execution_ctx != "docker":
+    #     if conf['disable_networking']:
+    #         subprocess.call('sudo nmcli networking off', shell=True)
+    #         subprocess.call('sudo systemctl stop network-manager.service', shell=True)
+    #         subprocess.call('sudo systemctl disable network-manager.service', shell=True)
+    #         subprocess.call('sudo systemctl disable wpa_supplicant.service', shell=True)
+    #         # subprocess.call('pkill wpa_supplicant', shell=True)
+    #         # subprocess.call('pkill -f "/var/run/wpa_supplicant-" 2>/dev/null', shell=True)
     # Copy mesh service to /etc/systemd/system/
     if confc['mesh_service']:
         mesh_interface = get_interface(confc['mesh_inf'])
-        if confs['ubuntu']['type'] == '11s':
-            subprocess.call('../../bash/conf-11s-mesh.sh ' + mesh_interface, shell=True)
-        if confs['ubuntu']['type'] == 'ibss':
-            subprocess.call('../../bash/conf-mesh.sh ' + mesh_interface, shell=True)
+        config_11s_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "src/bash/conf-11s-mesh.sh")
+        config_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "src/bash/conf-mesh.sh")
+        print(config_mesh_path)
+        if resp['type'] == '11s':
+            com = [config_11s_mesh_path, mesh_interface]
+        if resp['type'] == 'ibss':
+            com = [config_mesh_path,  mesh_interface]
+        subprocess.call(com, shell=False)
     return mesh_ip, mesh_mac
 
 
@@ -135,6 +145,6 @@ def create_password(WPA=False):
     '''
     if WPA:
         characters: str = string.ascii_letters + string.digits
-    else: #WEP
+    else:  # WEP
         characters: str = string.digits
     return ''.join(random.choice(characters) for i in range(10))

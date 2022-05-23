@@ -1,0 +1,137 @@
+# ness_check.krb
+
+#####################################################################################
+# Assertions to add:
+# is_latest_status_list(latest_status_list, tuple())
+# is_server_status_list(good_server_status_list, tuple())
+# is_flag_list(flags_list, tuple())
+# is_server_list(servers_list, tuple())
+# 
+
+trust_analysis
+	use trust_analysis(Good)
+	when
+		ness_fact.is_latest_status_list('latest_status_list', (*$latest_status_list))
+		ness_fact.is_server_status_list('good_server_status_list', (*$good_server_status_list))
+		ness_fact.is_flag_list('flags_list', (*$flags_list))
+		ness_fact.is_server_list('servers_list', (*$servers_list))
+		ness_fact.is_index('index', (*$index))
+		ness_fact.is_number_nodes('number_nodes', (*$nnode))
+		python
+			print("Inferred index = ", int($index[0]))
+			print("Inferred nnode = ", int($nnode[0]))
+			print("Inferred latest_status_list = ", $latest_status_list)
+			print("Inferred good_server_status_list = ", $good_server_status_list)
+			print("Inferred flags_list = ", $flags_list)
+			print("Inferred servers_list = ", $servers_list)
+		check_range($nnode, $index)
+		Table_Consistency($good_server_status_list, $servers_list, $flags_list)
+		Status_Analysis($latest_status_list, $flags_list, $index)
+
+trust_analysis_1
+	use trust_analysis(Uncertain)
+	when
+		ness_fact.is_latest_status_list('latest_status_list', (*$latest_status_list))
+		ness_fact.is_server_status_list('good_server_status_list', (*$good_server_status_list))
+		ness_fact.is_flag_list('flags_list', (*$flags_list))
+		ness_fact.is_server_list('servers_list', (*$servers_list))
+		ness_fact.is_index('index', (*$index))
+		ness_fact.is_number_nodes('number_nodes', (*$nnode))
+		check_range($nnode, $index)
+		Table_Consistency($good_server_status_list, $servers_list, $flags_list)
+		Status_Analysis_u($latest_status_list, $flags_list, $index)
+
+Consistent_data
+	use consistency_analysis(Good)
+	when
+		ness_fact.is_latest_status_list('latest_status_list', (*$latest_status_list))
+		ness_fact.is_server_status_list('good_server_status_list', (*$good_server_status_list))
+		ness_fact.is_flag_list('flags_list', (*$flags_list))
+		ness_fact.is_server_list('servers_list', (*$servers_list))
+		ness_fact.is_index('index', (*$index))
+		ness_fact.is_number_nodes('number_nodes', (*$nnode))
+		check_range($nnode, $index)
+		Table_Consistency($good_server_status_list, $servers_list, $flags_list)
+
+check_range
+	use check_range($nnode, $index)
+	when
+		python r = int($nnode[0])
+		check int($index[0]) in range(r)
+
+Table_Consistency
+	use Table_Consistency($good_server_status_list, $servers_list, $flags_list)
+	when
+		Check_Servers($good_server_status_list, $servers_list)
+		Flags_Consistency($servers_list, $flags_list)
+
+Check_Servers
+	use Check_Servers($good_server_status_list, $servers_list)
+	when
+		$serv in $servers_list
+		check $serv in $good_server_status_list
+
+Flags_Consistency
+	use Flags_Consistency($servers_list, $flags_list)
+	when
+		check len($servers_list) == len($flags_list)
+
+Status_Analysis_g
+	use Status_Analysis($latest_status_list, $flags_list, $index)
+	when
+		Check_flags($latest_status_list, $flags_list, $index)
+		Valid_Status($latest_status_list, $index)
+
+Status_Analysis_u
+	use Status_Analysis_u($latest_status_list, $flags_list, $index)
+	when
+		Check_flags_u($latest_status_list, $flags_list, $index)
+		Uncertain_Status($latest_status_list, $index)
+
+Valid_Status
+	use Valid_Status($latest_status_list, $index)
+	when
+		check int($latest_status_list[int($index[0])]) == 1
+
+Uncertain_Status
+	use Uncertain_Status($latest_status_list, $index)
+	when
+		check int($latest_status_list[int($index[0])]) == 3
+
+Check_flags
+	use Check_flags($latest_status_list, $flags_list, $index)
+	when
+		python
+			ref = $latest_status_list[int($index[0])]
+			count = 0
+			for i in $flags_list:
+				if i == ref:
+					count = count + 1
+			if count >= len($flags_list)/2:
+				res = 1
+			else:
+				res = 0
+		$ans = res
+		check $ans == 1
+
+Check_flags_u
+	use Check_flags_u($latest_status_list, $flags_list, $index)
+	when
+		python
+			ref = $latest_status_list[int($index[0])]
+			count_1 = 0
+			count_2 = 0
+			for i in $flags_list:
+				if i == 1:
+					count_1 = count_1 + 1
+				if i == 2:
+					count_2 = count_2 + 1
+			if count_1 > len($flags_list)/2:
+				res = 1
+			else:
+				if count_2 > len($flags_list)/2:
+					res = 2
+				else:
+					res = 3
+		$ans = res
+		check $ans == 3
