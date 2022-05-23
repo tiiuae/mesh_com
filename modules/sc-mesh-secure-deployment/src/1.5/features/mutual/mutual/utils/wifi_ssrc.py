@@ -1,10 +1,9 @@
-from wifi import Cell
 import subprocess
-import socket
+from .funsocket import *
 import fcntl
 import struct
 import time
-
+from wifi import Cell
 
 def scan_wifi():
     '''
