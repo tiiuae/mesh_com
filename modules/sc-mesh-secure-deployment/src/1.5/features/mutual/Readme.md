@@ -34,4 +34,4 @@ Once the docker compiles go to the different steps
  
 [Provisioning server](provServer/Readme.md)
 
-[Node Authentication](nodeAu/Readme.md)
+[Node Authentication](mutual/Readme.md)

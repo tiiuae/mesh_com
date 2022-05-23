@@ -1,0 +1,6 @@
+numpy==1.19.5
+networkx==2.6.3
+matplotlib==3.3.4
+pyke==1.1.1
+PySimpleGUI==4.55.1
+pyvis==0.1.9
