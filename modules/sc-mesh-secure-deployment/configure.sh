@@ -342,28 +342,31 @@ function client {
   server_details=($(sed -r 's/\b.local\b//g' <<< $server_details))
   server_ip=${server_details[0]}
   server_host=${server_details[1]}
-  echo "> We will use src/ecc_key.der if it already exists, or we can try and fetch it..."
+  echo "> We will use src/mesh_cert.der if it already exists, or we can try and fetch it..."
 if [[ "$2" == "-ci"  ]]; then
     source conf/var.conf
     echo "> Do you want to fetch the certificate from the server $server_host@$server_ip? (Y/N): Y"
     echo '> Fetching certificate from server...'
     echo "- Server Username: " $server_user
-    # pull the key from the server
-    scp $server_user@$server_ip:/opt/container-data/mesh/mesh_com/modules/sc-mesh-secure-deployment/src/ecc_key.der $MESH_COM_ROOT$KEY_PATH
+    scp $server_user@$server_ip:/opt/container-data/mesh/root_cert.der $KEY_PATH
+    echo "Importing root_cert"
+    pkcs11-tool --module $LIB -l --pin 1234 --write-object $KEY_PATH --type pubkey --id 2222  --label root  ## this is insecure
   else
-    read -p "> Do you want to fetch the certificate from the server $server_host@$server_ip? (Y/N): " confirm
-    if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
-      echo '> Fetching certificate from server...'
-      read -p "- Server Username: " server_user
-      # pull the key from the server
-      scp $server_user@$server_ip:/opt/container-data/mesh/mesh_com/modules/sc-mesh-secure-deployment/src/ecc_key.der $MESH_COM_ROOT$KEY_PATH
+read -p "> Do you want to fetch the certificate from the server $server_host@$server_ip? (Y/N): " confirm
+  if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
+    echo '> Fetching certificate from server...'
+    read -p "- Server Username: " server_user
+    # pull the key from the server
+    scp $server_user@$server_ip:/opt/container-data/mesh/root_cert.der $KEY_PATH
+    echo "Importing root_cert"
+    pkcs11-tool --module $LIB -l --pin 1234 --write-object $KEY_PATH --type pubkey --id 2222  --label root  ## this is insecure
     fi
   fi
   echo '> Configuring the client and connecting to server...'
   if [ "$2" == "-t" ] ; then
-    python3 $MESH_COM_ROOT$CLIENT_SRC_PATH -c $MESH_COM_ROOT$KEY_PATH -s http://$server_ip:5000 --test -m $mesh_mode
+    python3 $MESH_COM_ROOT$CLIENT_SRC_PATH -c $CERTS_PATH"mesh_cert.der" -s http://$server_ip:5000 --test  -m $mesh_mode
   else
-    python3 $MESH_COM_ROOT$CLIENT_SRC_PATH -c $MESH_COM_ROOT$KEY_PATH -s http://$server_ip:5000 -m $mesh_mode
+    python3 $MESH_COM_ROOT$CLIENT_SRC_PATH -c $CERTS_PATH"mesh_cert.der" -s http://$server_ip:5000 -m $mesh_mode
   fi
 }
 
@@ -412,11 +415,6 @@ while (( "$#" )); do
       help
       shift 2
       ;;
-    -ct)
-       client
-       NOAP=1
-       shift
-       ;;
     *) # preserve positional arguments
       PARAMS="$PARAMS $1"
       shift
