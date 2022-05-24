@@ -64,13 +64,14 @@ class Mutual:
     '''
     set_level function to establish trust level of an imported key
     run is the state machine of the entire class
+    interface should be the wireless interface of the mutual AP.
     '''
-
-    def __init__(self):
+    def __init__(self, interface):
         '''
         Import the keys: node Pub,Priv and server pub.
         Returns ID of the node: obtained from the certificate.
         '''
+        self.interface = interface
         print('Loading keys')
         self.create_table()
         if files := glob.glob('../hsm/*.asc'):
@@ -188,17 +189,17 @@ class Mutual:
         auth_role = mesh.get_auth_role()
         if auth_role == 'server':
             print("I'm an authentication Server. Creating AP")
-            wf.create_ap(self.myID)  # create AuthAPnodeID for authentication
+            wf.create_ap(self.myID, self.interface)  # create AuthAPnodeID for authentication
             time.sleep(2)
             print('1) server default')
             client_key, addr = fs.server_auth(self.myID)
         else:  # Client role
             time.sleep(7)
-            candidate = wf.scan_wifi()  # scan wifi to authenticate with
+            candidate = wf.scan_wifi(self.interface)  # scan wifi to authenticate with
             print('AP available: ' + candidate)
             wf.connect_wifi(candidate)
             serverIP = ".".join(
-                wf.get_ip_address("wlan0").split(".")[0:3]) + ".1"  # assuming we're connected ip will be .1
+                wf.get_ip_address(self.interface).split(".")[0:3]) + ".1"  # assuming we're connected ip will be .1
             print('2) send my key')
             fs.client_auth(candidate, serverIP, self.mykey)
             print('3) get node key')
