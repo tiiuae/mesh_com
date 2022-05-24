@@ -16,22 +16,19 @@ class myThread(threading.Thread):
         self.q = q
 
     def run(self):
-        print("Starting " + self.name)
-        print("Exiting " + self.name)
+        print(f"Starting {self.name}")
+        print(f"Exiting {self.name}")
 
 
 def launchTherads(threadList):
     queueLock = threading.Lock()
     workQueue = queue.Queue(10)
     threads = []
-    threadID = 1
     # Create new threads
-    for tName in threadList:
+    for threadID, tName in enumerate(threadList, start=1):
         thread = myThread(threadID, tName, workQueue)
         thread.start()
         threads.append(thread)
-        threadID += 1
-
     # Fill the queue
     queueLock.acquire()
     for word in range(len(threadList)):
@@ -83,7 +80,7 @@ if __name__ == "__main__":
     features = readfile()
     for index in features:
         if features[index]:
-            status=initialize(index)
+            status = initialize(index)
             threadList.append(index)
 
     launchTherads(threadList)

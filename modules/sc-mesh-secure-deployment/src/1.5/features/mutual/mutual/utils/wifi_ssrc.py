@@ -5,16 +5,17 @@ import struct
 import time
 from wifi import Cell
 
-def scan_wifi():
+
+def scan_wifi(interface):
     '''
     Scan wifi with the AuthAP pattern.
     If more than one, select the best quality one.
     If none, return false.
     '''
-    killall()
+    killall(interface)
     print('Scanning APs')
     possible = False
-    aps = Cell.all('wlan0')
+    aps = Cell.all(interface)
     max = 0
     for ap in list(aps):
         if 'AuthAP' in ap.ssid:
@@ -30,25 +31,25 @@ def connect_wifi(candidate):
     Connect to the best Ap selected in scan_wifi()
     we are using apmanager.sh for this
     '''
-    command = '/bin/bash utils/apmanager.sh  -ap_connect ' + candidate
-    subprocess.call(command, shell=True)
+    command = ['/bin/bash utils/apmanager.sh', '-ap_connect', candidate]
+    subprocess.call(command, shell=False)
 
 
-def killall():
-    subprocess.call('pkill wpa_supplicant', shell=True)
-    subprocess.call('ifconfig wlan0 down', shell=True)
-    subprocess.call('ifconfig wlan0 up', shell=True)
+def killall(interface):
+    subprocess.call(['pkill', 'wpa_supplicant'], shell=False)
+    subprocess.call(['ifconfig', interface, 'down'], shell=False)
+    subprocess.call(['ifconfig', interface, 'up'], shell=False)
 
 
-def create_ap(ID):
+def create_ap(ID, interface):
     '''
     If none AuthAP is available, then create a new one.
     Using apmanager.sh
     '''
-    killall()
+    killall(interface)
     time.sleep(2)
-    command = '/bin/bash utils/apmanager.sh -ap_create ' + ID
-    subprocess.call(command, shell=True)
+    command = ['/bin/bash utils/apmanager.sh', '-ap_create ', ID]
+    subprocess.call(command, shell=False)
 
 
 def get_ip_address(ifname):

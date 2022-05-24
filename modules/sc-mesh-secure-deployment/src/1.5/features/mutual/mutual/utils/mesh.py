@@ -14,8 +14,7 @@ mesh_file_name = '../mesh_com.conf'  # maybe it's better to add the absolute pat
 def read_yaml():
     with open(mesh_file_name, 'r') as stream:
         try:
-            parsed_yaml = yaml.safe_load(stream)
-            return parsed_yaml
+            return yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
 
