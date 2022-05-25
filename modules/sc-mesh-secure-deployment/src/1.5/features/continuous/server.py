@@ -16,7 +16,7 @@ def multi_threaded_client(c, addr):
     c.send(bytes('Connected to server', 'utf-8'))  # Transmit tcp msg as a byte with encoding format str to client
 
     # Session Initializations Parameters
-    secret = 1234
+    secret = 1234 #this should be stored on HSM
     total_period = 20  # Total period for the session
     period = 2  # Period for continuous authentication
     time_margin = 0.2 * period  # Time margin for freshness = 20 % of period
@@ -30,10 +30,11 @@ def multi_threaded_client(c, addr):
     num_of_fails = 0  # Number of times authentication has failed
     backoff_period = 0  # back off period initialized to 0
 
-    # Setting socket timeout = time margin to raise exception when client does not respond to authentication request within time margin
+    # Setting socket timeout = time margin to raise exception when client does not respond to authentication request
+    # within time margin
     c.settimeout(time_margin)
 
-    while (time.time() - start_time <= total_period):
+    while time.time() - start_time <= total_period:
         if (time_flag == 1) or (time.time() - start_timestamp >= period):
             auth_result = "pass"  # initialized as pass
             c.send(bytes('Request to authenticate', 'utf-8'))  # Request to authenticate client
@@ -72,7 +73,7 @@ def multi_threaded_client(c, addr):
                         num_of_fails = num_of_fails + 1
                         # exponential backoff = auth period ^ num of failures
                         # max(period, 2) to avoid diminishing exponential when period < 1
-                        backoff_period = max(period,2) ** num_of_fails
+                        backoff_period = max(period, 2) ** num_of_fails
                         result_dict = {
                             "auth_result": "fail",
                             "backoff_period": backoff_period

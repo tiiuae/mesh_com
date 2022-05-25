@@ -13,6 +13,7 @@ def xor(a, b):
 
     return ''.join(result)
 
+
 def mod2div(divident, divisor):
     # Performs Modulo-2 division
     # Number of bits to be XORed at a time
@@ -52,26 +53,28 @@ def mod2div(divident, divisor):
     checkword = tmp
     return checkword
 
+
 # Function used at the sender side to encode
 # data by appending remainder of modular division
 # at the end of data.
 def encodeData(data, key):
-        l_key = len(key)
+    l_key = len(key)
 
-        # Appends n-1 zeroes at end of data
-        appended_data = data + '0' * (l_key - 1)
-        remainder = mod2div(appended_data, key)
+    # Appends n-1 zeroes at end of data
+    appended_data = data + '0' * (l_key - 1)
+    remainder = mod2div(appended_data, key)
 
-        # Append remainder in the original data
-        codeword = data + remainder
-        return codeword
+    # Append remainder in the original data
+    codeword = data + remainder
+    return codeword
+
 
 # Function used at the receiver side to decode
 # data received by sender
 def decodeData(data, key):
-        l_key = len(key)
+    l_key = len(key)
 
-        # Appends n-1 zeroes at end of data
-        appended_data = data + '0' * (l_key - 1)
-        remainder = mod2div(appended_data, key)
-        return remainder
+    # Appends n-1 zeroes at end of data
+    appended_data = data + '0' * (l_key - 1)
+    remainder = mod2div(appended_data, key)
+    return remainder
