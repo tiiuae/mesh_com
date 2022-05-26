@@ -2,9 +2,9 @@ import queue
 import threading
 import yaml
 from features import continuous
-from features import MBA
+from features import mba
 from features.mutual.mutual import mutual
-from features import NESS
+from features import ness
 from features import quarantine
 
 
@@ -58,11 +58,11 @@ def readfile():
 
 def initialize(feature):
     match feature:
-        case 'MBA':
-            mba = MBA()
+        case 'mba':
+            mba = mba()
             return mba
-        case 'NESS':
-            ness = NESS()
+        case 'ness':
+            ness = ness()
             return ness
         case 'continuous':
             cont = continuous()

@@ -5,22 +5,17 @@ from features.continuos import continuos
 
 def get_macs():
     macs = []
-    proc = subprocess.Popen(['batctl', 'n'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    i = 0
-    for x in proc.stdout:
-        aux = x.split()
-        i += 1
+    proc = subprocess.call(['batctl', 'n'], shell=False)
+    for i, x in enumerate(proc.stdout, start=1):
         if i > 2:
+            aux = x.split()
             macs.append((aux[1]).decode("utf-8"))
     return macs
 
 
 def verify_mesh_status():
     macs = get_macs()
-    if len(macs) > 1:
-        return True
-    else:
-        return False
+    return len(macs) > 1
 
 
 def launchCA(neigh):  # need to see how to get the IP address of the neighbors
