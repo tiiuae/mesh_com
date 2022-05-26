@@ -1,5 +1,7 @@
 import socket
 from time import sleep
+from threading import Thread
+import queue
 
 
 class MBA:
@@ -8,20 +10,42 @@ class MBA:
         aux.append('255')
         self.add = '.'.join(aux)
 
-    def client(self):
+    def client(self, q, debug=False):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.bind(("0.0.0.0", 5005))
         while True:
             data, addr = sock.recvfrom(1024)
             print("mba: message received")
-            return data, addr
+            if debug:
+                print(data, addr)
+            q.put(data)
 
-    def server(self, message):
-        num_message = 200
+    def server(self, message, debug=False):
+        num_message = 5
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)  # UDP
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        for _ in range(num_message):
+        sock.setblocking(False)
+        while num_message:
+            if debug:
+                print("this is server and it will send message " + str(num_message) + " more times")
             sock.sendto(bytes(message, "utf-8"), (self.add, 5005))
+            num_message -= 1
             sleep(1)
+
+    def terminate(self):
+        del self
+
+    def test(self):
+        """
+        unit test should be run as
+        m = MBA('127.0.0.1')
+        m.test()
+        """
+        q = queue.Queue()
+        sever_thread = Thread(target=self.server, args=("this is a test", True,), daemon=True)
+        sever_thread.start()
+        Thread(target=self.client, args=(q,)).start()  # client thread
+        print(q.get())
+

@@ -1,21 +1,10 @@
 import subprocess
 from features.mutual.mutual import mutual
 from features.continuos import continuos
-
-
-def get_macs():
-    macs = []
-    proc = subprocess.call(['batctl', 'n'], shell=False)
-    for i, x in enumerate(proc.stdout, start=1):
-        if i > 2:
-            aux = x.split()
-            macs.append((aux[1]).decode("utf-8"))
-    return macs
-
-
-def verify_mesh_status():
-    macs = get_macs()
-    return len(macs) > 1
+from features.mba import mba
+from features.utils import mesh_utils
+from threading import Thread
+import queue
 
 
 def launchCA(neigh):  # need to see how to get the IP address of the neighbors
@@ -29,10 +18,22 @@ def launchCA(neigh):  # need to see how to get the IP address of the neighbors
         co.server(ne)
 
 
+def listeningMBA():
+    q = queue.Queue()
+    mal = mba.MBA(mesh_utils.get_mesh_ip_address())
+    Thread(target=mal.client, args=(q,)).start()
+    return q.get()
+
+
+def announcing(message):
+    mal = mba.MBA(mesh_utils.get_mesh_ip_address())
+    Thread(target=mal.server, args=(message, True,), daemon=True).start()
+
+
 if __name__ == "__main__":
     mut = mutual.Mutual('wlan0')
     mut.start()
-    if verify_mesh_status():
+    if mesh_utils.verify_mesh_status():
         table = mutual.get_status()  # this should be triggered every x second
-        neighbors = get_macs()
+        neighbors = mesh_utils.get_macs()
         launchCA(neighbors)
