@@ -28,7 +28,11 @@ else
 fi
 
 #install the python packages
-tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/python_packages.tar.gz
+if [ -d "/opt/mesh_com/modules/utils/package/python_packages" ]; then 
+   echo "Directory /opt/mesh_com/modules/utils/package/python_packages exists."
+else
+   tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/python_packages.tar.gz
+fi
 pip install --no-index --find-links /opt/mesh_com/modules/utils/package/python_packages -r /opt/mesh_com/modules/utils/package/python_packages/requirements.txt
 
 #start mesh service if mesh provisoning is done
