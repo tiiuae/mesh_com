@@ -27,6 +27,14 @@ else
    ch=$2
 fi
 
+#install the python packages
+if [ -d "/opt/mesh_com/modules/utils/package/python_packages" ]; then 
+   echo "Directory /opt/mesh_com/modules/utils/package/python_packages exists."
+else
+   tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/python_packages.tar.gz
+fi
+pip install --no-index --find-links /opt/mesh_com/modules/utils/package/python_packages -r /opt/mesh_com/modules/utils/package/python_packages/requirements.txt
+
 #start mesh service if mesh provisoning is done
 hw_platform=$(cat /proc/cpuinfo | grep Model | awk '{print $5}')
 if [ $hw_platform == "Compute" ]; then
