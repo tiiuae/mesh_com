@@ -172,6 +172,7 @@ def create_config(respo):
         mesh_config.write('COUNTRY=fi\n')
         mesh_config.write('MESH_VIF=' + mesh_vif + '\n')
         mesh_config.write('PHY=' + phy_name + '\n')
+        mesh_config.write('ROUTING=' + str(res['routing_protocol']) + '\n')
     # Are we a gateway node? If we are we need to set up the routes
     if conf['gw_service']:
         print("============================================")

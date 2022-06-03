@@ -17,7 +17,7 @@ LOG_FILE=/opt/mesh_11s.log
 source /opt/mesh.conf
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-MYMESH_ARGS="${MODE} ${IP} ${MASK} ${MAC} ${KEY} ${ESSID} ${FREQ} ${TXPOWER} ${COUNTRY} ${MESH_VIF} ${PHY}"
+MYMESH_ARGS="${MODE} ${IP} ${MASK} ${MAC} ${KEY} ${ESSID} ${FREQ} ${TXPOWER} ${COUNTRY} ${MESH_VIF} ${PHY} ${ROUTING}"
 start() {
     echo $MYMESH_ARGS
     printf 'Starting %s: ' "$DAEMON"
