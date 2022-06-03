@@ -140,22 +140,23 @@ def multi_threaded_client(c, addr):
     c.close()  # close client socket
     print('Connection closed')
 
+def initiate_server(ip):
+    s = socket.socket()  # create server socket s with default param ipv4, TCP
+    print('Socket Created')
 
-s = socket.socket()  # create server socket s with default param ipv4, TCP
-print('Socket Created')
+    # to accept connections from clients, bind IP of server, a port number to the server socket
+    server_ip = socket.gethostbyname(socket.gethostname())
+    # s.bind(('localhost', 9999))  # (IP, host num) #use a non busy port num
+    # s.bind((server_ip, 9999)) # (IP, host num) #use a non busy port num
+    # s.bind(('192.168.137.215', 9999))
+    s.bind((ip, 9999))
+	
+    # wait for clients to connect (tcp listener)
+    s.listen(3)  # buffer for only 3 connections
+    print('Waiting for connections')
 
-# to accept connections from clients, bind IP of server, a port number to the server socket
-server_ip = socket.gethostbyname(socket.gethostname())
-s.bind(('localhost', 9999))  # (IP, host num) #use a non busy port num
-# s.bind((server_ip, 9999)) # (IP, host num) #use a non busy port num
-# s.bind(('192.168.137.215', 9999))
-
-# wait for clients to connect (tcp listener)
-s.listen(3)  # buffer for only 3 connections
-print('Waiting for connections')
-
-while True:
-    # accept tcp connection from client
-    c, addr = s.accept()  # returns client socket and IP addr
-    # new_client_thread(c, addr).start()
-    start_new_thread(multi_threaded_client, (c, addr))
+    while True:
+    	# accept tcp connection from client
+        c, addr = s.accept()  # returns client socket and IP addr
+        # new_client_thread(c, addr).start()
+        start_new_thread(multi_threaded_client, (c, addr))
