@@ -3,7 +3,7 @@
 function help
 {
     echo
-    echo "Usage: sudo $0 <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> [<interface>] [<phyname>]"
+    echo "Usage: sudo $0 <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> [<interface>] [<phyname>] [<routing_algo>]"
     echo "Parameters:"
     echo "	<mode>"
     echo "	<ip>"
@@ -16,6 +16,7 @@ function help
     echo "	<country>"
     echo "	<interface>" - optional
     echo "	<phyname>"   - optional
+    echo "	<routing_algo>" - optional
     echo
     echo "example:"
     echo "sudo $0 mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh2 5220 30 fi wlan1 phy1"
@@ -80,6 +81,12 @@ else
 fi
 echo "Found: $wifidev $phyname"
 
+if [[ -z "${12}" ]]; then
+    routing_algo="batman-adv"
+else
+    routing_algo=${12}
+fi
+
 case "$1" in
 
 mesh)
@@ -120,14 +127,19 @@ EOF
         pkill -f "/var/run/wpa_supplicant-" 2>/dev/null
         rm -fr /var/run/wpa_supplicant/"$wifidev"
       fi
-      killall alfred 2>/dev/null
-      killall batadv-vis 2>/dev/null
-      rm -f /var/run/alfred.sock
 
-      #Check if batman_adv is built-in module
-      modname=$(ls /sys/module | grep batman_adv)
-      if [[ -z $modname ]]; then
-        modprobe batman-adv
+      if [ "$routing_algo" == "batman-adv" ]; then
+        killall alfred 2>/dev/null
+        killall batadv-vis 2>/dev/null
+        rm -f /var/run/alfred.sock
+
+        #Check if batman_adv is built-in module
+        modname=$(ls /sys/module | grep batman_adv)
+        if [[ -z $modname ]]; then
+          modprobe batman-adv
+        fi
+      elif [ "$routing_algo" == "olsr" ]; then
+         killall olsrd 2>/dev/null
       fi
 
       echo "$wifidev down.."
@@ -142,24 +154,30 @@ EOF
 
       echo "$wifidev up.."
       ip link set "$wifidev" up
-      batctl if add "$wifidev"
 
-      echo "bat0 up.."
-      ifconfig bat0 up
-      echo "bat0 ip address.."
-      ifconfig bat0 "$2" netmask "$3"
-      echo "bat0 mtu size"
-      ifconfig bat0 mtu 1460
-      echo
-      ifconfig bat0
+      if [ "$routing_algo" == "batman-adv" ]; then
+        batctl if add "$wifidev"
+        echo "bat0 up.."
+        ifconfig bat0 up
+        echo "bat0 ip address.."
+        ifconfig bat0 "$2" netmask "$3"
+        echo "bat0 mtu size"
+        ifconfig bat0 mtu 1460
+        echo
+        ifconfig bat0
 
-      sleep 3
+        sleep 3
 
-      # for visualisation
-      (alfred -i bat0 -m)&
-      echo "started alfred"
-      (batadv-vis -i bat0 -s)&
-      echo "started batadv-vis"
+        # for visualisation
+        (alfred -i bat0 -m)&
+        echo "started alfred"
+        (batadv-vis -i bat0 -s)&
+        echo "started batadv-vis"
+     elif [ "$routing_algo" == "olsr" ]; then
+        ifconfig bat0 "$wifidev" netmask "$3"
+        # Enable debug level as necessary
+        (olsrd -i "$wifidev") &
+     fi
 
       # Radio parameters
       iw dev "$wifidev" set txpower limit "$8"00
@@ -268,9 +286,13 @@ off)
       # service off
       pkill -f "/var/run/wpa_supplicant-" 2>/dev/null
       rm -fr /var/run/wpa_supplicant/"$wifidev"
-      killall alfred 2>/dev/null
-      killall batadv-vis 2>/dev/null
-      rm -f /var/run/alfred.sock 2>/dev/null
+      if [ "$routing_algo" == "batman-adv" ]; then
+        killall alfred 2>/dev/null
+        killall batadv-vis 2>/dev/null
+        rm -f /var/run/alfred.sock 2>/dev/null
+      elif [ "$routing_algo" == "olsr" ]; then
+        killall olsrd 2>/dev/null
+      fi
       ;;
 *)
       help
