@@ -30,7 +30,6 @@ FROM ghcr.io/tiiuae/fog-ros-baseimage:DP-2016-dockerfiles-pkcs-11-updates
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     wpasupplicant=2.9.0-20-6~git20210701.43d8971 \
     wifi-firmware \
-    ros-${ROS_DISTRO}-rmw-fastrtps-cpp \
     iw \
     batctl \
     alfred \
