@@ -174,9 +174,9 @@ EOF
         (batadv-vis -i bat0 -s)&
         echo "started batadv-vis"
      elif [ "$routing_algo" == "olsr" ]; then
-        ifconfig bat0 "$wifidev" netmask "$3"
+        ifconfig "$wifidev" $2 netmask "$3"
         # Enable debug level as necessary
-        (olsrd -i "$wifidev") &
+        (olsrd -i "$wifidev" -d 0)&
      fi
 
       # Radio parameters
