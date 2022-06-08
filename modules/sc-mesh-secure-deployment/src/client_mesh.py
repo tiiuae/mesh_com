@@ -24,6 +24,7 @@ ap.add_argument("-c", "--certificate", required=True)
 ap.add_argument("-t", "--test", required=False, default=False, action='store_true')
 ap.add_argument("-m", "--mode", required=True)
 args = ap.parse_args()
+
 # Get the mesh_com config
 mesh_mode = args.mode
 
@@ -172,7 +173,7 @@ def create_config(respo):
         mesh_config.write('COUNTRY=fi\n')
         mesh_config.write('MESH_VIF=' + mesh_vif + '\n')
         mesh_config.write('PHY=' + phy_name + '\n')
-        mesh_config.write('ROUTING=' + str(res['routing_protocol']) + '\n')
+        mesh_config.write('ROUTING=' + resp['routing_protocol'] + '\n')
     # Are we a gateway node? If we are we need to set up the routes
     if conf['gw_service']:
         print("============================================")
