@@ -1,0 +1,7 @@
+pandas
+matplotlib
+geopy
+tabulate
+numpy
+ipyleaflet
+ipywidgets
