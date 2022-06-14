@@ -32,49 +32,37 @@ function command_exists {
 
 
 function ap_connect {
+killall wpa_supplicant
 default $1 $2
 ifconfig $choice up
 if [[ "$2" == "-ci" ]]; then
   password = "root"
   echo "- Password: $password"
   # AP hostapd config
-cat <<EOF >/var/run/hostapd.conf
-country_code=AE
-interface=$choice
-ssid="WirelessLab"
-hw_mode=g
-channel=7
-macaddr_acl=0
-auth_algs=1
-ignore_broadcast_ssid=0
-wpa=2
-wpa_passphrase="ssrcpassword'
-wpa_key_mgmt=WPA-PSK
-wpa_pairwise=TKIP
-rsn_pairwise=CCMP
+cat <<EOF > conf/ap.conf
+  network={
+    ssid="WirelessLab"
+    mode=2
+    key_mgmt=WPA-PSK
+    psk="ssrcpassword"
+    frequency=2437
+}
 EOF
 else
-cat <<EOF >/var/run/hostapd.conf
-country_code=AE
-interface=$choice
-ssid=$ssid
-hw_mode=g
-channel=7
-macaddr_acl=0
-auth_algs=1
-ignore_broadcast_ssid=0
-wpa=2
-wpa_passphrase="$password"
-wpa_key_mgmt=WPA-PSK
-wpa_pairwise=TKIP
-rsn_pairwise=CCMP
+cat <<EOF > conf/ap.conf
+  network={
+    ssid="$ssid"
+    mode=2
+    key_mgmt=WPA-PSK
+    psk="$password"
+    frequency=2437
+}
 EOF
 fi
-
 echo '> Connecting to Access Point:'
 echo $ssid
-#wpa_supplicant -B -i $sta_if -c conf/ap.conf
-/usr/sbin/hostapd -B /var/run/hostapd.conf -f /tmp/hostapd.log
+wpa_supplicant -B -i $sta_if -c conf/ap.conf
+#/usr/sbin/hostapd -B /var/run/hostapd.conf -f /tmp/hostapd.log
 sleep 2
 execution_ctx=$(echo $HOSTNAME)
 if [ $execution_ctx = "br_hardened" ]; then
@@ -103,6 +91,7 @@ wpa_key_mgmt=WPA-PSK
 wpa_pairwise=TKIP
 rsn_pairwise=CCMP
 EOF
+
 if [ ! -d "/etc/mesh_com" ]; then
    mkdir /etc/mesh_com
 fi
@@ -114,14 +103,13 @@ cp $src/services/initd/S94meshAP /etc/init.d/.
 chmod 700 /etc/init.d/S94meshAP
 /etc/init.d/S94meshAP start $choice $ip
 echo "start :"  $choice $ip
-#cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-$choice.conf
 ifconfig $choice $ip netmask 255.255.255.0
-#killall dhcpd
+killall dhcpd
 }
 
 # shellcheck disable=SC1073
 function ap_remove {
-  killall hostapd
   default $1 $2
   subnet=$(awk -F"." '{print $1"."$2"."$3".0"}'<<<$2)
   echo '> Remove an Access Point...'
