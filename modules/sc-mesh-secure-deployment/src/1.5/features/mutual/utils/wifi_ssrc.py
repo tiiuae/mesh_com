@@ -34,7 +34,7 @@ def connect_wifi(candidate, interface):
 
 
 def killall(interface):
-#    subprocess.call(['killall', 'wpa_supplicant'], shell=False)
+    subprocess.call(['killall', 'wpa_supplicant'], shell=False)
     subprocess.call(['killall', 'hostapd'], shell=False)
     subprocess.call(['ifconfig', interface, 'down'], shell=False)
     subprocess.call(['ifconfig', interface, 'up'], shell=False)
