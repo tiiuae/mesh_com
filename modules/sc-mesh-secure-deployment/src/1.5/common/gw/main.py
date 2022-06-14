@@ -1,7 +1,7 @@
 import time
 import re
 import ipaddress
-from src.tools import setup_logger, \
+from .src.tools import setup_logger, \
     run_shell_command, \
     find_batman_wifi_iface, check_interface_connectivity
 
