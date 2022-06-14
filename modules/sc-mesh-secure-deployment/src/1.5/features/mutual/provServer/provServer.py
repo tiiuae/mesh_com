@@ -76,7 +76,7 @@ def update_table(info):
         set_auth_role()
     if info['ID'] not in set(table['ID']):
         while info['IP'] in set(table['IP']):
-            info['IP'] = '10.0.0.' + str(generate_ip().pop())
+            info['IP'] = f'10.0.0.{str(generate_ip().pop())}'
         table = table.append(info, ignore_index=True)
         table.drop_duplicates(inplace=True)
         table.to_csv('../auth/dev.csv', index=False)
@@ -115,12 +115,12 @@ def exporting(ID, key, sign=True):
     '''
     ascii_armored_public_keys = gpg.export_keys(key)
     ascii_armored_private_keys = gpg.export_keys(key, True, expect_passphrase=False)
-    file_keys = '../auth/' + ID + '.asc'
+    file_keys = f'../auth/{ID}.asc'
     if ID != 'provServer':
-        file_keys_pub = '../auth/node' + ID + 'pb.asc'
+        file_keys_pub = f'../auth/node{ID}pb.asc'
         with open(file_keys_pub, 'w') as f:
             f.write(ascii_armored_public_keys)
-        file_keys_pri = '../auth/node' + ID + 'pr.asc'
+        file_keys_pri = f'../auth/node{ID}pr.asc'
         with open(file_keys_pri, 'w') as f:
             f.write(ascii_armored_private_keys)
         if sign:
@@ -136,7 +136,7 @@ def exporting(ID, key, sign=True):
         print(ascii_armored_public_keys)
         print(ascii_armored_private_keys)
         print('\n---------------------------\n')
-        print('Key pair stored in: ' + file_keys)
+        print(f'Key pair stored in: {file_keys}')
     else:
         with open(file_keys, 'w') as f:
             f.write(ascii_armored_public_keys)
@@ -167,23 +167,33 @@ def exist(ID, verbose=True):
     If exists, it will verify if the keys are still valid.
     '''
     public_keys = gpg.list_keys()
-    realID = ID + ' <' + ID + '>'
+    realID = f'{ID} <{ID}>'
     if ID != 'provServer':
-        realID = 'node' + ID + ' <' + ID + '>'
+        realID = f'node{ID} <{ID}>'
     if realID not in public_keys.uids:
         return False, False
     index = public_keys.uids.index(realID)
     valid = float(public_keys[index]['expires'])
     if valid > time.time():
         if verbose:
-            print('A key pair exist for node ' + ID + ' and it is valid until: ' +
-                  str(datetime.datetime.utcfromtimestamp(valid)))
+            print(
+                (
+                    f'A key pair exist for node {ID} and it is valid until: '
+                    + str(datetime.datetime.utcfromtimestamp(valid))
+                )
+            )
+
             exporting(ID, public_keys[index]['fingerprint'], False)
         return True, public_keys[index]['fingerprint']
     else:
         if verbose:
-            print('A key pair exist for node ' + ID + ' but it expired on: ' +
-                  str(datetime.datetime.utcfromtimestamp(valid)))
+            print(
+                (
+                    f'A key pair exist for node {ID} but it expired on: '
+                    + str(datetime.datetime.utcfromtimestamp(valid))
+                )
+            )
+
         return False, False
 
 
@@ -196,7 +206,7 @@ def generate(input_data, sign=True):
     ID = input_data.split('Name-Real: ')[1].split('\n')[0]
     if 'node' in ID:
         ID = ID.split('node')[1]
-        print('Key pair generated with fingerprint ' + fingerprint)
+        print(f'Key pair generated with fingerprint {fingerprint}')
     if not sign:
         exporting(ID, fingerprint, False)
     else:
@@ -231,11 +241,11 @@ def encrypt_conf(ID):
     Save at ../auth/nodeID_conf.conf.gpg
     '''
     node = ID.split('../auth/')[1].split('.asc')[0]
-    real = node + ' <' + node.split('node')[1] + '>'
+    real = f'{node} <' + node.split('node')[1] + '>'
     recipients = [
         ids['fingerprint'] for ids in gpg.list_keys() if real in ids['uids']
     ]
-    output = ID + '_conf.conf.gpg'
+    output = f'{ID}_conf.conf.gpg'
     with open('../../mesh_com.conf', 'rb') as f:
         gpg.encrypt_file(f, recipients=recipients,
                          output=output)
@@ -255,8 +265,8 @@ def transfer(FILE):
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     sftp = ssh.open_sftp()
     only_node = FILE.split('../auth/')[1].split('.asc')[0]
-    sftp.put(FILE.split('.asc')[0]+'pr.asc', '/hsm/' + only_node+'pr.asc')
-    sftp.put(FILE.split('.asc')[0]+'pb.asc', '/hsm/' + only_node + 'pb.asc')
+    sftp.put(FILE.split('.asc')[0]+'pr.asc', f'/hsm/{only_node}pr.asc')
+    sftp.put(FILE.split('.asc')[0]+'pb.asc', f'/hsm/{only_node}pb.asc')
     sftp.put('../auth/provServer.asc', '/hsm/provServer.asc')
     encrypted_conf = encrypt_conf(FILE)
     sftp.put(encrypted_conf, '/hsm/' + encrypted_conf.split('../auth/')[1])
