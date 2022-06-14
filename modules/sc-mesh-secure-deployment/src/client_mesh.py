@@ -151,18 +151,18 @@ def ubuntu_node(gateway):  # this is not being used
 
 def create_config(respo):
     resp = json.loads(bytes(respo))
-    print('> Interfaces: ' + str(resp))
+    print(f'> Interfaces: {str(resp)}')
     address = resp['addr']
     if conf['mesh_service']:
         mesh_vif = get_interface(conf['mesh_inf'])
-        cmd = "iw dev " + mesh_vif + " info | awk '/wiphy/ {printf \"phy\" $2}'"
+        cmd = f"iw dev {mesh_vif}" + " info | awk '/wiphy/ {printf \"phy\" $2}'"
         with subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True) as proc:
             phy_name = proc.communicate()[0].decode('utf-8').strip()
     # Create mesh service config
     Path("/opt/mesh_com").mkdir(parents=True, exist_ok=True)
     with open('/opt/mesh.conf', 'w', encoding='UTF-8') as mesh_config:
         mesh_config.write('MODE=mesh\n')
-        mesh_config.write('IP=' + address + '\n')
+        mesh_config.write(f'IP={address}' + '\n')
         mesh_config.write('MASK=255.255.255.0\n')
         mesh_config.write('MAC=' + resp['ap_mac'] + '\n')
         mesh_config.write('KEY=' + resp['key'] + '\n')
@@ -170,8 +170,8 @@ def create_config(respo):
         mesh_config.write('FREQ=' + str(resp['frequency']) + '\n')
         mesh_config.write('TXPOWER=' + str(resp['tx_power']) + '\n')
         mesh_config.write('COUNTRY=fi\n')
-        mesh_config.write('MESH_VIF=' + mesh_vif + '\n')
-        mesh_config.write('PHY=' + phy_name + '\n')
+        mesh_config.write(f'MESH_VIF={mesh_vif}' + '\n')
+        mesh_config.write(f'PHY={phy_name}' + '\n')
     # Are we a gateway node? If we are we need to set up the routes
     if conf['gw_service']:
         print("============================================")

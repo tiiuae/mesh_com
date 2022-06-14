@@ -5,19 +5,22 @@ import os as osh
 import pandas as pd
 import netifaces
 import yaml
-import ruamel.yaml
+
+meshf='../common/mesh_com_11s.conf'
+
 
 
 class Utils:
     def __init__(self):
         self.lock = threading.Lock()
         # name with absolute path : '../auth/dev.csv'
-        self.state_csv_file = self._conf['state_csv_name']
+        #self.state_csv_file = self._conf['state_csv_name']
         # name with absolute path : '../../mesh_com.conf'
-        self.mesh_config_file = self._conf['mesh_conf_file']
+        #self.mesh_config_file = self._conf['mesh_conf_file']
+        self.mesh_config_file = meshf
 
     @staticmethod
-    def read_yaml(filename):
+    def read_yaml(filename=meshf):
         with open(filename, 'r') as stream:
             try:
                 return yaml.safe_load(stream)
@@ -39,11 +42,27 @@ class Utils:
         """
         Update the mesh_conf file with the new ip address.
         """
-        config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(self.mesh_config_file))
+        # config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(self.mesh_config_file))
+        config = self.read_yaml(self.mesh_config_file)
+
         instances = config['server']['ubuntu']
         instances['ip'] = ip
-        yaml = ruamel.yaml.YAML()
-        yaml.indent(mapping=ind, sequence=ind, offset=bsi)
+        # yaml = ruamel.yaml.YAML()
+        # yaml.indent(mapping=ind, sequence=ind, offset=bsi)
+        with open(self.mesh_config_file, 'w') as fp:
+            yaml.dump(config, fp)
+
+    def update_mesh_password(self, password):
+        '''
+        Update the mesh_conf file with the password.
+        '''
+        # config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(self.mesh_config_file))
+        config = self.read_yaml(self.mesh_config_file)
+
+        instances = config['server']['ubuntu']
+        instances['key'] = password
+        # yaml = ruamel.yaml.YAML()
+        # yaml.indent(mapping=ind, sequence=ind, offset=bsi)
         with open(self.mesh_config_file, 'w') as fp:
             yaml.dump(config, fp)
 
@@ -53,11 +72,12 @@ class Utils:
         To set the serve/client auth role.
         TODO: think a way to add more servers
         """
-        config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(self.mesh_config_file))
+        # config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(self.mesh_config_file))
+        config = self.read_yaml(self.mesh_config_file)
         config['client']['auth_role'] = 'server'
         print(config['client']['auth_role'])
-        yaml = ruamel.yaml.YAML()
-        yaml.indent(mapping=ind, sequence=ind, offset=bsi)
+        # yaml = ruamel.yaml.YAML()
+        # yaml.indent(mapping=ind, sequence=ind, offset=bsi)
         with open(self.mesh_config_file, 'w') as fp:
             yaml.dump(config, fp)
 
@@ -76,7 +96,7 @@ class Utils:
             self.set_auth_role(self)
         if info['ID'] not in set(table['ID']):
             while info['IP'] in set(table['IP']):
-                info['IP'] = '10.0.0.' + str(self.generate_ip().pop())
+                info['IP'] = f'10.0.0.{str(self.generate_ip().pop())}'
             table = table.append(info, ignore_index=True)
             table.drop_duplicates(inplace=True)
             self.lock.acquire()
@@ -117,8 +137,7 @@ class Utils:
     def get_interface_by_pattern(pattern):
         interface_list = netifaces.interfaces()
         interface = filter(lambda x: pattern in x, interface_list)
-        pre = list(interface)
-        if pre:
+        if pre := list(interface):
             return str(pre[0])
 
         print(f'> ERROR: Interface {pattern} not found!')

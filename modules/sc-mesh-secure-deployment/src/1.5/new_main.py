@@ -1,4 +1,3 @@
-import subprocess
 from features.mutual.mutual import mutual
 from features.continuos import continuos
 from features.mba import mba

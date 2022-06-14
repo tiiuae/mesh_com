@@ -4,7 +4,7 @@ sys.path.insert(0, '..')
 from utils import mesh_utils
 
 
-class Quarantine():
+class Quarantine:
     def __int__(self, mac):
         self.mac = mac
         self.interface = mesh_utils.get_mesh_interface()
@@ -12,4 +12,4 @@ class Quarantine():
     def block(self, mac):
         command = ['traffic_block.sh', self.mac, self.interface]
         subprocess.call(command, shell=False)
-        print('blocking MAC: ' + str(self.mac) + " on interface " + str(self.interface))
+        print(f'blocking MAC: {str(self.mac)} on interface {str(self.interface)}')
