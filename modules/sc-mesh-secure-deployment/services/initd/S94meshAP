@@ -1,10 +1,11 @@
 DAEMON="mesh-ap.sh"
 PIDFILE="/var/run/$DAEMON.pid"
 WLANDEV=$2
+IP=$3
 start() {
     printf 'Starting %s: ' "$DAEMON"
     start-stop-daemon -b -m -S -q -p "$PIDFILE" -x "/usr/sbin/$DAEMON" \
-        -- $WLANDEV
+        -- $WLANDEV $IP
     status=$?
     if [ "$status" -eq 0 ]; then
         echo "OK"

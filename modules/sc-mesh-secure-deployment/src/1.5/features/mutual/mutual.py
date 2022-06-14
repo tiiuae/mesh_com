@@ -51,7 +51,7 @@ def decrypt_conf(ID):
     '''
     Decrypt the mesh_conf file
     '''
-    with open("../hsm/" + ID + ".asc_conf.conf.gpg", "rb") as f:
+    with open(f"../hsm/{ID}.asc_conf.conf.gpg", "rb") as f:
         status = gpg.decrypt_file(f, output="../mesh_com.conf")  # status has some info from the signer
         if status.ok:
             print("Mesh_conf file decrypt successful ")
@@ -192,19 +192,17 @@ class Mutual:
             wf.create_ap(self.myID, self.interface)  # create AuthAPnodeID for authentication
             time.sleep(2)
             print('1) server default')
-            client_key, addr = fs.server_auth(self.myID)
         else:  # Client role
             time.sleep(7)
             candidate = wf.scan_wifi(self.interface)  # scan wifi to authenticate with
-            print('AP available: ' + candidate)
+            print(f'AP available: {candidate}')
             wf.connect_wifi(candidate)
-            serverIP = ".".join(
-                wf.get_ip_address(self.interface).split(".")[0:3]) + ".1"  # assuming we're connected ip will be .1
+            serverIP = (".".join(wf.get_ip_address(self.interface).split(".")[:3]) + ".1")
             print('2) send my key')
             fs.client_auth(candidate, serverIP, self.mykey)
             print('3) get node key')
-            client_key, addr = fs.server_auth(self.myID)
             cli = True
+        client_key, addr = fs.server_auth(self.myID)
         level, client_fpr = self.set_level(client_key)
         if level >= 3:
             print('Authenticated, now send my pubkey')
@@ -222,7 +220,7 @@ class Mutual:
                     mesh.update_password(password)  # update password in config file
                 print(password)
                 encrpt_pass = gpg.encrypt(password, client_fpr[0], armor=False).data
-                print('encrypted pass: ' + str(encrpt_pass))
+                print(f'encrypted pass: {str(encrpt_pass)}')
                 try:
                     time.sleep(2)
                     fs.client_auth(nodeID, addr[0], encrpt_pass)  # send mesh password
@@ -230,7 +228,7 @@ class Mutual:
                     time.sleep(7)
                     fs.client_auth(nodeID, addr[0], encrpt_pass)
                 client_mesh_ip, _ = fs.server_auth(self.myID)
-                print('Client Mesh IP: ' + str(client_mesh_ip))
+                print(f'Client Mesh IP: {str(client_mesh_ip)}')
                 try:
                     time.sleep(2)
                     fs.client_auth(nodeID, addr[0], my_mac_mesh.encode())  # send my mac
@@ -255,7 +253,7 @@ class Mutual:
                     time.sleep(7)
                     fs.client_auth(nodeID, addr[0], my_mesh_ip.encode())
                 client_mac, _ = fs.server_auth(self.myID)
-                print('Client MAC: ' + str(client_mac))
+                print(f'Client MAC: {str(client_mac)}')
                 try:
                     time.sleep(2)
                     fs.client_auth(nodeID, addr[0], my_mac_mesh.encode())  # send my mac
@@ -272,3 +270,6 @@ if __name__ == "__main__":
     mutual = Mutual()
     mutual.terminate()
     mutual.start()
+
+
+

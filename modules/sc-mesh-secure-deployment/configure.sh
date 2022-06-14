@@ -86,25 +86,6 @@ else
 EOF
 fi
 
-#mesh(IBSS) and sta interface are not supported concurrently.
-#Stop mesh(IBSS) service on the selected vif, if already running.
-#Below condition will be false for dual radio using seperate sta/ibss vif.
-wlan_if="$(iw dev | awk '$1=="Interface"{print $2}')"
-wlan_if_count="$(echo $wlan_if | wc -l)"
-if [ "$wlan_if_count" = "1" ]; then
-  choice="wlan0"
-  mesh_service="mesh@""$choice"".service"
-  STATUS="$(systemctl is-active $mesh_service)"
-  if [ "${STATUS}" = "active" ]; then
-    echo "Disabling" $mesh_service
-    /etc/init.d/S90 mesh stop
-    sudo ifconfig bat0 down
-    sudo rmmod batman_adv
-    killall wpa_supplicant
-    ifconfig $choice down
-    ifconfig $choice up
-  fi
-fi
 
 echo '> Connecting to Access Point:'
 echo $ssid
