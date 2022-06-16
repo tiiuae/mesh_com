@@ -9,10 +9,13 @@ import struct
 from .gw import main
 import random
 import string
+from threading import Thread
 
 from .utils import Utils
 
 ut = Utils()
+
+
 
 
 class ConnectionMgr:
@@ -42,6 +45,7 @@ class ConnectionMgr:
             com = [self.config_mesh_path, self.mesh_if]
         subprocess.call(com, shell=False)
 
+    @property
     def create_mesh_config(self):
         """
         load mesh_conf as yaml file
@@ -55,7 +59,7 @@ class ConnectionMgr:
         except (IOError, yaml.YAMLError) as error:
             print(error)
             exit()
-        config = confs['ubuntu']
+        config = confs['secos']
         if confc['mesh_service']:
             mesh_vif = self.util.get_interface_by_pattern(confc['mesh_inf'])
             cmd = f"iw dev {mesh_vif}" + " info | awk '/wiphy/ {printf \"phy\" $2}'"
@@ -79,7 +83,7 @@ class ConnectionMgr:
             mesh_config.write(f'PHY={phy_name}' + '\n')
         if confc['gw_service']:
             print("============================================")
-            # main.AutoGateway() ##need to be send it with a thread
+            Thread(target=main.AutoGateway(), daemon=True).start()
         if config['type'] == '11s':
             self.mesh_mode = "11s"
         if config['type'] == 'ibss':

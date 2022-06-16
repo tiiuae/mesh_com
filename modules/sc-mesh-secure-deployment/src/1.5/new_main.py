@@ -1,4 +1,4 @@
-from features.mutual.mutual import mutual
+from features.mutual import mutual
 from features.continuos import continuos
 from features.mba import mba
 from features.utils import mesh_utils
