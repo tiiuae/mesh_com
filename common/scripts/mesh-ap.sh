@@ -16,6 +16,7 @@ subnet $subnet netmask 255.255.255.0 {
 }
 EOF
 ifconfig "$1" $2
+route add default gw $2 $1
 echo "DHCPDARGS=$1" > /etc/sysconfig/dhcpd
 killall dhcpd
 dhcpd -cf /etc/dhcp/dhcpd.conf
