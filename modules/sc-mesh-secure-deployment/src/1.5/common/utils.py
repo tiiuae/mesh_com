@@ -6,7 +6,7 @@ import pandas as pd
 import netifaces
 import yaml
 
-meshf='../common/mesh_com_11s.conf'
+meshf='../../common/mesh_com_11s.conf'
 
 
 

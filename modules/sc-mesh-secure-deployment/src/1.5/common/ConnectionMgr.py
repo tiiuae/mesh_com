@@ -17,8 +17,8 @@ ut = Utils()
 
 class ConnectionMgr:
     def __init__(self):
-        self.config_11s_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "../src/bash/conf-11s-mesh.sh")
-        self.config_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "../src/bash/conf-mesh.sh")
+        self.config_11s_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "../../../bash/conf-11s-mesh.sh")
+        self.config_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "../../../bash/conf-mesh.sh")
         self.mesh_ip = None
         self.mesh_if = None
         self.mesh_mac = None
@@ -79,7 +79,7 @@ class ConnectionMgr:
             mesh_config.write(f'PHY={phy_name}' + '\n')
         if confc['gw_service']:
             print("============================================")
-            #main.AutoGateway() ##need to be send it with a thread
+            # main.AutoGateway() ##need to be send it with a thread
         if config['type'] == '11s':
             self.mesh_mode = "11s"
         if config['type'] == 'ibss':
@@ -93,7 +93,7 @@ class ConnectionMgr:
     def set_provisioned_state(config):
         # TBD
         cmd = None
-        #subprocess.call(cmd, shell=False)
+        # subprocess.call(cmd, shell=False)
 
     @staticmethod
     def create_dhcpd_conf(self, start, end):
