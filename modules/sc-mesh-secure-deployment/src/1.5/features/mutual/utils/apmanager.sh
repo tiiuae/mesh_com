@@ -3,13 +3,12 @@
 
 [ ! -d "conf" ] && mkdir conf
 
-
+#assuming we are running from main (1.5)
 feature_folder=$(dirname "$(pwd)")
 features_folder=$(dirname $feature_folder)
 folder=$(dirname $features_folder)
 src=$(dirname $folder)
-sc_folder=$(dirname $src)
-mesh_com_folder=$(dirname $sc_folder)
+
 
 [ ! -d "/etc/wpa_supplicant/" ] && mkdir "/etc/wpa_supplicant/"
 
@@ -91,9 +90,9 @@ if [ ! -d "/etc/mesh_com" ]; then
 fi
 #echo "AP_INF=$choice" >> /etc/mesh_com/ap.conf
 # Create Gateway Service
-cp $mesh_com_folder/common/scripts/mesh-ap.sh /usr/sbin/.
+cp $src/common/scripts/mesh-ap.sh /usr/sbin/.
 chmod 744 /usr/sbin/mesh-ap.sh
-cp $src/services/initd/S94meshAP /etc/init.d/.
+cp $folder/sc-mesh-secure-deployment/services/initd/S94meshAP /etc/init.d/.
 chmod 700 /etc/init.d/S94meshAP
 /etc/init.d/S94meshAP start $choice $ip
 echo "start :"  $choice $ip
