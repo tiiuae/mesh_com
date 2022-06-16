@@ -1,25 +1,22 @@
 #!/bin/python3
-import gnupg
+
 import os
 from os import path
-import glob
-from .utils import wifi_ssrc as wf
-from .utils import mesh as mesh
-from .utils import funsocket as fs
+from utils import wifi_ssrc as wf
+from utils import funsocket as fs
 import time
-import numpy as np
 import pandas as pd
-# import argparse
+from utils import primitives as pri
+from termcolor import colored
 import sys
 
+sys.path.insert(0, '../../')
+'''
+only for testing 
+'''
+from common import ConnectionMgr
 
-# # Construct the argument parser
-# ap = argparse.ArgumentParser()
-# # Add the arguments to the parser
-# ap.add_argument("-c", "--clean", help='clean all (delete all keys and files)', required=False,
-#                 default=False, const=True, nargs='?')
-# ap.set_defaults(clean=False)
-# args: argparse.Namespace = ap.parse_args()
+co = ConnectionMgr.ConnectionMgr()
 
 
 def folder():
@@ -27,148 +24,58 @@ def folder():
         os.mkdir(PATH)
 
 
-# always install it with python3 gnupg, do not use pip3 install gnupg (different libraries)
 PATH = '../auth'
 folder()
+
+root_cert = "/etc/ssl/certs/root_cert.der"
+local_cert = "/etc/ssl/certs/mesh_cert.der"
+
 try:
-    gpg = gnupg.GPG(gnupghome='.')
-except TypeError:
-    gpg = gnupg.GPG(homedir='.')
-os.environ['GNUPGHOME'] = '.'
-
-
-def get_id_from_frp(fpr):
-    '''
-    get id from key fingerprint
-    '''
-    for key in gpg.list_keys():
-        if key['fingerprint'] == fpr:
-            nodeID = key['uids'][0].split(' <')[0]
-    return nodeID
-
-
-def decrypt_conf(ID):
-    '''
-    Decrypt the mesh_conf file
-    '''
-    with open(f"../hsm/{ID}.asc_conf.conf.gpg", "rb") as f:
-        status = gpg.decrypt_file(f, output="../mesh_com.conf")  # status has some info from the signer
-        if status.ok:
-            print("Mesh_conf file decrypt successful ")
-        else:
-            print("Mesh_conf file decrypt error")
-            print("status: ", status.status)
+    open(local_cert, 'rb')
+except FileNotFoundError:
+    print("Local certificate not found. Run generate_keys.sh")
+    sys.exit(0)
+try:
+    open(root_cert, 'rb')
+except FileNotFoundError:
+    print("Root certificate not found. Run generate_keys.sh")
+    sys.exit(0)
 
 
 class Mutual:
-    '''
+    """
     set_level function to establish trust level of an imported key
     run is the state machine of the entire class
     interface should be the wireless interface of the mutual AP.
-    '''
+    """
+
     def __init__(self, interface):
-        '''
+        """
         Import the keys: node Pub,Priv and server pub.
-        Returns ID of the node: obtained from the certificate.
-        '''
+        """
         self.interface = interface
         print('Loading keys')
-        self.create_table()
-        if files := glob.glob('../hsm/*.asc'):
-            for fi in files:
-                aux = open(fi, 'rb')  # assuming it's the first and only certificate
-                fi2 = aux.read()
-                gpg.import_keys(fi2)
-            for ky in gpg.list_keys():
-                if ky["uids"] == ["provServer <provServer>"]:
-                    fpS = ky["fingerprint"]
-                    gpg.trust_keys(fpS, 'TRUST_ULTIMATE')  # trusting the server key
-                if 'node' in ky['uids'][0]:
-                    self.myID = ky['uids'][0].split(' <')[0]
-                    self.myfpr = ky["fingerprint"]
-                if ky['fingerprint'] == self.my_fpr:
-                    self.mykey = gpg.export_keys(self.my_fpr, armor=False)
-        else:
-            print('no keys in hsm folder')
-
-    def terminate(self):
-        '''
-        to clean the previous keys
-        '''
-        keys = gpg.list_keys(True)
-        for key in keys:
-            gpg.trust_keys(key['fingerprint'], "TRUST_UNDEFINED")
-            gpg.delete_keys(key['fingerprint'], True, expect_passphrase=False)  # for private
-            gpg.delete_keys(key['fingerprint'], expect_passphrase=False)  # for public
-        keys = gpg.list_keys()
-        for key in keys:
-            gpg.trust_keys(key['fingerprint'], "TRUST_UNDEFINED")
-            gpg.delete_keys(key['fingerprint'], True, expect_passphrase=False)  # for private
-            gpg.delete_keys(key['fingerprint'], expect_passphrase=False)  # for public
-        try:
-            os.remove('../auth/dev.csv')
-        except FileNotFoundError:
-            print('Done')
-        sys.exit()
-
-    def set_level(self, client_key):
-        '''
-        first import the key (I think this can be improved without importing the key, only scanning)
-        Then we will check if the key has been signed for the Server(level 3), or another authenticated node (level 3)
-        or for the server and for another authenticated node (level 4).
-        If not, delete key.
-        '''
-        ck = gpg.import_keys(client_key)
-        print(ck.results)
-        fpr = ck.fingerprints
-        level = 0
-        levels = []
-        for ky in gpg.list_keys(sigs=True):  # checking if key was signed by Server
-            if ky["fingerprint"] == fpr[0] and len(ky['sigs']) > 1:  # this avoids self signed certificate
-                for sig in ky["sigs"]:
-                    if ("provServer" in sig[
-                        1]  # signed by server #note: if the server signed the keys in a different 'moment' this will fail
-                            and float(ky['expires']) > time.time()):  # not expired
-                        levels.append(3)
-                        gpg.trust_keys(fpr, 'TRUST_ULTIMATE')  # trusting the server key
-                    for key_id in range(1, len(ky['sigs'])):
-                        for key in gpg.list_keys():
-                            if ky['sigs'][key_id][0] == key["keyid"] and (
-                                    key["ownertrust"] == 'f' or key[
-                                "ownertrust"] == 'u'  # signed by a trusted node fully or ultimate
-                                    and float(ky['expires']) > time.time()
-                            ):  # not expired
-                                levels.append(3)
-                        count_level_signs = np.unique(levels, return_counts=True)[1]  # getting the number of 3s
-                        if len(count_level_signs) == 0:  # no trusted signed
-                            gpg.delete_keys(fpr, expect_passphrase=False)  # for public
-                        else:
-                            if count_level_signs[0] == 1:  # case only one signed and trusted
-                                level = 3
-                                gpg.trust_keys(fpr, 'TRUST_ULTIMATE')  # trusting the imported key
-                            if count_level_signs[0] > 1:  # more than one and all trusted
-                                level = 4
-                                gpg.trust_keys(fpr, 'TRUST_ULTIMATE')  # trusting the imported key
-        print('PubKey authenticated with level ' + str(level))
-        return level, fpr
-
-    def get_status(self):
-        '''
-        status of the current authenticated nodes
-        '''
-        return self.table.to_dict()
+        self.table = self.create_table()
+        self.root_cert = root_cert
+        self.local_cert = local_cert
+        self.debug = True
+        self.cli = False
+        self.myID = pri.get_labels()
+        print("loading root_cert")
+        pri.import_cert(root_cert, 'root')
+        print("my ID: ", self.myID)
 
     def create_table(self):
         '''
         Function to create table of authenticated devices
         '''
-        columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'trust_level']
+        columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'MA_level']
         if not path.isfile('../auth/dev.csv'):
             table = pd.DataFrame(columns=columns)
             table.to_csv('../auth/dev.csv', header=columns, index=False)
         else:
             table = pd.read_csv('../auth/dev.csv')
-        self.table = table
+        return table
 
     def update_table(self, info):
         '''
@@ -181,95 +88,162 @@ class Mutual:
             self.table = self.table.append(info, ignore_index=True)
             self.table.to_csv('../auth/dev.csv', mode='a', header=False, index=False)
 
+    def get_status(self):
+        '''
+        status of the current authenticated nodes
+        '''
+        return self.table.to_dict()
+
+    def signature(self):
+        _, sig = pri.hashSig(self.root_cert)
+        if self.debug:
+            print(f'> Signature: {bytes(sig)}')
+        return bytes(sig)
+
+    def digest(self):
+        dig, _ = pri.hashSig(self.root_cert)
+        if self.debug:
+            print(f'> Digest: {dig}')
+        return dig
+
+    def exchange(self, candidate, serverIP):
+        cert = open(self.local_cert, 'rb').read()
+        message = self.signature() + cert + self.myID.encode('utf-8')
+        fs.client_auth(candidate, serverIP, message)
+
+    def client(self, candidate):
+        print(f'AuthAP available: {candidate}')
+        wf.connect_wifi(candidate, self.interface)
+        print('2) sending signature of root certificate')
+        serverIP = (".".join(co.get_ip_address(self.interface).split(".")[:3]) + ".1")
+        self.exchange(candidate, serverIP)
+        print('3) getting node certificate')
+        server_sig, addr = fs.server_auth(self.myID, self.interface)
+        self.cli = True
+        return server_sig, addr
+
+    def server(self):
+        print('No AP available')
+        print("I'm an authentication server. Creating AP")
+        wf.create_ap(self.myID, self.interface)  # create AuthAPnodeID for authentication
+        time.sleep(2)
+        print('1) server default')
+        client_cert, addr = fs.server_auth(self.myID, self.interface)
+        return client_cert, addr
+
+    def decode_cert(self, client):
+        sig = self.signature()
+        client_sig = client[:len(sig)]
+        client_cert = client[len(sig):]
+        cliID = client[-5:]
+        return client_sig, client_cert, cliID.decode('utf-8')
+
+    def set_password(self, node_name):
+        password = co.get_password()
+        if password == '':  # this means still not connected with anyone
+            password = co.create_password()  # create a password (only if no mesh exist)
+            co.util.update_mesh_password(password)  # update password in config file
+        print(password)
+        encrypt_pass = pri.encrypt_response(password, node_name)
+        if self.debug:
+            print(f'encrypted pass: {str(encrypt_pass)}')
+        return encrypt_pass
+
+    def send_password(self, cliID, addr, my_mac_mesh, my_ip_mesh, encrypt_pass):
+        try:
+            time.sleep(2)
+            fs.client_auth(cliID, addr[0], encrypt_pass)  # send mesh password
+        except ConnectionRefusedError:
+            time.sleep(7)
+            fs.client_auth(cliID, addr[0], encrypt_pass)
+        client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
+        if self.debug:
+            print(f'Client Mesh IP: {str(client_mesh_ip)}')
+        try:
+            time.sleep(2)
+            fs.client_auth(cliID, addr[0], my_mac_mesh.encode())  # send my mac
+        except ConnectionRefusedError:
+            time.sleep(7)
+            fs.client_auth(cliID, addr[0], my_mac_mesh.encode())
+        client_mac, _ = fs.server_auth(self.myID, self.interface)
+        if self.debug:
+            print(f'Client Mesh MAC: {str(client_mesh_ip)}')
+        try:
+            fs.client_auth(cliID, addr[0], my_ip_mesh.encode())  # send my mesh ip
+        except ConnectionRefusedError:
+            time.sleep(7)
+            fs.client_auth(cliID, addr[0], my_ip_mesh.encode())
+        return client_mac, client_mesh_ip
+
+    def start_mesh(self):
+        print('creating mesh')
+        self.my_ip_mesh, self.my_mac_mesh = co.create_mesh_config
+        co.start_mesh()
+
     def start(self):
         set_mesh = False
-        cli = False
-        decrypt_conf(self.myID)  # decrypt config provided by server
-        print("I'm node " + str(self.myID))
-        auth_role = mesh.get_auth_role()
-        if auth_role == 'server':
-            print("I'm an authentication Server. Creating AP")
-            wf.create_ap(self.myID, self.interface)  # create AuthAPnodeID for authentication
-            time.sleep(2)
-            print('1) server default')
-        else:  # Client role
-            time.sleep(7)
-            candidate = wf.scan_wifi(self.interface)  # scan wifi to authenticate with
-            print(f'AP available: {candidate}')
-            wf.connect_wifi(candidate)
-            serverIP = (".".join(wf.get_ip_address(self.interface).split(".")[:3]) + ".1")
-            print('2) send my key')
-            fs.client_auth(candidate, serverIP, self.mykey)
-            print('3) get node key')
+        candidate = wf.scan_wifi(self.interface)  # scan wifi to authenticate with
+        if candidate:  # client
+            sigs, addr = self.client(candidate)
+            sig, client_cert, cliID = self.decode_cert(sigs)
             cli = True
-        client_key, addr = fs.server_auth(self.myID)
-        level, client_fpr = self.set_level(client_key)
-        if level >= 3:
+        else:  # server
+            client, addr = self.server()
+            sig, client_cert, cliID = self.decode_cert(client)
+            print("Client ID", cliID)
+            print('4) local key')
+            self.exchange(cliID, addr[0])
+            cli = False
+        node_name = addr[0].replace('.', '_')
+        pri.import_cert(client_cert, node_name)
+        if pri.verify_certificate(sig, node_name, self.digest(), self.root_cert):
+            print(colored('> Valid Certificate', 'green'))
             print('Authenticated, now send my pubkey')
-            nodeID = self.get_id_from_frp(client_fpr[0])
-            if not set_mesh:
-                print('creating mesh')
-                my_mesh_ip, my_mac_mesh = mesh.create_mesh(self.myID.split('node')[1])
-                set_mesh = True
-            if not cli:  # initial server
-                print('4) server key')
-                fs.client_auth(nodeID, addr[0], self.mykey)  # send my public key
-                password = mesh.get_password()
-                if password == '':  # this means still not connected with anyone
-                    password = mesh.create_password()  # create a password (only if no mesh exist)
-                    mesh.update_password(password)  # update password in config file
-                print(password)
-                encrpt_pass = gpg.encrypt(password, client_fpr[0], armor=False).data
-                print(f'encrypted pass: {str(encrpt_pass)}')
-                try:
-                    time.sleep(2)
-                    fs.client_auth(nodeID, addr[0], encrpt_pass)  # send mesh password
-                except ConnectionRefusedError:
-                    time.sleep(7)
-                    fs.client_auth(nodeID, addr[0], encrpt_pass)
-                client_mesh_ip, _ = fs.server_auth(self.myID)
-                print(f'Client Mesh IP: {str(client_mesh_ip)}')
-                try:
-                    time.sleep(2)
-                    fs.client_auth(nodeID, addr[0], my_mac_mesh.encode())  # send my mac
-                except ConnectionRefusedError:
-                    time.sleep(7)
-                    fs.client_auth(nodeID, addr[0], my_mac_mesh.encode())
-                client_mac, _ = fs.server_auth(self.myID)
-                try:
-                    fs.client_auth(nodeID, addr[0], my_mesh_ip.encode())  # send my mesh ip
-                except ConnectionRefusedError:
-                    time.sleep(7)
-                    fs.client_auth(nodeID, addr[0], my_mesh_ip.encode())
-            else:  # client
+            client_fpr, _ = pri.hashSig(node_name + '.der')
+            if cli:  # client
                 print('5) get password')
-                enc_pass, _ = fs.server_auth(self.myID)
-                password = gpg.decrypt(enc_pass)
-                print(password)
-                mesh.update_password(str(password))  # update password in config file
+                enc_pass, _ = fs.server_auth(self.myID, self.interface)
+                password = pri.decrypt_response(enc_pass)
+                print(bytes(password).decode())
+                co.util.update_mesh_password(bytes(password).decode())
+                self.start_mesh()
                 try:
-                    fs.client_auth(nodeID, addr[0], my_mesh_ip.encode())  # send my mesh ip
+                    fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode())  # send my mesh ip
                 except ConnectionRefusedError:
-                    time.sleep(7)
-                    fs.client_auth(nodeID, addr[0], my_mesh_ip.encode())
-                client_mac, _ = fs.server_auth(self.myID)
+                    time.sleep(2)
+                    fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode())
+                client_mac, _ = fs.server_auth(self.myID, self.interface)
                 print(f'Client MAC: {str(client_mac)}')
                 try:
                     time.sleep(2)
-                    fs.client_auth(nodeID, addr[0], my_mac_mesh.encode())  # send my mac
+                    fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode())  # send my mac
                 except ConnectionRefusedError:
-                    time.sleep(7)
-                    fs.client_auth(nodeID, addr[0], my_mac_mesh.encode())
-                client_mesh_ip, _ = fs.server_auth(self.myID)
-            info = {'ID': 'provServer', 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(),
-                    'PubKey_fpr': client_fpr[0], 'trust_level': level}
+                    time.sleep(2)
+                    fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode())
+                client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
+            elif pri.verify_certificate(sig, node_name, self.digest(), self.root_cert):
+                print(colored('> Valid Certificate', 'green'))
+                print("4.1) Setting PasswordS")
+                encrypt_pass = self.set_password(node_name)
+                self.start_mesh()
+                client_mac, client_mesh_ip = self.send_password(cliID, addr, self.my_mac_mesh, self.my_ip_mesh,
+                                                                encrypt_pass)
+            info = {'ID': node_name, 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(),
+                    'PubKey_fpr': client_fpr, 'MA_level': 'A'}
             self.update_table(info)  # #update csv file
+        else:
+            info = {'ID': node_name, 'MAC': "00:00:00:00", 'IP': addr[0],
+                    'PubKey_fpr': "___", 'MA_level': 'NA'}
+            self.update_table(info)  # #update csv file
+            print(colored("Not Valid Client Certificate", 'red'))
+            pri.delete_key(node_name)
+            os.remove(node_name + '.der')
+
+    def test(self): # unit test
+        raise NotImplementedError
 
 
 if __name__ == "__main__":
-    mutual = Mutual()
-    mutual.terminate()
+    mutual = Mutual('wlan1')
+    # mutual.terminate()
     mutual.start()
-
-
-
