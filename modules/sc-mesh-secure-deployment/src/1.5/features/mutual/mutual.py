@@ -2,11 +2,11 @@
 
 import os
 from os import path
-from utils import wifi_ssrc as wf
-from utils import funsocket as fs
+from .utils import wifi_ssrc as wf
+from .utils import funsocket as fs
 import time
 import pandas as pd
-from utils import primitives as pri
+from .utils import primitives as pri
 from termcolor import colored
 import sys
 
@@ -34,12 +34,12 @@ try:
     open(local_cert, 'rb')
 except FileNotFoundError:
     print("Local certificate not found. Run generate_keys.sh")
-    sys.exit(0)
+    exit()
 try:
     open(root_cert, 'rb')
 except FileNotFoundError:
-    print("Root certificate not found. Run generate_keys.sh")
-    sys.exit(0)
+    print("Root certificate not found. Need to get it from provisioning")
+    exit()
 
 
 class Mutual:
