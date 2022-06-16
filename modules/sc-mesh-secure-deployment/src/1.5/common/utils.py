@@ -30,8 +30,9 @@ class Utils:
     def init_state(self):
         """
         Function to create table of authenticated devices.
+        TODO: Currently this function is inside mutual. Consider to export it here
         """
-        columns = ['ID', 'MAC', 'IP', 'PubKey_fpr']
+        columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'MA_level']
         if not path.isfile(self.state_csv_file):
             table = pd.DataFrame(columns=columns)
             table.to_csv(self.state_csv_file, header=columns, index=False)
@@ -45,7 +46,7 @@ class Utils:
         # config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(self.mesh_config_file))
         config = self.read_yaml(self.mesh_config_file)
 
-        instances = config['server']['ubuntu']
+        instances = config['server']['secos']
         instances['ip'] = ip
         # yaml = ruamel.yaml.YAML()
         # yaml.indent(mapping=ind, sequence=ind, offset=bsi)
@@ -56,13 +57,9 @@ class Utils:
         '''
         Update the mesh_conf file with the password.
         '''
-        # config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(self.mesh_config_file))
         config = self.read_yaml(self.mesh_config_file)
-
-        instances = config['server']['ubuntu']
+        instances = config['server']['secos']
         instances['key'] = password
-        # yaml = ruamel.yaml.YAML()
-        # yaml.indent(mapping=ind, sequence=ind, offset=bsi)
         with open(self.mesh_config_file, 'w') as fp:
             yaml.dump(config, fp)
 
@@ -72,12 +69,9 @@ class Utils:
         To set the serve/client auth role.
         TODO: think a way to add more servers
         """
-        # config, ind, bsi = ruamel.yaml.util.load_yaml_guess_indent(open(self.mesh_config_file))
         config = self.read_yaml(self.mesh_config_file)
         config['client']['auth_role'] = 'server'
         print(config['client']['auth_role'])
-        # yaml = ruamel.yaml.YAML()
-        # yaml.indent(mapping=ind, sequence=ind, offset=bsi)
         with open(self.mesh_config_file, 'w') as fp:
             yaml.dump(config, fp)
 
@@ -89,6 +83,7 @@ class Utils:
         this function update the table with the node's info.
         Then, it updates mesh_conf_file with ip address.
         Finally, it calls the transfer function.
+        TODO: Currently this function is inside mutual. Consider to export it here
         """
         table = self.init_state(self)
         print(table)
