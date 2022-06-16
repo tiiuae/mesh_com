@@ -29,7 +29,7 @@ class MBA:
         sock.setblocking(False)
         while num_message:
             if debug:
-                print("this is server and it will send message " + str(num_message) + " more times")
+                print(f"this is server and it will send message {num_message} more times")
             sock.sendto(bytes(message, "utf-8"), (self.add, 5005))
             num_message -= 1
             sleep(1)
