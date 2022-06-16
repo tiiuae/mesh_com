@@ -140,9 +140,9 @@ class ConnectionMgr:
             wifi.write(config)
 
     def connect_to_ap(self, config):
-        cmd = "wpa_supplicant - B - i " + self.sta_if + "- c " + "/etc/wpa_supplicant/wpa_supplicant_sta.conf"
+        cmd = f"wpa_supplicant - B - i {self.sta_if}- c /etc/wpa_supplicant/wpa_supplicant_sta.conf"
         subprocess.call(cmd, shell=False)
-        cmd = "udhcpc -i " + self.sta_if
+        cmd = f"udhcpc -i {self.sta_if}"
         subprocess.call(cmd, shell=False)
 
     @staticmethod

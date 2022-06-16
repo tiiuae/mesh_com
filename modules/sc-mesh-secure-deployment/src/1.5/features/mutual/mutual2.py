@@ -64,7 +64,7 @@ class Mutual:
         self.myID = pri.get_labels()
         print("loading root_cert")
         pri.import_cert(root_cert, 'root')
-        print("my ID: ", str(self.myID))
+        print("my ID: ", self.myID)
 
     def create_table(self):
         '''
@@ -183,8 +183,6 @@ class Mutual:
 
     def start(self):
         set_mesh = False
-        # decrypt_conf(self.myID)  # decrypt config provided by server
-        # print("I'm node " + str(self.myID))
         candidate = wf.scan_wifi(self.interface)  # scan wifi to authenticate with
         if candidate:  # client
             sigs, addr = self.client(candidate)
@@ -203,20 +201,12 @@ class Mutual:
             print(colored('> Valid Certificate', 'green'))
             print('Authenticated, now send my pubkey')
             client_fpr, _ = pri.hashSig(node_name + '.der')
-            if not cli:
-                if pri.verify_certificate(sig, node_name, self.digest(), self.root_cert):
-                    print(colored('> Valid Certificate', 'green'))
-                    print("4.1) Setting PasswordS")
-                    encrypt_pass = self.set_password(node_name)
-                    self.start_mesh()
-                    client_mac, client_mesh_ip = self.send_password(cliID, addr, self.my_mac_mesh, self.my_ip_mesh,
-                                                                    encrypt_pass)
-            else:  # client
+            if cli:  # client
                 print('5) get password')
                 enc_pass, _ = fs.server_auth(self.myID, self.interface)
                 password = pri.decrypt_response(enc_pass)
                 print(bytes(password).decode())
-                co.util.update_mesh_password(str(bytes(password).decode()))  # update password in config file
+                co.util.update_mesh_password(bytes(password).decode())
                 self.start_mesh()
                 try:
                     fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode())  # send my mesh ip
@@ -232,6 +222,13 @@ class Mutual:
                     time.sleep(2)
                     fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode())
                 client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
+            elif pri.verify_certificate(sig, node_name, self.digest(), self.root_cert):
+                print(colored('> Valid Certificate', 'green'))
+                print("4.1) Setting PasswordS")
+                encrypt_pass = self.set_password(node_name)
+                self.start_mesh()
+                client_mac, client_mesh_ip = self.send_password(cliID, addr, self.my_mac_mesh, self.my_ip_mesh,
+                                                                encrypt_pass)
             info = {'ID': node_name, 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(),
                     'PubKey_fpr': client_fpr, 'MA_level': 'A'}
             self.update_table(info)  # #update csv file
@@ -242,6 +239,9 @@ class Mutual:
             print(colored("Not Valid Client Certificate", 'red'))
             pri.delete_key(node_name)
             os.remove(node_name + '.der')
+
+    def test(self): # unit test
+        raise NotImplementedError
 
 
 if __name__ == "__main__":
