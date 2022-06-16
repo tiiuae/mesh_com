@@ -42,21 +42,15 @@ if [[ "$2" == "-ci" ]]; then
 cat <<EOF > conf/ap.conf
   network={
     ssid="WirelessLab"
-    mode=2
-    key_mgmt=WPA-PSK
     psk="ssrcpassword"
-    frequency=2437
 }
 EOF
 else
 cat <<EOF > conf/ap.conf
   network={
     ssid="$ssid"
-    mode=2
-    key_mgmt=WPA-PSK
     psk="$password"
-    frequency=2437
-}
+  }
 EOF
 fi
 echo '> Connecting to Access Point:'
@@ -86,7 +80,7 @@ macaddr_acl=0
 auth_algs=1
 ignore_broadcast_ssid=0
 wpa=2
-wpa_passphrase="$password"
+wpa_passphrase=$password
 wpa_key_mgmt=WPA-PSK
 wpa_pairwise=TKIP
 rsn_pairwise=CCMP
@@ -95,7 +89,7 @@ EOF
 if [ ! -d "/etc/mesh_com" ]; then
    mkdir /etc/mesh_com
 fi
-echo "AP_INF=$choice" >> /etc/mesh_com/ap.conf
+#echo "AP_INF=$choice" >> /etc/mesh_com/ap.conf
 # Create Gateway Service
 cp $mesh_com_folder/common/scripts/mesh-ap.sh /usr/sbin/.
 chmod 744 /usr/sbin/mesh-ap.sh
@@ -103,7 +97,7 @@ cp $src/services/initd/S94meshAP /etc/init.d/.
 chmod 700 /etc/init.d/S94meshAP
 /etc/init.d/S94meshAP start $choice $ip
 echo "start :"  $choice $ip
-cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-$choice.conf
+#cp conf/ap.conf /etc/wpa_supplicant/wpa_supplicant-$choice.conf
 ifconfig $choice $ip netmask 255.255.255.0
 killall dhcpd
 }
