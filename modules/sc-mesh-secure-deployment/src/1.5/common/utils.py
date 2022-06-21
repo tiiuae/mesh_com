@@ -5,8 +5,11 @@ import os as osh
 import pandas as pd
 import netifaces
 import yaml
+import pathlib
+script_path = pathlib.Path(__file__).parent.resolve()
 
-meshf='../../common/mesh_com_11s.conf'
+
+meshf= str(script_path)+'/mesh_com_11s.conf'
 
 
 
