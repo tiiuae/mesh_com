@@ -109,7 +109,7 @@ class Mutual:
     def exchange(self, candidate, serverIP):
         cert = open(self.local_cert, 'rb').read()
         message = self.signature() + cert + self.myID.encode('utf-8')
-        fs.client_auth(candidate, serverIP, message)
+        fs.client_auth(candidate, serverIP, message, self.interface)
 
     def client(self, candidate):
         print(f'AuthAP available: {candidate}')
@@ -152,27 +152,27 @@ class Mutual:
     def send_password(self, cliID, addr, my_mac_mesh, my_ip_mesh, encrypt_pass):
         try:
             time.sleep(2)
-            fs.client_auth(cliID, addr[0], encrypt_pass)  # send mesh password
+            fs.client_auth(cliID, addr[0], encrypt_pass, self.interface)  # send mesh password
         except ConnectionRefusedError:
             time.sleep(7)
-            fs.client_auth(cliID, addr[0], encrypt_pass)
+            fs.client_auth(cliID, addr[0], encrypt_pass, self.interface)
         client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
         if self.debug:
             print(f'Client Mesh IP: {str(client_mesh_ip)}')
         try:
             time.sleep(2)
-            fs.client_auth(cliID, addr[0], my_mac_mesh.encode())  # send my mac
+            fs.client_auth(cliID, addr[0], my_mac_mesh.encode(), self.interface)  # send my mac
         except ConnectionRefusedError:
             time.sleep(7)
-            fs.client_auth(cliID, addr[0], my_mac_mesh.encode())
+            fs.client_auth(cliID, addr[0], my_mac_mesh.encode(), self.interface)
         client_mac, _ = fs.server_auth(self.myID, self.interface)
         if self.debug:
             print(f'Client Mesh MAC: {str(client_mesh_ip)}')
         try:
-            fs.client_auth(cliID, addr[0], my_ip_mesh.encode())  # send my mesh ip
+            fs.client_auth(cliID, addr[0], my_ip_mesh.encode(), self.interface)  # send my mesh ip
         except ConnectionRefusedError:
             time.sleep(7)
-            fs.client_auth(cliID, addr[0], my_ip_mesh.encode())
+            fs.client_auth(cliID, addr[0], my_ip_mesh.encode(), self.interface)
         return client_mac, client_mesh_ip
 
     def start_mesh(self):
@@ -208,22 +208,22 @@ class Mutual:
                 co.util.update_mesh_password(bytes(password).decode())
                 self.start_mesh()
                 try:
-                    fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode())  # send my mesh ip
+                    fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode(), self.interface)  # send my mesh ip
                 except ConnectionRefusedError:
                     time.sleep(2)
-                    fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode())
+                    fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode(), self.interface)
                 client_mac, _ = fs.server_auth(self.myID, self.interface)
                 print(f'Client MAC: {str(client_mac)}')
                 try:
                     time.sleep(2)
-                    fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode())  # send my mac
+                    fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode(), self.interface)  # send my mac
                 except ConnectionRefusedError:
                     time.sleep(2)
-                    fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode())
+                    fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode(), self.interface)
                 client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
             elif pri.verify_certificate(sig, node_name, self.digest(), self.root_cert):
                 print(colored('> Valid Certificate', 'green'))
-                print("4.1) Setting PasswordS")
+                print("4.1) Setting Password")
                 encrypt_pass = self.set_password(node_name)
                 self.start_mesh()
                 client_mac, client_mesh_ip = self.send_password(cliID, addr, self.my_mac_mesh, self.my_ip_mesh,
@@ -239,7 +239,7 @@ class Mutual:
             pri.delete_key(node_name)
             os.remove(node_name + '.der')
 
-    def test(self): # unit test
+    def test(self):  # unit test
         raise NotImplementedError
 
 

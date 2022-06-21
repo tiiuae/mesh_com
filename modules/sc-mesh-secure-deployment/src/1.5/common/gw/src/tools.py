@@ -40,7 +40,7 @@ def setup_logger(name):
     screen_handler = logging.StreamHandler(stream=None)
     screen_handler.setFormatter(formatter)
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.ERROR)
     logger.addHandler(handler)
     logger.addHandler(screen_handler)
     return logger
