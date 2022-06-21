@@ -1,6 +1,7 @@
 import socket
 import sys
 sys.path.insert(0, '../../')
+import random
 '''
 only for testing 
 '''
@@ -8,14 +9,16 @@ from common import ConnectionMgr
 co = ConnectionMgr.ConnectionMgr()
 
 
-def client_auth(ID, ser_ip, message):
+def client_auth(ID, ser_ip, message, interface='wlan0'):
     '''
     Socket client to send message to specific server.
     '''
     HOST = ser_ip  # The server's hostname or IP address
     PORT = int(ID.split('AuthAP_')[1]) if 'AuthAP_' in ID else int(ID)
     print(f'Starting client Auth with {str(HOST)}:{PORT}')
+    ipaddr = co.get_ip_address(interface)  # assuming that wlan0 will be (or connected to) the 'AP'
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((ipaddr, random.randint(1000, 64000)))
         s.connect((HOST, PORT))
         s.sendall(message)
         data = s.recv(2048)

@@ -10,18 +10,20 @@ from .gw import main
 import random
 import string
 from threading import Thread
+import pathlib
 
 from .utils import Utils
 
 ut = Utils()
 
-
+script_path = pathlib.Path(__file__).parent.resolve()
+src_path = str(script_path).split('common')[0].split('1.5')[0]
 
 
 class ConnectionMgr:
     def __init__(self):
-        self.config_11s_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "../../../bash/conf-11s-mesh.sh")
-        self.config_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), "../../../bash/conf-mesh.sh")
+        self.config_11s_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), src_path + "/bash/conf-11s-mesh.sh")
+        self.config_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), src_path + "bash/conf-mesh.sh")
         self.mesh_ip = None
         self.mesh_if = None
         self.mesh_mac = None
@@ -65,7 +67,7 @@ class ConnectionMgr:
             cmd = f"iw dev {mesh_vif}" + " info | awk '/wiphy/ {printf \"phy\" $2}'"
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)  # check how to transform it Shell=False
             phy_name = proc.communicate()[0].decode('utf-8').strip()
-        mesh_ip = confs['ubuntu']['ip']
+        mesh_ip = config['ip']
         mesh_mac = self.util.get_mac_by_interface(mesh_vif)
         # Create mesh service config
         Path("/opt/mesh_com").mkdir(parents=True, exist_ok=True)
@@ -176,7 +178,7 @@ class ConnectionMgr:
 
     def get_password(self):
         yaml_conf = self.util.read_yaml()
-        instances = yaml_conf['server']['ubuntu']
+        instances = yaml_conf['server']['secos']
         return instances['key'] or ''
 
     @staticmethod

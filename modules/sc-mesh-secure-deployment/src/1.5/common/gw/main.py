@@ -6,8 +6,9 @@ from .src.tools import setup_logger, \
     find_batman_wifi_iface, check_interface_connectivity
 
 
+
 class AutoGateway:
-    def __init__(self, init_gw_mode: str="server"):
+    def __init__(self, init_gw_mode: str = "server"):
 
         self.old_mesh_gateway_mac_and_ip = ("", "")
         self.masquerade_set = None
@@ -49,7 +50,6 @@ class AutoGateway:
         ret, val = run_shell_command(f"ip route show|grep -e bat0 -e br-lan|grep default|xargs ip route del >/dev/null")
         if ret != 0:
             self.logger.error("Error ip route del failed as no previous configuration")
-
         # without wwan_iface -> start with client mode
         if self.wan_iface == "":
             run_shell_command("batctl gw_mode client")
@@ -128,7 +128,8 @@ class AutoGateway:
                 # add local default mesh gw
                 else:
                     self.logger.debug("Default route deleted successfully")
-                command = "arp-scan " + str(subnet) + " --interface " + wifi + " 2>/dev/null|grep " + gateway_mac + " | awk '{print $1}'"
+                command = "arp-scan " + str(
+                    subnet) + " --interface " + wifi + " 2>/dev/null|grep " + gateway_mac + " | awk '{print $1}'"
                 ret, new_gateway_ip = run_shell_command(command)
                 new_gateway_ip = new_gateway_ip.strip()
                 if ret == 0:
