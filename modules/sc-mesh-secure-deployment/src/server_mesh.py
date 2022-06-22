@@ -13,6 +13,7 @@ import pathlib
 import hashlib
 import os
 import primitives as pri
+from os import getenv
 
 # Construct the argument parser
 ap = argparse.ArgumentParser()
@@ -24,10 +25,19 @@ ap.add_argument("-m", "--mode", required=True)
 args = ap.parse_args()
 # Get the mesh_com config
 print(os.getenv("MESH_COM_ROOT", ""))
-config_path = os.path.join(os.getenv("MESH_COM_ROOT", ""), "src/mesh_com.conf")
+
+# Get the mesh_com config
+mesh_mode = args.mode
+
+# Get the mesh_com config
+if mesh_mode == 'ibss':
+    conf_path = "src/mesh_com.conf"
+elif mesh_mode == '11s':
+    conf_path = "src/mesh_com_11s.conf"
+config_path = os.path.join(getenv("MESH_COM_ROOT", ""), conf_path)
 print('> Loading yaml conf... ')
 try:
-    yaml_conf = yaml.safe_load(open('src/mesh_com.conf', 'r'))
+    yaml_conf = yaml.safe_load(open(config_path, 'r'))
     conf = yaml_conf['server']
     debug = yaml_conf['debug']
 except (IOError, yaml.YAMLError) as error:
