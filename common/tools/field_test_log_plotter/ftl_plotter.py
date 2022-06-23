@@ -1,5 +1,7 @@
 import sys
+import getopt
 import os  # For directory / file handling purposes
+import logging
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -11,6 +13,14 @@ from ipywidgets import Layout
 
 # Local imports
 from constants import *
+
+# Create logger
+logger = logging.getLogger(__name__)
+# create console handler and set level to debug
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+# add ch to logger
+logger.addHandler(ch)
 
 
 def show_plots():
@@ -45,7 +55,7 @@ class FieldTestLogPlotter:
         # Create dataframe from csv file.
         self.df = pd.read_csv(self.filename)
         # Debug
-        # print(tabulate(self.df, headers='keys', tablefmt='psql'))
+        logger.debug(tabulate(self.df, headers='keys', tablefmt='psql'))
 
         # Convert invalid GPS coordinates first to NaN.Assumption:
         # invalid values exists only at the beginning of the log.
@@ -89,11 +99,11 @@ class FieldTestLogPlotter:
             raise Exception('Dataframe is empty!')
 
         # Debug
-        # print(tabulate(self.df, headers='keys', tablefmt='psql'))
+        logger.debug(tabulate(self.df, headers='keys', tablefmt='psql'))
 
         # Calculate distance to base station and total distance moved around.
         self.__calculate_distances((self.__base_latitude, self.__base_longitude))
-        self.__isbase_device()
+        self.__is_base_device()
 
         # Convert date time formatted information to relative time stamps in seconds.
         self.df['Timestamp'] = pd.to_datetime(self.df['Timestamp'])
@@ -110,14 +120,15 @@ class FieldTestLogPlotter:
         # Convert units to more readable format
         self.__convert_units()
         # Debug
-        # print('datatypes: ', self.df.dtypes)
-        # print(tabulate(self.df, headers='keys', tablefmt='psql'))
+        logger.debug('datatypes: ', self.df.dtypes)
+        logger.info(tabulate(self.df, headers='keys', tablefmt='psql'))
 
         # Write generated dataframe to CSV file
         # self.df.to_csv('generated_dataframe.csv')
         df2 = self.df[['latitude', 'longitude']].copy()
         self.coordinates = df2.values.tolist()
-        # print(self.coordinates)
+        # Debug coordinates
+        logger.debug(self.coordinates)
 
     def __parse_rssi_data(self):
         """
@@ -217,7 +228,7 @@ class FieldTestLogPlotter:
             # Replace NaN values with -1 that is out of normal scale.
             self.df[mcs_class].replace(np.nan, -1, inplace=True)
 
-    def __isbase_device(self):
+    def __is_base_device(self):
         """
         Determines if logged device has been so-called base device.
         Decision is made based on filename, max distance and median top
@@ -234,12 +245,13 @@ class FieldTestLogPlotter:
             self.is_base = True
         elif max_distance <= 10:
             self.is_base = True
-        elif median_speed < 2:
+        elif median_speed < 3:
             self.is_base = True
         else:
             self.is_base = False
-        # Debug
-        # print('is_base:', self.is_base, 'max_distance: ', max_distance, 'top speed median: ', median_speed)
+        # Debug info
+        logger.info('is_base: %s, max_distance: %s, top speed median:  %s',
+                    self.is_base, max_distance, median_speed)
 
     def __calculate_distances(self, base_lat_lon):
         """
@@ -411,6 +423,13 @@ class FieldTestLogPlotter:
         plt.savefig(self.filename + subtitle + ".png", dpi=MY_DPI)
 
     def plot_temperature_and_current(self):
+        """
+        Plots temperature and current values as a function of time.
+        The first y-axis is for CPU, Wi-Fi card and TMP100 sensor temperatures.
+        The second y-axis is for current values.
+
+        :return: None
+        """
         fig, ax_temp = plt.subplots()
         ax_temp.set_facecolor(COLOR_FACECOLOR)
         ax_current = ax_temp.twinx()
@@ -439,7 +458,7 @@ class FieldTestLogPlotter:
                      figsize=FIGSIZE)
         # Get dataframe row index according to max distance
         rows = self.df.index[self.df['distance [m]'] == max(self.df['distance [m]'])].tolist()
-        # print('Row index: ', rows)
+
         # Set vertical split line for turning point. Note! Using first index match.
         ax_temp.axvline((self.df['Timestamp'][rows[0]]), color=COLOR_TURNING_POINT, lw=3,
                         linestyle='--', label='Turning point')
@@ -468,6 +487,12 @@ class FieldTestLogPlotter:
         plt.savefig(self.filename + subtitle + ".png", dpi=MY_DPI)
 
     def plot_voltage_and_current(self):
+        """
+        Plots voltage and current values as a function of time.
+        The first y-axis is for voltage values and the second y-axis is for current values.
+
+        :return: None
+        """
         fig, ax_voltage = plt.subplots()
         ax_voltage.set_facecolor(COLOR_FACECOLOR)
         ax_current = ax_voltage.twinx()
@@ -504,7 +529,7 @@ class FieldTestLogPlotter:
                      title=figure_title, figsize=FIGSIZE)
         # Get dataframe row index according to max distance
         rows = self.df.index[self.df['distance [m]'] == max(self.df['distance [m]'])].tolist()
-        # print('Row index: ', rows)
+
         # Set vertical split line for turning point. Note! Using first index match.
         ax_voltage.axvline((self.df['Timestamp'][rows[0]]), color=COLOR_TURNING_POINT, lw=3,
                            linestyle='--', label='Turning point')
@@ -532,13 +557,19 @@ class FieldTestLogPlotter:
         # Save the figure
         plt.savefig(self.filename + subtitle + ".png", dpi=MY_DPI)
 
-    def rssi_noise_throughput_and_mcs(self, _mac, x_axis='Timestamp'):
+    def rssi_noise_throughput_and_mcs(self, _mac, x_axis='Timestamp', x_start=None, x_stop=None):
         """
+        Plots RSSI sum signal level from heard device, noise level, RX/TX throughput and MCS class
+        info as a function of time/distance or total distance. Signal level scale is described
+        of first y-axis, throughput values on second y-axis and MCS class values on third y-axis.
+        RX and TX throughput values.
 
         :param _mac: MAC address of the device heard.
         :param x_axis: Name of the dataframe column to be used as X axis value.
                        Default value is 'Timestamp'. Other typical options:
                        'distance traveled [m]' or 'distance [m]'
+        :param x_start: Optional x axis slice start value. Default value is None.
+        :param x_stop: Optional x axis slice end value. Default value is None.
 
         :return: None
         """
@@ -553,15 +584,28 @@ class FieldTestLogPlotter:
         rspine.set_position(('axes', 1.07))
         fig.subplots_adjust(right=0.85)
 
+        if x_start:
+            start_idx = self.df[self.df[x_axis].le(float(x_start))].index.max()
+        else:
+            start_idx = None
+        if x_stop:
+            stop_idx = self.df[self.df[x_axis].le(float(x_stop))].index.max()
+        else:
+            stop_idx = None
+
         # Determine x-axis scale
-        min_x_axis_val = min(self.df[x_axis])
-        max_x_axis_val = max(self.df[x_axis])
+        min_x_axis_val = min(self.df.iloc[start_idx:stop_idx][x_axis])
+        max_x_axis_val = max(self.df.iloc[start_idx:stop_idx][x_axis])
         x_interval = int((max_x_axis_val - min_x_axis_val) / 40)
+
         if x_interval > 10:
             x_interval = round(x_interval / 10) * 10
         elif x_interval == 0:
             x_interval = 1
         max_x_axis_val += x_interval
+
+        logger.debug('min_x_axis_val %s, max_x_axis_val %s, x_interval %s',
+                     min_x_axis_val, max_x_axis_val, x_interval)
 
         # Device specific column names:
         rssi_dbm = _mac + ' rssi [dBm]'
@@ -580,29 +624,53 @@ class FieldTestLogPlotter:
         figure_title = self.filename.replace(self.__homedir, '') + subtitle
 
         # Plot signal strength figures
-        self.df.plot(ax=ax_signal_strength, x=x_axis, y=rssi_dbm, color=COLOR_RSSI, lw=1.5)
-        self.df.plot(ax=ax_signal_strength, x=x_axis, y='noise [dBm]', color=COLOR_NOISE,
-                     grid=True, ylabel=LABEL_SIGNAL_STRENGTH,
-                     xticks=(np.arange(min_x_axis_val, max_x_axis_val, x_interval)),
-                     yticks=(np.arange(-110, 0, 10)),
-                     title=figure_title, figsize=FIGSIZE)
+        self.df.iloc[start_idx:stop_idx].plot(ax=ax_signal_strength, x=x_axis,
+                                              y=rssi_dbm, color=COLOR_RSSI, lw=1.5)
+        self.df.iloc[start_idx:stop_idx].plot(ax=ax_signal_strength, x=x_axis,
+                                              y='noise [dBm]', color=COLOR_NOISE,
+                                              grid=True, ylabel=LABEL_SIGNAL_STRENGTH,
+                                              xticks=(np.arange(min_x_axis_val,
+                                                                max_x_axis_val,
+                                                                x_interval)),
+                                              yticks=(np.arange(-110, 0, 10)),
+                                              title=figure_title, figsize=FIGSIZE)
 
-        if x_axis == 'Timestamp':
+        if not self.is_base:
             # Get dataframe row index according to max distance
             rows = self.df.index[self.df['distance [m]'] == max(self.df['distance [m]'])].tolist()
-            # Set vertical split line for turning point. Note! Using first index match.
-            ax_signal_strength.axvline((self.df['Timestamp'][rows[0]]), color=COLOR_TURNING_POINT,
-                                       lw=3, linestyle='--', label='Turning point')
-        else:
-            # Set vertical split line for turning point
-            ax_signal_strength.axvline(max(self.df['distance [m]']), color=COLOR_TURNING_POINT,
-                                       linestyle='--', label='Turning point', lw=3)
+            index = rows[0]
+            plot_turning_point = False
+
+            if start_idx is None and stop_idx is None:
+                plot_turning_point = True
+            elif start_idx is None and stop_idx is not None:
+                if index < stop_idx:
+                    plot_turning_point = True
+            elif start_idx is not None and stop_idx is None:
+                if index > start_idx:
+                    plot_turning_point = True
+            else:
+                if start_idx < index < stop_idx:
+                    plot_turning_point = True
+            if plot_turning_point:
+                if x_axis == 'Timestamp':
+                    # Set vertical split line for turning point.
+                    ax_signal_strength.axvline((self.df['Timestamp'][index]),
+                                               color=COLOR_TURNING_POINT,
+                                               lw=3, linestyle='--', label='Turning point')
+                else:
+                    ax_signal_strength.axvline((self.df['distance [m]'][index]),
+                                               color=COLOR_TURNING_POINT,
+                                               linestyle='--', label='Turning point', lw=3)
+
         # Label box location
         ax_signal_strength.legend(bbox_to_anchor=(0, 1.0), loc='upper left')
 
         # Rotate x-axis tick labels to make them fit better in the picture
         plt.setp(ax_signal_strength.get_xticklabels(), rotation=30, ha='right')
 
+        # TODO: Consider using fixed throughput scale. Scale (Mbps, Kbps etc.) could be
+        #  function parameter. It should ease up comparison of plots from different devices.
         # Determine y-axis scale
         if min(self.df['TX throughput [Bits/s]']) < min(self.df['RX throughput [Bits/s]']):
             min_bitrate = int(min(self.df['TX throughput [Bits/s]']))
@@ -620,29 +688,45 @@ class FieldTestLogPlotter:
         elif y_interval > 1:
             y_interval = int(y_interval)
 
-        self.df.plot(ax=ax_throughput, x=x_axis, y='RX throughput [Bits/s]',
-                     xticks=(np.arange(min_x_axis_val, max_x_axis_val, x_interval)),
-                     yticks=(np.arange(min_bitrate, max_bitrate, y_interval)),
-                     color=COLOR_RX_THROUGHPUT, lw=2, label='RX throughput [bit/s]')
-        self.df.plot(ax=ax_throughput, title=figure_title,
-                     grid=True, x=x_axis, y='TX throughput [Bits/s]',
-                     xticks=(np.arange(min_x_axis_val, max_x_axis_val, x_interval)),
-                     yticks=(np.arange(min_bitrate, max_bitrate, y_interval)),
-                     label='TX throughput [bit/s]', figsize=FIGSIZE,
-                     color=COLOR_TX_THROUGHPUT, lw=2, ylabel=LABEL_THROUGHPUT)
+        self.df.iloc[start_idx:stop_idx].plot(ax=ax_throughput, x=x_axis,
+                                              y='RX throughput [Bits/s]',
+                                              xticks=(np.arange(min_x_axis_val,
+                                                                max_x_axis_val, x_interval)),
+                                              yticks=(np.arange(min_bitrate,
+                                                                max_bitrate, y_interval)),
+                                              color=COLOR_RX_THROUGHPUT, lw=2,
+                                              label='RX throughput [bit/s]')
+        self.df.iloc[start_idx:stop_idx].plot(ax=ax_throughput, title=figure_title,
+                                              grid=True, x=x_axis, y='TX throughput [Bits/s]',
+                                              xticks=(np.arange(min_x_axis_val,
+                                                                max_x_axis_val, x_interval)),
+                                              yticks=(np.arange(min_bitrate,
+                                                                max_bitrate, y_interval)),
+                                              label='TX throughput [bit/s]', figsize=FIGSIZE,
+                                              color=COLOR_TX_THROUGHPUT, lw=2,
+                                              ylabel=LABEL_THROUGHPUT)
         # Label box upper right corner coordinate relative to base plot coordinate
         ax_throughput.legend(bbox_to_anchor=(1.0, 1.0), loc='upper right')
 
-        self.df.plot(kind='scatter', ax=ax_mcs, x=x_axis, y=tx_mcs, label='TX MCS class',
-                     color=COLOR_RX_MCS)
-        self.df.plot(kind='scatter', ax=ax_mcs, x=x_axis, y=rx_mcs, label='RX MCS class',
-                     color=COLOR_TX_MCS, ylabel=LABEL_MCS, yticks=np.arange(0, 30 + 1, 1))
+        self.df.iloc[start_idx:stop_idx].plot(kind='scatter', ax=ax_mcs, x=x_axis,
+                                              y=tx_mcs, label='TX MCS class', color=COLOR_RX_MCS)
+        self.df.iloc[start_idx:stop_idx].plot(kind='scatter', ax=ax_mcs, x=x_axis,
+                                              y=rx_mcs, label='RX MCS class', color=COLOR_TX_MCS,
+                                              ylabel=LABEL_MCS, yticks=np.arange(0, 30 + 1, 1))
 
         ax_mcs.legend(bbox_to_anchor=(1.1, 1.0), loc='upper left')
         # Save the figure
         plt.savefig(self.filename + subtitle + ".png", dpi=MY_DPI)
 
-    def plot_rssi_mcs_distance(self, _mac):
+    def plot_rssi_sum_and_tx_mcs_distance(self, _mac):
+        """
+        Plots RSSI sum signal level from heard device and TX MCS class as a function of
+        distance to starting point.
+
+        param _mac: MAC address of the device heard.
+
+        return: None
+        """
         if self.is_base is True:
             return
         fig, ax_rssi = plt.subplots()
@@ -698,7 +782,15 @@ class FieldTestLogPlotter:
         # Save the figure
         plt.savefig(self.filename + subtitle + ".png", dpi=MY_DPI)
 
-    def plot_line_rssi_scatter_mcs_per_distance_traveled(self, _mac):
+    def plot_rssi_sum_and_tx_mcs_per_distance_traveled(self, _mac):
+        """
+        Plots RSSI sum signal level from heard device and TX MCS class as a function of
+        total/traveled distance (back and forth) from starting point.
+
+        :param _mac: MAC address of the device heard.
+
+        :return: None
+        """
         if self.is_base is True:
             return
         fig, ax_rssi = plt.subplots()
@@ -760,12 +852,20 @@ class FieldTestLogPlotter:
         # Save the figure
         plt.savefig(self.filename + subtitle + ".png", dpi=MY_DPI)
 
-    def plot_line_rssi_scatter_mcs_per_time(self, _mac):
+    def plot_rssi_and_mcs_per_time(self, _mac):
+        """
+        Plots RSSI sum signal level as well as antenna specific RSSI
+        values, from heard device, and also RX MCS class as a function
+        of time.
+
+        :param _mac: MAC address of the device heard.
+
+        :return: None
+        """
         fig, ax_rssi = plt.subplots()
         ax_rssi.set_facecolor(COLOR_FACECOLOR)
         ax_mcs = ax_rssi.twinx()
 
-        # print('mac: ', _mac)
         x_axis = 'Timestamp'
         # Determine x-axis scale
         min_time = int(min(self.df[x_axis]))
@@ -824,7 +924,15 @@ class FieldTestLogPlotter:
         # Save the figure
         plt.savefig(self.filename + subtitle + ".png", dpi=MY_DPI)
 
-    def plot_line_tx_throughput_scatter_mcs_per_distance_traveled(self, _mac):
+    def plot_throughput_and_mcs_per_distance_traveled(self, _mac):
+        """
+        Plots RX and TX throughput values as well as MCS class values as
+        a function of total distance traveled.
+
+        :param _mac: MAC address of the device heard.
+
+        :return: None
+        """
         if self.is_base is True:
             return
         fig, ax_throughput = plt.subplots()
@@ -911,7 +1019,15 @@ class FieldTestLogPlotter:
         # Save the figure
         plt.savefig(self.filename + subtitle + ".png", dpi=MY_DPI)
 
-    def plot_line_rx_throughput_scatter_mcs_per_time(self, _mac):
+    def plot_rx_throughput_and_mcs_per_time(self, _mac):
+        """
+        Plots RX and TX throughput values as well as MCS class values as
+        a function of total distance traveled.
+
+        :param _mac: MAC address of the device heard.
+
+        :return: None
+        """
         fig, ax_throughput = plt.subplots()
         ax_throughput.set_facecolor(COLOR_FACECOLOR)
         ax_mcs = ax_throughput.twinx()
@@ -953,7 +1069,7 @@ class FieldTestLogPlotter:
         # Rotate x-axis tick labels to make them fit better in the picture
         plt.setp(ax_throughput.get_xticklabels(), rotation=30, ha='right')
 
-        # print('min, max: ', min(self.df['RX MCS']), max(self.df['RX MCS']))
+        logger.debug('min rx mcs: %s, max rx mcs: %s', min(self.df[rx_mcs]), max(self.df[rx_mcs]))
         self.df.plot(kind='scatter', ax=ax_mcs, grid=True, x='Timestamp', y=rx_mcs,
                      yticks=(np.arange(min(self.df[rx_mcs]), max(self.df[rx_mcs]) + 1, 1)),
                      label='RX MCS class', color=COLOR_RX_MCS, ylabel=LABEL_MCS)
@@ -963,6 +1079,14 @@ class FieldTestLogPlotter:
         plt.savefig(self.filename + subtitle + ".png", dpi=MY_DPI)
 
     def create_map(self, coordinates):
+        """
+        Creates a map with travel route including start and stop markers
+        and saves output as a HTML file.
+
+        :param coordinates: list of latitude and longitude pairs.
+
+        :return: None
+        """
         # Define center point for the map.
         lat = (self.df['latitude'].min() + self.df['latitude'].max()) / 2
         lon = (self.df['longitude'].min() + self.df['longitude'].max()) / 2
@@ -1013,6 +1137,12 @@ class FieldTestLogPlotter:
 if __name__ == '__main__':
     path = sys.argv[1]
     csv_files = []
+    show_on_ui = False  # Do not plot on UI by default
+    plot_baseband = True
+    x_ax = 'Timestamp'
+    is_stationary = False
+    x_start_val = None
+    x_stop_val = None
 
     if os.path.isdir(path):
         os.chdir(path)
@@ -1027,27 +1157,102 @@ if __name__ == '__main__':
         if path.endswith(".csv"):
             csv_files.append(path)
 
+    # Get optional parameters
+    try:
+        options, args = getopt.getopt(sys.argv[2:], 'idsb:u:', ['log=', 'xaxis=',
+                                                                'xstart=', 'xstop=', 'ismoving='])
+    except getopt.error as msg:
+        sys.stdout = sys.stderr
+        print(msg)
+        print('''usage: %s [-i|-d|-s|-b<val>|-u] [--log <level>,--xaxis <val>, --xstart <val>, \
+--xstop <val>, ismoving <val>]
+                -i: set log level to INFO
+                -d: set log level to DEBUG
+                -s: shows generated plots on UI.
+                -b: defines whether baseband related (temperature, voltage, current) plots
+                    are generated. Possible values: 0, 1, false, true. Default value: true.
+                -u: define units for throughput values (b, Kb, Mb)
+                --log <level> where <level> can be INFO or DEBUG
+                --xaxis <val> defines x-axis for plots. Possible values: time, distance, 
+                  total_distance. Default value: time.
+                --xstart <val> defines starting point of plot slice.
+                --xstop <val> defines end point of plot slice.
+                  For example: --x_ax time --xstart 420 --xstop 840 will produce a figure that
+                  contains rssi, noise, throughput and mcs values starting from timestamp value 
+                  420s to 840s.
+                --ismoving <val> defines whether or not logged device should be treated as 
+                  stationary or moving device. Should be set to zero or false in case tested device
+                  has been stationary in actual use case but logging has been on so long time that
+                  it cannot be determined from gps coordinates. Default value: true.                  
+                ''')
+        sys.exit(2)
+
+    # Define settings based on given configuration options.
+    for o, a in options:
+        if o == '-i':
+            logger.setLevel(logging.INFO)
+        if o == '-d':
+            logger.setLevel(logging.DEBUG)
+        if o == '-s':
+            show_on_ui = True
+        if o == '--log':
+            if a.upper() == 'INFO':
+                logger.setLevel(logging.INFO)
+            if a.upper() == 'DEBUG':
+                logger.setLevel(logging.DEBUG)
+        if o == '-u':
+            if a == 'b':
+                logger.info('Setting throughput units to bits per seconds.')
+            if a == 'Kb':
+                logger.info('Setting throughput units to kilobits per seconds.')
+            if a == 'Mb':
+                logger.info('Setting throughput units to megabits per seconds.')
+        if o == '-b':
+            if a.lower() == '0' or a.lower() == 'false':
+                plot_baseband = False
+        if o == '--x_ax':
+            if a.lower() == 'time':
+                logger.info('Setting x axis to time.')
+                x_ax = 'Timestamp'
+            if a.lower() == 'distance':
+                logger.info('Setting x axis to distance.')
+                x_ax = 'distance [m]'
+            if a.lower() == 'total_distance':
+                logger.info('Setting x axis to total_distance.')
+                x_ax = 'distance traveled [m]'
+        if o == '--xstart':
+            xstart = a
+        if o == '--xstop':
+            x_stop_val = a
+        if o == '--ismoving':
+            if a.lower() == '0' or a.lower() == 'false':
+                is_stationary = True
+
     for file in csv_files:
         print(file)
         try:
             ftlp = FieldTestLogPlotter(file)
-            ftlp.plot_temp_voltage_and_current()
-            ftlp.plot_temperature_and_current()
-            ftlp.plot_voltage_and_current()
+            if plot_baseband:
+                ftlp.plot_temp_voltage_and_current()
+                ftlp.plot_temperature_and_current()
+                ftlp.plot_voltage_and_current()
             ftlp.create_map(ftlp.coordinates)
             for mac in ftlp.mac_list:
                 if mac == '00:00:00:00:00:00':
                     continue
-                ftlp.rssi_noise_throughput_and_mcs(mac, 'Timestamp')
-                if not ftlp.is_base:
-                    ftlp.rssi_noise_throughput_and_mcs(mac, 'distance traveled [m]')
-                    ftlp.plot_rssi_mcs_distance(mac)
-                    ftlp.plot_line_rssi_scatter_mcs_per_distance_traveled(mac)
-                    ftlp.plot_line_tx_throughput_scatter_mcs_per_distance_traveled(mac)
-                ftlp.plot_line_rx_throughput_scatter_mcs_per_time(mac)
-                ftlp.plot_line_rssi_scatter_mcs_per_time(mac)
+                ftlp.rssi_noise_throughput_and_mcs(mac, x_ax, x_start_val, x_stop_val)
+                if not ftlp.is_base and not is_stationary:
+                    if x_ax is not None:
+                        ftlp.rssi_noise_throughput_and_mcs(mac, 'distance traveled [m]',
+                                                           x_start_val, x_stop_val)
+                    ftlp.plot_rssi_sum_and_tx_mcs_distance(mac)
+                    ftlp.plot_rssi_sum_and_tx_mcs_per_distance_traveled(mac)
+                    ftlp.plot_throughput_and_mcs_per_distance_traveled(mac)
+                ftlp.plot_rx_throughput_and_mcs_per_time(mac)
+                ftlp.plot_rssi_and_mcs_per_time(mac)
         except Exception as e:
             print("Could not plot log: ", file)
             print("Reason:", e)
     # Show generated plots
-    show_plots()
+    if show_on_ui:
+        show_plots()
