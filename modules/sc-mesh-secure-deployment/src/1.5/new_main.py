@@ -31,7 +31,7 @@ def launchCA(ID, sectable):  # need to see how to get the IP address of the neig
     myip = co.get_ip_address('bat0')
     # server_tread = Thread(target=ca.as_server, args=(myip, server_q), daemon=True)
     # server_tread.start()
-    proc = multiprocessing.Process(target=ca.as_server, args=(myip))
+    proc = multiprocessing.Process(target=ca.as_server, args=(myip,))
     proc.start()
     for index, row in sectable.iterrows():
         IP = row['IP']

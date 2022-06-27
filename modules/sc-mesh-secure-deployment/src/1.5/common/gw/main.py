@@ -6,7 +6,6 @@ from .src.tools import setup_logger, \
     find_batman_wifi_iface, check_interface_connectivity
 
 
-
 class AutoGateway:
     def __init__(self, init_gw_mode: str = "server"):
 
