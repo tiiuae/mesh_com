@@ -1,11 +1,7 @@
 import hashlib
 import hmac
-import random
-import numpy as np
-import time
 import json
-import crc_functions
-import ntplib
+import time
 
 
 def authenticator(secret, crc_key, received_shares, msg_received, time_margin, start_timestamp):

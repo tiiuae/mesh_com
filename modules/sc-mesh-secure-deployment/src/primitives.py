@@ -125,13 +125,23 @@ def import_cert(client_key, node_name):
     subprocess.call(command, shell=False)
 
 
-def verify_hsm(msg, sig, name):
+def get_public_key(name):
+    pubKey = None
     session = get_session()
     keys = session.findObjects()
     for key in range(len(keys)):
         aux = keys[key].to_dict()
         if aux['CKA_LABEL'] == name:
             pubKey = keys[key]  ##check here need to verify if not exported
+    if pubKey:
+        return pubKey
+    else:
+        print("No Key Found")
+
+
+def verify_hsm(msg, sig, name):
+    pubKey = get_public_key(name)
+    session = get_session()
     ver = session.verify(pubKey, msg, sig)
     # logout
     session.logout()
@@ -188,47 +198,6 @@ def chunks(file_obj, size=10000):
         yield chunks
 
 
-def encrypt_file(file_name, key_name):
-    encr = []
-    session = get_session()
-    keys = session.findObjects()
-    for key in range(len(keys)):
-        aux = keys[key].to_dict()
-        if aux['CKA_LABEL'] == key_name:
-            pubKey = keys[key]
-    split_files = chunks(open(file_name))
-    for chunk in split_files:
-        size = len(chunk)
-    for ch in range(size):
-        c = session.encrypt(pubKey, chunk[ch])
-        if debug:
-            print(bytes(c))
-        encr.append(bytes(c))
-    session.logout()
-    session.closeSession()
-    return encr
-
-
-def decrypt_file(file_name):
-    ''''
-    not working
-    '''
-    decr = []
-    session = get_session()
-    privKey = session.findObjects([(CKA_CLASS, CKO_PRIVATE_KEY)])[0]
-    split_files = chunks(open(file_name))
-    for chunk in split_files:
-        size = len(chunk)
-    for ch in range(size):
-        c = session.decrypt(privKey, bytes(chunk[ch].split('\n')[0], encoding='utf-8'))
-        if debug:
-            print(bytes(c))
-        decr.append(bytes(c))
-    session.logout()
-    session.closeSession()
-    return decr
-
-
 def get_labels():
     labels = []
     session = get_session()
@@ -236,7 +205,6 @@ def get_labels():
     for key in range(len(keys)):
         aux = keys[key].to_dict()
         if aux['CKA_CLASS'] == 'CKO_PRIVATE_KEY':
-            print("aux")
             labels.append(aux['CKA_LABEL'])
     return list(set(labels))[0]
 
