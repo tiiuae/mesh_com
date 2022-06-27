@@ -135,7 +135,7 @@ class Mutual:
         sig = self.signature()
         client_sig = client[:len(sig)]
         client_cert = client[len(sig):]
-        cliID = client[-5:]
+        cliID = client[-5:] ##### ID must be 5 bits
         return client_sig, client_cert, cliID.decode('utf-8')
 
     def set_password(self, node_name):

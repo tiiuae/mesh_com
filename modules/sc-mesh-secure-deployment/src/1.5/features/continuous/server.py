@@ -1,9 +1,14 @@
-import socket
-import server_functions
-import time
 import json
-import crc_functions
+import socket
+import time
 from _thread import *
+from threading import Thread
+
+
+from .functions import crc_functions
+from .functions import server_functions
+import queue
+
 
 
 def multi_threaded_client(c, addr):
@@ -16,7 +21,7 @@ def multi_threaded_client(c, addr):
     c.send(bytes('Connected to server', 'utf-8'))  # Transmit tcp msg as a byte with encoding format str to client
 
     # Session Initializations Parameters
-    secret = 1234 #this should be stored on HSM
+    secret = 1234  # this should be stored on HSM
     total_period = 20  # Total period for the session
     period = 2  # Period for continuous authentication
     time_margin = 0.2 * period  # Time margin for freshness = 20 % of period
@@ -120,7 +125,7 @@ def multi_threaded_client(c, addr):
                 num_of_fails = num_of_fails + 1
                 # exponential backoff = auth period ^ num of failures
                 # max(period, 2) to avoid diminishing exponential when period < 1
-                backoff_period = max(period,2) ** num_of_fails
+                backoff_period = max(period, 2) ** num_of_fails
                 result_dict = {
                     "auth_result": auth_result,
                     "backoff_period": backoff_period
@@ -140,23 +145,20 @@ def multi_threaded_client(c, addr):
     c.close()  # close client socket
     print('Connection closed')
 
+
 def initiate_server(ip):
     s = socket.socket()  # create server socket s with default param ipv4, TCP
     print('Socket Created')
 
     # to accept connections from clients, bind IP of server, a port number to the server socket
-    server_ip = socket.gethostbyname(socket.gethostname())
-    # s.bind(('localhost', 9999))  # (IP, host num) #use a non busy port num
-    # s.bind((server_ip, 9999)) # (IP, host num) #use a non busy port num
-    # s.bind(('192.168.137.215', 9999))
     s.bind((ip, 9999))
-	
+
     # wait for clients to connect (tcp listener)
     s.listen(3)  # buffer for only 3 connections
     print('Waiting for connections')
 
     while True:
-    	# accept tcp connection from client
+        # accept tcp connection from client
         c, addr = s.accept()  # returns client socket and IP addr
-        # new_client_thread(c, addr).start()
-        start_new_thread(multi_threaded_client, (c, addr))
+        Thread(target=multi_threaded_client, daemon=True, args=(c, addr,)).start()  # client thread
+        #start_new_thread(multi_threaded_client, (c, addr, q))

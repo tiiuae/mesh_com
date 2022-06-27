@@ -11,11 +11,11 @@ def get_macs_neighbors():
     return a list of macs
     """
     macs = []
-    proc = subprocess.call(['batctl', 'n'], shell=False)
-    for i, x in enumerate(proc.stdout, start=1):
-        if i > 2:
-            aux = x.split()
-            macs.append((aux[1]).decode("utf-8"))
+    proc = subprocess.run(['batctl', 'n'], capture_output=True)
+    splitout = proc.stdout.decode().split('\n')
+    if len(splitout) > 3:
+            for aux in splitout[2:-1]:
+                macs.append(aux.split('\t')[1].split(' ')[2])
     return macs
 
 
@@ -34,7 +34,7 @@ def verify_mesh_status():
     return False/True
     """
     macs = get_macs_neighbors()
-    return len(macs) > 1
+    return len(macs) >= 1
 
 
 def get_mesh_ip_address(ifname='bat0'):

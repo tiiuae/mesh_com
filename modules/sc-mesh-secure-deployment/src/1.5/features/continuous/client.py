@@ -1,27 +1,22 @@
-import socket
-import time
-import random
-import client_functions
-import json
-import numpy as np
-import sys
-import math
 import hashlib
+import json
+import math
+import random
+import socket
+import sys
+import time
 
-def initiate_client(server_ip):
+from .functions import client_functions
+
+
+def initiate_client(server_ip, ID):
     c = socket.socket()  # create server socket c with default param ipv4, TCP
-
-    # server_ip = 'localhost'  # server ip addr local
-    # server_ip = '10.161.7.55'
-    # server_ip = '192.168.137.197'
-    # server_ip = '10.161.6.234' # server ip addr rbpi w sticker
-    # server_ip = '10.161.6.230' # server ip addr rbpi wo sticker
 
     # connect to server socket
     c.connect((server_ip, 9999))
 
-    name = input("Enter your name:")  # Taking input from client
-    c.send(bytes(name, 'utf-8'))  # Send client name to server
+    # name = input("Enter your name:")  # Taking input from client
+    c.send(bytes(ID, 'utf-8'))  # Send client name to server
 
     # receive byte sent by server and print it
     print(c.recv(1024).decode())  # decode byte to string
@@ -60,7 +55,7 @@ def initiate_client(server_ip):
             print("share u = ", u)
             print("Share Authenticator sa = ", sa)
 
-            msg = "Continuous Authentication " + str(time_flag)
+            msg = f"Continuous Authentication {str(time_flag)}"
 
             # Generate message with authentication tokens
             msg_to_send = client_functions.message_generator(secret, server_id, client_id, msg, u, time_flag, sa)
@@ -80,12 +75,11 @@ def initiate_client(server_ip):
             while True:
                 # Resend message to server if CRC fails
                 result = c.recv(1024).decode()
-                if result == 'Resend message':
-                    print("Resending message")
-                    c.send(msg_with_crc_bytes)  # Resend message to server
-                else:
+                if result != 'Resend message':
                     break
 
+                print("Resending message")
+                c.send(msg_with_crc_bytes)  # Resend message to server
             print("Result = ", result)
             print('*********************************************************************')
             print(' ')
@@ -95,9 +89,10 @@ def initiate_client(server_ip):
             if result["auth_result"] == "fail":
                 backoff_start = time.time()
                 while time.time() - backoff_start <= result["backoff_period"]:
-                   pass
+                    pass
         elif request == 'Closing connection':
-                print('Connection closed')
-                break
+            print('Connection closed')
+            break
     print("Share storage cost: ", sys.getsizeof(sent_shares))
+    return result["auth_result"]
     # print("Average message size: ", msg_size/ math.ceil(total_period/period))

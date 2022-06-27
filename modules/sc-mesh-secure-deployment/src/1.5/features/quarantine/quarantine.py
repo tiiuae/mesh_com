@@ -1,7 +1,7 @@
 import subprocess
 import sys
-sys.path.insert(0, '..')
-from utils import mesh_utils
+sys.path.insert(0, '../')
+from commom import mesh_utils
 
 
 class Quarantine:
