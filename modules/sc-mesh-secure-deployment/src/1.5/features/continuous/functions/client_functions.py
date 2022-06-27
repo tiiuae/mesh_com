@@ -1,11 +1,8 @@
 import hashlib
 import hmac
-import random
-import numpy as np
 import json
-import ntplib
-import time
-import crc_functions
+
+from . import crc_functions
 
 
 def message_generator(secret, server_id, client_id, msg, u, time_flag, sa):
@@ -37,9 +34,10 @@ def message_generator(secret, server_id, client_id, msg, u, time_flag, sa):
     return msg_to_send
 
 
-def crc_generator(msg_to_send, crc_key):
+def crc_generator(msg_to_send, crc_key, debug=True):
     bin_data = ''.join(format(ord(i), '08b') for i in msg_to_send)  # Convert json to binary
-    print('Binary data = ', bin_data)
     data_with_crc = crc_functions.encodeData(bin_data, crc_key)
-    print('Data with crc = ', data_with_crc)
+    if debug:
+        print('Binary data = ', bin_data)
+        print('Data with crc = ', data_with_crc)
     return data_with_crc
