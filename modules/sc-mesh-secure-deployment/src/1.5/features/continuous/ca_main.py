@@ -5,12 +5,14 @@ from . import client
 
 class CA:
 
-    def __init__(self, ID):
+    def __init__(self,ID):
         self.ID = ID
 
+    def as_client(self,server_ip, return_dict):
+        client.initiate_client(server_ip, self.ID,return_dict)
 
-    def as_client(self, server_ip):
-        return client.initiate_client(server_ip, self.ID)
-
-    def as_server(self, ip):
+    def as_server(self,ip):
         server.initiate_server(ip)
+
+        
+
