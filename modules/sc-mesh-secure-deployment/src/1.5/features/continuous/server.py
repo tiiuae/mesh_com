@@ -7,7 +7,6 @@ from threading import Thread
 
 from .functions import crc_functions
 from .functions import server_functions
-import queue
 
 
 
@@ -156,9 +155,17 @@ def initiate_server(ip):
     # wait for clients to connect (tcp listener)
     s.listen(3)  # buffer for only 3 connections
     print('Waiting for connections')
+    
+    max_count = 8
+    flag_ctr = 0
 
     while True:
+        flag_ctr += 1
+        if (flag_ctr == max_count):
+            break
         # accept tcp connection from client
         c, addr = s.accept()  # returns client socket and IP addr
-        Thread(target=multi_threaded_client, daemon=True, args=(c, addr,)).start()  # client thread
+        a = Thread(target=multi_threaded_client, daemon=True, args=(c, addr,))  # client thread
+        a.start()
+        #a.join()
         #start_new_thread(multi_threaded_client, (c, addr, q))

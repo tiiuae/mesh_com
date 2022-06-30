@@ -9,14 +9,14 @@ import time
 from .functions import client_functions
 
 
-def initiate_client(server_ip, ID):
+def initiate_client(server_ip, ID, return_dict):
     c = socket.socket()  # create server socket c with default param ipv4, TCP
 
     # connect to server socket
     c.connect((server_ip, 9999))
 
     # name = input("Enter your name:")  # Taking input from client
-    c.send(bytes(ID, 'utf-8'))  # Send client name to server
+    c.send(bytes(str(ID), 'utf-8'))  # Send client name to server
 
     # receive byte sent by server and print it
     print(c.recv(1024).decode())  # decode byte to string
@@ -29,6 +29,8 @@ def initiate_client(server_ip, ID):
     start_time = time.time()
     timestamp = start_time  # Gives current timestamp in seconds
     time_flag = 1  # Initialization of time flag
+    max_count = 8
+    flag_ctr = 0
 
     period = 2  # Period for each authentication in seconds
     total_period = 20  # Total period for the session
@@ -38,6 +40,9 @@ def initiate_client(server_ip, ID):
     # Generate k degree polynomial for the secret
     auth_result = "pass"  # initialization
     while True:
+        flag_ctr += 1
+        if (flag_ctr == max_count):
+            break
         request = c.recv(1024).decode()
         if request == 'Request to authenticate':
             print("Processing authentication request")
@@ -94,5 +99,6 @@ def initiate_client(server_ip, ID):
             print('Connection closed')
             break
     print("Share storage cost: ", sys.getsizeof(sent_shares))
+    return_dict[auth_result] =  result["auth_result"]
     return result["auth_result"]
     # print("Average message size: ", msg_size/ math.ceil(total_period/period))
