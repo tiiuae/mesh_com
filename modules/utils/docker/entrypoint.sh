@@ -32,8 +32,14 @@ if [ -d "/opt/mesh_com/modules/utils/package/python_packages" ]; then
    echo "Directory /opt/mesh_com/modules/utils/package/python_packages exists."
 else
    tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/python_packages.tar.gz
+   tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/python_packages2.tar.gz
 fi
 pip install --no-index --find-links /opt/mesh_com/modules/utils/package/python_packages -r /opt/mesh_com/modules/utils/package/python_packages/requirements.txt
+pip install --no-index --find-links /opt/mesh_com/modules/utils/package/python_packages2 -r /opt/mesh_com/modules/utils/package/python_packages2/requirements.txt
+
+#copy libraries for pypcap
+cp /opt/mesh_com/modules/utils/package/python_packages2/libpcap.so.0.8 /usr/lib/.
+cp /opt/mesh_com/modules/utils/package/python_packages2/pcap.cpython-39-aarch64-linux-gnu.so /usr/lib/python3.9/site-packages/.
 
 #start mesh service if mesh provisoning is done
 hw_platform=$(cat /proc/cpuinfo | grep Model | awk '{print $5}')
