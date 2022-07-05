@@ -38,7 +38,8 @@ def initiate_client(server_ip, ID, return_dict):
     msg_size = 0  # Initialized to compute avg message size
 
     # Generate k degree polynomial for the secret
-    auth_result = "pass"  # initialization
+    #auth_result = "pass"  # initialization
+    auth_result = 1  # initialization
     while True:
         flag_ctr += 1
         if (flag_ctr == max_count):
@@ -91,7 +92,8 @@ def initiate_client(server_ip, ID, return_dict):
             result = json.loads(result)
 
             # Do not send data for backoff period if auth fails
-            if result["auth_result"] == "fail":
+            #if result["auth_result"] == "fail":
+            if result["auth_result"] == 0:
                 backoff_start = time.time()
                 while time.time() - backoff_start <= result["backoff_period"]:
                     pass

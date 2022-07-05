@@ -96,7 +96,8 @@ def multi_threaded_client(c, addr):
                     print(' ')
 
             # Avoid following block of code when auth failed in earlier steps
-            if auth_result == "pass":
+            #if auth_result == "pass":
+            if auth_result == 1:
                 r_bin_data = msg_received[:-(len(crc_key) - 1)]
                 # print('Received binary data = ', r_bin_data)
 
@@ -110,7 +111,8 @@ def multi_threaded_client(c, addr):
                                                              time_margin, start_timestamp)
                 print("Authentication ", auth_result)
 
-            if auth_result == "pass":
+            #if auth_result == "pass":
+            if auth_result == 1:
                 num_of_fails = 0  # reset no of failures to 0
                 backoff_period = 0  # reset backoff time to 0
                 result_dict = {

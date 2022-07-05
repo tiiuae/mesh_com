@@ -6,20 +6,19 @@ import pandas as pd
 import netifaces
 import yaml
 import pathlib
+
 script_path = pathlib.Path(__file__).parent.resolve()
 
-
-meshf= str(script_path)+'/mesh_com_11s.conf'
-
+meshf = str(script_path) + '/mesh_com_11s.conf'
 
 
 class Utils:
     def __init__(self):
         self.lock = threading.Lock()
         # name with absolute path : '../auth/dev.csv'
-        #self.state_csv_file = self._conf['state_csv_name']
+        # self.state_csv_file = self._conf['state_csv_name']
         # name with absolute path : '../../mesh_com.conf'
-        #self.mesh_config_file = self._conf['mesh_conf_file']
+        # self.mesh_config_file = self._conf['mesh_conf_file']
         self.mesh_config_file = meshf
 
     @staticmethod
