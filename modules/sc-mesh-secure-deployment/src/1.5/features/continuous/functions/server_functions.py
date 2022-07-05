@@ -25,7 +25,8 @@ def authenticator(secret, crc_key, received_shares, msg_received, time_margin, s
         print("Message is fresh")
     else:
         print("Stale message")
-        return "fail"
+        # return "fail"
+        return 0
 
     # Check if share is fresh (has not been used previously in this session)
     if received_shares.count(r_u) == 0:
@@ -33,7 +34,8 @@ def authenticator(secret, crc_key, received_shares, msg_received, time_margin, s
         received_shares.append(r_u)
     else:
         print("Share has been used previously")
-        return "fail"
+        # return "fail"
+        return 0
 
     # Compute fresh MAC
     msg_to_mac_dict = {
@@ -54,7 +56,8 @@ def authenticator(secret, crc_key, received_shares, msg_received, time_margin, s
         print("MACs match")
     else:
         print("MACs do not match")
-        return "fail"
+        # return "fail"
+        return 0
 
     # Compute new share authenticator
     # print("u - secret - time flag= ", str(r_u - secret - r_time_flag))
@@ -62,16 +65,19 @@ def authenticator(secret, crc_key, received_shares, msg_received, time_margin, s
     print("Calculated share authenticator = ", calc_sa)
     if str(calc_sa) == r_sa:
         print("Share authenticated")
-        return "pass"
+        # return "pass"
+        return 1
     else:
         print("Share not authenticated")
-        return "fail"
+        # return "fail"
+        return 0
 
 
 def authentication_result(auth_result):
     # Sends authentication result to client and implements exponential backoff in case of failure
     # Set backoff period according to auth result and consecutive num of failures
-    if auth_result == "pass":
+    # if auth_result == "pass":
+    if auth_result == 1:
         num_of_fails = 0  # reset no of failures to 0
         backoff_period = 0  # reset backoff time to 0
         result_dict = {
