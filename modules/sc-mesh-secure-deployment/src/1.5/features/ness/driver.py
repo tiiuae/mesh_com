@@ -39,15 +39,16 @@ def create_servers_flags_list(sec_list, n, p):
     return out
 
 
+#print('[node_num, [svr1, svr2, ..., svrk], [flg1, flg2, ..., flgk], status]]\n')
+
 def run_decision(latest_status_list, good_server_status_list, flags_list, servers_list, n, i):
     engine.reset()
-
-    engine.assert_('ness_fact', 'is_latest_status_list', ('latest_status_list', latest_status_list))
-    engine.assert_('ness_fact', 'is_server_status_list', ('good_server_status_list', good_server_status_list))
-    engine.assert_('ness_fact', 'is_flag_list', ('flags_list', flags_list))
-    engine.assert_('ness_fact', 'is_server_list', ('servers_list', servers_list))
-    engine.assert_('ness_fact', 'is_index', ('index', i))
-    engine.assert_('ness_fact', 'is_number_nodes', ('number_nodes', n))
+    engine.assert_('.ness_fact', 'is_latest_status_list', ('latest_status_list', latest_status_list))
+    engine.assert_('.ness_fact', 'is_server_status_list', ('good_server_status_list', good_server_status_list))
+    engine.assert_('.ness_fact', 'is_flag_list', ('flags_list', flags_list))
+    engine.assert_('.ness_fact', 'is_server_list', ('servers_list', servers_list))
+    engine.assert_('.ness_fact', 'is_index', ('index', i))
+    engine.assert_('.ness_fact', 'is_number_nodes', ('number_nodes', n))
     print("\nAdded fact:")
     engine.get_kb('ness_fact').dump_specific_facts()
 
@@ -70,11 +71,11 @@ def run_decision(latest_status_list, good_server_status_list, flags_list, server
         krb_traceback.print_exc()
         sys.exit(1)
 
-    if (res == 1):
+    if res == 1:
         print("\nAction is: ", act, "for node ", i[0])
     else:
         res1 = 0
-        print("\nCan't conclude inferrence. More checks needed for node ", i[0])
+        print("\nCan't conclude inference. More checks needed for node ", i[0])
         try:
             with engine.prove_goal('ness_check.consistency_analysis($eval1)') as gen:
                 for vars, plan in gen:

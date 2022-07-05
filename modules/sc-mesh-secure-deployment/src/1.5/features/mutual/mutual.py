@@ -229,11 +229,11 @@ class Mutual:
                 client_mac, client_mesh_ip = self.send_password(cliID, addr, self.my_mac_mesh, self.my_ip_mesh,
                                                                 encrypt_pass)
             info = {'ID': node_name, 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(),
-                    'PubKey_fpr': client_fpr, 'MA_level': 'A'}
+                    'PubKey_fpr': client_fpr, 'MA_level': 1}
             self.update_table(info)  # #update csv file
         else:
             info = {'ID': node_name, 'MAC': "00:00:00:00", 'IP': addr[0],
-                    'PubKey_fpr': "___", 'MA_level': 'NA'}
+                    'PubKey_fpr': "___", 'MA_level': 0}
             self.update_table(info)  # #update csv file
             print(colored("Not Valid Client Certificate", 'red'))
             pri.delete_key(node_name)
