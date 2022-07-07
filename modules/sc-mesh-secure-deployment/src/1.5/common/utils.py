@@ -9,7 +9,7 @@ import pathlib
 
 script_path = pathlib.Path(__file__).parent.resolve()
 
-meshf = str(script_path) + '/mesh_com_11s.conf'
+meshf = f'{str(script_path)}/mesh_com_11s.conf'
 
 
 class Utils:
@@ -152,3 +152,4 @@ class Utils:
         subprocess.call(command, shell=False)
         command2 = ['echo', mesh_ip, 'node', id, '>', '/etc/hosts']
         subprocess.call(command2, shell=False)
+

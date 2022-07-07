@@ -1,11 +1,14 @@
 import socket
 import sys
+
 sys.path.insert(0, '../../')
 import random
+
 '''
 only for testing 
 '''
 from common import ConnectionMgr
+
 co = ConnectionMgr.ConnectionMgr()
 
 
