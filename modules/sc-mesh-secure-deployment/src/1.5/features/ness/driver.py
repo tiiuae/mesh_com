@@ -10,13 +10,7 @@ engine = knowledge_engine.engine(__file__)
 
 
 def create_status_list(sec_list, n):
-    out = []
-
-    for i in range(n):
-        l = len(sec_list[i])
-        out.append(sec_list[i][l - 1])
-
-    return out
+    return [sec_list[i][len(sec_list[i]) - 1] for i in range(n)]
 
 
 def create_good_server_list(sec_list, n):
@@ -31,12 +25,7 @@ def create_good_server_list(sec_list, n):
 
 
 def create_servers_flags_list(sec_list, n, p):
-    out = []
-
-    for i in range(n):
-        out.append(sec_list[i][p])
-
-    return out
+    return [sec_list[i][p] for i in range(n)]
 
 
 #print('[node_num, [svr1, svr2, ..., svrk], [flg1, flg2, ..., flgk], status]]\n')
@@ -116,13 +105,11 @@ def read_file(file):
 
 T_struct, n = read_file('input-simulator/output.data')
 
-n_list = []
-n_list.append(n)
+n_list = [n]
 sec_table_valid = 1
 
 init_latest_status_list = create_status_list(T_struct, n)
-init_latest_status_list1 = []
-init_latest_status_list1.append(init_latest_status_list)
+init_latest_status_list1 = [init_latest_status_list]
 init_good_server_status_list = create_good_server_list(T_struct, n)
 p = 1
 init_servers_table = create_servers_flags_list(T_struct, n, p)
@@ -132,10 +119,8 @@ init_flags_table = create_servers_flags_list(T_struct, n, p)
 fig, ax = plt.subplots()
 ax.set_axis_off()
 
-colLabels = []
+colLabels = [f'N{str(name)}' for name in range(n)]
 
-for name in range(n):
-    colLabels.append('N' + str(name))
 table = ax.table(
     cellText=init_latest_status_list1,
     #	rowLabels = [],
@@ -166,8 +151,7 @@ if sec_table_valid == 1:
         # Marshalling layer:
         # index of node to check
         #
-        i_list = []
-        i_list.append(i)
+        i_list = [i]
         #
         # Preparing tuples for the query into Pyke engine
         #

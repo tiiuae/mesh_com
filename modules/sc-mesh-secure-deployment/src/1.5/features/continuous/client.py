@@ -101,6 +101,6 @@ def initiate_client(server_ip, ID, return_dict):
             print('Connection closed')
             break
     print("Share storage cost: ", sys.getsizeof(sent_shares))
-    return_dict[auth_result] =  result["auth_result"]
+    return_dict[auth_result] = result["auth_result"]
     return result["auth_result"]
     # print("Average message size: ", msg_size/ math.ceil(total_period/period))

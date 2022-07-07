@@ -10,20 +10,13 @@ class NESS:
 
     def __init__(self):
         self.engine = knowledge_engine.engine((__file__, '.compiled_krb'))
-        self.dataset = file_path + '/input-simulator/output.data'
+        self.dataset = f'{file_path}/input-simulator/output.data'
 
     def create_status_list(self, sec_list, n):
-        out = []
-
-        for i in range(n):
-            l = len(sec_list[i])
-            out.append(sec_list[i][l - 1])
-
-        return out
+        return [sec_list[i][len(sec_list[i]) - 1] for i in range(n)]
 
     def create_good_server_list(self, sec_list, n):
         out = []
-
         for i in range(n):
             l = len(sec_list[i])
             if sec_list[i][l - 1] == 1:
@@ -32,12 +25,7 @@ class NESS:
         return out
 
     def create_servers_flags_list(self, sec_list, n, p):
-        out = []
-
-        for i in range(n):
-            out.append(sec_list[i][p])
-
-        return out
+        return [sec_list[i][p] for i in range(n)]
 
     def adapt_table(self, df):
         '''
@@ -117,45 +105,18 @@ class NESS:
     def test(self):
         T_struct, n = self.read_file()
 
-        n_list = []
-        n_list.append(n)
+        n_list = [n]
         sec_table_valid = 1
 
         init_latest_status_list = self.create_status_list(T_struct, n)
-        init_latest_status_list1 = []
-        init_latest_status_list1.append(init_latest_status_list)
+        init_latest_status_list1 = [init_latest_status_list]
         init_good_server_status_list = self.create_good_server_list(T_struct, n)
         p = 1
         init_servers_table = self.create_servers_flags_list(T_struct, n, p)
         p = 2
         init_flags_table = self.create_servers_flags_list(T_struct, n, p)
 
-        print("Running Decision on all nodes as the Sec Table is valid")
-        print("Nodes status table: ", init_latest_status_list)
-        print("Known good Servers table: ", init_good_server_status_list)
-        print("All Servers table: ", init_servers_table)
-        print("All Flags table: ", init_flags_table)
-        for i in range(n):
-            #
-            # Marshalling layer:
-            # index of node to check
-            #
-            i_list = []
-            i_list.append(i)
-            #
-            # Preparing tuples for the query into Pyke engine
-            #
-            latest_status_list = tuple(init_latest_status_list)
-            good_server_status_list = tuple(init_good_server_status_list)
-            # flags_list = tuple(init_flags_table[i])
-            # servers_list = tuple(init_servers_table[i])
-            flags_list = tuple(init_flags_table)
-            servers_list = tuple(init_servers_table)
-            nt = tuple(n_list)
-            it = tuple(i_list)
-
-            act_code = self.run_decision(latest_status_list, good_server_status_list, flags_list, servers_list, nt, it)
-            print("\nAction Code issued is ", act_code)
+        self.run(init_latest_status_list, init_good_server_status_list, init_flags_table, init_servers_table, n)
 
     def run(self, init_latest_status_list, init_good_server_status_list, init_flags_table, init_servers_table, n):
 
@@ -164,15 +125,13 @@ class NESS:
         print("Known good Servers table: ", init_good_server_status_list)
         print("All Servers table: ", init_servers_table)
         print("All Flags table: ", init_flags_table)
-        n_list = []
-        n_list.append(n)
+        n_list = [n]
         for i in range(n):
             #
             # Marshalling layer:
             # index of node to check
             #
-            i_list = []
-            i_list.append(i)
+            i_list = [i]
             #
             # Preparing tuples for the query into Pyke engine
             #
@@ -187,6 +146,8 @@ class NESS:
 
             act_code = self.run_decision(latest_status_list, good_server_status_list, flags_list, servers_list, nt, it)
             print("\nAction Code issued is ", act_code)
+
+            return act_code
 
 
 

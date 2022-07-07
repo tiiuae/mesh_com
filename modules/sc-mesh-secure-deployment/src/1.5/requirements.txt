@@ -1,0 +1,10 @@
+paramiko==2.7.2
+wifi==0.3.8
+pandas==1.1.5
+netifaces==0.10.9
+numpy==1.19.5
+numpy==1.19.5
+networkx==2.6.3
+matplotlib==3.3.4
+scitools-pyke==1.1.1
+pyvis==0.1.9
