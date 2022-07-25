@@ -17,7 +17,7 @@ from .utils import Utils
 ut = Utils()
 
 script_path = pathlib.Path(__file__).parent.resolve()
-src_path = str(script_path).split('common')[0].split('1.5')[0]
+src_path = str(script_path).split('common')[0].split('1_5')[0]
 
 
 class ConnectionMgr:

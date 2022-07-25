@@ -9,6 +9,8 @@ file_path = os.path.dirname(__file__)
 class NESS:
 
     def __init__(self):
+        print("here")
+        print(__file__)
         self.engine = knowledge_engine.engine((__file__, '.compiled_krb'))
         self.dataset = f'{file_path}/input-simulator/output.data'
 

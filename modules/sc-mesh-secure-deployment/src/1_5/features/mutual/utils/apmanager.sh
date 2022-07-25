@@ -3,7 +3,7 @@
 
 [ ! -d "conf" ] && mkdir conf
 
-#assuming we are running from main (1.5)
+#assuming we are running from main (1_5)
 feature_folder=$(dirname "$(pwd)")
 features_folder=$(dirname $feature_folder)
 folder=$(dirname $features_folder)
