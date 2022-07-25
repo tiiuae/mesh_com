@@ -2,10 +2,6 @@ from pyke import knowledge_engine, krb_traceback
 import sys
 import pickle
 import os
-import json
-import time
-import numpy as np
-import pandas as pd
 
 file_path = os.path.dirname(__file__)
 
@@ -13,99 +9,38 @@ file_path = os.path.dirname(__file__)
 class NESS:
 
     def __init__(self):
+        print("here")
+        print(__file__)
         self.engine = knowledge_engine.engine((__file__, '.compiled_krb'))
         self.dataset = f'{file_path}/input-simulator/output.data'
 
     def create_status_list(self, sec_list, n):
         return [sec_list[i][len(sec_list[i]) - 1] for i in range(n)]
 
-    def mapping(self, nodes):
-        mapp = dict(zip(nodes, range(len(nodes))))
-        print("Map node labels with ID :", mapp)
-        return mapp
-
-    def remapping(self, mapps, position):
-        # list out keys and values separately
-        key_list = list(mapps.keys())
-        val_list = list(mapps.values())
-        return key_list[position]
-
     def create_good_server_list(self, sec_list, n):
         out = []
         for i in range(n):
             l = len(sec_list[i])
-            #if sec_list[i][l - 1] == 1: # commenting this, let's assume all are benign
-            out.append(i)
+            if sec_list[i][l - 1] == 1:
+                out.append(i)
+
         return out
 
     def create_servers_flags_list(self, sec_list, n, p):
-        out = []
-        for i in range(n):
-            out.append(sec_list[i][p])
-        return out
+        return [sec_list[i][p] for i in range(n)]
 
-    def save_file_status(self, **args):
-        aux = {arg: args[arg] for arg in args}
-        aux['timestamp'] = time.time()
-        jsonStr = json.dumps(aux)
-        with open("last_result.json", "w") as outfile:
-            outfile.write(jsonStr)
+    def adapt_table(self, df):
+        '''
+        Assuming that timestamp is small enough between rows
+        '''
+        nodes = df['IP'].to_list()
+        latest_status_list = []
+        good_server_status_list = tuple(range(len(nodes)))
+        flags_list = df["CA_Result"].tolist()
+        servers_list = df["ID"].tolist()
+        n = df.shape[0]
 
-    def get_table(self, df):
-        flags_map = {65: 1, 131: 2, 132: 2, 133: 2, 134: 2, 194: 3}  # needs to add disconection (-1)
-        mappids = self.mapping(set(df["ID"].tolist()))
-        df2 = df.replace({"CA_Server": mappids})
-        # df2 = df2.replace({"ID": mapp})
-        new_list = []
-        last_status = []
-        for i in df2["ID"]:
-            df2.loc[(df2['CA_Server'].isnull()) & (df2["ID"] == i), "CA_Server"] = int(list(pd.Series(i).map(mappids))[0])
-            table = [list(pd.Series(i).map(mappids))[0]]
-            servers = list(df2.loc[df2['ID'] == i, "CA_Server"])
-            table.append(servers)
-            flags = list(df2.loc[df2['ID'] == i, "CA_Result"])
-            table.append(flags)
-            count = np.unique(flags, return_counts=True)
-            if len(count[1]) > 1:
-                final = count[0][0] if count[1][0] > count[1][1] else count[0][1]
-            else:
-                final = count[0][0]
-            table.append(final)
-            new_list.append(table)
-        finaltable = []
-        for l in new_list:
-            if l not in finaltable:
-                finaltable.append(l)
-        return finaltable, mappids
-
-    def adapt_table(self, result, mapp):
-        if not os.path.isfile('last_result.json'):
-            latest_status_list = []
-            good_server_status_list = []
-            flags_list = []
-            servers_list = []
-        else:
-            f = open('last_result.json')
-            json_object = json.load(f)
-            latest_status_list = json_object['latest_status_list']
-            good_server_status_list = json_object['good_server_status_list']
-            flags_list = json_object['flags_list']
-            servers_list = json_object['servers_list']
-            mapp = json_object['mapp']
-        for node in result:
-            if result[node] == 65:
-                latest_status_list.append(1)
-                good_server_status_list.append(node)
-                flags_list.append(1)
-            if result[node] in [131, 132, 133, 134]:
-                latest_status_list.append(2)
-                flags_list.append(2)
-            if result[node] == 194:
-                latest_status_list.append(3)
-                flags_list.append(3)
-        n = len(servers_list)
-        self.save_file_status(latest_status_list=latest_status_list, good_server_status_list=good_server_status_list,
-                              flags_list=flags_list, servers_list=servers_list, mapp=mapp)
+        return latest_status_list, good_server_status_list, flags_list, servers_list, n
 
     def run_decision(self, latest_status_list, good_server_status_list, flags_list, servers_list, n, i):
         self.engine.reset()
@@ -142,7 +77,6 @@ class NESS:
         else:
             res1 = 0
             print("\nCan't conclude inference. More checks needed for node ", i[0])
-            mnode = ''
             try:
                 with self.engine.prove_goal('ness_check.consistency_analysis($eval1)') as gen:
                     for vars, plan in gen:
@@ -160,10 +94,10 @@ class NESS:
                 act = "Signaling Suspected Malicious"
                 print("Action is: ", act, "node ", i[0])
                 action_code = 2 + 128 + 64
-        mnode = i[0]
+
         print("\nDone")
 
-        return action_code, mnode
+        return action_code
 
     def read_file(self):
         with open(self.dataset, 'rb') as f:  # b for binary
@@ -186,68 +120,36 @@ class NESS:
 
         self.run(init_latest_status_list, init_good_server_status_list, init_flags_table, init_servers_table, n)
 
-    def ness_result_to_table(self, df, ness_result, mapp):
-        df = df.assign(Ness_Result=0)
-        for res in ness_result:
-            ind = self.remapping(mapp, res)
-            df.loc[df['ID'] == ind, 'Ness_Result'] = int(ness_result[res])
-        df.drop_duplicates(inplace=True)
-        return df
+    def run(self, init_latest_status_list, init_good_server_status_list, init_flags_table, init_servers_table, n):
 
-    def run_all(self, output, latest_status=False):
-        result = {}
-        T_struct = output
-        n = len(T_struct)
+        print("Running Decision on all nodes as the Sec Table is valid")
+        print("Nodes status table: ", init_latest_status_list)
+        print("Known good Servers table: ", init_good_server_status_list)
+        print("All Servers table: ", init_servers_table)
+        print("All Flags table: ", init_flags_table)
         n_list = [n]
-        sec_table_valid = 1
-        init_latest_status_list = self.create_status_list(T_struct, n)
-        init_latest_status_list1 = []
-        init_latest_status_list1.append(init_latest_status_list)
-        init_good_server_status_list = self.create_good_server_list(T_struct, n)
-        p = 1
-        init_servers_table = self.create_servers_flags_list(T_struct, n, p)
-        p = 2
-        init_flags_table = self.create_servers_flags_list(T_struct, n, p)
-        #
-        # Marshalling to prepare dashboard and Decision Function call if table valid
-        #
-        if sec_table_valid == 1:
-            print("Running Decision on all nodes as the Sec Table is valid")
-            print("Nodes status table: ", init_latest_status_list)
-            print("Known good Servers table: ", init_good_server_status_list)
-            print("All Servers table: ", init_servers_table)
-            print("All Flags table: ", init_flags_table)
-            for i in range(n):
-                #
-                # Marshalling layer:
-                # index of node to check
-                #
-                i_list = []
-                i_list.append(i)
-                #
-                # Preparing tuples for the query into Pyke engine
-                #
-                # if latest_status:
-                #     f = open('last_result.json')
-                #     json_object = json.load(f)
-                #     latest_status_list = json_object['latest_status_list']
-                #     good_server_status_list = json_object['good_server_status_list']
-                #     flags_list = json_object['flags_list']
-                #     servers_list = json_object['servers_list']
-                #     mapp = json_object['mapp']
-                # else:
-                latest_status_list = tuple(init_latest_status_list)
-                good_server_status_list = tuple(init_good_server_status_list)
-                flags_list = tuple(init_flags_table[i])
-                servers_list = tuple(init_servers_table[i])
-                nt = tuple(n_list)
-                it = tuple(i_list)
+        for i in range(n):
+            #
+            # Marshalling layer:
+            # index of node to check
+            #
+            i_list = [i]
+            #
+            # Preparing tuples for the query into Pyke engine
+            #
+            latest_status_list = tuple(init_latest_status_list)
+            good_server_status_list = tuple(init_good_server_status_list)
+            # flags_list = tuple(init_flags_table[i])
+            # servers_list = tuple(init_servers_table[i])
+            flags_list = tuple(init_flags_table)
+            servers_list = tuple(init_servers_table)
+            nt = tuple(n_list)
+            it = tuple(i_list)
 
-                act_code, nnode = self.run_decision(latest_status_list, good_server_status_list, flags_list,
-                                                    servers_list, nt,
-                                                    it)
-                print("\nFor node: ", nnode)
-                print("Action Code issued is ", act_code)
+            act_code = self.run_decision(latest_status_list, good_server_status_list, flags_list, servers_list, nt, it)
+            print("\nAction Code issued is ", act_code)
 
-                result[nnode] = act_code
-        return result
+            return act_code
+
+
+

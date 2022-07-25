@@ -13,7 +13,7 @@ class MBA:
     def client(self, q, debug=False):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.bind(("0.0.0.0", 6006))
+        sock.bind(("0.0.0.0", 5005))
         while True:
             data, addr = sock.recvfrom(1024)
             print("mba: message received")
@@ -30,7 +30,7 @@ class MBA:
         while num_message:
             if debug:
                 print(f"this is server and it will send message {num_message} more times")
-            sock.sendto(bytes(message, "utf-8"), (self.add, 6006))
+            sock.sendto(bytes(message, "utf-8"), (self.add, 5005))
             num_message -= 1
             sleep(1)
 

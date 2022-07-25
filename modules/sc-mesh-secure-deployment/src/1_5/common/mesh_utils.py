@@ -4,14 +4,6 @@ import struct
 import socket
 import netifaces
 
-from threading import Thread
-
-try:
-    import queue
-except ImportError:
-    import Queue as queue
-import re
-
 
 def get_macs_neighbors():
     """
@@ -22,8 +14,8 @@ def get_macs_neighbors():
     proc = subprocess.run(['batctl', 'n'], capture_output=True)
     splitout = proc.stdout.decode().split('\n')
     if len(splitout) > 3:
-        for aux in splitout[2:-1]:
-            macs.append(aux.split('\t')[1].split(' ')[2])
+            for aux in splitout[2:-1]:
+                macs.append(aux.split('\t')[1].split(' ')[2])
     return macs
 
 
@@ -70,78 +62,3 @@ def get_mesh_interface(pattern):
         print('> ERROR: Interface ' + pattern + ' not found!')
     else:
         return pre[0]
-
-
-def get_neighbors_ip():
-    # some global vars
-    num_threads = 15
-    ips_q = queue.Queue()
-    out_q = queue.Queue()
-    my_ip = get_mesh_ip_address()
-    aux = my_ip.split('.')[0:3]
-    # build IP array
-    ips = []
-    final = []
-    for i in range(1, 10):
-        ips.append('.'.join(aux) + '.' + str(i))
-
-    def thread_pinger(i, q):
-        """Pings hosts in queue"""
-        while True:
-            # get an IP item form queue
-            ip = q.get()
-            # ping it
-            args = ['/bin/ping', '-c', '1', '-W', '1', str(ip)]
-            p_ping = subprocess.Popen(args,
-                                      shell=False,
-                                      stdout=subprocess.PIPE)
-            # save ping stdout
-            p_ping_out = str(p_ping.communicate()[0])
-
-            if (p_ping.wait() == 0):
-                # rtt min/avg/max/mdev = 22.293/22.293/22.293/0.000 ms
-                search = re.search(r'rtt min/avg/max/mdev = (.*)/(.*)/(.*)/(.*) ms',
-                                   p_ping_out, re.M | re.I)
-                out_q.put(str(ip))
-
-            # update queue : this ip is processed
-            q.task_done()
-
-    # start the thread pool
-    for i in range(num_threads):
-        worker = Thread(target=thread_pinger, args=(i, ips_q), daemon=True).start()
-
-    # fill queue
-    for ip in ips:
-        ips_q.put(ip)
-
-    # wait until worker threads are done to exit
-    ips_q.join()
-
-    # print result
-    while True:
-        try:
-            msg = out_q.get_nowait()
-        except queue.Empty:
-            break
-        final.append(msg)
-    final.remove(my_ip)
-    return final
-
-
-def get_arp():
-    neig = {}
-    # get_neighbors_ip()
-    # time.sleep(2)
-    args = ['ip', 'neigh', 'show', 'dev', 'bat0', 'nud', 'stale']
-    output = subprocess.check_output(args, shell=False)
-
-    aux = output.decode().split('\n')
-    aux.remove('')
-    for entry in aux:
-        string = entry.split()
-        ip = string[0]
-        if len(ip.split('.')) > 1:
-            mac = string[-2]
-            neig[ip] = mac
-    return neig

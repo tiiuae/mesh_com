@@ -24,7 +24,7 @@ def folder():
         os.mkdir(PATH)
 
 
-PATH = 'auth/'
+PATH = '../auth'
 folder()
 
 root_cert = "/etc/ssl/certs/root_cert.der"
@@ -51,10 +51,11 @@ class Mutual:
 
     def __init__(self, interface):
         """
-        Import the keys: node Pub,Priv and server(root) pub.
+        Import the keys: node Pub,Priv and server pub.
         """
         self.interface = interface
         print('Loading keys')
+        self.table = self.create_table()
         self.root_cert = root_cert
         self.local_cert = local_cert
         self.debug = True
@@ -63,19 +64,17 @@ class Mutual:
         print("loading root_cert")
         pri.import_cert(root_cert, 'root')
         print("my ID: ", self.myID)
-        self.table = self.create_table()
-
 
     def create_table(self):
         '''
         Function to create table of authenticated devices
         '''
         columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'MA_level']
-        if not path.isfile('auth/dev.csv'):
+        if not path.isfile('../auth/dev.csv'):
             table = pd.DataFrame(columns=columns)
-            table.to_csv('auth/dev.csv', header=columns, index=False)
+            table.to_csv('../auth/dev.csv', header=columns, index=False)
         else:
-            table = pd.read_csv('auth/dev.csv')
+            table = pd.read_csv('../auth/dev.csv')
         return table
 
     def update_table(self, info):
@@ -84,11 +83,10 @@ class Mutual:
         '''
         if info['ID'] not in set(self.table['ID']):
             self.table = self.table.append(info, ignore_index=True)
-            self.table.to_csv('auth/dev.csv', mode='a', header=False, index=False)
+            self.table.to_csv('../auth/dev.csv', mode='a', header=False, index=False)
         elif self.table.loc[self.table['ID'] == info['ID']]['PubKey_fpr'].all() != info['PubKey_fpr']:
             self.table = self.table.append(info, ignore_index=True)
-            self.table.drop_duplicates(inplace=True)
-            self.table.to_csv('auth/dev.csv', mode='a', header=False, index=False)
+            self.table.to_csv('../auth/dev.csv', mode='a', header=False, index=False)
 
     def get_status(self):
         '''
@@ -136,20 +134,17 @@ class Mutual:
     def decode_cert(self, client):
         sig = self.signature()
         client_sig = client[:len(sig)]
-        client_cert = client[len(sig):-5]
-        cliID = client[-5:]  ##### ID must be 5 bits
-        try:
-            return client_sig, client_cert, cliID.decode('utf-8')
-        except AttributeError:
-            return client_sig, client_cert, cliID
+        client_cert = client[len(sig):]
+        cliID = client[-5:] ##### ID must be 5 bits
+        return client_sig, client_cert, cliID.decode('utf-8')
 
-    def set_password(self, node_name, cliID):
+    def set_password(self, node_name):
         password = co.get_password()
         if password == '':  # this means still not connected with anyone
             password = co.create_password()  # create a password (only if no mesh exist)
             co.util.update_mesh_password(password)  # update password in config file
         print(password)
-        encrypt_pass = pri.encrypt_response(password, cliID)
+        encrypt_pass = pri.encrypt_response(password, node_name)
         if self.debug:
             print(f'encrypted pass: {str(encrypt_pass)}')
         return encrypt_pass
@@ -182,15 +177,11 @@ class Mutual:
 
     def start_mesh(self):
         print('creating mesh')
-        try:
-            self.my_ip_mesh, self.my_mac_mesh = co.create_mesh_config
-            co.starting_mesh()
-        except Exception:
-            TypeError
-            print("No password provided for the mesh. Please get the password via provisioning server")
-            exit()
+        self.my_ip_mesh, self.my_mac_mesh = co.create_mesh_config
+        co.start_mesh()
 
-    def define_role(self):
+    def start(self):
+        set_mesh = False
         candidate = wf.scan_wifi(self.interface)  # scan wifi to authenticate with
         if candidate:  # client
             sigs, addr = self.client(candidate)
@@ -198,27 +189,21 @@ class Mutual:
             cli = True
         else:  # server
             client, addr = self.server()
-            client_cert, sig, cliID, cli = self.send_my_key(client, addr)
-        return addr, client_cert, sig, cliID, cli
-
-    def send_my_key(self, client, addr):
-        sig, client_cert, cliID = self.decode_cert(client)
-        print("Client ID", cliID)
-        print('4) local key')
-        self.exchange(cliID, addr[0])
-        cli = False
-        return client_cert, sig, cliID, cli
-
-    def cert_validation(self, sig, node_name, cliID, cli, addr):
+            sig, client_cert, cliID = self.decode_cert(client)
+            print("Client ID", cliID)
+            print('4) local key')
+            self.exchange(cliID, addr[0])
+            cli = False
+        node_name = addr[0].replace('.', '_')
+        pri.import_cert(client_cert, node_name)
         if pri.verify_certificate(sig, node_name, self.digest(), self.root_cert):
             print(colored('> Valid Certificate', 'green'))
             print('Authenticated, now send my pubkey')
             client_fpr, _ = pri.hashSig(node_name + '.der')
-            pri.derive_ecdh_secret(node_name, cliID)
             if cli:  # client
                 print('5) get password')
                 enc_pass, _ = fs.server_auth(self.myID, self.interface)
-                password = pri.decrypt_response(enc_pass, cliID)
+                password = pri.decrypt_response(enc_pass)
                 print(bytes(password).decode())
                 co.util.update_mesh_password(bytes(password).decode())
                 self.start_mesh()
@@ -237,31 +222,22 @@ class Mutual:
                     fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode(), self.interface)
                 client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
             elif pri.verify_certificate(sig, node_name, self.digest(), self.root_cert):
-                # print(colored('> Valid Certificate', 'green'))
+                print(colored('> Valid Certificate', 'green'))
                 print("4.1) Setting Password")
-                encrypt_pass = self.set_password(node_name, cliID)
+                encrypt_pass = self.set_password(node_name)
                 self.start_mesh()
                 client_mac, client_mesh_ip = self.send_password(cliID, addr, self.my_mac_mesh, self.my_ip_mesh,
                                                                 encrypt_pass)
-            info = {'ID': self.myID, 'MAC': self.my_mac_mesh, 'IP': self.my_ip_mesh,
-                    'PubKey_fpr': pri.hashSig(local_cert)[0], 'MA_level': 1}
-            self.update_table(info)
-            info = {'ID': cliID, 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(),
+            info = {'ID': node_name, 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(),
                     'PubKey_fpr': client_fpr, 'MA_level': 1}
             self.update_table(info)  # #update csv file
         else:
-            info = {'ID': cliID, 'MAC': "00:00:00:00", 'IP': addr[0],
+            info = {'ID': node_name, 'MAC': "00:00:00:00", 'IP': addr[0],
                     'PubKey_fpr': "___", 'MA_level': 0}
             self.update_table(info)  # #update csv file
             print(colored("Not Valid Client Certificate", 'red'))
             pri.delete_key(node_name)
             os.remove(node_name + '.der')
-
-    async def start(self):
-        addr, client_cert, sig, cliID, cli = self.define_role()
-        node_name = addr[0].replace('.', '_')
-        pri.import_cert(client_cert, node_name)
-        self.cert_validation(sig, node_name, cliID, cli, addr)
 
     def test(self):  # unit test
         raise NotImplementedError

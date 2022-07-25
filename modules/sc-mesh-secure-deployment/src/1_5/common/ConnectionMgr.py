@@ -37,7 +37,7 @@ class ConnectionMgr:
         # 11s :default mesh mode
         self.mesh_mode = "11s"
 
-    def starting_mesh(self):  # Get the mesh_com config
+    def start_mesh(self):  # Get the mesh_com config
         """
         start mesh service(11s/ibss)
         """
@@ -62,41 +62,38 @@ class ConnectionMgr:
             print(error)
             exit()
         config = confs['secos']
-        if config['key'] != '':
-            if confc['mesh_service']:
-                mesh_vif = self.util.get_interface_by_pattern(confc['mesh_inf'])
-                cmd = f"iw dev {mesh_vif}" + " info | awk '/wiphy/ {printf \"phy\" $2}'"
-                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)  # check how to transform it Shell=False
-                phy_name = proc.communicate()[0].decode('utf-8').strip()
-            mesh_ip = config['ip']
-            mesh_mac = self.util.get_mac_by_interface(mesh_vif)
-            # Create mesh service config
-            Path("/opt/mesh_com").mkdir(parents=True, exist_ok=True)
-            with open('/opt/mesh.conf', 'w', encoding='UTF-8') as mesh_config:
-                mesh_config.write('MODE=mesh\n')
-                mesh_config.write(f'IP={mesh_ip}' + '\n')
-                mesh_config.write('MASK=255.255.255.0\n')
-                mesh_config.write('MAC=' + config['ap_mac'] + '\n')
-                mesh_config.write('KEY=' + config['key'] + '\n')
-                mesh_config.write('ESSID=' + config['ssid'] + '\n')
-                mesh_config.write('FREQ=' + str(config['frequency']) + '\n')
-                mesh_config.write('TXPOWER=' + str(config['tx_power']) + '\n')
-                mesh_config.write('COUNTRY=fi\n')
-                mesh_config.write(f'MESH_VIF={mesh_vif}' + '\n')
-                mesh_config.write(f'PHY={phy_name}' + '\n')
-            if confc['gw_service']:
-                print("============================================")
-                Thread(target=main.AutoGateway, daemon=True).start()
-            if config['type'] == '11s':
-                self.mesh_mode = "11s"
-            if config['type'] == 'ibss':
-                self.mesh_mode = "ibss"
-            self.mesh_if = self.util.get_interface_by_pattern(confc['mesh_inf'])
-            self.mesh_ip = mesh_ip
-            self.mesh_mac = mesh_mac
-            return self.mesh_ip, self.mesh_mac
-        else:
-            return TypeError
+        if confc['mesh_service']:
+            mesh_vif = self.util.get_interface_by_pattern(confc['mesh_inf'])
+            cmd = f"iw dev {mesh_vif}" + " info | awk '/wiphy/ {printf \"phy\" $2}'"
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)  # check how to transform it Shell=False
+            phy_name = proc.communicate()[0].decode('utf-8').strip()
+        mesh_ip = config['ip']
+        mesh_mac = self.util.get_mac_by_interface(mesh_vif)
+        # Create mesh service config
+        Path("/opt/mesh_com").mkdir(parents=True, exist_ok=True)
+        with open('/opt/mesh.conf', 'w', encoding='UTF-8') as mesh_config:
+            mesh_config.write('MODE=mesh\n')
+            mesh_config.write(f'IP={mesh_ip}' + '\n')
+            mesh_config.write('MASK=255.255.255.0\n')
+            mesh_config.write('MAC=' + config['ap_mac'] + '\n')
+            mesh_config.write('KEY=' + config['key'] + '\n')
+            mesh_config.write('ESSID=' + config['ssid'] + '\n')
+            mesh_config.write('FREQ=' + str(config['frequency']) + '\n')
+            mesh_config.write('TXPOWER=' + str(config['tx_power']) + '\n')
+            mesh_config.write('COUNTRY=fi\n')
+            mesh_config.write(f'MESH_VIF={mesh_vif}' + '\n')
+            mesh_config.write(f'PHY={phy_name}' + '\n')
+        if confc['gw_service']:
+            print("============================================")
+            Thread(target=main.AutoGateway(), daemon=True).start()
+        if config['type'] == '11s':
+            self.mesh_mode = "11s"
+        if config['type'] == 'ibss':
+            self.mesh_mode = "ibss"
+        self.mesh_if = self.util.get_interface_by_pattern(confc['mesh_inf'])
+        self.mesh_ip = mesh_ip
+        self.mesh_mac = mesh_mac
+        return self.mesh_ip, self.mesh_mac
 
     @staticmethod
     def set_provisioned_state(config):

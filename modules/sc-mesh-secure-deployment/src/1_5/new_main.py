@@ -22,8 +22,8 @@ executor = ProcessPoolExecutor()
 mutual_int = 'wlan1'
 mesh_int = 'bat0'
 client_q = {}
-ne = ness_main.NESS()
-ma = mba.MBA()
+ness = ness_main.NESS()
+#ma = mba.MBA()
 qua = quarantine.Quarantine()
 
 
@@ -149,8 +149,8 @@ if __name__ == "__main__":
         for ind in received:
             new = pd.read_json(received[ind].decode())
             sectable = sectable.append(new, ignore_index=True)
-        latest_status_list, good_server_status_list, flags_list, servers_list, nt = ne.adapt_table(sectable)
-        ness_status = ne.run(latest_status_list, good_server_status_list, flags_list, servers_list,
+        latest_status_list, good_server_status_list, flags_list, servers_list, nt = ness.adapt_table(sectable)
+        ness_status = ness.run(latest_status_list, good_server_status_list, flags_list, servers_list,
                              nt)  # needs to get MAC
         Thread(target=ma.client, args=(q,)).start()  # malicious announcement client thread
         if ness_status == 194 or q.get() == 'malicious':
