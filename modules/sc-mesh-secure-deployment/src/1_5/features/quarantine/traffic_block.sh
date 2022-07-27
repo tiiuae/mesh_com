@@ -26,10 +26,15 @@ function nft_block {
 	nft add rule filter INPUT iif bat0 ether saddr == $MAC
 }
 
+function iptablesave {
+  iptables-save > iptables-$(date +%s).save
+}
+
 function iptables_block {
 	echo "IPTABLES blocking"
 	iptables -A INPUT -i bat0 -m mac ! --mac-source $MAC -j DROP
 	iptables -A INPUT -i $IFACE -m mac ! --mac-source  $MAC -j DROP
+	iptablesave
 }
 
 function flush_all {
