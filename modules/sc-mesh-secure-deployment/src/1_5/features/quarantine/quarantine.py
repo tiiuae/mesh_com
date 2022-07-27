@@ -12,3 +12,5 @@ class Quarantine:
         command = ['./traffic_block.sh', mac, self.interface]
         subprocess.call(command, shell=False)
         print(f'blocking MAC: {str(self.mac)} on interface {str(self.interface)}')
+
+

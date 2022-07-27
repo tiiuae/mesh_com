@@ -9,8 +9,6 @@ file_path = os.path.dirname(__file__)
 class NESS:
 
     def __init__(self):
-        print("here")
-        print(__file__)
         self.engine = knowledge_engine.engine((__file__, '.compiled_krb'))
         self.dataset = f'{file_path}/input-simulator/output.data'
 
@@ -77,6 +75,7 @@ class NESS:
         else:
             res1 = 0
             print("\nCan't conclude inference. More checks needed for node ", i[0])
+            mnode = ''
             try:
                 with self.engine.prove_goal('ness_check.consistency_analysis($eval1)') as gen:
                     for vars, plan in gen:
@@ -90,14 +89,16 @@ class NESS:
                 act = "Signaling Security Table data Consistency or Servers trust Issues"
                 print("Action is: ", act, "on node ", i[0])
                 action_code = 4 + 128
+                mnode = i[0]
             else:
                 act = "Signaling Suspected Malicious"
                 print("Action is: ", act, "node ", i[0])
                 action_code = 2 + 128 + 64
+                mnode = i[0]
 
         print("\nDone")
 
-        return action_code
+        return action_code, mnode
 
     def read_file(self):
         with open(self.dataset, 'rb') as f:  # b for binary
@@ -146,10 +147,10 @@ class NESS:
             nt = tuple(n_list)
             it = tuple(i_list)
 
-            act_code = self.run_decision(latest_status_list, good_server_status_list, flags_list, servers_list, nt, it)
+            act_code, mnode = self.run_decision(latest_status_list, good_server_status_list, flags_list, servers_list, nt, it)
             print("\nAction Code issued is ", act_code)
 
-            return act_code
+            return act_code, mnode
 
 
 
