@@ -5,6 +5,8 @@ import time
 import socket
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from threading import Thread
+import glob
+import subprocess
 
 import pandas as pd
 
@@ -23,7 +25,6 @@ mutual_int = 'wlan1'
 mesh_int = 'bat0'
 client_q = {}
 ness = ness_main.NESS()
-#ma = mba.MBA()
 qua = quarantine.Quarantine()
 
 
@@ -76,7 +77,6 @@ def update_table_ca(df):
 
 def exchage_table(df):
     q = queue.Queue()
-
     client_q = {}
     message = df.to_json()
     neigh = get_neighbors()
@@ -134,12 +134,30 @@ def announcing(message):
     Thread(target=mal.server, args=(message, True,), daemon=True).start()
 
 
+def checkiptables():
+    '''
+    this function check if any iptable was blocked before
+    '''
+    files = glob.glob('features/quarantine/iptables*')
+    if files:
+        data = 0
+        for fi in files:
+            da = fi.split('-')[1]
+            if da > data:
+                    data = da
+        path = 'features/quarantine/iptables-' + str(data)
+        command = ['iptables-restore', '<', path]
+        subprocess.call(command, shell=False)
+
+
 if __name__ == "__main__":
     mut = mutual.Mutual(mutual_int)
     mut.start()
     time.sleep(5)
     q = queue.Queue()  # queue for the malicious announcement
     if mesh_utils.verify_mesh_status():  # verifying that mesh is running
+        checkiptables()
+        ma = mba.MBA(mesh_utils.get_mesh_ip_address())
         sectable = pd.read_csv('../auth/dev.csv')
         sectable.drop_duplicates(inplace=True)
         result = launchCA(random.randint(1000, 64000),
@@ -150,10 +168,11 @@ if __name__ == "__main__":
             new = pd.read_json(received[ind].decode())
             sectable = sectable.append(new, ignore_index=True)
         latest_status_list, good_server_status_list, flags_list, servers_list, nt = ness.adapt_table(sectable)
-        ness_status = ness.run(latest_status_list, good_server_status_list, flags_list, servers_list,
-                             nt)  # needs to get MAC
+        ness_status, mnode = ness.run(latest_status_list, good_server_status_list, flags_list, servers_list,
+                                      nt)  # needs to get MAC
         Thread(target=ma.client, args=(q,)).start()  # malicious announcement client thread
         if ness_status == 194 or q.get() == 'malicious':
-            sever_thread = Thread(target=ma.server, args=("malicious, IP ", True,),
+            mac = sectable.iloc[mnode]['mac']
+            sever_thread = Thread(target=ma.server, args=("malicious: " + mac, True,),
                                   daemon=True)  # malicious announcement server #need to send IP and MAC
-            qua.block()
+            qua.block(mac)
