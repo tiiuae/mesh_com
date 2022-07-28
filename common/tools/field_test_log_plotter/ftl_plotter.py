@@ -31,12 +31,13 @@ class FieldTestLogPlotter:
     """
     Field test log plotter class.
     """
-    def __init__(self, filename):
+    def __init__(self, filename, throughput_unit='b'):
         """
         Creates a pandas dataframe from given input file.
 
         :param filename: Filename of field test log file (csv).
-        """
+        :param throughput_unit: b, Kb or Mb.
+       """
         self.filename = filename
         self.df = None  # To be set later
         self.mac_list = []
@@ -45,6 +46,7 @@ class FieldTestLogPlotter:
         self.__base_latitude = 0
         self.__base_longitude = 0
         self.__homedir = os.path.expanduser('~')
+        self.throughput_units = throughput_unit
         self.__create_dataframe()
 
     def __create_dataframe(self):
@@ -57,7 +59,7 @@ class FieldTestLogPlotter:
         # Debug
         logger.debug(tabulate(self.df, headers='keys', tablefmt='psql'))
 
-        # Convert invalid GPS coordinates first to NaN.Assumption:
+        # Convert invalid GPS coordinates first to NaN. Assumption:
         # invalid values exists only at the beginning of the log.
         self.df['latitude'].replace(-999999, np.NaN, inplace=True)
         self.df['longitude'].replace(-999999, np.NaN, inplace=True)
@@ -334,6 +336,17 @@ class FieldTestLogPlotter:
         self.df.rename(columns={'3v3 voltage [mV]': MPCIE_VOLTAGE}, inplace=True)
         self.df['3v3 current [mA]'] = abs(self.df['3v3 current [mA]'] / 1000)
         self.df.rename(columns={'3v3 current [mA]': MPCIE_CURRENT}, inplace=True)
+
+        tp_divider = 1
+        # Convert throughput values
+        if self.throughput_units == 'Kb':
+            tp_divider = 1000
+        elif self.throughput_units == 'Mb':
+            tp_divider = 1000000
+        if tp_divider > 1:
+			# Converting only actual values but not changing column name.
+            self.df['RX throughput [Bits/s]'] = self.df['RX throughput [Bits/s]'] / tp_divider
+            self.df['TX throughput [Bits/s]'] = self.df['TX throughput [Bits/s]'] / tp_divider
 
     def plot_temp_voltage_and_current(self):
         """
@@ -688,6 +701,19 @@ class FieldTestLogPlotter:
         elif y_interval > 1:
             y_interval = int(y_interval)
 
+        # Set throughput label names
+        rx_throughput_label = 'RX throughput [bit/s]'
+        tx_throughput_label = 'TX throughput [bit/s]'
+        label_throughput = LABEL_THROUGHPUT
+        if self.throughput_units == 'Kb':
+            rx_throughput_label = 'RX throughput [Kb/s]'
+            tx_throughput_label = 'TX throughput [Kb/s]'
+            label_throughput = 'Throughput [Kb/s]'
+        elif self.throughput_units == 'Mb':
+            rx_throughput_label = 'RX throughput [Mb/s]'
+            tx_throughput_label = 'TX throughput [Mb/s]'
+            label_throughput = 'Throughput [Mb/s]'
+
         self.df.iloc[start_idx:stop_idx].plot(ax=ax_throughput, x=x_axis,
                                               y='RX throughput [Bits/s]',
                                               xticks=(np.arange(min_x_axis_val,
@@ -695,16 +721,16 @@ class FieldTestLogPlotter:
                                               yticks=(np.arange(min_bitrate,
                                                                 max_bitrate, y_interval)),
                                               color=COLOR_RX_THROUGHPUT, lw=2,
-                                              label='RX throughput [bit/s]')
+                                              label=rx_throughput_label)
         self.df.iloc[start_idx:stop_idx].plot(ax=ax_throughput, title=figure_title,
                                               grid=True, x=x_axis, y='TX throughput [Bits/s]',
                                               xticks=(np.arange(min_x_axis_val,
                                                                 max_x_axis_val, x_interval)),
                                               yticks=(np.arange(min_bitrate,
                                                                 max_bitrate, y_interval)),
-                                              label='TX throughput [bit/s]', figsize=FIGSIZE,
+                                              label=tx_throughput_label, figsize=FIGSIZE,
                                               color=COLOR_TX_THROUGHPUT, lw=2,
-                                              ylabel=LABEL_THROUGHPUT)
+                                              ylabel=label_throughput)
         # Label box upper right corner coordinate relative to base plot coordinate
         ax_throughput.legend(bbox_to_anchor=(1.0, 1.0), loc='upper right')
 
@@ -968,18 +994,28 @@ class FieldTestLogPlotter:
             y_interval = int(y_interval)
         max_bitrate += y_interval
 
+        # Set throughput label names
+        rx_throughput_label = 'RX throughput [bit/s]'
+        tx_throughput_label = 'TX throughput [bit/s]'
+        if self.throughput_units == 'Kb':
+            rx_throughput_label = 'RX throughput [Kb/s]'
+            tx_throughput_label = 'TX throughput [Kb/s]'
+        elif self.throughput_units == 'Mb':
+            rx_throughput_label = 'RX throughput [Mb/s]'
+            tx_throughput_label = 'TX throughput [Mb/s]'
+
         subtitle = '_throughput_per_distance_traveled'
         figure_title = self.filename.replace(self.__homedir, '') + subtitle
 
         self.df.plot(ax=ax_throughput, x='distance traveled [m]', y='RX throughput [Bits/s]',
                      xticks=(np.arange(min_distance, max_distance, x_interval)),
                      yticks=(np.arange(min_bitrate, max_bitrate, y_interval)),
-                     label='RX throughput [bit/s]', color=COLOR_RX_THROUGHPUT, lw=2)
+                     label=rx_throughput_label, color=COLOR_RX_THROUGHPUT, lw=2)
         self.df.plot(ax=ax_throughput, title=figure_title,
                      grid=True, x='distance traveled [m]', y='TX throughput [Bits/s]',
                      xticks=(np.arange(min_distance, max_distance, x_interval)),
                      yticks=(np.arange(min_bitrate, max_bitrate, y_interval)),
-                     label='TX throughput [bit/s]', color=COLOR_TX_THROUGHPUT, lw=2,
+                     label=tx_throughput_label, color=COLOR_TX_THROUGHPUT, lw=2,
                      figsize=FIGSIZE)
 
         # Set vertical split line for turning point
@@ -1081,7 +1117,7 @@ class FieldTestLogPlotter:
     def create_map(self, coordinates):
         """
         Creates a map with travel route including start and stop markers
-        and saves output as a HTML file.
+        and saves output as an HTML file.
 
         :param coordinates: list of latitude and longitude pairs.
 
@@ -1143,6 +1179,7 @@ if __name__ == '__main__':
     is_stationary = False
     x_start_val = None
     x_stop_val = None
+    tp_unit = 'b'
 
     if os.path.isdir(path):
         os.chdir(path)
@@ -1177,7 +1214,7 @@ if __name__ == '__main__':
                   total_distance. Default value: time.
                 --xstart <val> defines starting point of plot slice.
                 --xstop <val> defines end point of plot slice.
-                  For example: --x_ax time --xstart 420 --xstop 840 will produce a figure that
+                  For example: --xaxis time --xstart 420 --xstop 840 will produce a figure that
                   contains rssi, noise, throughput and mcs values starting from timestamp value 
                   420s to 840s.
                 --ismoving <val> defines whether or not logged device should be treated as 
@@ -1202,15 +1239,18 @@ if __name__ == '__main__':
                 logger.setLevel(logging.DEBUG)
         if o == '-u':
             if a == 'b':
+                tp_unit = 'b'
                 logger.info('Setting throughput units to bits per seconds.')
             if a == 'Kb':
+                tp_unit = 'Kb'
                 logger.info('Setting throughput units to kilobits per seconds.')
             if a == 'Mb':
+                tp_unit = 'Mb'
                 logger.info('Setting throughput units to megabits per seconds.')
         if o == '-b':
             if a.lower() == '0' or a.lower() == 'false':
                 plot_baseband = False
-        if o == '--x_ax':
+        if o == '--xaxis':
             if a.lower() == 'time':
                 logger.info('Setting x axis to time.')
                 x_ax = 'Timestamp'
@@ -1231,7 +1271,7 @@ if __name__ == '__main__':
     for file in csv_files:
         print(file)
         try:
-            ftlp = FieldTestLogPlotter(file)
+            ftlp = FieldTestLogPlotter(file, tp_unit)
             if plot_baseband:
                 ftlp.plot_temp_voltage_and_current()
                 ftlp.plot_temperature_and_current()
