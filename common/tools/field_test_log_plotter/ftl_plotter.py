@@ -344,7 +344,7 @@ class FieldTestLogPlotter:
         elif self.throughput_units == 'Mb':
             tp_divider = 1000000
         if tp_divider > 1:
-			# Converting only actual values but not changing column name.
+            # Converting only actual values but not changing column name.
             self.df['RX throughput [Bits/s]'] = self.df['RX throughput [Bits/s]'] / tp_divider
             self.df['TX throughput [Bits/s]'] = self.df['TX throughput [Bits/s]'] / tp_divider
 
@@ -1170,8 +1170,35 @@ class FieldTestLogPlotter:
         m.save(self.filename + '.html')
 
 
+def show_usage():
+    print('''usage: <file_or_directory_path> [-i|-d|-s|-b<val>|-u] [--log <level>,\
+--xaxis <val>, --xstart <val>,\
+--xstop <val>, --ismoving <val>]
+                    -i: set log level to INFO
+                    -d: set log level to DEBUG
+                    -s: shows generated plots on UI.
+                    -b: defines whether baseband related (temperature, voltage, current) plots
+                        are generated. Possible values: 0, 1, false, true. Default value: true.
+                    -u: define units for throughput values (b, Kb, Mb)
+                    --log <level> where <level> can be INFO or DEBUG
+                    --xaxis <val> defines x-axis for plots. Possible values: time, distance, 
+                      total_distance. Default value: time.
+                    --xstart <val> defines starting point of plot slice.
+                    --xstop <val> defines end point of plot slice.
+                      For example: --xaxis time --xstart 420 --xstop 840 will produce a figure that
+                      contains rssi, noise, throughput and mcs values starting from timestamp value 
+                      420s to 840s.
+                    --ismoving <val> defines whether or not logged device should be treated as 
+                      stationary or moving device. Should be set to zero or false in case tested
+                      device has been stationary in actual use case but logging has been on so long
+                      time that it cannot be determined from gps coordinates. Default value: true.
+                      ''')
+
+
 if __name__ == '__main__':
-    path = sys.argv[1]
+    path = ''
+    if len(sys.argv) > 1:
+        path = sys.argv[1]
     csv_files = []
     show_on_ui = False  # Do not plot on UI by default
     plot_baseband = True
@@ -1194,6 +1221,10 @@ if __name__ == '__main__':
         if path.endswith(".csv"):
             csv_files.append(path)
 
+    if not csv_files:
+        print('CSV file not found.')
+        show_usage()
+
     # Get optional parameters
     try:
         options, args = getopt.getopt(sys.argv[2:], 'idsb:u:', ['log=', 'xaxis=',
@@ -1201,27 +1232,7 @@ if __name__ == '__main__':
     except getopt.error as msg:
         sys.stdout = sys.stderr
         print(msg)
-        print('''usage: %s [-i|-d|-s|-b<val>|-u] [--log <level>,--xaxis <val>, --xstart <val>, \
---xstop <val>, ismoving <val>]
-                -i: set log level to INFO
-                -d: set log level to DEBUG
-                -s: shows generated plots on UI.
-                -b: defines whether baseband related (temperature, voltage, current) plots
-                    are generated. Possible values: 0, 1, false, true. Default value: true.
-                -u: define units for throughput values (b, Kb, Mb)
-                --log <level> where <level> can be INFO or DEBUG
-                --xaxis <val> defines x-axis for plots. Possible values: time, distance, 
-                  total_distance. Default value: time.
-                --xstart <val> defines starting point of plot slice.
-                --xstop <val> defines end point of plot slice.
-                  For example: --xaxis time --xstart 420 --xstop 840 will produce a figure that
-                  contains rssi, noise, throughput and mcs values starting from timestamp value 
-                  420s to 840s.
-                --ismoving <val> defines whether or not logged device should be treated as 
-                  stationary or moving device. Should be set to zero or false in case tested device
-                  has been stationary in actual use case but logging has been on so long time that
-                  it cannot be determined from gps coordinates. Default value: true.                  
-                ''')
+        show_usage()
         sys.exit(2)
 
     # Define settings based on given configuration options.
