@@ -1,8 +1,8 @@
 #! /bin/bash
 
-MAC=$1
+MAC=$2
 EBT=/sbin/ebtables
-IFACE=$2
+IFACE=$3
 
 function ebtables_block () {
 	echo "EBTABLES blocking"
@@ -30,6 +30,13 @@ function iptablesave {
   iptables-save > iptables-$(date +%s).save
 }
 
+function iptables_unblock {
+	echo "IPTABLES blocking"
+	iptables -D INPUT -i bat0 -m mac ! --mac-source $MAC -j DROP
+	iptables -D INPUT -i $IFACE -m mac ! --mac-source  $MAC -j DROP
+	iptablesave
+}
+
 function iptables_block {
 	echo "IPTABLES blocking"
 	iptables -A INPUT -i bat0 -m mac ! --mac-source $MAC -j DROP
@@ -49,5 +56,10 @@ function flush_all {
 [[ "$(id -u)" != "0" ]] && { echo "Error: $0 script must be run as root." 2>&1; exit 2; }
 flush_all
 #ebtables_block
-iptables_block
+if [ -z "$1" ]
+  then
+    iptables_block
+  else
+    iptables_unblock
+fi
 #nft_block
