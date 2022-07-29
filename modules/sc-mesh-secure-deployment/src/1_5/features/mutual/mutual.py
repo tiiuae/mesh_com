@@ -24,7 +24,7 @@ def folder():
         os.mkdir(PATH)
 
 
-PATH = '../auth'
+PATH = 'auth/'
 folder()
 
 root_cert = "/etc/ssl/certs/root_cert.der"
@@ -51,7 +51,7 @@ class Mutual:
 
     def __init__(self, interface):
         """
-        Import the keys: node Pub,Priv and server pub.
+        Import the keys: node Pub,Priv and server(root) pub.
         """
         self.interface = interface
         print('Loading keys')
@@ -70,11 +70,11 @@ class Mutual:
         Function to create table of authenticated devices
         '''
         columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'MA_level']
-        if not path.isfile('../auth/dev.csv'):
+        if not path.isfile('auth/dev.csv'):
             table = pd.DataFrame(columns=columns)
-            table.to_csv('../auth/dev.csv', header=columns, index=False)
+            table.to_csv('auth/dev.csv', header=columns, index=False)
         else:
-            table = pd.read_csv('../auth/dev.csv')
+            table = pd.read_csv('auth/dev.csv')
         return table
 
     def update_table(self, info):
@@ -83,10 +83,10 @@ class Mutual:
         '''
         if info['ID'] not in set(self.table['ID']):
             self.table = self.table.append(info, ignore_index=True)
-            self.table.to_csv('../auth/dev.csv', mode='a', header=False, index=False)
+            self.table.to_csv('auth/dev.csv', mode='a', header=False, index=False)
         elif self.table.loc[self.table['ID'] == info['ID']]['PubKey_fpr'].all() != info['PubKey_fpr']:
             self.table = self.table.append(info, ignore_index=True)
-            self.table.to_csv('../auth/dev.csv', mode='a', header=False, index=False)
+            self.table.to_csv('auth/dev.csv', mode='a', header=False, index=False)
 
     def get_status(self):
         '''
@@ -228,11 +228,11 @@ class Mutual:
                 self.start_mesh()
                 client_mac, client_mesh_ip = self.send_password(cliID, addr, self.my_mac_mesh, self.my_ip_mesh,
                                                                 encrypt_pass)
-            info = {'ID': node_name, 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(),
+            info = {'ID': cliID, 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(),
                     'PubKey_fpr': client_fpr, 'MA_level': 1}
             self.update_table(info)  # #update csv file
         else:
-            info = {'ID': node_name, 'MAC': "00:00:00:00", 'IP': addr[0],
+            info = {'ID': cliID, 'MAC': "00:00:00:00", 'IP': addr[0],
                     'PubKey_fpr': "___", 'MA_level': 0}
             self.update_table(info)  # #update csv file
             print(colored("Not Valid Client Certificate", 'red'))

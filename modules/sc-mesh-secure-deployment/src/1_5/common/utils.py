@@ -15,7 +15,7 @@ meshf = f'{str(script_path)}/mesh_com_11s.conf'
 class Utils:
     def __init__(self):
         self.lock = threading.Lock()
-        # name with absolute path : '../auth/dev.csv'
+        # name with absolute path : 'auth/dev.csv'
         # self.state_csv_file = self._conf['state_csv_name']
         # name with absolute path : '../../mesh_com.conf'
         # self.mesh_config_file = self._conf['mesh_conf_file']
@@ -107,9 +107,9 @@ class Utils:
             self.lock.release()
         self.update_mesh_conf(info['IP'])
         # Fix Me: remove hardcoded path
-        file_keys = '../auth/' + info['ID'] + '.asc'
+        file_keys = 'auth/' + info['ID'] + '.asc'
         if info['ID'] != 'provServer':
-            file_keys = '../auth/node' + info['ID'] + '.asc'
+            file_keys = 'auth/node' + info['ID'] + '.asc'
             return file_keys
         return None
 

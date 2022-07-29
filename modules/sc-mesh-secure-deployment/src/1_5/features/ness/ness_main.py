@@ -122,7 +122,7 @@ class NESS:
         self.run(init_latest_status_list, init_good_server_status_list, init_flags_table, init_servers_table, n)
 
     def run(self, init_latest_status_list, init_good_server_status_list, init_flags_table, init_servers_table, n):
-
+        result = {}
         print("Running Decision on all nodes as the Sec Table is valid")
         print("Nodes status table: ", init_latest_status_list)
         print("Known good Servers table: ", init_good_server_status_list)
@@ -149,8 +149,9 @@ class NESS:
 
             act_code, mnode = self.run_decision(latest_status_list, good_server_status_list, flags_list, servers_list, nt, it)
             print("\nAction Code issued is ", act_code)
-
-            return act_code, mnode
+            print("\nfor node ", mnode)
+            result[mnode] = act_code
+        return result
 
 
 

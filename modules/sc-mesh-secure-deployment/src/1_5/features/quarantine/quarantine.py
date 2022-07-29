@@ -1,5 +1,6 @@
 import subprocess
 import sys
+
 sys.path.insert(0, '../../')
 from common import mesh_utils
 
@@ -13,4 +14,7 @@ class Quarantine:
         subprocess.call(command, shell=False)
         print(f'blocking MAC: {str(self.mac)} on interface {str(self.interface)}')
 
-
+    def unblock(self, mac):
+        command = ['./traffic_block.sh', mac, self.interface]
+        subprocess.call(command, shell=False)
+        print(f'unblocking MAC: {str(self.mac)} on interface {str(self.interface)}')
