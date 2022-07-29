@@ -1272,7 +1272,7 @@ if __name__ == '__main__':
                 logger.info('Setting x axis to total_distance.')
                 x_ax = 'distance traveled [m]'
         if o == '--xstart':
-            xstart = a
+            x_start_val = a
         if o == '--xstop':
             x_stop_val = a
         if o == '--ismoving':
