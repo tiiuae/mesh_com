@@ -158,7 +158,7 @@ def initiate_server(ip):
     s.listen(3)  # buffer for only 3 connections
     print('Waiting for connections')
     
-    max_count = 8
+    max_count = 3
     flag_ctr = 0
 
     while True:
