@@ -134,10 +134,10 @@ def multi_threaded_client(c, addr):
                 result = json.dumps(result_dict)
                 print("Result Sent = ", result)
                 c.send(bytes(result, 'utf-8'))
-                backoff_start = time.time()
-                # Do not receive data for backoff period
-                while time.time() - backoff_start <= backoff_period:
-                    pass
+                # backoff_start = time.time()
+                # # Do not receive data for backoff period
+                # while time.time() - backoff_start <= backoff_period:
+                #     pass
             print('*********************************************************************')
             print(' ')
             time_flag = time_flag + 1

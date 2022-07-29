@@ -93,10 +93,11 @@ def initiate_client(server_ip, ID, return_dict):
 
             # Do not send data for backoff period if auth fails
             #if result["auth_result"] == "fail":
-            if result["auth_result"] == 0:
-                backoff_start = time.time()
-                while time.time() - backoff_start <= result["backoff_period"]:
-                    pass
+            # # function for back off
+            # if result["auth_result"] == 0:
+            #     backoff_start = time.time()
+            #     while time.time() - backoff_start <= result["backoff_period"]:
+            #         pass
         elif request == 'Closing connection':
             print('Connection closed')
             break

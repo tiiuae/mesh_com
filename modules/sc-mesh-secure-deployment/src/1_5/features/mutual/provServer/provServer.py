@@ -30,10 +30,10 @@ def folder():
         os.mkdir(PATH)
 
 
-PATH = '../auth/'
+PATH = 'auth//'
 folder()
 gpg = gnupg.GPG(gnupghome=PATH)
-os.environ['GNUPGHOME'] = '../auth/'
+os.environ['GNUPGHOME'] = 'auth/'
 
 
 def create_table():
@@ -41,11 +41,11 @@ def create_table():
     Function to create table of authenticated devices.
     '''
     columns = ['ID', 'MAC', 'IP', 'PubKey_fpr']
-    if not path.isfile('../auth/dev.csv'):
+    if not path.isfile('auth/dev.csv'):
         table = pd.DataFrame(columns=columns)
-        table.to_csv('../auth/dev.csv', header=columns, index=False)
+        table.to_csv('auth/dev.csv', header=columns, index=False)
     else:
-        table = pd.read_csv('../auth/dev.csv')
+        table = pd.read_csv('auth/dev.csv')
     return table
 
 
@@ -79,15 +79,15 @@ def update_table(info):
             info['IP'] = f'10.0.0.{str(generate_ip().pop())}'
         table = table.append(info, ignore_index=True)
         table.drop_duplicates(inplace=True)
-        table.to_csv('../auth/dev.csv', index=False)
+        table.to_csv('auth/dev.csv', index=False)
     elif table.loc[table['ID'] == info['ID']]['PubKey_fpr'].all() != info['PubKey_fpr']:
         table = table.append(info, ignore_index=True)
         table.drop_duplicates(inplace=True)
-        table.to_csv('../auth/dev.csv', index=False)
+        table.to_csv('auth/dev.csv', index=False)
     update_conf_file(info['IP'])
-    file_keys = '../auth/' + info['ID'] + '.asc'
+    file_keys = 'auth/' + info['ID'] + '.asc'
     if info['ID'] != 'provServer':
-        file_keys = '../auth/node' + info['ID'] + '.asc'
+        file_keys = 'auth/node' + info['ID'] + '.asc'
         sent = input("Would you like to send the certificates to a node? (yes/no): ")
         if sent in ['yes', 'YES', 'Yes', 'y', 'Y']:
             transfer(file_keys)
@@ -115,12 +115,12 @@ def exporting(ID, key, sign=True):
     '''
     ascii_armored_public_keys = gpg.export_keys(key)
     ascii_armored_private_keys = gpg.export_keys(key, True, expect_passphrase=False)
-    file_keys = f'../auth/{ID}.asc'
+    file_keys = f'auth/{ID}.asc'
     if ID != 'provServer':
-        file_keys_pub = f'../auth/node{ID}pb.asc'
+        file_keys_pub = f'auth/node{ID}pb.asc'
         with open(file_keys_pub, 'w') as f:
             f.write(ascii_armored_public_keys)
-        file_keys_pri = f'../auth/node{ID}pr.asc'
+        file_keys_pri = f'auth/node{ID}pr.asc'
         with open(file_keys_pri, 'w') as f:
             f.write(ascii_armored_private_keys)
         if sign:
@@ -147,14 +147,14 @@ def clean_all():
     for key in keys:
         gpg.delete_keys(key['fingerprint'], True, expect_passphrase=False)  # for private
         gpg.delete_keys(key['fingerprint'], expect_passphrase=False)  # for public
-    files = glob.glob('../auth/*.asc')
+    files = glob.glob('auth/*.asc')
     for fi in files:
         os.remove(fi)
-    files = glob.glob('../auth/*.conf.gpg')
+    files = glob.glob('auth/*.conf.gpg')
     for fi in files:
         os.remove(fi)
     try:
-        os.remove('../auth/dev.csv')
+        os.remove('auth/dev.csv')
     except FileNotFoundError:
         print('Nothing to clean')
     exit()
@@ -238,9 +238,9 @@ def get_mac():
 def encrypt_conf(ID):
     '''
     Encrypt the mesh configuration file with the public key from the node (recipients)
-    Save at ../auth/nodeID_conf.conf.gpg
+    Save at auth/nodeID_conf.conf.gpg
     '''
-    node = ID.split('../auth/')[1].split('.asc')[0]
+    node = ID.split('auth/')[1].split('.asc')[0]
     real = f'{node} <' + node.split('node')[1] + '>'
     recipients = [
         ids['fingerprint'] for ids in gpg.list_keys() if real in ids['uids']
@@ -264,12 +264,12 @@ def transfer(FILE):
     ssh.connect(server, username=username, password=password)
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     sftp = ssh.open_sftp()
-    only_node = FILE.split('../auth/')[1].split('.asc')[0]
+    only_node = FILE.split('auth/')[1].split('.asc')[0]
     sftp.put(FILE.split('.asc')[0]+'pr.asc', f'/hsm/{only_node}pr.asc')
     sftp.put(FILE.split('.asc')[0]+'pb.asc', f'/hsm/{only_node}pb.asc')
-    sftp.put('../auth/provServer.asc', '/hsm/provServer.asc')
+    sftp.put('auth/provServer.asc', '/hsm/provServer.asc')
     encrypted_conf = encrypt_conf(FILE)
-    sftp.put(encrypted_conf, '/hsm/' + encrypted_conf.split('../auth/')[1])
+    sftp.put(encrypted_conf, '/hsm/' + encrypted_conf.split('auth/')[1])
     sftp.close()
     ssh.close()
 
