@@ -11,6 +11,7 @@ from .functions import client_functions
 
 def initiate_client(server_ip, ID, return_dict):
     c = socket.socket()  # create server socket c with default param ipv4, TCP
+    partial_result = []
 
     # connect to server socket
     c.connect((server_ip, 9999))
@@ -29,7 +30,7 @@ def initiate_client(server_ip, ID, return_dict):
     start_time = time.time()
     timestamp = start_time  # Gives current timestamp in seconds
     time_flag = 1  # Initialization of time flag
-    max_count = 8
+    max_count = 3
     flag_ctr = 0
 
     period = 2  # Period for each authentication in seconds
@@ -90,6 +91,7 @@ def initiate_client(server_ip, ID, return_dict):
             print('*********************************************************************')
             print(' ')
             result = json.loads(result)
+            partial_result.append(result["auth_result"])
 
             # Do not send data for backoff period if auth fails
             #if result["auth_result"] == "fail":
@@ -98,10 +100,10 @@ def initiate_client(server_ip, ID, return_dict):
             #     backoff_start = time.time()
             #     while time.time() - backoff_start <= result["backoff_period"]:
             #         pass
-        elif request == 'Closing connection':
-            print('Connection closed')
-            break
+        # elif request == 'Closing connection':
+        #     print('Connection closed')
+        #     break
+    return_dict[auth_result] = partial_result
     print("Share storage cost: ", sys.getsizeof(sent_shares))
-    return_dict[auth_result] = result["auth_result"]
     return result["auth_result"]
     # print("Average message size: ", msg_size/ math.ceil(total_period/period))

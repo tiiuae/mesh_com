@@ -9,6 +9,7 @@ import glob
 import subprocess
 
 import pandas as pd
+import numpy as np
 
 from common import ConnectionMgr
 from common import mesh_utils
@@ -28,7 +29,7 @@ ness = ness_main.NESS()
 qua = quarantine.Quarantine()
 
 
-def launchCA(ID, sectable):  # need to see how to get the IP address of the neighbors
+def launchCA(ID, sectable):    # need to see how to get the IP address of the neighbors
     '''
     this function should start server within localhost and client within the neighbors
     It should be the trigger in time-bases ex: every X seconds
@@ -44,7 +45,7 @@ def launchCA(ID, sectable):  # need to see how to get the IP address of the neig
     for ne in neigh:
         ind = sectable.index[sectable['MAC'] == ne].tolist()[0]
         IP = sectable.loc[ind]["IP"]
-        print(IP)
+        print("neighbor IP:", IP)
         manager = multiprocessing.Manager()
         return_dict = manager.dict()
         p = multiprocessing.Process(target=ca.as_client, args=(IP, return_dict,))
@@ -52,7 +53,13 @@ def launchCA(ID, sectable):  # need to see how to get the IP address of the neig
         p.start()
         for proc in jobs:
             proc.join()
-        client_q[IP] = return_dict.values()
+        for key in return_dict.keys():
+            count = np.unique(return_dict[key], return_counts=True)
+            if len(count[1]) > 1:
+                final = count[0][0] if count[1][0] > count[1][1] else count[0][1]
+            else:
+                final = count[0][0]
+        client_q[IP] = final
         flag_ctr += 1
         if flag_ctr == max_count:
             p.terminate()
@@ -156,7 +163,7 @@ def checkiptables():
             da = fi.split('-')[1]
             if da > data:
                     data = da
-        path = 'features/quarantine/iptables-' + str(data)
+        path = f'features/quarantine/iptables-{str(data)}'
         command = ['iptables-restore', '<', path]
         subprocess.call(command, shell=False)
 
