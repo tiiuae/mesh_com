@@ -68,9 +68,14 @@ class BatAdvVis:
         return raw_data.decode('utf-8')
 
     def run(self):
+        """
+        Run method for task
+
+        :return: None
+        """
         while self.thread_running:
             self.latest_topology = self.get()
-            time.sleep(0.1)
+            time.sleep(1.0)
 
 
 # Real user is mesh_executor
