@@ -115,6 +115,8 @@ network={
     key_mgmt=SAE
     ieee80211w=2
     mesh_fwding=0
+    # 11b rates dropped (for better performance)
+    mesh_basic_rates=60 90 120 180 240 360 480 540
 }
 EOF
 
@@ -145,7 +147,7 @@ EOF
       echo "$wifidev down.."
       iw dev "$wifidev" del
       iw phy "$phyname" interface add "$wifidev" type mp
-  
+
       echo "Longer range tweak.."
       iw phy "$phyname" set distance 1000
 
