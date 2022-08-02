@@ -42,7 +42,7 @@ find_mesh_wifi_device()
     for phy in $phynames; do
       device_id="$(cat /sys/bus/pci/devices/*/ieee80211/"$phy"/device/device 2>/dev/null)"
       device_vendor="$(cat /sys/bus/pci/devices/*/ieee80211/"$phy"/device/vendor 2>/dev/null)"
-      if [ "$device_id" = "$device" -a "$device_vendor" = "$1" ]; then
+      if [ "$device_id" = "$device" ] && [ "$device_vendor" = "$1" ]; then
         retval_phy=$phy
         retval_name=$(ls /sys/class/ieee80211/"$phy"/device/net/)
         break 2
@@ -136,8 +136,7 @@ EOF
         rm -f /var/run/alfred.sock
 
         #Check if batman_adv is built-in module
-        modname=$(ls /sys/module | grep batman_adv)
-        if [[ -z $modname ]]; then
+        if [[ -d /sys/module/batman_adv ]]; then
           modprobe batman-adv
         fi
       elif [ "$routing_algo" == "olsr" ]; then
@@ -176,7 +175,7 @@ EOF
         (batadv-vis -i bat0 -s)&
         echo "started batadv-vis"
      elif [ "$routing_algo" == "olsr" ]; then
-        ifconfig "$wifidev" $2 netmask "$3"
+        ifconfig "$wifidev" "$2" netmask "$3"
         # Enable debug level as necessary
         (olsrd -i "$wifidev" -d 0)&
      fi
@@ -264,7 +263,8 @@ EOF
           # DRONE_DEVICE_ID not available set default
           ifconfig bat0 192.168.1.1 netmask 255.255.255.0
         else
-          declare -i ip=10#$(echo "$DRONE_DEVICE_ID" | tr -d -c 0-9)
+          value=$(echo "$DRONE_DEVICE_ID" | tr -d -c 0-9)
+          declare -i ip=10#"$value"
           ifconfig bat0 192.168.1."$ip" netmask 255.255.255.0
       fi
 
