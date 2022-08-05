@@ -80,9 +80,9 @@ def update_table_ca(df, result):
         for ip in result.keys():
             if row['IP'] == ip:
                 IP = row['IP']
-                if result[ip][0] == 'pass':
-                    df.loc[index, 'CA_Result'] = 1 # CA pass
-                elif result[ip][0] == 'fail':
+                if result[ip] == 'pass':
+                    df.loc[index, 'CA_Result'] = 1  # CA pass
+                elif result[ip] == 'fail':
                     df.loc[df['IP'] == IP, 'CA_Result'] = 2 #if the IP is not in the table, it will be added
                 else:
                     df.loc[df['IP'] == IP, 'CA_Result'] = 3  # unknown
@@ -185,13 +185,14 @@ if __name__ == "__main__":
         for ind in received:
             new = pd.read_json(received[ind].decode())
             sectable = pd.concat([sectable, new], ignore_index=True)
-        latest_status_list, good_server_status_list, flags_list, servers_list, nt = ness.adapt_table(sectable)
+        latest_status_list, good_server_status_list, flags_list, servers_list, nt, mapp = ness.adapt_table(sectable)
         ness_result = ness.run(latest_status_list, good_server_status_list, flags_list, servers_list,
                                       nt)  # needs to get MAC
         Thread(target=ma.client, args=(q,)).start()  # malicious announcement client thread
         for node in ness_result:
             if ness_result[node] == 194 or q.get() == 'malicious':
-                mac = sectable.iloc[node]['mac']
+                print("Malicious Node: ", ness.remapping(mapp, node))
+                mac = sectable.iloc[node]['IP']
                 sever_thread = Thread(target=ma.server, args=("malicious: " + mac, True,),
                                       daemon=True)  # malicious announcement server #need to send IP and MAC
                 qua.block(mac)

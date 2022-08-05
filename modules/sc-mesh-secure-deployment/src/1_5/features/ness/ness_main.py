@@ -21,24 +21,36 @@ class NESS:
             l = len(sec_list[i])
             if sec_list[i][l - 1] == 1:
                 out.append(i)
-
         return out
+
+    def mapping(self, nodes):
+        mapp = dict(zip(nodes, range(len(nodes))))
+        print("Map node labels with ID :", mapp)
+        return mapp
+
+    def remapping(self, mapps, position):
+        # list out keys and values separately
+        key_list = list(mapps.keys())
+        val_list = list(mapps.values())
+        return key_list[position]
+
 
     def create_servers_flags_list(self, sec_list, n, p):
         return [sec_list[i][p] for i in range(n)]
 
-    def adapt_table(self, df):
+    def adapt_table(self, df, laststatus=None):
         '''
         Assuming that timestamp is small enough between rows
         '''
         nodes = df['IP'].to_list()
-        latest_status_list = []
-        good_server_status_list = tuple(range(len(nodes)))
+        latest_status_list = laststatus or [1 for _ in range(df.shape[0])]
+        good_server_status_list = list(range(len(nodes)))
         flags_list = df["CA_Result"].tolist()
-        servers_list = df["ID"].tolist()
+        mapp = self.mapping(df["ID"].tolist())
+        servers_list = list(mapp.values())
         n = df.shape[0]
 
-        return latest_status_list, good_server_status_list, flags_list, servers_list, n
+        return latest_status_list, good_server_status_list, flags_list, servers_list, n, mapp
 
     def run_decision(self, latest_status_list, good_server_status_list, flags_list, servers_list, n, i):
         self.engine.reset()
@@ -89,13 +101,11 @@ class NESS:
                 act = "Signaling Security Table data Consistency or Servers trust Issues"
                 print("Action is: ", act, "on node ", i[0])
                 action_code = 4 + 128
-                mnode = i[0]
             else:
                 act = "Signaling Suspected Malicious"
                 print("Action is: ", act, "node ", i[0])
                 action_code = 2 + 128 + 64
-                mnode = i[0]
-
+        mnode = i[0]
         print("\nDone")
 
         return action_code, mnode
