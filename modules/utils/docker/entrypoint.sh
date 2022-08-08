@@ -20,26 +20,13 @@ calculate_wifi_channel()
 }
 
 if [[ -z "${1}"  && -z "${2}" ]]; then
-    mode="ap+mesh"
-    ch="2412"
+    #mode="ap+mesh"
+    #ch="2412"
+    mode="mesh"
 else
    mode=$1
    ch=$2
 fi
-
-#install the python packages
-if [ -d "/opt/mesh_com/modules/utils/package/python_packages" ]; then 
-   echo "Directory /opt/mesh_com/modules/utils/package/python_packages exists."
-else
-   tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/python_packages.tar.gz
-   tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/python_packages2.tar.gz
-fi
-pip install --no-index --find-links /opt/mesh_com/modules/utils/package/python_packages -r /opt/mesh_com/modules/utils/package/python_packages/requirements.txt
-pip install --no-index --find-links /opt/mesh_com/modules/utils/package/python_packages2 -r /opt/mesh_com/modules/utils/package/python_packages2/requirements.txt
-
-#copy libraries for pypcap
-cp /opt/mesh_com/modules/utils/package/python_packages2/libpcap.so.0.8 /usr/lib/.
-cp /opt/mesh_com/modules/utils/package/python_packages2/pcap.cpython-39-aarch64-linux-gnu.so /usr/lib/python3.9/site-packages/.
 
 if [ $mode == "provisioning" ]; then
    killall hostapd
@@ -130,24 +117,43 @@ EOF
   route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
   iptables -A FORWARD --in-interface bat0 -j ACCEPT
   iptables --table nat -A POSTROUTING --out-interface $ifname_ap -j MASQUERADE
-fi
 
-#setup minimalistic Mumble server configuration
-rm /etc/umurmur.conf
-cp /opt/mesh_com/modules/utils/docker/umurmur.conf /etc/umurmur.conf
-#Get GW IP
-if [ "$mode" = "sta+mesh" ]; then
-  gw_ip=$(ifconfig $iface | grep "inet " | awk '{ print $2 }')
-elif [ "$mode" = "ap+mesh" ]; then
-  gw_ip=$(ifconfig br-lan | grep "inet " | awk '{ print $2 }')
+  #setup minimalistic Mumble server configuration
+  rm /etc/umurmur.conf
+  cp /opt/mesh_com/modules/utils/docker/umurmur.conf /etc/umurmur.conf
+  #Get GW IP
+  if [ "$mode" = "sta+mesh" ]; then
+    gw_ip=$(ifconfig $iface | grep "inet " | awk '{ print $2 }')
+  elif [ "$mode" = "ap+mesh" ]; then
+    gw_ip=$(ifconfig br-lan | grep "inet " | awk '{ print $2 }')
+  fi
+  echo "bindport = 64738;" >> /etc/umurmur.conf
+  echo "bindaddr = "\"$gw_ip\"";" >> /etc/umurmur.conf
+  sleep 10
+  umurmurd
+else
+  brctl addbr br-lan
+  # Bridge eth1 and Mesh
+  brctl addif br-lan bat0 eth1
+  ifname_mesh="$(ifconfig -a | grep wlp* | awk -F':' '{ print $1 }')"
+  mesh_if_mac="$(ip -brief link | grep "$ifname_mesh" | awk '{print $3; exit}')"
+  ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
+  br_lan_ip="192.168.1."$((16#$ip_random))
+  echo $br_lan_ip
+  ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
+  ifconfig br-lan up
+  echo
+  ifconfig br-lan
+  # Add forwading rules from AP to bat0 interface
+  iptables -P FORWARD ACCEPT
+  route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
+  route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
+  iptables -A FORWARD --in-interface bat0 -j ACCEPT
+  iptables --table nat -A POSTROUTING --out-interface $br_lan_ip -j MASQUERADE
 fi
-echo "bindport = 64738;" >> /etc/umurmur.conf
-echo "bindaddr = "\"$gw_ip\"";" >> /etc/umurmur.conf
-sleep 10
-umurmurd
 
 #start gw manager
 nohup python -u /opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw/main.py
 
 #start comms sleeve web server for companion phone
-nohup python -u /opt/mesh_com/modules/utils/docker/comms_sleeve_server.py -ip $br_lan_ip -ap_if $ifname_ap  -mesh_if bat0
+#nohup python -u /opt/mesh_com/modules/utils/docker/comms_sleeve_server.py -ip $br_lan_ip -ap_if $ifname_ap  -mesh_if bat0
