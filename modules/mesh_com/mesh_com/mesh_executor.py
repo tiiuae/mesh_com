@@ -42,6 +42,8 @@ class MeshNetwork:
             self.subnet = ""
             self.tx_power = ""
             self.mode = ""
+            #
+            self.meshsuffix = ""
             # self.enc = ""
 
     def __init__(self):
@@ -53,7 +55,9 @@ class MeshNetwork:
         self.batman_visual = BatAdvVis()
         self.batman = Batman()
         self.status = STATUS()
-
+        #
+        self.vmname = socket.gethostname()
+        
     def __handle_msg(self, msg):
 
         # {
@@ -73,19 +77,31 @@ class MeshNetwork:
         #                                       purposes (e.g. 5dBm)
         #     "mode": "mesh"                    mesh=mesh network, ap=debug hotspot
         # }
+        
+        #
+        #Create mesh suffix based on the VM name
+        if self.vmname == 'mesh':
+            print('find_me_for_debug_mesh' + self.vmname)
+            self.meshsuffix = '_edge'
+        elif self.vmname == 'gslink':
+            print('find_me_for_debug_gslink' + self.vmname)
+            self.meshsuffix = '_gs'
+        else:
+            print('fog_it_all! we need some kind of abnormal termination function here!')
+        #
 
         try:
             parameters = json.loads(msg)
-            self.settings.api_version = int(parameters["api_version_gs"])
-            self.settings.ssid = str(parameters["ssid_gs"])
-            self.settings.key = str(parameters["key_gs"])
-            self.settings.ap_mac = str(parameters["ap_mac_gs"])
-            self.settings.country = str(parameters["country_gs"]).lower()
-            self.settings.frequency = str(parameters["frequency_gs"])
-            self.settings.ip_address = str(parameters["ip_gs"])
-            self.settings.subnet = str(parameters["subnet_gs"])
-            self.settings.tx_power = str(parameters["tx_power_gs"])
-            self.settings.mode = str(parameters["mode_gs"])
+            self.settings.api_version = int(parameters["api_version"+self.meshsuffix])
+            self.settings.ssid = str(parameters["ssid"+self.meshsuffix])
+            self.settings.key = str(parameters["key"+self.meshsuffix])
+            self.settings.ap_mac = str(parameters["ap_mac"+self.meshsuffix])
+            self.settings.country = str(parameters["country"+self.meshsuffix]).lower()
+            self.settings.frequency = str(parameters["frequency"+self.meshsuffix])
+            self.settings.ip_address = str(parameters["ip"+self.meshsuffix])
+            self.settings.subnet = str(parameters["subnet"+self.meshsuffix])
+            self.settings.tx_power = str(parameters["tx_power"+self.meshsuffix])
+            self.settings.mode = str(parameters["mode"+self.meshsuffix])
             # self.settings.enc = str(parameters["enc"])
             self.__change_configuration()
         except (json.decoder.JSONDecodeError, KeyError,
