@@ -32,16 +32,16 @@ class MeshNetwork:
         """
 
         def __init__(self):
-            self.api_version_gs = 1
-            self.ssid_gs = ""
-            self.key_gs = ""
-            self.ap_mac_gs = ""
-            self.country_gs = ""
-            self.frequency_gs = ""
-            self.ip_address_gs = ""
-            self.subnet_gs = ""
-            self.tx_power_gs = ""
-            self.mode_gs = ""
+            self.api_version = 1
+            self.ssid = ""
+            self.key = ""
+            self.ap_mac = ""
+            self.country = ""
+            self.frequency = ""
+            self.ip_address = ""
+            self.subnet = ""
+            self.tx_power = ""
+            self.mode = ""
             # self.enc = ""
 
     def __init__(self):
@@ -57,35 +57,35 @@ class MeshNetwork:
     def __handle_msg(self, msg):
 
         # {
-        #     "api_version_gs": 1,                 interface version for future purposes
-        #     "ssid_gs": "gold",                   0-32 octets, UTF-8, shlex.quote chars limiting
-        #     "key_gs": "foobar",                  key for the network
-        #     "ap_mac_gs": "00:11:22:33:44:55",    bssid for mesh network
-        #     "country_gs": "FI",                  Country code, sets tx power limits and supported
+        #     "api_version": 1,                 interface version for future purposes
+        #     "ssid": "gold",                   0-32 octets, UTF-8, shlex.quote chars limiting
+        #     "key": "foobar",                  key for the network
+        #     "ap_mac": "00:11:22:33:44:55",    bssid for mesh network
+        #     "country": "FI",                  Country code, sets tx power limits and supported
         #                                       channels
-        #     "frequency_gs": "5220",              wifi channel frequency, depends on the country
+        #     "frequency": "5220",              wifi channel frequency, depends on the country
         #                                       code and HW
-        #     "ip_gs": "192.168.1.1",              select unique IP
-        #     "subnet_gs": "255.255.255.0",
-        #     "tx_power_gs": "30",                 select 30dBm, HW and regulations limiting it
+        #     "ip": "192.168.1.1",              select unique IP
+        #     "subnet": "255.255.255.0",
+        #     "tx_power": "30",                 select 30dBm, HW and regulations limiting it
         #                                       correct level.
         #                                       Can be used to set lower dBm levels for testing
         #                                       purposes (e.g. 5dBm)
-        #     "mode_gs": "mesh"                    mesh=mesh network, ap=debug hotspot
+        #     "mode": "mesh"                    mesh=mesh network, ap=debug hotspot
         # }
 
         try:
             parameters = json.loads(msg)
-            self.settings.api_version_gs = int(parameters["api_version"])
-            self.settings.ssid_gs = str(parameters["ssid"])
-            self.settings.key_gs = str(parameters["key"])
-            self.settings.ap_mac_gs = str(parameters["ap_mac"])
-            self.settings.country_gs = str(parameters["country"]).lower()
-            self.settings.frequency_gs = str(parameters["frequency"])
-            self.settings.ip_address_gs = str(parameters["ip"])
-            self.settings.subnet_gs = str(parameters["subnet"])
-            self.settings.tx_power_gs = str(parameters["tx_power"])
-            self.settings.mode_gs = str(parameters["mode"])
+            self.settings.api_version = int(parameters["api_version_gs"])
+            self.settings.ssid = str(parameters["ssid_gs"])
+            self.settings.key = str(parameters["key_gs"])
+            self.settings.ap_mac = str(parameters["ap_mac_gs"])
+            self.settings.country = str(parameters["country_gs"]).lower()
+            self.settings.frequency = str(parameters["frequency_gs"])
+            self.settings.ip_address = str(parameters["ip_gs"])
+            self.settings.subnet = str(parameters["subnet_gs"])
+            self.settings.tx_power = str(parameters["tx_power_gs"])
+            self.settings.mode = str(parameters["mode_gs"])
             # self.settings.enc = str(parameters["enc"])
             self.__change_configuration()
         except (json.decoder.JSONDecodeError, KeyError,
@@ -99,27 +99,27 @@ class MeshNetwork:
 
         self.batman.status = self.status.ongoing
 
-        if int(self.settings.api_version_gs) == 1:
+        if int(self.settings.api_version) == 1:
             path = self.script_path_1
         else:
             path = self.script_path_2
 
-        if self.settings.mode_gs == "ap":
-            subprocess.call([path, quote(self.settings.mode_gs)])
+        if self.settings.mode == "ap":
+            subprocess.call([path, quote(self.settings.mode)])
             self.batman.status = self.status.accesspoint
-        elif self.settings.mode_gs == "off":
-            subprocess.call([path, quote(self.settings.mode_gs)])
+        elif self.settings.mode == "off":
+            subprocess.call([path, quote(self.settings.mode)])
             self.batman.status = self.status.off
-        elif self.settings.mode_gs == "mesh":
-            subprocess.call([path, quote(self.settings.mode_gs),
-                             quote(self.settings.ip_address_gs),
-                             quote(self.settings.subnet_gs),
-                             quote(self.settings.ap_mac_gs),
-                             quote(self.settings.key_gs),
-                             quote(self.settings.ssid_gs),
-                             quote(self.settings.frequency_gs),
-                             quote(self.settings.tx_power_gs),
-                             quote(self.settings.country_gs)])
+        elif self.settings.mode == "mesh":
+            subprocess.call([path, quote(self.settings.mode),
+                             quote(self.settings.ip_address),
+                             quote(self.settings.subnet),
+                             quote(self.settings.ap_mac),
+                             quote(self.settings.key),
+                             quote(self.settings.ssid),
+                             quote(self.settings.frequency),
+                             quote(self.settings.tx_power),
+                             quote(self.settings.country)])
             self.batman.status = self.status.mesh
 
         syslog.syslog('Setting Done')
