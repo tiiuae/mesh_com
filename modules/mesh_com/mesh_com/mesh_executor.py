@@ -8,6 +8,7 @@ import subprocess
 import syslog
 import select
 import threading
+import os
 
 try:
     # in deb import
@@ -42,8 +43,6 @@ class MeshNetwork:
             self.subnet = ""
             self.tx_power = ""
             self.mode = ""
-            #
-            self.meshsuffix = ""
             # self.enc = ""
 
     def __init__(self):
@@ -55,11 +54,14 @@ class MeshNetwork:
         self.batman_visual = BatAdvVis()
         self.batman = Batman()
         self.status = STATUS()
-        #
-        self.vmname = socket.gethostname()
-        
+                
     def __handle_msg(self, msg):
+        ###  1st level
+        # {
+        # "edge": {2-nd level},                 mesh network class: can be "edge" or "gs"
+        # }
 
+        ###  2nd level
         # {
         #     "api_version": 1,                 interface version for future purposes
         #     "ssid": "gold",                   0-32 octets, UTF-8, shlex.quote chars limiting
@@ -79,29 +81,41 @@ class MeshNetwork:
         # }
         
         #
-        #Create mesh suffix based on the VM name
-        if self.vmname == 'mesh':
-            print('find_me_for_debug_mesh' + self.vmname)
-            self.meshsuffix = '_edge'
-        elif self.vmname == 'gslink':
-            print('find_me_for_debug_gslink' + self.vmname)
-            self.meshsuffix = '_gs'
-        else:
-            print('fog_it_all! we need some kind of abnormal termination function here!')
-        #
-
+        #Read environment variable to determine the mesh network class
         try:
-            parameters = json.loads(msg)
-            self.settings.api_version = int(parameters["api_version"+self.meshsuffix])
-            self.settings.ssid = str(parameters["ssid"+self.meshsuffix])
-            self.settings.key = str(parameters["key"+self.meshsuffix])
-            self.settings.ap_mac = str(parameters["ap_mac"+self.meshsuffix])
-            self.settings.country = str(parameters["country"+self.meshsuffix]).lower()
-            self.settings.frequency = str(parameters["frequency"+self.meshsuffix])
-            self.settings.ip_address = str(parameters["ip"+self.meshsuffix])
-            self.settings.subnet = str(parameters["subnet"+self.meshsuffix])
-            self.settings.tx_power = str(parameters["tx_power"+self.meshsuffix])
-            self.settings.mode = str(parameters["mode"+self.meshsuffix])
+            mesh_class=os.environ.get('MESH_CLASS')
+        except (json.decoder.JSONDecodeError, KeyError,
+                TypeError, AttributeError) as error:
+            syslog.syslog("Environment variable MESH_CLASS not set")
+            syslog.syslog(str(error))
+        try:
+            mesh_params_ros=json.loads(msg)
+        except (json.decoder.JSONDecodeError, KeyError,
+                TypeError, AttributeError) as error:
+            syslog.syslog("JSON format not correct")
+            syslog.syslog(str(error))
+
+        #Read mesh parameters according to the mesh class and convert it to normal JSON
+        try:
+            mesh_params=str(mesh_params_ros[mesh_class])
+        except (json.decoder.JSONDecodeError, KeyError,
+                TypeError, AttributeError) as error:
+            syslog.syslog("JSON format not correct")
+            syslog.syslog(str(error))
+        mesh_params=mesh_params.replace("\'", "\"")
+        
+        try:
+            parameters = json.loads(mesh_params)
+            self.settings.api_version = int(parameters["api_version"])
+            self.settings.ssid = str(parameters["ssid"])
+            self.settings.key = str(parameters["key"])
+            self.settings.ap_mac = str(parameters["ap_mac"])
+            self.settings.country = str(parameters["country"]).lower()
+            self.settings.frequency = str(parameters["frequency"])
+            self.settings.ip_address = str(parameters["ip"])
+            self.settings.subnet = str(parameters["subnet"])
+            self.settings.tx_power = str(parameters["tx_power"])
+            self.settings.mode = str(parameters["mode"])
             # self.settings.enc = str(parameters["enc"])
             self.__change_configuration()
         except (json.decoder.JSONDecodeError, KeyError,
