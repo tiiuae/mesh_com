@@ -13,9 +13,9 @@ export PYTHONPATH=/opt/ros/galactic/lib/python3.8/site-packages
 if [ "$1" == "init" ]; then
 
     echo "Start mesh executor"
-    # Start mesh executor 1          2        3          4         5         6           7          8         9             10          11        12             13         14
+    # Start mesh executor 1          2        3          4         5         6           7          8         9              10          11        12             13         14
     # Usage: mesh-ibss.sh <mode>     <ip>     <mask>     <AP MAC>  <key>     <essid>     <freq>     <txpower> <country>     <interface> <phyname> <routing_algo> <mtu_size> <log_dir>
-    # Env variables:      $mesh_mode $mesh_ip $mesh_mask $mesh_mac $mesh_key $mesh_essid $mesh_freq $mesh_tx  $mesh_country $mesh_iface $mesh_phy $mesh_rtalg    $mesh_mtu  $mesh_log
+    # Env variables:      $MESH_MODE $MESH_IP $MESH_MASK $MESH_MAC $MESH_KEY $MESH_ESSID $MESH_FREQ $MESH_TX  $MESH_COUNTRY $MESH_IFACE $MESH_PHY $MESH_RTALG    $MESH_MTU  $MESH_LOG
     # Parameters:
     #    <mode>
     #	 <ip>
@@ -34,10 +34,10 @@ if [ "$1" == "init" ]; then
     #
     # example:
     #     mesh-ibss.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh 5220 30 fi wlan1 phy1
-    #     sudo mesh-ibss.sh ap
+    #     mesh-ibss.sh ap
 
     #starting Default mesh
-    /opt/ros/galactic/share/bin/mesh-ibss.sh $mesh_mode $mesh_ip $mesh_mask $mesh_mac $mesh_key $mesh_essid $mesh_freq $mesh_tx $mesh_country
+    /opt/ros/galactic/share/bin/mesh-ibss.sh $MESH_MODE $MESH_IP $MESH_MASK $MESH_MAC $MESH_KEY $MESH_ESSID $MESH_FREQ $MESH_TX $MESH_COUNTRY
     /opt/ros/galactic/lib/mesh_com/mesh_executor
 
 else
