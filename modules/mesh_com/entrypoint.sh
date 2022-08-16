@@ -1,8 +1,8 @@
 #!/bin/bash -e
 
-. /enclave/drone_device_id
+# . /enclave/drone_device_id
 
-export DRONE_DEVICE_ID
+# export DRONE_DEVICE_ID
 
 source /opt/ros/galactic/setup.bash
 
@@ -16,21 +16,22 @@ if [ "$1" == "init" ]; then
     # Start mesh executor 
     #                     1      2    3      4        5     6       7      8         9         10          11        12             13         14
     # Usage: mesh-ibss.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface> <phyname> <routing_algo> <mtu_size> <log_dir>
+    # 
     # Number:      Parameter:                    Environment Variable:
     # 1            <mode>                        $DEFAUTLT_MESH_MODE
     # 2            <ip>                          $DEFAUTLT_MESH_IP
-    # 3 	       <mask>                        $DEFAUTLT_MESH_MASK
-    # 4 	       <AP MAC>                      $DEFAUTLT_MESH_MAC
+    # 3            <mask>                        $DEFAUTLT_MESH_MASK
+    # 4            <AP MAC>                      $DEFAUTLT_MESH_MAC
     # 5            <WEP key>                     $DEFAUTLT_MESH_KEY
     # 6            <essid>                       $DEFAUTLT_MESH_ESSID
     # 7            <freq>                        $DEFAUTLT_MESH_FREQ
     # 8	           <txpower>                     $DEFAUTLT_MESH_TX
     # 9	           <country>                     $DEFAUTLT_MESH_COUNTRY
-    # 10	       <interface> - optional        $DEFAUTLT_MESH_IFACE
-    # 11	       <phyname> - optional          $DEFAUTLT_MESH_PHY
-    # 12	       <routing_algo> - optional     $DEFAUTLT_MESH_RTALG
-    # 13	       <mtu_dir>   - optional        $DEFAUTLT_MESH_MTU
-    # 14	       <log_dir>   - optional        $DEFAUTLT_MESH_LOG
+    # 10           <interface> - optional        $DEFAUTLT_MESH_IFACE
+    # 11           <phyname> - optional          $DEFAUTLT_MESH_PHY
+    # 12           <routing_algo> - optional     $DEFAUTLT_MESH_RTALG
+    # 13           <mtu_dir>   - optional        $DEFAUTLT_MESH_MTU
+    # 14           <log_dir>   - optional        $DEFAUTLT_MESH_LOG
     #
     # example:
     #     mesh-ibss.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh 5220 30 fi wlan1 phy1

@@ -104,8 +104,13 @@ class MeshNetwork:
                 TypeError, AttributeError) as error:
             syslog.syslog("JSON format not correct")
             syslog.syslog(str(error))
-        mesh_params=mesh_params.replace("\'", "\"")
-        
+        try:
+            mesh_params=mesh_params.replace("\'", "\"")
+        except (json.decoder.JSONDecodeError, KeyError,
+                TypeError, AttributeError) as error:
+            syslog.syslog("JSON format not correct. Probably incorrect Google IoT 'initial-wifi' settings")
+            syslog.syslog(str(error))
+
         try:
             parameters = json.loads(mesh_params)
             self.settings.api_version = int(parameters["api_version"])
