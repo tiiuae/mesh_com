@@ -59,6 +59,8 @@ class MeshNetwork:
         ###  1st level
         # {
         # "edge": {2-nd level},                 mesh network class: can be "edge" or "gs"
+        #                                                           edge=EDGE mesh network, 
+        #                                                           gs=GS mesh network
         # }
 
         ###  2nd level
@@ -95,7 +97,7 @@ class MeshNetwork:
             syslog.syslog("JSON format not correct")
             syslog.syslog(str(error))
 
-        #Read mesh parameters according to the mesh class and convert it to normal JSON
+        #Read mesh parameters according to the MESH_CLASS and convert it to normal JSON
         try:
             mesh_params=str(mesh_params_ros[mesh_class])
         except (json.decoder.JSONDecodeError, KeyError,

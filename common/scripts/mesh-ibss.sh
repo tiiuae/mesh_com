@@ -22,7 +22,7 @@ function help
     echo
     echo "example:"
     echo "sudo ./mesh-ibss.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh 5220 30 fi wlan1 phy1"
-    echo "sudo mesh.sh ap"
+    echo "sudo ./mesh-ibss.sh ap"
     exit
 }
 
