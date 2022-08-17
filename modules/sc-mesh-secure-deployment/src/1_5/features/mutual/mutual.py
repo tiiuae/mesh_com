@@ -9,6 +9,7 @@ import pandas as pd
 from .utils import primitives as pri
 from termcolor import colored
 import sys
+import asyncio
 
 sys.path.insert(0, '../../')
 '''
@@ -180,7 +181,7 @@ class Mutual:
         self.my_ip_mesh, self.my_mac_mesh = co.create_mesh_config
         co.start_mesh()
 
-    def start(self):
+    async def start(self):
         set_mesh = False
         candidate = wf.scan_wifi(self.interface)  # scan wifi to authenticate with
         if candidate:  # client

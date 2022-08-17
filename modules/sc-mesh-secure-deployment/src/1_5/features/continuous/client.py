@@ -41,10 +41,7 @@ def initiate_client(server_ip, ID, return_dict):
     # Generate k degree polynomial for the secret
     #auth_result = "pass"  # initialization
     auth_result = 1  # initialization
-    while True:
-        flag_ctr += 1
-        if (flag_ctr == max_count):
-            break
+    while flag_ctr <= max_count:
         request = c.recv(1024).decode()
         if request == 'Request to authenticate':
             print("Processing authentication request")
@@ -55,7 +52,6 @@ def initiate_client(server_ip, ID, return_dict):
                 if sent_shares.count(u) == 0:  # Check that new share has not been sent previously
                     sent_shares.append(u)
                     break
-
             # Share authenticator = hash(share - secret - timeflag) = hash(x)
             sa = hashlib.sha256(bytes(str(x), 'utf-8')).digest()
 
@@ -100,9 +96,10 @@ def initiate_client(server_ip, ID, return_dict):
             #     backoff_start = time.time()
             #     while time.time() - backoff_start <= result["backoff_period"]:
             #         pass
-        # elif request == 'Closing connection':
-        #     print('Connection closed')
-        #     break
+        elif request == 'Closing connection':
+            print('Connection closed')
+            break
+        flag_ctr += 1
     return_dict[auth_result] = partial_result
     print("Share storage cost: ", sys.getsizeof(sent_shares))
     return result["auth_result"]

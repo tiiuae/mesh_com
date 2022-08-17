@@ -7,6 +7,8 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from threading import Thread
 import glob
 import subprocess
+import asyncio
+
 
 import pandas as pd
 import numpy as np
@@ -29,14 +31,15 @@ ness = ness_main.NESS()
 qua = quarantine.Quarantine()
 
 
-def launchCA(ID, sectable):    # need to see how to get the IP address of the neighbors
+
+async def launchCA(ID, sectable):    # need to see how to get the IP address of the neighbors
     '''
     this function should start server within localhost and client within the neighbors
     It should be the trigger in time-bases ex: every X seconds
     '''
     ca = ca_main.CA(ID)
     myip = co.get_ip_address(mesh_int)
-    max_count = 8
+    max_count = 3
     flag_ctr = 0
     proc = multiprocessing.Process(target=ca.as_server, args=(myip,))  # lock variable add later
     proc.start()
@@ -53,6 +56,7 @@ def launchCA(ID, sectable):    # need to see how to get the IP address of the ne
         p.start()
         for proc in jobs:
             proc.join()
+        time.sleep(5)
         for key in return_dict.keys():
             count = np.unique(return_dict[key], return_counts=True)
             if len(count[1]) > 1:
@@ -77,16 +81,17 @@ def update_table_ca(df, result):
     '''
     df = df.assign(CA_Result=0)
     for index, row in df.iterrows():
-        for ip in result.keys():
-            if row['IP'] == ip:
-                IP = row['IP']
-                if result[ip] == 'pass':
-                    df.loc[index, 'CA_Result'] = 1  # CA pass
-                elif result[ip] == 'fail':
-                    df.loc[df['IP'] == IP, 'CA_Result'] = 2 #if the IP is not in the table, it will be added
-                else:
-                    df.loc[df['IP'] == IP, 'CA_Result'] = 3  # unknown
-                df.loc[df['IP'] == IP, 'CA_ts'] = time.time()
+        for res in result:
+            for ip in res.keys():
+                if row['IP'] == ip:
+                    IP = row['IP']
+                    if res[ip] == 'pass' or res[ip] == 1:
+                        df.loc[index, 'CA_Result'] = 1  # CA pass
+                    elif res[ip] == 'fail':
+                        df.loc[df['IP'] == IP, 'CA_Result'] = 2 #if the IP is not in the table, it will be added
+                    else:
+                        df.loc[df['IP'] == IP, 'CA_Result'] = 3  # unknown
+                    df.loc[df['IP'] == IP, 'CA_ts'] = time.time()
     return df
 
 
@@ -169,19 +174,38 @@ def checkiptables():
 
 
 if __name__ == "__main__":
+    # Mutual Authentication
+    print("Starting Mutual Authentication")
     mut = mutual.Mutual(mutual_int)
-    mut.start()
+    loop = asyncio.get_event_loop()
+    mutual_task = loop.create_task(mut.start())
+    try:
+        loop.run_until_complete(mutual_task)
+    except asyncio.CancelledError:
+        pass
     time.sleep(5)
+    # end of mutual authentication
+    print("End of Mutual Authentication")
     q = queue.Queue()  # queue for the malicious announcement
     if mesh_utils.verify_mesh_status():  # verifying that mesh is running
         checkiptables()
-        ma = mba.MBA(mesh_utils.get_mesh_ip_address())
+        ma = mba.MBA(mesh_utils.get_mesh_ip_address())  # starting the malicious announcement
         sectable = pd.read_csv('auth/dev.csv')
         sectable.drop_duplicates(inplace=True)
-        result = launchCA(random.randint(1000, 64000),
-                          sectable)  # currently is with a generic ID, need to be taken from the provisioning
+        print("Starting Continuous Authentication")
+        # Starting Continuous Authentication
+        loop_ca = asyncio.get_event_loop()
+        ca_task = loop_ca.create_task(launchCA(random.randint(1000, 64000),  # currently is with a generic ID, need to be taken from the provisioning
+                          sectable))
+        try:
+            result = loop_ca.run_until_complete(asyncio.gather(ca_task))
+        except asyncio.CancelledError:
+            pass
         sectable = update_table_ca(sectable, result)
-        received = exchage_table(sectable)
+        loop_ca.close()
+        # Finishing CA
+        print("End of Continuous Authentication")
+        received = exchage_table(sectable) #exchange the table with the neighbors
         for ind in received:
             new = pd.read_json(received[ind].decode())
             sectable = pd.concat([sectable, new], ignore_index=True)
