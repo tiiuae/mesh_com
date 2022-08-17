@@ -2,15 +2,16 @@ import json
 import socket
 import time
 from _thread import *
-from threading import Thread
-
+from threading import Thread, Lock
 
 from .functions import crc_functions
 from .functions import server_functions
+import asyncio
 
 
+def multi_threaded_client(c, addr, lock):
 
-def multi_threaded_client(c, addr):
+    lock.acquire()
     # receive client's name
     name = c.recv(1024).decode()
     print('====================================================================')
@@ -27,7 +28,8 @@ def multi_threaded_client(c, addr):
     crc_key = '1001'  # CRC key
     start_time = time.time()  # session start time
     start_timestamp = start_time
-    time_flag = 1
+    time_flag = 0
+    max_count = 3
 
     received_shares = []  # Store old shares received during the session to check freshness of new share
 
@@ -96,8 +98,7 @@ def multi_threaded_client(c, addr):
                     print(' ')
 
             # Avoid following block of code when auth failed in earlier steps
-            #if auth_result == "pass":
-            if auth_result == 1:
+            if auth_result == "pass" or auth_result == 1:
                 r_bin_data = msg_received[:-(len(crc_key) - 1)]
                 # print('Received binary data = ', r_bin_data)
 
@@ -111,8 +112,7 @@ def multi_threaded_client(c, addr):
                                                              time_margin, start_timestamp)
                 print("Authentication ", auth_result)
 
-            #if auth_result == "pass":
-            if auth_result == 1:
+            if auth_result == "pass" or auth_result == 1:
                 num_of_fails = 0  # reset no of failures to 0
                 backoff_period = 0  # reset backoff time to 0
                 result_dict = {
@@ -140,11 +140,14 @@ def multi_threaded_client(c, addr):
                 #     pass
             print('*********************************************************************')
             print(' ')
+            if time_flag == max_count:
+                c.send(bytes('Closing connection', 'utf-8'))
+                c.close()  # close client socket
+                print('Connection closed')
+                lock.release()
+                break
             time_flag = time_flag + 1
 
-    c.send(bytes('Closing connection', 'utf-8'))
-    c.close()  # close client socket
-    print('Connection closed')
 
 
 def initiate_server(ip):
@@ -157,17 +160,17 @@ def initiate_server(ip):
     # wait for clients to connect (tcp listener)
     s.listen(3)  # buffer for only 3 connections
     print('Waiting for connections')
-    
-    max_count = 3
-    flag_ctr = 0
 
     while True:
-        flag_ctr += 1
-        if (flag_ctr == max_count):
-            break
-        # accept tcp connection from client
-        c, addr = s.accept()  # returns client socket and IP addr
-        a = Thread(target=multi_threaded_client, daemon=True, args=(c, addr,))  # client thread
-        a.start()
-        #a.join()
-        #start_new_thread(multi_threaded_client, (c, addr, q))
+        lock = Lock()
+        # accept connection from client
+        c, addr = s.accept()
+        print('Connected to client', c)
+        print('Client address:', addr)
+        print(' ')
+        # start thread to handle client
+        Thread(target=multi_threaded_client, args=(c, addr, lock )).start()
+    c.send(bytes('Closing connection', 'utf-8'))
+    c.close()  # close client socket
+    print('Connection closed')
+
