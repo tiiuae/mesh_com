@@ -112,6 +112,7 @@ if __name__ == '__main__':
     ftl.register_logger_function("RX throughput [Bits/s]", wifi_stats.get_rx_throughput)
     ftl.register_logger_function("TX throughput [Bits/s]", wifi_stats.get_tx_throughput)
     ftl.register_logger_function("Neighbors", wifi_stats.get_neighbors)
+    ftl.register_logger_function("Originators", wifi_stats.get_originators)
 
     ftl.register_logger_function("latitude", info.get_latitude)
     ftl.register_logger_function("longitude", info.get_longitude)
