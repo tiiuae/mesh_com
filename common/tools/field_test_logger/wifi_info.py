@@ -6,7 +6,7 @@ class WifiInfo:
 
     def __init__(self, interval):
         self.__neighbors = ""
-		self.__originators = ""
+        self.__originators = ""
         self.__channel = ""
         self.__country = ""
         self.__txpower = ""
