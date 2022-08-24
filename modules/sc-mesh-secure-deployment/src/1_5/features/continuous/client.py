@@ -80,14 +80,18 @@ def initiate_client(server_ip, ID, return_dict):
                 result = c.recv(1024).decode()
                 if result != 'Resend message':
                     break
-
                 print("Resending message")
                 c.send(msg_with_crc_bytes)  # Resend message to server
             print("Result = ", result)
             print('*********************************************************************')
             print(' ')
-            result = json.loads(result)
-            partial_result.append(result["auth_result"])
+            try:
+                result = json.loads(result)
+                partial_result.append(result["auth_result"])
+            except json.decoder.JSONDecodeError:
+                res = result.split('Closing connection')[0]
+                result = json.loads(res)
+                partial_result.append(result["auth_result"])
 
             # Do not send data for backoff period if auth fails
             #if result["auth_result"] == "fail":

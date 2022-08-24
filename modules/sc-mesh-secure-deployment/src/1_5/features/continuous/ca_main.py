@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import contextlib
 from . import server
 from . import client
 
@@ -12,7 +13,9 @@ class CA:
         client.initiate_client(server_ip, self.ID, return_dict)
 
     def as_server(self, ip):
-        server.initiate_server(ip)
+        with contextlib.suppress(OSError):
+            server.initiate_server(ip)
+
 
         
 

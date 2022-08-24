@@ -1,15 +1,15 @@
 import multiprocessing
 import queue
 import random
-import time
+from time import time, sleep
 import socket
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-from threading import Thread
+import threading
 import glob
 import subprocess
 import asyncio
 
-
+import contextlib
 import pandas as pd
 import numpy as np
 
@@ -31,19 +31,19 @@ ness = ness_main.NESS()
 qua = quarantine.Quarantine()
 
 
-
-async def launchCA(ID, sectable):    # need to see how to get the IP address of the neighbors
-    '''
+async def launchCA(ID, sectable):
+    """
     this function should start server within localhost and client within the neighbors
     It should be the trigger in time-bases ex: every X seconds
-    '''
-    ca = ca_main.CA(ID)
+    """
+    with contextlib.suppress(OSError):
+        ca = ca_main.CA(ID)
     myip = co.get_ip_address(mesh_int)
     max_count = 3
     flag_ctr = 0
-    proc = multiprocessing.Process(target=ca.as_server, args=(myip,))  # lock variable add later
+    proc = multiprocessing.Process(target=ca.as_server, args=(myip, ))
     proc.start()
-    time.sleep(random.randint(1, 10))
+    sleep(random.randint(1, 10))
     neigh = mesh_utils.get_macs_neighbors()
     for ne in neigh:
         ind = sectable.index[sectable['MAC'] == ne].tolist()[0]
@@ -51,12 +51,12 @@ async def launchCA(ID, sectable):    # need to see how to get the IP address of 
         print("neighbor IP:", IP)
         manager = multiprocessing.Manager()
         return_dict = manager.dict()
-        p = multiprocessing.Process(target=ca.as_client, args=(IP, return_dict,))
+        p = multiprocessing.Process(target=ca.as_client, args=(IP, return_dict))
         jobs = [p]
         p.start()
         for proc in jobs:
             proc.join()
-        time.sleep(5)
+        sleep(5)
         for key in return_dict.keys():
             count = np.unique(return_dict[key], return_counts=True)
             if len(count[1]) > 1:
@@ -69,29 +69,28 @@ async def launchCA(ID, sectable):    # need to see how to get the IP address of 
             p.terminate()
             break
     proc.terminate()
-
     return client_q
 
 
 def update_table_ca(df, result):
-    '''
+    """
     function to update the mutual authentication table with the CA result.
     Note: this function should be called after the CA result is received.
     Note2: the new table is not being saved only converted to json and sent to the neighbors.
-    '''
+    """
     df = df.assign(CA_Result=0)
     for index, row in df.iterrows():
         for res in result:
             for ip in res.keys():
                 if row['IP'] == ip:
                     IP = row['IP']
-                    if res[ip] == 'pass' or res[ip] == 1:
-                        df.loc[index, 'CA_Result'] = 1  # CA pass
+                    if res[ip] in ['pass', 1]:
+                        df.loc[index, 'CA_Result'] = 1
                     elif res[ip] == 'fail':
-                        df.loc[df['IP'] == IP, 'CA_Result'] = 2 #if the IP is not in the table, it will be added
+                        df.loc[df['IP'] == IP, 'CA_Result'] = 2
                     else:
-                        df.loc[df['IP'] == IP, 'CA_Result'] = 3  # unknown
-                    df.loc[df['IP'] == IP, 'CA_ts'] = time.time()
+                        df.loc[df['IP'] == IP, 'CA_Result'] = 3
+                    df.loc[df['IP'] == IP, 'CA_ts'] = time()
     return df
 
 
@@ -104,13 +103,13 @@ def exchage_table(df):
     message = df.to_json()
     neigh = mesh_utils.get_macs_neighbors()
     for ne in neigh:
-        ind = sectable.index[sectable['MAC'] == ne].tolist()[0]
-        IP = sectable.loc[ind]["IP"]
+        ind = df.index[df['MAC'] == ne].tolist()[0]
+        IP = df.loc[ind]["IP"]
         print(IP)
-        proc = Thread(target=server, args=(IP, message,))  # lock variable add later
+        proc = threading.Thread(target=server, args=(IP, message,))  # lock variable add later
         proc.daemon = True
         proc.start()
-        p = Thread(target=client, args=(q,))
+        p = threading.Thread(target=client, args=(q,))
         jobs = [p]
         p.start()
         client_q[IP] = q.get()
@@ -142,19 +141,19 @@ def server(IP, message, debug=False):
             print(f"this is server and it will send message {num_message} more times")
         sock.sendto(bytes(message, "utf-8"), (IP, 5005))
         num_message -= 1
-        time.sleep(1)
+        sleep(1)
 
 
 def listeningMBA():
     q = queue.Queue()
     mal = mba.MBA(mesh_utils.get_mesh_ip_address())
-    Thread(target=mal.client, args=(q,)).start()
+    threading.Thread(target=mal.client, args=(q,)).start()
     return q.get()
 
 
 def announcing(message):
     mal = mba.MBA(mesh_utils.get_mesh_ip_address())
-    Thread(target=mal.server, args=(message, True,), daemon=True).start()
+    threading.Thread(target=mal.server, args=(message, True,), daemon=True).start()
 
 
 def checkiptables():
@@ -167,56 +166,71 @@ def checkiptables():
         for fi in files:
             da = fi.split('-')[1]
             if da > data:
-                    data = da
+                data = da
         path = f'features/quarantine/iptables-{str(data)}'
         command = ['iptables-restore', '<', path]
         subprocess.call(command, shell=False)
 
 
-if __name__ == "__main__":
-    # Mutual Authentication
+def sec_beat(first_round, ness_result):
+    q = queue.Queue()
+    checkiptables()
+    ma = mba.MBA(mesh_utils.get_mesh_ip_address())
+    sectable = pd.read_csv('auth/dev.csv')
+    sectable.drop_duplicates(inplace=True)
+    print("Starting Continuous Authentication")
+    loop_ca = asyncio.get_event_loop()
+    ca_task = loop_ca.create_task(launchCA(random.randint(1000, 64000), sectable))
+    with contextlib.suppress(asyncio.CancelledError):
+        result = loop_ca.run_until_complete(asyncio.gather(ca_task))
+    sectable = update_table_ca(sectable, result)
+    print("End of Continuous Authentication")
+    received = exchage_table(sectable)
+    for ind in received:
+        new = pd.read_json(received[ind].decode())
+        sectable = pd.concat([sectable, new], ignore_index=True)
+    print("Starting Decision Engine")
+    if first_round:
+        latest_status_list, good_server_status_list, flags_list, servers_list, nt, mapp = ness.first_table(sectable)
+
+        threading.Thread(target=ma.client, args=(q, ), daemon=True).start()
+        first_round = False
+    else:
+        latest_status_list, good_server_status_list, flags_list, servers_list, nt = ness.adapt_table(ness_result)
+
+    ness_result = ness.run(latest_status_list, good_server_status_list, flags_list, servers_list, nt)
+
+    print("Decision Engine Done")
+    for node in ness_result:
+        if ness_result[node] == 194 or (not q.empty() and q.get() == 'malicious'):
+            print("Malicious Node: ", ness.remapping(mapp, node))
+            mac = sectable.iloc[node]['IP']
+            threading.Thread(target=ma.server, args=("malicious: " + mac, True), daemon=True).start()
+
+            threading.Thread(target=qua.block, args=(mac, ), daemon=True).start()
+    return first_round, ness_result
+
+
+def mutual_authentication():
     print("Starting Mutual Authentication")
     mut = mutual.Mutual(mutual_int)
     loop = asyncio.get_event_loop()
     mutual_task = loop.create_task(mut.start())
-    try:
+    with contextlib.suppress(asyncio.CancelledError):
         loop.run_until_complete(mutual_task)
-    except asyncio.CancelledError:
-        pass
-    time.sleep(5)
-    # end of mutual authentication
+    sleep(5)
     print("End of Mutual Authentication")
-    q = queue.Queue()  # queue for the malicious announcement
-    if mesh_utils.verify_mesh_status():  # verifying that mesh is running
-        checkiptables()
-        ma = mba.MBA(mesh_utils.get_mesh_ip_address())  # starting the malicious announcement
-        sectable = pd.read_csv('auth/dev.csv')
-        sectable.drop_duplicates(inplace=True)
-        print("Starting Continuous Authentication")
-        # Starting Continuous Authentication
-        loop_ca = asyncio.get_event_loop()
-        ca_task = loop_ca.create_task(launchCA(random.randint(1000, 64000),  # currently is with a generic ID, need to be taken from the provisioning
-                          sectable))
-        try:
-            result = loop_ca.run_until_complete(asyncio.gather(ca_task))
-        except asyncio.CancelledError:
-            pass
-        sectable = update_table_ca(sectable, result)
-        loop_ca.close()
-        # Finishing CA
-        print("End of Continuous Authentication")
-        received = exchage_table(sectable) #exchange the table with the neighbors
-        for ind in received:
-            new = pd.read_json(received[ind].decode())
-            sectable = pd.concat([sectable, new], ignore_index=True)
-        latest_status_list, good_server_status_list, flags_list, servers_list, nt, mapp = ness.adapt_table(sectable)
-        ness_result = ness.run(latest_status_list, good_server_status_list, flags_list, servers_list,
-                                      nt)  # needs to get MAC
-        Thread(target=ma.client, args=(q,)).start()  # malicious announcement client thread
-        for node in ness_result:
-            if ness_result[node] == 194 or q.get() == 'malicious':
-                print("Malicious Node: ", ness.remapping(mapp, node))
-                mac = sectable.iloc[node]['IP']
-                sever_thread = Thread(target=ma.server, args=("malicious: " + mac, True,),
-                                      daemon=True)  # malicious announcement server #need to send IP and MAC
-                qua.block(mac)
+
+
+if __name__ == "__main__":
+    sec_beat_time = 5
+    first_round = True  # flag for the decision engine. If not information available, create a table.
+    # Mutual Authentication
+    mutual_authentication()
+    ness_result = {}
+    while True:
+        if mesh_utils.verify_mesh_status():  # verifying that mesh is running
+            sleep(sec_beat_time - time() % sec_beat_time)  # sec beat time
+            first_round, ness_result = sec_beat(first_round, ness_result)
+        else:
+            print("No mesh established")
