@@ -38,7 +38,7 @@ class NESS:
     def create_servers_flags_list(self, sec_list, n, p):
         return [sec_list[i][p] for i in range(n)]
 
-    def adapt_table(self, df, laststatus=None):
+    def first_table(self, df, laststatus=None):
         '''
         Assuming that timestamp is small enough between rows
         '''
@@ -51,6 +51,28 @@ class NESS:
         n = df.shape[0]
 
         return latest_status_list, good_server_status_list, flags_list, servers_list, n, mapp
+
+    def adapt_table(self, result):
+        latest_status_list = []
+        good_server_status_list = []
+        flags_list = []
+        servers_list = []
+        for node in result:
+            servers_list.append(node)
+            if result[node] == '65':
+                latest_status_list.append(1)
+                good_server_status_list.append(node)
+                flags_list.append(1)
+            if result[node] in ['131', '132', '133', '134']:
+                latest_status_list.append(2)
+                flags_list.append(2)
+            if result[node] == '194':
+                latest_status_list.append(3)
+                flags_list.append(3)
+        n = len(servers_list)
+        return latest_status_list, good_server_status_list, flags_list, servers_list, n
+
+
 
     def run_decision(self, latest_status_list, good_server_status_list, flags_list, servers_list, n, i):
         self.engine.reset()
