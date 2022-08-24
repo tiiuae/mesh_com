@@ -91,12 +91,14 @@ class MeshNetwork:
             self.mesh_class=os.environ.get('MESH_CLASS')
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
+            print("Environment variable MESH_CLASS not set")
             syslog.syslog("Environment variable MESH_CLASS not set")
             syslog.syslog(str(error))
         try:
             self.mesh_params_ros=json.loads(msg)
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
+            print("JSON format not correct, msg processing error. Probably incorrect Google IoT 'initial-wifi' settings")
             syslog.syslog("JSON format not correct, msg processing error. Probably incorrect Google IoT 'initial-wifi' settings")
             syslog.syslog(str(error))
 
@@ -105,12 +107,14 @@ class MeshNetwork:
             self.mesh_params=str(self.mesh_params_ros[self.mesh_class])
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
+            print("JSON format not correct, MESH_CLASS processing error. Probably incorrect Google IoT 'initial-wifi' settings")
             syslog.syslog("JSON format not correct, MESH_CLASS processing error. Probably incorrect Google IoT 'initial-wifi' settings")
             syslog.syslog(str(error))
         try:
             self.mesh_params=self.mesh_params.replace("\'", "\"")
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
+            print("JSON format not correct, msg processing error. Probably incorrect Google IoT 'initial-wifi' settings")
             syslog.syslog("JSON format not correct. Error while processing 2nd lvl JSON message. Probably incorrect Google IoT 'initial-wifi' settings")
             syslog.syslog(str(error))
 
@@ -130,6 +134,7 @@ class MeshNetwork:
             self.__change_configuration()
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
+            print("JSON format not correct")
             syslog.syslog("JSON format not correct")
             syslog.syslog(str(error))
 
