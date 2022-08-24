@@ -10,7 +10,6 @@ import asyncio
 
 
 def multi_threaded_client(c, addr, lock):
-
     lock.acquire()
     # receive client's name
     name = c.recv(1024).decode()
@@ -149,7 +148,6 @@ def multi_threaded_client(c, addr, lock):
             time_flag = time_flag + 1
 
 
-
 def initiate_server(ip):
     s = socket.socket()  # create server socket s with default param ipv4, TCP
     print('Socket Created')
@@ -169,7 +167,7 @@ def initiate_server(ip):
         print('Client address:', addr)
         print(' ')
         # start thread to handle client
-        Thread(target=multi_threaded_client, args=(c, addr, lock )).start()
+        Thread(target=multi_threaded_client, args=(c, addr, lock)).start()
     c.send(bytes('Closing connection', 'utf-8'))
     c.close()  # close client socket
     print('Connection closed')
