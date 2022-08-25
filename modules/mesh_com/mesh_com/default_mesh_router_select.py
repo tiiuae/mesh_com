@@ -2,6 +2,7 @@
 
 import subprocess
 import re
+import sys
 import syslog
 import psutil
 import time
@@ -10,6 +11,10 @@ INTERFACE_READY_RETRY_COUNT = 120
 TABLE_READ_RETRY_COUNT = 60
 FETCH_IP_RETRY_COUNT = 10
 INTERFACE_NAME = "bat0"
+
+# Define function for printing output to stderr stream
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 # Table comparison code block
 # Find the best TransmissionQuality router and its virtual MAC
@@ -63,13 +68,13 @@ def is_interface_up_and_got_carrier(interface):
     for attempt in range(1, INTERFACE_READY_RETRY_COUNT + 1):
         # Check if interface exists and it is up.
         if interface in (stats := psutil.net_if_stats()) and stats[interface].isup:
-            print("Interface [{:s}] is up.".format(interface))
+            eprint("Interface [{:s}] is up.".format(interface))
             break
-        print("Interface [{:s}] is down.".format(interface))
-        print(wait_message.format(attempt, INTERFACE_READY_RETRY_COUNT))
+        eprint("Interface [{:s}] is down.".format(interface))
+        eprint(wait_message.format(attempt, INTERFACE_READY_RETRY_COUNT))
         time.sleep(1)
     else:
-        print("Waited for network interface, but it was not available.")
+        eprint("Waited for network interface, but it was not available.")
         raise IOError
 
     for attempt in range(attempt + 1, INTERFACE_READY_RETRY_COUNT + 1):
@@ -78,18 +83,18 @@ def is_interface_up_and_got_carrier(interface):
             with open("/sys/class/net/{:s}/carrier".format(interface), "r") as carrier_file:
                 dat = carrier_file.readline().strip()
             if dat == "1":
-                print("Got carrier in interface [{:s}].".format(interface))
+                eprint("Got carrier in interface [{:s}].".format(interface))
                 break
             else:
-                print("No carrier in interface [{:s}].".format(interface))
-                print(wait_message.format(attempt, INTERFACE_READY_RETRY_COUNT))
+                eprint("No carrier in interface [{:s}].".format(interface))
+                eprint(wait_message.format(attempt, INTERFACE_READY_RETRY_COUNT))
                 time.sleep(1)
         except FileNotFoundError:
-            print("Carrier file does not exist (yet).")
-            print(wait_message.format(attempt, INTERFACE_READY_RETRY_COUNT))
+            eprint("Carrier file does not exist (yet).")
+            eprint(wait_message.format(attempt, INTERFACE_READY_RETRY_COUNT))
             time.sleep(1)
     else:
-        print("Waited for network interface, but it was not available.")
+        eprint("Waited for network interface, but it was not available.")
         raise IOError
 
 is_interface_up_and_got_carrier(INTERFACE_NAME)
@@ -107,7 +112,7 @@ for _ in range(TABLE_READ_RETRY_COUNT):
         batctl_tg=batctl_tg.split("\n")
         batctl_tg=batctl_tg[0].split('\\')
     except:
-        print(batctl_tg_err)
+        eprint(batctl_tg_err)
         syslog.syslog(batctl_tg_err)
     
     batctl_tg_list=[]
@@ -118,11 +123,11 @@ for _ in range(TABLE_READ_RETRY_COUNT):
     if len(batctl_tg_list):
         break
     else:
-        print("BATMAN TransGlobal table empty")
+        eprint("BATMAN TransGlobal table empty")
         syslog.syslog("BATMAN TransGlobal table empty")
         time.sleep(1)
 else:
-    print("Waited for BATMAN TransGlobal table, but it was not available.")
+    eprint("Waited for BATMAN TransGlobal table, but it was not available.")
     raise IOError
 
 for _ in range(TABLE_READ_RETRY_COUNT):
@@ -133,7 +138,7 @@ for _ in range(TABLE_READ_RETRY_COUNT):
         batctl_dc=batctl_dc.split("\n")
         batctl_dc=batctl_dc[0].split('\\')
     except:
-        print(batctl_dc_err)
+        eprint(batctl_dc_err)
         syslog.syslog(batctl_dc_err)
 
     batctl_dc_list=[]
@@ -145,11 +150,11 @@ for _ in range(TABLE_READ_RETRY_COUNT):
     if len(batctl_dc_list):
         break
     else:
-        print("BATMAN Distributed ARP Table empty")
+        eprint("BATMAN Distributed ARP Table empty")
         syslog.syslog("BATMAN Distributed ARP Table empty")
         time.sleep(1)
 else:
-    print("Waited for BATMAN ARP table, but it was not available.")
+    eprint("Waited for BATMAN ARP table, but it was not available.")
     raise IOError
 
 for _ in range(TABLE_READ_RETRY_COUNT):
@@ -160,7 +165,7 @@ for _ in range(TABLE_READ_RETRY_COUNT):
         batctl_gwl=batctl_gwl.split("\n")
         batctl_gwl=batctl_gwl[0].split('\\')
     except:
-        print(batctl_gwl_err)
+        eprint(batctl_gwl_err)
         syslog.syslog(batctl_tg_err)
 
     batctl_gwl_list=[]
@@ -168,7 +173,7 @@ for _ in range(TABLE_READ_RETRY_COUNT):
         a=re.findall(parse_mac, batctl_gwl[i])
         b=re.findall(parse_tq, batctl_gwl[i])
         if not len(a) or not len(b):
-            print("Invalid parameters.")
+            eprint("Invalid parameters.")
             syslog.syslog("Invalid parameters.")
             time.sleep(1)
             continue
@@ -177,11 +182,11 @@ for _ in range(TABLE_READ_RETRY_COUNT):
     if len(batctl_gwl_list):
         break
     else:
-        print("BATMAN Gateway List empty")
+        eprint("BATMAN Gateway List empty")
         syslog.syslog("BATMAN Gateway List empty")
         time.sleep(1)
 else:
-    print("Waited for BATMAN Gateway List, but it was not available.")
+    eprint("Waited for BATMAN Gateway List, but it was not available.")
     raise IOError
 
 for _ in range(FETCH_IP_RETRY_COUNT):
@@ -190,7 +195,7 @@ for _ in range(FETCH_IP_RETRY_COUNT):
         break
     time.sleep(1)
 else:
-    print("Waited for best gateway, but it was not available.")
+    eprint("Waited for best gateway, but it was not available.")
     raise IOError
 
 print(ip)
