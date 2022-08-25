@@ -35,6 +35,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     alfred \
     rfkill \
     iproute2 \
+    python3-pip \
     && pip install psutil \
     && rm -rf /var/lib/apt/lists/*
 
