@@ -40,7 +40,7 @@ if [ "$1" == "init" ]; then
     #starting Default mesh
     /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
     # /opt/ros/galactic/lib/mesh_com/mesh_executor
-    gateway_ip=$(python3 default_mesh_router_select.py)
+    gateway_ip=$(python3 /usr/bin/default_mesh_router_select.py)
     route add default gw $gateway_ip bat0
     sleep 86400
 else
