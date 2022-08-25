@@ -41,6 +41,8 @@ ENTRYPOINT [ "/entrypoint.sh" ]
 
 COPY modules/mesh_com/entrypoint.sh /entrypoint.sh
 
+COPY modules/mesh_com/mesh_com/default_mesh_router_select.py /usr/bin/
+
 COPY --from=builder /main_ws/src/modules/ros-*-mesh-com_*_amd64.deb /mesh-com.deb
 
 RUN dpkg -i /mesh-com.deb && rm /mesh-com.deb
