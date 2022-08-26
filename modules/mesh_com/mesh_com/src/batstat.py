@@ -4,8 +4,9 @@ Batman stats helper
 import subprocess
 import re
 import json
-import netifaces
 from time import sleep
+import netifaces
+
 
 class STATUS:  # pylint: disable=too-few-public-methods
     """
@@ -46,7 +47,7 @@ class Batman:
 
     def _update_interface_name(self):
         """
-        Update wifi device name ti self.network_interface
+        Update Wi-Fi device name ti self.network_interface
 
         :return: None
         """
@@ -113,7 +114,7 @@ class Batman:
 
     def _update_iw_info(self):
         """
-        Update device self.freq and self.txpower info
+        Update device "self.freq" and "self.txpower" info
 
         :return: None
         """
@@ -157,7 +158,7 @@ class Batman:
 
     def _update_iw_reg(self):
         """
-        Update device self.country code
+        Update device "self.country" code
 
         :return: None
         """
@@ -216,7 +217,7 @@ class Batman:
         self._status = new_status
 
     def _update_device_info(self):
-        self._update_interface_name()  # wifi interface name
+        self._update_interface_name()  # Wi-Fi interface name
         self._update_station_dump_info()
         self._update_iw_info()
         self._update_iw_type()
@@ -286,7 +287,7 @@ class Batman:
             self.topology['devices'] = route
         except FileNotFoundError:
             self.topology['devices'] = self.device_template  # if not succeed, return empty template
-            print("ERROR")
+            print("update_stat_data: ERROR")
 
         return self.topology
 
@@ -294,15 +295,20 @@ class Batman:
         """
         Get stat as JSON
 
-        :return: self.topology in json compatible str
+        :return: "self.topology" in json compatible str
         """
         return str(self.topology).replace("'", "\"")
 
     def run(self):
+        """
+        Run method for task
+
+        :return: None
+        """
         while self.thread_running:
             self.update_stat_data()
             self.latest_stat = self.get_stat()
-            sleep(0.1)
+            sleep(1.0)
 
 
 # Real user is mesh_executor
