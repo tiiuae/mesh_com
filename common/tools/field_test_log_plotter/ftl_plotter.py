@@ -581,8 +581,8 @@ class FieldTestLogPlotter:
         :param x_axis: Name of the dataframe column to be used as X axis value.
                        Default value is 'Timestamp'. Other typical options:
                        'distance traveled [m]' or 'distance [m]'
-        :param x_start: Optional x axis slice start value. Default value is None.
-        :param x_stop: Optional x axis slice end value. Default value is None.
+        :param x_start: Optional x-axis slice start value. Default value is None.
+        :param x_stop: Optional x-axis slice end value. Default value is None.
 
         :return: None
         """
@@ -682,17 +682,15 @@ class FieldTestLogPlotter:
         # Rotate x-axis tick labels to make them fit better in the picture
         plt.setp(ax_signal_strength.get_xticklabels(), rotation=30, ha='right')
 
-        # TODO: Consider using fixed throughput scale. Scale (Mbps, Kbps etc.) could be
-        #  function parameter. It should ease up comparison of plots from different devices.
         # Determine y-axis scale
         if min(self.df['TX throughput [Bits/s]']) < min(self.df['RX throughput [Bits/s]']):
-            min_bitrate = int(min(self.df['TX throughput [Bits/s]']))
+            min_bitrate = min(self.df['TX throughput [Bits/s]'])
         else:
-            min_bitrate = int(min(self.df['RX throughput [Bits/s]']))
+            min_bitrate = min(self.df['RX throughput [Bits/s]'])
         if max(self.df['TX throughput [Bits/s]']) > max(self.df['RX throughput [Bits/s]']):
-            max_bitrate = int(max(self.df['TX throughput [Bits/s]']))
+            max_bitrate = max(self.df['TX throughput [Bits/s]'])
         else:
-            max_bitrate = int(max(self.df['RX throughput [Bits/s]']))
+            max_bitrate = max(self.df['RX throughput [Bits/s]'])
         y_interval = (max_bitrate - min_bitrate) / 10
         max_bitrate += y_interval
 
@@ -1081,8 +1079,8 @@ class FieldTestLogPlotter:
         max_timestamp += x_interval
 
         # Determine y-axis scale
-        min_bitrate = int(min(self.df['RX throughput [Bits/s]']))
-        max_bitrate = int(max(self.df['RX throughput [Bits/s]']))
+        min_bitrate = min(self.df['RX throughput [Bits/s]'])
+        max_bitrate = max(self.df['RX throughput [Bits/s]'])
         y_interval = (max_bitrate - min_bitrate) / 10
 
         if y_interval == 0:
@@ -1091,6 +1089,13 @@ class FieldTestLogPlotter:
             y_interval = int(y_interval)
         max_bitrate += y_interval
 
+        # Set throughput label names
+        rx_throughput_label = 'RX throughput [bit/s]'
+        if self.throughput_units == 'Kb':
+            rx_throughput_label = 'RX throughput [Kb/s]'
+        elif self.throughput_units == 'Mb':
+            rx_throughput_label = 'RX throughput [Mb/s]'
+
         subtitle = '_rx_throughput_per_time'
         figure_title = self.filename.replace(self.__homedir, '') + subtitle
 
@@ -1098,7 +1103,7 @@ class FieldTestLogPlotter:
                      grid=True, x='Timestamp', y='RX throughput [Bits/s]',
                      xticks=(np.arange(min_timestamp, max_timestamp, x_interval)),
                      yticks=(np.arange(min_bitrate, max_bitrate, y_interval)),
-                     label='RX throughput [bit/s]', color=COLOR_RX_THROUGHPUT, lw=2,
+                     label=rx_throughput_label, color=COLOR_RX_THROUGHPUT, lw=2,
                      figsize=FIGSIZE)
         # Label box upper right corner coordinate relative to base plot coordinate
         ax_throughput.legend(bbox_to_anchor=(-0.03, 1.0), loc='upper right')
