@@ -1,9 +1,5 @@
 #!/bin/bash -e
 
-# . /enclave/drone_device_id
-
-# export DRONE_DEVICE_ID
-
 source /opt/ros/galactic/setup.bash
 
 # I don't know what we're doing wrong, but Python isn't able to resolve mesh packages without this.
@@ -18,8 +14,11 @@ if [ "$1" == "init" ]; then
         gateway_ip="192.168.1.10" # FIXME: hardcoded for now. later detect automatically.
         route add default gw $gateway_ip bat0
         sleep 86400
+    elif [ "$DRONE_TYPE" == "groundstation" ]; then
+        /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+        sleep 86400
     else
-        echo "not implemented yet"
+        echo "drone type not implemented: $DRONE_TYPE"
         exit 1
     fi
 
