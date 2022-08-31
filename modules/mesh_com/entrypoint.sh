@@ -11,8 +11,18 @@ source /opt/ros/galactic/setup.bash
 export PYTHONPATH=/opt/ros/galactic/lib/python3.8/site-packages
 
 if [ "$1" == "init" ]; then
-
     echo "Start mesh executor"
+
+    if [ "$DRONE_TYPE" == "recon" ]; then
+        /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+        gateway_ip="192.168.1.10" # FIXME: hardcoded for now. later detect automatically.
+        route add default gw $gateway_ip bat0
+        sleep 86400
+    else
+        echo "not implemented yet"
+        exit 1
+    fi
+
     # Start mesh executor 
     #                     1      2    3      4        5     6       7      8         9         10          11        12             13         14
     # Usage: mesh-11s.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface> <phyname> <routing_algo> <mtu_size> <log_dir>
@@ -38,11 +48,11 @@ if [ "$1" == "init" ]; then
     #     mesh-11s.sh ap
 
     #starting Default mesh
-    /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+    # /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
     # /opt/ros/galactic/lib/mesh_com/mesh_executor
-    gateway_ip=$(python3 /usr/bin/default_mesh_router_select.py)
-    route add default gw $gateway_ip bat0
-    sleep 86400
+    # gateway_ip=$(python3 /usr/bin/default_mesh_router_select.py)
+    # route add default gw $gateway_ip bat0
+    # sleep 86400
 else
     echo "Start mesh pub&sub"
 
