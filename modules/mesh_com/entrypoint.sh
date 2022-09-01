@@ -36,7 +36,7 @@ if [ "$1" == "init" ]; then
         if [ "$MESH_CLASS" == "gs" ]; then
             gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
             route add default gw $gateway_ip bat0
-        else
+        fi
         sleep 86400
     else
         echo "drone type not implemented: $DRONE_TYPE"
