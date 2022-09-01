@@ -10,12 +10,33 @@ if [ "$1" == "init" ]; then
     echo "Start mesh executor"
 
     if [ "$DRONE_TYPE" == "recon" ]; then
+        # 192.168.240.1-192.168.246.254
+        DEFAULT_MESH_IP="192.168.$[ $RANDOM % 7 + 240 ].$[ $RANDOM % 254 + 1 ]"
+
         /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-        gateway_ip="192.168.1.10" # FIXME: hardcoded for now. later detect automatically.
+        echo "mesh setup done"
+        gateway_ip="192.168.247.10" # FIXME: hardcoded for now. later detect automatically.
         route add default gw $gateway_ip bat0
         sleep 86400
     elif [ "$DRONE_TYPE" == "groundstation" ]; then
+        DEFAULT_MESH_IP="192.168.248.1"
         /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+        echo "mesh setup done"
+        sleep 86400
+    elif [ "$DRONE_TYPE" == "fog" ]; then
+        if [ "$MESH_CLASS" == "edge" ]; then
+            DEFAULT_MESH_IP="192.168.248.1"
+        else
+            # mesh class is gs
+            DEFAULT_MESH_IP="192.168.247.10"
+        fi
+
+        /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+        echo "mesh setup done"
+        if [ "$MESH_CLASS" == "gs" ]; then
+            gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
+            route add default gw $gateway_ip bat0
+        else
         sleep 86400
     else
         echo "drone type not implemented: $DRONE_TYPE"
