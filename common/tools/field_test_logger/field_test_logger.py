@@ -124,6 +124,7 @@ if __name__ == '__main__':
     ftl.register_logger_function("PDOP", info.get_pdop)
 
     ftl.register_logger_function("cpu temp [mC]", info.get_cpu_temp)
+    ftl.register_logger_function("battery temp [mC]", info.get_bat_temp)
     ftl.register_logger_function("wifi temp [mC]", info.get_wifi_temp)
     ftl.register_logger_function("tmp100 [mC]", info.get_tmp100)
 
