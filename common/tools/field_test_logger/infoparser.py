@@ -67,6 +67,9 @@ class InfoParser:
     def get_cpu_temp(self):
         return self.__cpu_temp
 
+    def get_bat_temp(self):
+        return self.__bat_temp
+
     def get_tmp100(self):
         return self.__tmp100
 
@@ -119,10 +122,12 @@ class InfoParser:
 
     def __update_temperatures(self):
         self.__cpu_temp = read_value("/sys/class/thermal/thermal_zone0/temp")
+        self.__bat_temp = read_value("/sys/class/thermal/thermal_zone1/temp")
         self.__tmp100 = read_value(get_hwmon_path("/sys/class/i2c-adapter/i2c-10/10-0049/driver/10-0049/hwmon/hwmon*/temp1_input"))
         self.__wifi_temp = read_value(get_hwmon_path("/sys/class/ieee80211/phy0/device/hwmon/hwmon*/temp1_input"))
 
         #print(f"cpu_temp: {self.cpu_temp}")
+        #print(f"bat_temp: {self.bat_temp}")
         #print(f"tmp100: {self.tmp100}")
         #print(f"wifi_temp: {self.wifi_temp}")
 
