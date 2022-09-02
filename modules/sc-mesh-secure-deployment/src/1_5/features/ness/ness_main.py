@@ -2,6 +2,8 @@ from pyke import knowledge_engine, krb_traceback
 import sys
 import pickle
 import os
+import json
+import time
 
 file_path = os.path.dirname(__file__)
 
@@ -34,9 +36,15 @@ class NESS:
         val_list = list(mapps.values())
         return key_list[position]
 
-
     def create_servers_flags_list(self, sec_list, n, p):
         return [sec_list[i][p] for i in range(n)]
+
+    def save_file_status(self, **args):
+        aux = {arg: args[arg] for arg in args}
+        aux['timestamp'] = time.time()
+        jsonStr = json.dumps(aux)
+        with open("last_result.json", "w") as outfile:
+            outfile.write(jsonStr)
 
     def first_table(self, df, laststatus=None):
         '''
@@ -49,16 +57,23 @@ class NESS:
         mapp = self.mapping(df["ID"].tolist())
         servers_list = list(mapp.values())
         n = df.shape[0]
-
+        self.save_file_status(latest_status_list=latest_status_list, good_server_status_list=good_server_status_list, flags_list=flags_list, servers_list=servers_list, mapp=mapp)
         return latest_status_list, good_server_status_list, flags_list, servers_list, n, mapp
 
     def adapt_table(self, result):
-        latest_status_list = []
-        good_server_status_list = []
-        flags_list = []
-        servers_list = []
+        if not os.path.isfile('last_result.json'):
+            latest_status_list = []
+            good_server_status_list = []
+            flags_list = []
+            servers_list = []
+        else:
+            f = open('last_result.json')
+            json_object = json.load(f)
+            latest_status_list = json_object['latest_status_list']
+            good_server_status_list = json_object['good_server_status_list']
+            flags_list = json_object['flags_list']
+            servers_list = json_object['servers_list']
         for node in result:
-            servers_list.append(node)
             if result[node] == '65':
                 latest_status_list.append(1)
                 good_server_status_list.append(node)
@@ -70,9 +85,8 @@ class NESS:
                 latest_status_list.append(3)
                 flags_list.append(3)
         n = len(servers_list)
+        self.save_file_status(latest_status_list=latest_status_list, good_server_status_list=good_server_status_list, flags_list=flags_list, servers_list=servers_list)
         return latest_status_list, good_server_status_list, flags_list, servers_list, n
-
-
 
     def run_decision(self, latest_status_list, good_server_status_list, flags_list, servers_list, n, i):
         self.engine.reset()
@@ -179,11 +193,9 @@ class NESS:
             nt = tuple(n_list)
             it = tuple(i_list)
 
-            act_code, mnode = self.run_decision(latest_status_list, good_server_status_list, flags_list, servers_list, nt, it)
+            act_code, mnode = self.run_decision(latest_status_list, good_server_status_list, flags_list, servers_list,
+                                                nt, it)
             print("\nAction Code issued is ", act_code)
             print("\nfor node ", mnode)
             result[mnode] = act_code
         return result
-
-
-

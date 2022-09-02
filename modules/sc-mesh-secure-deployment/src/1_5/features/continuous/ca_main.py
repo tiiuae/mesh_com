@@ -15,7 +15,3 @@ class CA:
     def as_server(self, ip):
         with contextlib.suppress(OSError):
             server.initiate_server(ip)
-
-
-        
-
