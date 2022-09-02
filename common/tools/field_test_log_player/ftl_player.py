@@ -41,8 +41,8 @@ class Node:
 
         try:
             self.__load_data_from_file(filename)
-        except:
-            print(f"Can't load values from: {filename}")
+        except Exception as e:
+            print(f"Can't load values from: {filename}\nException- {e}")
             print(f"Is the last line complete data set?")
             exit()
 
@@ -78,14 +78,14 @@ class Node:
         df.dropna(subset=[lat_name], inplace=True)
         df[lon_name].replace('', np.nan, inplace=True)
         df.dropna(subset=[lon_name], inplace=True)
-
+        df[rssi_name].replace('', np.nan, inplace=True)
         df[neighbours_name].replace('', np.nan, inplace=True)
         df.dropna(subset=[neighbours_name], inplace=True)
         df[gps_time].replace('', np.nan, inplace=True)
         df.dropna(subset=[gps_time], inplace=True)
 
         # originators column not available in old field test logger files
-        if df.columns[df.columns.str.contains(pat=originators_name)] != "":
+        if originators_name in df.columns:
             df[originators_name].replace('', np.nan, inplace=True)
             df.dropna(subset=[originators_name], inplace=True)
             self.__f_originators_list = df[originators_name].values.tolist()
