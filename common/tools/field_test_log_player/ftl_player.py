@@ -38,10 +38,12 @@ class Node:
         self.my_mac = None  # node MAC address
         self.__gps_matched_row_offset = 0  # row offset
         self.__gps_matched_time_s = 0  # offset in seconds to the laziest one
+
         try:
             self.__load_data_from_file(filename)
         except:
             print(f"Can't load values from: {filename}")
+            print(f"Is the last line complete data set?")
             exit()
 
     def __load_data_from_file(self, filename):
@@ -79,14 +81,16 @@ class Node:
 
         df[neighbours_name].replace('', np.nan, inplace=True)
         df.dropna(subset=[neighbours_name], inplace=True)
-        df[originators_name].replace('', np.nan, inplace=True)
-        df.dropna(subset=[originators_name], inplace=True)
-
         df[gps_time].replace('', np.nan, inplace=True)
         df.dropna(subset=[gps_time], inplace=True)
 
+        # originators column not available in old field test logger files
+        if df.columns[df.columns.str.contains(pat=originators_name)] != "":
+            df[originators_name].replace('', np.nan, inplace=True)
+            df.dropna(subset=[originators_name], inplace=True)
+            self.__f_originators_list = df[originators_name].values.tolist()
+
         self.__f_neighbour_list = df[neighbours_name].values.tolist()
-        self.__f_originators_list = df[originators_name].values.tolist()
         self.__f_timestamps = df[timestamp_name].values.tolist()
         df[gps_time] = pd.to_datetime(df[gps_time])
         # to seconds
