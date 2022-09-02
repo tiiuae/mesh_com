@@ -1,6 +1,7 @@
 import csv
 import os
 import time
+import sys
 from datetime import datetime
 
 import wifi_info
@@ -96,6 +97,9 @@ if __name__ == '__main__':
     ftl = FieldTestLogger()
     wifi_stats = wifi_info.WifiInfo(LOGGING_INTERVAL_SECONDS)
     info = infoparser.InfoParser()
+    uc_arg = ""
+    if len(sys.argv) > 1:
+        uc_arg = f"_{sys.argv[1]}"
 
     ftl.register_logger_function("Timestamp", timestamp)
     wifi_stats.update()
@@ -130,7 +134,7 @@ if __name__ == '__main__':
     ftl.register_logger_function("3v3 voltage [mV]", info.get_3v3_voltage)
     ftl.register_logger_function("3v3 current [mA]", info.get_3v3_current)
 
-    ftl.create_csv(wifi_stats.get_mac_addr())
+    ftl.create_csv(f"{wifi_stats.get_mac_addr()}{uc_arg}")
 
     while True:
         wifi_stats.update()
