@@ -25,10 +25,10 @@ if [ "$1" == "init" ]; then
         sleep 86400
     elif [ "$DRONE_TYPE" == "fog" ]; then
         if [ "$MESH_CLASS" == "edge" ]; then
-            DEFAULT_MESH_IP="192.168.248.1"
+            DEFAULT_MESH_IP="192.168.247.10"
         else
             # mesh class is gs
-            DEFAULT_MESH_IP="192.168.247.10"
+            DEFAULT_MESH_IP="192.168.248.10"
         fi
 
         /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
