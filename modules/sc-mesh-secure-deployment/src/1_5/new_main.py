@@ -197,9 +197,7 @@ def sec_beat(first_round, ness_result):
         first_round = False
     else:
         latest_status_list, good_server_status_list, flags_list, servers_list, nt = ness.adapt_table(ness_result)
-
     ness_result = ness.run(latest_status_list, good_server_status_list, flags_list, servers_list, nt)
-
     print("Decision Engine Done")
     for node in ness_result:
         if ness_result[node] == 194 or (not q.empty() and q.get() == 'malicious'):
