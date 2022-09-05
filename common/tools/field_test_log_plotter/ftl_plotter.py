@@ -313,7 +313,10 @@ class FieldTestLogPlotter:
         # Convert millidegree Celsius values to Celsius
         self.df['cpu temp [mC]'] = self.df['cpu temp [mC]'] / 1000
         self.df.rename(columns={'cpu temp [mC]': CPU_TEMP}, inplace=True)
-        self.df['battery temp [mC]'] = self.df['battery temp [mC]'] / 1000
+        if 'battery temp [mC]' in self.df.columns:
+            self.df['battery temp [mC]'] = self.df['battery temp [mC]'] / 1000
+        else:
+            self.df['battery temp [mC]'] = np.NaN
         self.df.rename(columns={'battery temp [mC]': BATT_TEMP}, inplace=True)
         # In some logs Wi-Fi card temperature has been NaN. Treat it as zero.
         self.df.rename(columns={'wifi temp [mC]': WIFI_TEMP}, inplace=True)
@@ -1219,10 +1222,10 @@ if __name__ == '__main__':
             files = os.walk(subdir).__next__()[2]
             if len(files) > 0:
                 for file in files:
-                    if file.endswith(".csv"):
+                    if file.lower().endswith(".csv"):
                         csv_files.append(os.path.join(subdir, file))
     else:
-        if path.endswith(".csv"):
+        if path.lower().endswith(".csv"):
             csv_files.append(path)
 
     if not csv_files:
