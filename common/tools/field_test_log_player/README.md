@@ -23,19 +23,25 @@ $ pip3 install -r requirements.txt
 
 Create animated graph from all the logs in specified directory:
 ```
-$ python3 ftl_player.py -f ~/logs/mesh_test
+$ python3 ftl_player.py -p ~/logs/mesh_test
 ```
 Control options:
-
-    -f: Path to folder which includes field_test_logger CSV log files from one specific test run.
+```
+    -p: Path to folder which includes field_test_logger CSV log files from one specific test run.
         Folder should include one log file from each Node DUT.
-    -m: MAC address of a moving node.  This option will add trace from old node positions
-
+    -m: MAC address of a moving node.  This option will add trace from old node positions (optional)
+    -i: Enable this in indoor environment, when GPS use is not possible.  Nodes are plotted to the
+        circumference of the circle and timestamps are taken from system time instead of GSP time.
+    -a: active path tracking between given MAC addresses (optional)
+```
 Create animated graph from all the logs in specified directory and add trace from moving node:
 ```
-$ python3 ftl_player.py -f ~/logs/mesh_test -m 11:22:33:44:55:66
+$ python3 ftl_player.py -p ~/logs/mesh_test -m 11:22:33:44:55:66
 ```
-HOX!!
+Indoor example:
+```
+$ python3 ftl_player.py -p ~/logs/mesh_test -i -a 11:22:33:44:55:66,11:22:33:44:55:77
+```
+Active keys in plotter view:
 
-field_test_logger generated log files needs to include GPS timestamp column.  ftl_player will synchronize
-log files based on GPS time.
+    spacebar    - pause/resume, zooming possible during pause
