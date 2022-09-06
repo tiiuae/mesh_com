@@ -313,6 +313,11 @@ class FieldTestLogPlotter:
         # Convert millidegree Celsius values to Celsius
         self.df['cpu temp [mC]'] = self.df['cpu temp [mC]'] / 1000
         self.df.rename(columns={'cpu temp [mC]': CPU_TEMP}, inplace=True)
+        if 'battery temp [mC]' in self.df.columns:
+            self.df['battery temp [mC]'] = self.df['battery temp [mC]'] / 1000
+        else:
+            self.df['battery temp [mC]'] = np.NaN
+        self.df.rename(columns={'battery temp [mC]': BATT_TEMP}, inplace=True)
         # In some logs Wi-Fi card temperature has been NaN. Treat it as zero.
         self.df.rename(columns={'wifi temp [mC]': WIFI_TEMP}, inplace=True)
         self.df[WIFI_TEMP].fillna(0, inplace=True)
@@ -351,7 +356,7 @@ class FieldTestLogPlotter:
     def plot_temp_voltage_and_current(self):
         """
         Plots temperatures, voltages and current as a function of time.
-        The first y-axis is for CPU, Wi-Fi card and TMP100 sensor temperatures.
+        The first y-axis is for CPU, Battery, Wi-Fi card and TMP100 sensor temperatures.
         The second y-axis is for battery, RF amd voltages and the third one for current.
 
         :return: None
@@ -381,6 +386,7 @@ class FieldTestLogPlotter:
         # Plot temperatures
         self.df.plot(title=figure_title,
                      ax=ax_temp, x='Timestamp', y=CPU_TEMP, color=COLOR_CPU_TEMP, lw=2)
+        self.df.plot(ax=ax_temp, x='Timestamp', y=BATT_TEMP, color=COLOR_BATT_TEMP, lw=2)
         self.df.plot(ax=ax_temp, x='Timestamp', y=WIFI_TEMP, color=COLOR_WIFI_TEMP, lw=2)
         self.df.plot(ax=ax_temp, x='Timestamp', y=TMP100, color=COLOR_TMP100, lw=2, grid=True,
                      xlabel=LABEL_TIME_SECONDS, ylabel=LABEL_TEMPERATURE,
@@ -438,7 +444,7 @@ class FieldTestLogPlotter:
     def plot_temperature_and_current(self):
         """
         Plots temperature and current values as a function of time.
-        The first y-axis is for CPU, Wi-Fi card and TMP100 sensor temperatures.
+        The first y-axis is for CPU, Battery, Wi-Fi card and TMP100 sensor temperatures.
         The second y-axis is for current values.
 
         :return: None
@@ -463,6 +469,7 @@ class FieldTestLogPlotter:
         # Plot temperatures
         self.df.plot(title=figure_title,
                      ax=ax_temp, x='Timestamp', y=CPU_TEMP, color=COLOR_CPU_TEMP, lw=2)
+        self.df.plot(ax=ax_temp, x='Timestamp', y=BATT_TEMP, color=COLOR_BATT_TEMP, lw=2)
         self.df.plot(ax=ax_temp, x='Timestamp', y=WIFI_TEMP, color=COLOR_WIFI_TEMP, lw=2)
         self.df.plot(ax=ax_temp, x='Timestamp', y=TMP100, color=COLOR_TMP100, lw=2, grid=True,
                      xlabel=LABEL_TIME_SECONDS, ylabel=LABEL_TEMPERATURE,
@@ -1220,10 +1227,10 @@ if __name__ == '__main__':
             files = os.walk(subdir).__next__()[2]
             if len(files) > 0:
                 for file in files:
-                    if file.endswith(".csv"):
+                    if file.lower().endswith(".csv"):
                         csv_files.append(os.path.join(subdir, file))
     else:
-        if path.endswith(".csv"):
+        if path.lower().endswith(".csv"):
             csv_files.append(path)
 
     if not csv_files:
