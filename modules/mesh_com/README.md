@@ -1,8 +1,16 @@
 # mesh_com
 
-mesh_com ROS node subsriber listening topic "mesh_parameters". 
+mesh_com ROS node subsriber listening topic "mesh_parameters".
 Supports following configuration JSON as String format:
 
+1st level
+```json
+{
+ "edge": {2nd level},                 "mesh network class. edge=edge mesh network, gs=groundstation mesh network"
+}
+```
+
+2nd level
 ```json
 {
  "api_version": 1,                 "interface version for future purposes"
@@ -23,4 +31,31 @@ Supports following configuration JSON as String format:
  "mode": "mesh"                    "mesh=mesh network, ap=debug hotspot"
 }
 ```
-
+## Google IoT config block example
+```python
+initial-wifi:
+    edge:
+        api_version: 2
+        ssid: default-edge
+        key: "foobar"
+        enc: wep
+        ap_mac: "00:11:22:33:44:55"
+        country: cn
+        frequency: "5180"
+        ip: 192.168.1.10
+        subnet: 255.255.255.0
+        tx_power: "30"
+        mode: mesh
+    gs:
+        api_version: 2
+        ssid: default-gs
+        key: "foobar"
+        enc: wep
+        ap_mac: "00:11:22:33:44:55"
+        country: cn
+        frequency: "5745"
+        ip: 192.168.32.10
+        subnet: 255.255.255.0
+        tx_power: "30"
+        mode: mesh
+```

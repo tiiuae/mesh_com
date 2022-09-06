@@ -22,7 +22,7 @@ function help
     echo
     echo "example:"
     echo "sudo ./mesh-ibss.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh 5220 30 fi wlan1 phy1"
-    echo "sudo mesh.sh ap"
+    echo "sudo ./mesh-ibss.sh ap"
     exit
 }
 
@@ -65,9 +65,10 @@ if [[ -z "${10}" ]]; then
   rfkill unblock all
   # multiple wifi options --> can be detected as follows:
   # manufacturer 0x168c = Qualcomm
-  # devices = 0x0034 0x003c 9462/988x
-  #           0x003e        6174
-  find_mesh_wifi_device 0x168c "0x003e 0x0034 0x003c"
+  # devices = 0x0034 0x003c 9462/988x  11s
+  #           0x003e        6174       adhoc
+  #           0x0033        9590       doodle
+  find_mesh_wifi_device 0x168c "0x0034 0x003c 0x003e 0x0033"
 
   if [ "$retval_phy" != "" ]; then
       phyname=$retval_phy
