@@ -55,7 +55,7 @@ class FieldTestLogPlotter:
         :return: None
         """
         # Create dataframe from csv file.
-        self.df = pd.read_csv(self.filename)
+        self.df = pd.read_csv(self.filename, engine='python', on_bad_lines='warn')
         # Debug
         logger.debug(tabulate(self.df, headers='keys', tablefmt='psql'))
 
@@ -94,6 +94,9 @@ class FieldTestLogPlotter:
                                                         inplace=True)
         # Drop any DF lines where timestamp is NaN
         self.df.dropna(subset=['Timestamp'], inplace=True)
+        # Drop corrupted DF lines i.e. the ones where the
+        # last expected csv file column is empty.
+        self.df.dropna(subset=['3v3 current [mA]'], inplace=True)
         # Reindex DF after any possible line drops
         self.df.reset_index(drop=True, inplace=True)
 
