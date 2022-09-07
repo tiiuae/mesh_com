@@ -96,7 +96,7 @@ class FieldTestLogPlotter:
         self.df.dropna(subset=['Timestamp'], inplace=True)
         # Drop corrupted DF lines i.e. the ones where the
         # last expected csv file column is empty.
-        self.df.dropna(subset=['3v3 current [mA]'], inplace=True)
+        self.df.dropna(subset=self.df.columns[-1], inplace=True)
         # Reindex DF after any possible line drops
         self.df.reset_index(drop=True, inplace=True)
 
