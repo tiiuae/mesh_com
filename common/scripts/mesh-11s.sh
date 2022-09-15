@@ -107,7 +107,7 @@ network={
     psk="$5"
     key_mgmt=SAE
     ieee80211w=2
-    #mesh_fwding=0
+    mesh_fwding=0
 }
 EOF
 
