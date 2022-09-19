@@ -105,8 +105,8 @@ EOF
   /usr/sbin/hostapd -B /var/run/hostapd.conf -f /tmp/hostapd.log
   # Bridge AP and Mesh
   brctl addif br-lan bat0 "$ifname_ap"
-  ifconfig br-lan "192.168.1.20" netmask "255.255.255.0"
-  ifconfig br-lan up
+  ifconfig br-lan "192.168.1.20" netmask "255.255.255.0" 
+  ifconfig br-lan mtu 1400 up
   echo
   ifconfig br-lan
   # Add forwading rules from AP to bat0 interface
