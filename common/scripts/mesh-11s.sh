@@ -160,7 +160,7 @@ EOF
         fi
       elif [ "$routing_algo" == "olsr" ]; then
          pkill olsrd 2>/dev/null
-      
+
       pkill hostapd 2>/dev/null
       pkill transmit 2>/dev/null
 
@@ -359,6 +359,8 @@ off)
       elif [ "$routing_algo" == "olsr" ]; then
         pkill olsrd 2>/dev/null
       fi
+      pkill hostapd 2>/dev/null
+      pkill transmit 2>/dev/null
       ;;
 *)
       help
