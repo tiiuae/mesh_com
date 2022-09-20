@@ -459,8 +459,6 @@ class NodeNetwork:
             letters = string.ascii_letters
             for node in self.network_nodes:
                 if node.my_mac == self.trace_this_mac:
-                    #for seconds in np.arange(self.sec_offset_from_start-10, self.sec_offset_from_start, LOOP_SECONDS):
-                    #    node.update_row_offset_from_seconds_offset(seconds)
                     for r, __ in enumerate(range(0, self.sec_offset_from_start)):
                         node.update_row_offset_from_seconds_offset(r)
                         self.nx_trace.add_node(''.join(random.choice(letters) for __ in range(10)),
