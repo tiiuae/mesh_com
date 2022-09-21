@@ -39,6 +39,8 @@ class Node:
         self.__f_rssi = []
         self.__f_noise = []
         self.__f_txmcs = []
+        self.__f_txtp = []
+        self.__f_rxtp = []
 
         self.my_mac = None  # node MAC address
         self.__matched_row_offset = 0  # row offset
@@ -48,7 +50,6 @@ class Node:
             self.__load_data_from_file(_path, _filename)
         except Exception as error:
             print(f"Can't load values from: {_filename}\nException- {error}")
-            print("Is the last line complete data set?")
             sys.exit()
 
     def __load_data_from_file(self, __path, __filename):
@@ -65,17 +66,22 @@ class Node:
         lon_name = "longitude"
         rssi_name = "rssi [MAC,dBm;MAC,dBm ...]"
         txmcs_name = "TX MCS [MAC,MCS;MAC,MCS ...]"
+        rx_tp_name = "RX throughput [Bits/s]"
+        tx_tp_name = "TX throughput [Bits/s]"
 
         self.my_mac = __filename.split("_")[2].split(".")[0]
-        df = pd.read_csv(f"{__path}/{__filename}")
+        df = pd.read_csv(f"{__path}/{__filename}", engine='python', on_bad_lines='warn')
 
         df.drop(columns=["channel", "txpower [dBm]",
                          "RX MCS [MAC,MCS;MAC,MCS ...]",
-                         "TX throughput [Bits/s]", "altitude", "PDOP",
+                         "altitude", "PDOP",
                          "cpu temp [mC]", "wifi temp [mC]", "tmp100 [mC]",
                          "battery voltage [uV]", "battery current [uA]", "nRF voltage [mV]",
-                         "nRF current [mA]", "3v3 voltage [mV]", "3v3 current [mA]",
-                         "RX throughput [Bits/s]"], inplace=True)
+                         "nRF current [mA]", "3v3 voltage [mV]", "3v3 current [mA]"], inplace=True)
+
+        # Drop corrupted DF lines i.e. the ones where the
+        # last expected csv file column is empty.
+        df.dropna(subset=[df.columns[-1]], inplace=True)
 
         # GPS information available if not indoor
         if self.indoor_mode is False:
@@ -100,20 +106,16 @@ class Node:
                 time.mktime(datetime.strptime(str(ts), "%Y-%m-%d %H:%M:%S").timetuple()) for ts in
                 df[timestamp_name].values.tolist()]
 
-        df[rssi_name].replace('', np.nan, inplace=True)
-        df[neighbours_name].replace('', np.nan, inplace=True)
-        df.dropna(subset=[neighbours_name], inplace=True)
-
         # originators column not available in old field test logger files
         if originators_name in df.columns:
-            df[originators_name].replace('', np.nan, inplace=True)
-            df.dropna(subset=[originators_name], inplace=True)
             self.__f_originators_list = df[originators_name].values.tolist()
 
         self.__f_neighbour_list = df[neighbours_name].values.tolist()
         self.__f_rssi = df[rssi_name].values.tolist()
         self.__f_noise = df[noise_name].values.tolist()
         self.__f_txmcs = df[txmcs_name].values.tolist()
+        self.__f_rxtp = df[rx_tp_name].values.tolist()
+        self.__f_txtp = df[tx_tp_name].values.tolist()
 
     def get_location_utm(self):
         """
@@ -145,6 +147,20 @@ class Node:
         :return:
         """
         return self.__f_txmcs[self.__matched_row_offset]
+
+    def get_tx_throughput(self):
+        """
+        get TX TrhoughPut from synced time offset point
+        :return:
+        """
+        return self.__f_txtp[self.__matched_row_offset]
+
+    def get_rx_throughput(self):
+        """
+        get RX TrhoughPut from synced time offset point
+        :return:
+        """
+        return self.__f_rxtp[self.__matched_row_offset]
 
     def get_originator(self):
         """
@@ -226,7 +242,7 @@ class NodeNetwork:
     Plot static and moving nodes with matplotlib
     """
 
-    def __init__(self, mode, _active_path):
+    def __init__(self, mode, _active_path, _rxtx):
         self.nx_edges_list = []
         self.nx_nodes_list = []
         self.edge_labels = {}
@@ -239,6 +255,7 @@ class NodeNetwork:
         self.__bbox = None  # outlines for drawing
         self.pause = False
         self.indoor_mode = mode
+        self.rxtx = _rxtx
         if len(_active_path) > 0:
             self.active_path_macs = _active_path.split(",")[0], _active_path.split(",")[1]
         else:
@@ -265,8 +282,10 @@ class NodeNetwork:
             lon_max = lon if lon > lon_max else lon_max
             lon_min = lon if lon < lon_min else lon_min
 
-        return lon_min - bbox_offset, lon_max + bbox_offset, \
-               lat_min - bbox_offset, lat_max + bbox_offset
+        return (lon_min - bbox_offset,
+                lon_max + bbox_offset,
+                lat_min - bbox_offset,
+                lat_max + bbox_offset)
 
     def __read_data(self, files_path, csv_filenames):
         """
@@ -282,7 +301,7 @@ class NodeNetwork:
         :param color_map:
         :return:
         """
-        pylab.clf()
+
         colors = []
         path_colors = []
 
@@ -350,11 +369,6 @@ class NodeNetwork:
                                          font_color="green",
                                          label_pos=0.8,
                                          font_size=7)
-
-        # todo move these
-        fig = pylab.get_current_fig_manager()
-        fig.canvas.mpl_connect('close_event', self.__on_close)
-        fig.canvas.mpl_connect('key_press_event', self.__on_key_press_event)
 
         pause(LOOP_SECONDS)
 
@@ -484,6 +498,7 @@ class NodeNetwork:
         """
         Collect data ana create node objects with edges
         """
+        pylab.clf()
         self.nx_graph.clear()
         self.nx_trace.clear()
         self.nx_data_path.clear()
@@ -499,6 +514,10 @@ class NodeNetwork:
                 self.nx_graph.add_node(node.get_mac(), pos=nx.circular_layout(self.nx_graph))
             else:
                 self.nx_graph.add_node(node.get_mac(), pos=node.get_location_utm())
+                if self.rxtx:
+                    pylab.text(node.get_location_utm()[0], node.get_location_utm()[1] + 10,
+                           f"TX:{round(node.get_tx_throughput() / 1000)}\n"
+                           f"RX:{round(node.get_rx_throughput() / 1000)} (kbit/s)")
 
             # check neighbour_list and add/remove connections
             nodes = node.get_neighbours().split(";")
@@ -581,6 +600,11 @@ class NodeNetwork:
             pylab.gca().invert_xaxis()
             pylab.gca().invert_yaxis()
 
+            # connect event handlers
+            fig = pylab.get_current_fig_manager()
+            fig.canvas.mpl_connect('close_event', self.__on_close)
+            fig.canvas.mpl_connect('key_press_event', self.__on_key_press_event)
+
             # find sync time
             self.__sync_node_timestamps()
             while True:
@@ -598,6 +622,7 @@ def show_usage():
     -m travelled path trace for a given MAC address (node)
     -i indoor environment, when GPS use not possible.  Nodes are plotted to the circumference of
        the circle and timestamps are taken from system time instead of GSP time.
+    -t rx/tx kbit/s values from each node.  Currently supported in outdoor mode.
     -a active path tracking between given MAC addresses
 
     Python script will synchronize CSV log files based on the GPS timestamp.  Drawing starts
@@ -623,10 +648,11 @@ if __name__ == '__main__':
     MAC = ""
     PATH = ""
     INDOOR_MODE = False
+    RXTX = False
     ACTIVE_PATH = []
 
     try:
-        options, args = getopt.getopt(sys.argv[1:], 'ip:m:a:', [])
+        options, args = getopt.getopt(sys.argv[1:], 'itp:m:a:', [])
         for opt, arg in options:
             if opt in '-m':
                 MAC = arg
@@ -634,6 +660,8 @@ if __name__ == '__main__':
                 PATH = arg
             if opt in '-i':
                 INDOOR_MODE = True
+            if opt in '-t':
+                RXTX = True
             if opt in '-a':
                 ACTIVE_PATH = arg
         if PATH == "":
@@ -643,5 +671,5 @@ if __name__ == '__main__':
         show_usage()
         sys.exit(2)
 
-    runner = NodeNetwork(INDOOR_MODE, ACTIVE_PATH)
+    runner = NodeNetwork(INDOOR_MODE, ACTIVE_PATH, RXTX)
     runner.execute(PATH, file_list, MAC)
