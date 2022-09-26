@@ -35,7 +35,7 @@ killall wpa_supplicant
 default $1 $2
 ifconfig $choice up
 if [[ "$2" == "-ci" ]]; then
-  password = "root"
+  password="root"
   echo "- Password: $password"
   # AP hostapd config
 cat <<EOF > conf/ap.conf
