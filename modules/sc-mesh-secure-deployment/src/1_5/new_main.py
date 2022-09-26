@@ -41,13 +41,24 @@ async def launchCA(ID, sectable):
     myip = co.get_ip_address(mesh_int)
     max_count = 3
     flag_ctr = 0
-    proc = multiprocessing.Process(target=ca.as_server, args=(myip, ))
+    proc = multiprocessing.Process(target=ca.as_server, args=(myip,))
     proc.start()
     sleep(random.randint(1, 10))
     neigh = mesh_utils.get_macs_neighbors()
     for ne in neigh:
-        ind = sectable.index[sectable['MAC'] == ne].tolist()[0]
-        IP = sectable.loc[ind]["IP"]
+        if ne not in sectable["MAC"]:  # means that this is neighbor but was authenticated by someone else
+            ne_ips = mesh_utils.get_neighbors_ip()
+            for ip in ne_ips:
+                if ip not in sectable["IP"]:
+                    info = {'ID': '---', 'MAC': ne, 'IP': ip,
+                            'PubKey_fpr': "___", 'MA_level': -1}
+                    mut = mutual.Mutual(mutual_int)
+                    mut.update_table(info)
+                IP = ip
+                sectable = pd.read_csv('auth/dev.csv')
+        else:
+            ind = sectable.index[sectable['MAC'] == ne].tolist()[0]
+            IP = sectable.loc[ind]["IP"]
         print("neighbor IP:", IP)
         manager = multiprocessing.Manager()
         return_dict = manager.dict()
@@ -78,6 +89,8 @@ def update_table_ca(df, result):
     Note: this function should be called after the CA result is received.
     Note2: the new table is not being saved only converted to json and sent to the neighbors.
     """
+    filetable = 'auth/dev.csv'
+    old_table = pd.read_csv(filetable)
     df = df.assign(CA_Result=0)
     for index, row in df.iterrows():
         for res in result:
@@ -91,6 +104,11 @@ def update_table_ca(df, result):
                     else:
                         df.loc[df['IP'] == IP, 'CA_Result'] = 3
                     df.loc[df['IP'] == IP, 'CA_ts'] = time()
+    df.drop_duplicates(inplace=True)
+    if 'CA_Result' in set(old_table):
+        df.to_csv(filetable, mode='a', index=False)
+    else:
+        df.to_csv(filetable, mode='a', header=False, index=False)
     return df
 
 
@@ -172,12 +190,7 @@ def checkiptables():
         subprocess.call(command, shell=False)
 
 
-def sec_beat(first_round, ness_result):
-    q = queue.Queue()
-    checkiptables()
-    ma = mba.MBA(mesh_utils.get_mesh_ip_address())
-    sectable = pd.read_csv('auth/dev.csv')
-    sectable.drop_duplicates(inplace=True)
+def continuous_authentication(sectable):
     print("Starting Continuous Authentication")
     loop_ca = asyncio.get_event_loop()
     ca_task = loop_ca.create_task(launchCA(random.randint(1000, 64000), sectable))
@@ -185,27 +198,44 @@ def sec_beat(first_round, ness_result):
         result = loop_ca.run_until_complete(asyncio.gather(ca_task))
     sectable = update_table_ca(sectable, result)
     print("End of Continuous Authentication")
-    received = exchage_table(sectable)
-    for ind in received:
-        new = pd.read_json(received[ind].decode())
-        sectable = pd.concat([sectable, new], ignore_index=True)
+    return sectable
+
+
+def decision_engine(first_round, ness_result, sectable, ma, q):
     print("Starting Decision Engine")
     if first_round:
         latest_status_list, good_server_status_list, flags_list, servers_list, nt, mapp = ness.first_table(sectable)
-
-        threading.Thread(target=ma.client, args=(q, ), daemon=True).start()
+        threading.Thread(target=ma.client, args=(q,), daemon=True).start()
         first_round = False
     else:
-        latest_status_list, good_server_status_list, flags_list, servers_list, nt = ness.adapt_table(ness_result)
+        latest_status_list, good_server_status_list, flags_list, servers_list, nt, mapp = ness.adapt_table(ness_result)
     ness_result = ness.run(latest_status_list, good_server_status_list, flags_list, servers_list, nt)
     print("Decision Engine Done")
+    return ness_result, first_round, mapp
+
+
+def quarantine(ness_result, q, sectable, ma, mapp):
     for node in ness_result:
         if ness_result[node] == 194 or (not q.empty() and q.get() == 'malicious'):
             print("Malicious Node: ", ness.remapping(mapp, node))
             mac = sectable.iloc[node]['IP']
             threading.Thread(target=ma.server, args=("malicious: " + mac, True), daemon=True).start()
+            threading.Thread(target=qua.block, args=(mac,), daemon=True).start()
 
-            threading.Thread(target=qua.block, args=(mac, ), daemon=True).start()
+
+def sec_beat(first_round, ness_result):
+    q = queue.Queue()
+    checkiptables()
+    ma = mba.MBA(mesh_utils.get_mesh_ip_address())
+    sectable = pd.read_csv('auth/dev.csv')
+    sectable.drop_duplicates(inplace=True)
+    sectable = continuous_authentication(sectable)
+    received = exchage_table(sectable)
+    for ind in received:
+        new = pd.read_json(received[ind].decode())
+        sectable = pd.concat([sectable, new], ignore_index=True)
+    ness_result, first_round, mapp = decision_engine(first_round, ness_result, sectable, ma, q)
+    quarantine(ness_result, q, sectable, ma, mapp)
     return first_round, ness_result
 
 

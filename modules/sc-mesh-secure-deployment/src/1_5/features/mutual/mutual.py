@@ -9,7 +9,6 @@ import pandas as pd
 from .utils import primitives as pri
 from termcolor import colored
 import sys
-import asyncio
 
 sys.path.insert(0, '../../')
 '''
@@ -87,6 +86,7 @@ class Mutual:
             self.table.to_csv('auth/dev.csv', mode='a', header=False, index=False)
         elif self.table.loc[self.table['ID'] == info['ID']]['PubKey_fpr'].all() != info['PubKey_fpr']:
             self.table = self.table.append(info, ignore_index=True)
+            self.table.drop_duplicates(inplace=True)
             self.table.to_csv('auth/dev.csv', mode='a', header=False, index=False)
 
     def get_status(self):
@@ -178,11 +178,14 @@ class Mutual:
 
     def start_mesh(self):
         print('creating mesh')
-        self.my_ip_mesh, self.my_mac_mesh = co.create_mesh_config
-        co.start_mesh()
-
-    async def start(self):
-        set_mesh = False
+        try:
+            self.my_ip_mesh, self.my_mac_mesh = co.create_mesh_config
+            co.starting_mesh()
+        except Exception:
+            TypeError
+            print("No password provided for the mesh. Please get the password via provisioning server")
+            exit()
+    def define_role(self):
         candidate = wf.scan_wifi(self.interface)  # scan wifi to authenticate with
         if candidate:  # client
             sigs, addr = self.client(candidate)
@@ -195,8 +198,9 @@ class Mutual:
             print('4) local key')
             self.exchange(cliID, addr[0])
             cli = False
-        node_name = addr[0].replace('.', '_')
-        pri.import_cert(client_cert, node_name)
+        return addr, client_cert, sig, cliID, cli
+
+    def cert_validation(self, sig, node_name, cliID, cli, addr):
         if pri.verify_certificate(sig, node_name, self.digest(), self.root_cert):
             print(colored('> Valid Certificate', 'green'))
             print('Authenticated, now send my pubkey')
@@ -239,6 +243,14 @@ class Mutual:
             print(colored("Not Valid Client Certificate", 'red'))
             pri.delete_key(node_name)
             os.remove(node_name + '.der')
+
+
+    async def start(self):
+        set_mesh = False
+        addr, client_cert, sig, cliID, cli = self.define_role()
+        node_name = addr[0].replace('.', '_')
+        pri.import_cert(client_cert, node_name)
+        self.cert_validation(sig, node_name, cliID, cli, addr)
 
     def test(self):  # unit test
         raise NotImplementedError

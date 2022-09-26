@@ -1,18 +1,16 @@
-#! /usr/bin/python3
-
-from main import *
+from new_main import *
+from features.mutual import mutual
+import os
+from features.mutual.utils import primitives as pri
 
 menu_options = {
     1: 'Mutual Authentication (MA)',
     2: 'Only Mesh Network',
     3: 'Continuous Authentication (CA)',
-    4: 'Decision Engine',
+    4: 'Continuous Authentication (CA) + Decision Engine',
     5: 'Show Security Table',
     6: 'Check Neighbors',
-    7: 'Security Beat',
-    8: 'Exchange Table',
-    9: 'Quarantine',
-    0: "Exit"
+    7: "Exit"
 }
 
 
@@ -30,94 +28,68 @@ def banner():
     """)
 
 
-AUTHSERVER = False
-mut = mutual.Mutual(MUTUALINT)
-myID = mut.myID
-
 def print_menu():
     banner()
     for key in menu_options.keys():
         print(key, '--', menu_options[key])
 
 
-def aux_auth(semasphore):
+def aux_auth():
     while True:
-        with semasphore:
-            mut = mutual.Mutual(MUTUALINT)
-            client, addr = mut.server()
-            sig, client_cert, cliID = mut.decode_cert(client)
-            node_name = addr[0].replace('.', '_')
-            pri.import_cert(client_cert, node_name)
-            mut.send_my_key(cliID, addr)
-            mut.cert_validation(sig, node_name, cliID, False, addr)
-            '''
-            only for demo
-            '''
-            command = ['route', 'del', '-net', '10.10.10.0', 'gw', '0.0.0.0', 'netmask', '255.255.255.0', 'dev', 'eth1']
-            subprocess.call(command, shell=False)
+        mut = mutual.Mutual(mutual_int)
+        client, addr = mut.server()
+        sig, client_cert, cliID = mut.decode_cert(client)
+        node_name = addr[0].replace('.', '_')
+        pri.import_cert(client_cert, node_name)
+        mut.cert_validation(sig, node_name, cliID, False, addr)
 
 
-def MA():
-    os.system('clear')
-    semasphore = threading.Semaphore(2)
-    global AUTHSERVER
+def option1():
     print('\'Mutual Authentication\'')
-    if not AUTHSERVER:  # already
-        mutual_authentication()
-        AUTHSERVER = True
-    p = threading.Thread(target=aux_auth, daemon=True, args=(semasphore,))
+    mutual_authentication()
+    p = threading.Thread(target=aux_auth, daemon=True, args=())
     p.start()
 
 
-def only_mesh():
-    os.system('clear')
+def option2():
     print('\'Run Only Mesh\'')
-    mut = mutual.Mutual(MUTUALINT)
+    mut = mutual.Mutual(mutual_int)
     try:
         mut.start_mesh()
-        mut.create_table()
-        sleep(2)
-        if mesh_utils.verify_mesh_status():  # verifying that mesh is running
-            print("Mesh Running")
-            mesh_utils.get_neighbors_ip()
-            neigh = mesh_utils.get_arp()
-            for ne in neigh:
-                info = {'ID': ne, 'MAC': neigh[ne], 'IP': ne,
-                        'PubKey_fpr': "----", 'MA_level': 1}
-                print(info)
-                mut.update_table(info)
     except TypeError:
         print("No password provided for the mesh. Please get the password via provisioning server")
         exit()
 
 
-def CA():
-    os.system('clear')
+def option3():
     print('\'Continuous Authentication\'')
-    sectable = pd.read_csv('auth/dev.csv')
     if not mesh_utils.verify_mesh_status():  # verifying that mesh is running
         print("Mesh network not established")
-        only_mesh()
-    return only_ca(myID)
-
-
-def DE():
-    os.system('clear')
-    print('\'Decision Engine\'')
+        option2()
     try:
         sectable = pd.read_csv('auth/dev.csv')
-        if 'CA_Result' not in sectable.columns:
-            sectable = CA()
-        if sectable.empty:
+        if not sectable.empty:
+            sectable = continuous_authentication(sectable)
+            received = exchage_table(sectable)
+            for ind in received:
+                new = pd.read_json(received[ind].decode())
+                sectable = pd.concat([sectable, new], ignore_index=True)
+            return sectable
+        else:
             print("Empty Security Table")
-        ness_result, mapp = decision_engine(sectable, mba.MBA(mesh_utils.get_mesh_ip_address()),
-                                            queue.Queue())
-        return ness_result, mapp
+            exit()
     except FileNotFoundError:
         print("SecTable not available. Need to be requested during provisioning")
 
 
-def show_table():
+def option4():
+    print('\'Continuous Authentication + Decision Engine\'')
+    sectable = option3()
+    ness_result, first_round, mapp = decision_engine(True, {}, sectable, mba.MBA(mesh_utils.get_mesh_ip_address()),
+                                                     queue.Queue())
+
+
+def option5():
     os.system('clear')
     print('\'Current Security Table\'')
     try:
@@ -130,63 +102,18 @@ def show_table():
         print("SecTable not available. Need to be requested during provisioning")
 
 
-def show_neighbors():
+def option6():
     os.system('clear')
     print('\'Check Neighbors Status\'')
     if mesh_utils.verify_mesh_status():  # verifying that mesh is running
         neigh = mesh_utils.get_macs_neighbors()
         for ne in neigh:
-            print(f'{str(ne)} connected')
+            print(str(ne) + ' connected')
     else:
         print("No mesh established")
 
 
-def sbeat():
-    os.system('clear')
-    original_time = time()
-    end_time = 5  # one minute
-    sec_beat_time = 5
-    os.system('clear')
-    print('\'SecBeat\'')
-    print(f'Running SecBeat every {sec_beat_time} seconds, during {end_time} minutes')
-    while time() < original_time + end_time:
-        if mesh_utils.verify_mesh_status():  # verifying that mesh is running
-            sleep(sec_beat_time - time() % sec_beat_time)  # sec beat time
-            sec_beat(myID)
-
-
-def extable():
-    os.system('clear')
-    print('\'Exchange Security Table\'')
-    table = 'auth/dev.csv'
-    try:
-        mesh_utils.get_neighbors_ip()
-        try:
-            sectable = pd.read_csv(table)
-            sectable.drop_duplicates(inplace=True)
-            ut.exchage_table(sectable)
-        except Exception:
-            pass
-    except FileNotFoundError:
-        print("SecTable not available. Need to be requested during provisioning")
-
-
-def Quarantine():
-    os.system('clear')
-    print('\'Quarantine\'')
-    ness_result, mapp = DE()
-    q = queue.Queue()
-    table = 'auth/dev.csv'
-    try:
-        sectable = pd.read_csv(table)
-        ma = mba.MBA(mesh_utils.get_mesh_ip_address())
-        quaran(ness_result, q, sectable, ma, mapp)
-    except FileNotFoundError:
-        print("SecTable not available. Need to be requested during provisioning")
-
-
 if __name__ == '__main__':
-    wf.killall('wlan1')
     while True:
         print_menu()
         option = ''
@@ -195,26 +122,20 @@ if __name__ == '__main__':
         except Exception:
             print('Wrong input. Please enter a number ...')
         # Check what choice was entered and act accordingly
-        if option == 0:
-            print('Exiting....')
-            sys.exit()
-        elif option == 1:
-            MA()                # 1: 'Mutual Authentication (MA)',
+        if option == 1:
+            option1()  # 'Mutual Authentication (MA)',
         elif option == 2:
-            only_mesh()         # 2: 'Only Mesh Network',
+            option2()  # 2: 'Only Mesh Network',
         elif option == 3:
-            CA()                # 3: 'Continuous Authentication (CA)',
+            option3()  # 3: 'Continuous Authentication (CA)',
         elif option == 4:
-            DE()                # 4: 'Decision Engine',
+            option4()  # 4: 'Continuous Authentication (CA) + Decision Engine',
         elif option == 5:
-            show_table()        # 5: 'Show Security Table',
+            option5()  # 5: 'Show Security Table',
         elif option == 6:
-            show_neighbors()    # 6: 'Check Neighbors',
+            option6()  # 6: 'Check Neighbors',
         elif option == 7:
-            sbeat()             # 7: 'SecBeat',
-        elif option == 8:
-            extable()           # 8: 'Exchange Table',
-        elif option == 9:
-            Quarantine()        # 9: 'Quarantine',
+            print('Exiting....')
+            exit()
         else:
-            print('Invalid option. Please enter a number between 0 and 9.')
+            print('Invalid option. Please enter a number between 1 and 7.')
