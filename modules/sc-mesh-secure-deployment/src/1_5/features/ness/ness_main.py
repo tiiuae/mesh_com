@@ -73,6 +73,7 @@ class NESS:
             good_server_status_list = json_object['good_server_status_list']
             flags_list = json_object['flags_list']
             servers_list = json_object['servers_list']
+            mapp = json_object['mapp']
         for node in result:
             if result[node] == '65':
                 latest_status_list.append(1)
@@ -86,7 +87,7 @@ class NESS:
                 flags_list.append(3)
         n = len(servers_list)
         self.save_file_status(latest_status_list=latest_status_list, good_server_status_list=good_server_status_list, flags_list=flags_list, servers_list=servers_list)
-        return latest_status_list, good_server_status_list, flags_list, servers_list, n
+        return latest_status_list, good_server_status_list, flags_list, servers_list, n, mapp
 
     def run_decision(self, latest_status_list, good_server_status_list, flags_list, servers_list, n, i):
         self.engine.reset()
