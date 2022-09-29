@@ -40,6 +40,8 @@ This will clean all the keys generated as well as the files.
 ![Conceptual Diagram](../images/prov-server.png)
 
 
+## Installation Flow
+
 Source code
 GitHub - https://github.com/tiiuae/configurationservice 
 
