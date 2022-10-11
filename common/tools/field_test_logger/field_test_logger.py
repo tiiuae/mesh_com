@@ -8,7 +8,7 @@ import wifi_info
 import infoparser
 
 LOG_FOLDER_LOCATION = r"/root/field_test_logs/"
-LOGGING_INTERVAL_SECONDS = 1
+LOGGING_INTERVAL_SECONDS = 1  # LOGGING_INTERVAL_SECONDS needs to be >=0.4s
 
 
 def check_log_folder():
@@ -138,7 +138,12 @@ if __name__ == '__main__':
     ftl.create_csv(f"{wifi_stats.get_mac_addr()}{uc_arg}")
 
     while True:
+        start = time.time()
         wifi_stats.update()
         info.update()
         ftl.append_csv()
-        time.sleep(LOGGING_INTERVAL_SECONDS)
+        d = time.time() - start
+
+        # adjust delay for precise logging interval
+        if d < LOGGING_INTERVAL_SECONDS:
+            time.sleep(LOGGING_INTERVAL_SECONDS - d)
