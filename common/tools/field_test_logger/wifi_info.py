@@ -1,6 +1,8 @@
 import subprocess
+import re
 
 EXPECTED_INTERFACE = "wlp1s0"
+
 
 class WifiInfo:
 
@@ -257,19 +259,20 @@ class WifiInfo:
                                        stdout=subprocess.PIPE)
 
         out = batctl_proc.communicate()[0].decode().rstrip()
+        # Remove parentheses and square brackets
+        out = re.sub('[()\\[\\]]', '', out)
 
         lines = out.split("\n")
-
         nodes = ""
 
         for line in lines:
             node_stats = line.split()
-            if len(node_stats) == 7:
+            if len(node_stats) == 6 and node_stats[0] == '*':
                 nodes = f"{nodes}{node_stats[1]},{node_stats[4]};"
 
         # Remove semicolon after last node in list
         self.__originators = nodes[:-1]
-        #print(self.originators)
+
     # ----------------------------------------
 
     def update(self):
@@ -282,3 +285,4 @@ class WifiInfo:
         self.__update_mcs_and_rssi()
         self.__update_throughputs()
         self.__update_batman_neighbors()
+        self.__update_batman_originators()

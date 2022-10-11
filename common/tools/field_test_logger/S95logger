@@ -5,7 +5,7 @@ name="field_test_logger"
 # The path of the client executable
 command="/usr/bin/python3"
 # Any command line arguments for the client executable
-command_args="/usr/local/bin/field_test_logger.py"
+command_args="/usr/local/bin/field_test_logger.py $2"
 # The path of the daemon executable
 daemon="/usr/bin/daemon"
 

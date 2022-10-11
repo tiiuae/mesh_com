@@ -55,7 +55,7 @@ class FieldTestLogPlotter:
         :return: None
         """
         # Create dataframe from csv file.
-        self.df = pd.read_csv(self.filename)
+        self.df = pd.read_csv(self.filename, engine='python', on_bad_lines='warn')
         # Debug
         logger.debug(tabulate(self.df, headers='keys', tablefmt='psql'))
 
@@ -94,6 +94,9 @@ class FieldTestLogPlotter:
                                                         inplace=True)
         # Drop any DF lines where timestamp is NaN
         self.df.dropna(subset=['Timestamp'], inplace=True)
+        # Drop corrupted DF lines i.e. the ones where the
+        # last expected csv file column is empty.
+        self.df.dropna(subset=self.df.columns[-1], inplace=True)
         # Reindex DF after any possible line drops
         self.df.reset_index(drop=True, inplace=True)
 
@@ -313,6 +316,11 @@ class FieldTestLogPlotter:
         # Convert millidegree Celsius values to Celsius
         self.df['cpu temp [mC]'] = self.df['cpu temp [mC]'] / 1000
         self.df.rename(columns={'cpu temp [mC]': CPU_TEMP}, inplace=True)
+        if 'battery temp [mC]' in self.df.columns:
+            self.df['battery temp [mC]'] = self.df['battery temp [mC]'] / 1000
+        else:
+            self.df['battery temp [mC]'] = np.NaN
+        self.df.rename(columns={'battery temp [mC]': BATT_TEMP}, inplace=True)
         # In some logs Wi-Fi card temperature has been NaN. Treat it as zero.
         self.df.rename(columns={'wifi temp [mC]': WIFI_TEMP}, inplace=True)
         self.df[WIFI_TEMP].fillna(0, inplace=True)
@@ -351,7 +359,7 @@ class FieldTestLogPlotter:
     def plot_temp_voltage_and_current(self):
         """
         Plots temperatures, voltages and current as a function of time.
-        The first y-axis is for CPU, Wi-Fi card and TMP100 sensor temperatures.
+        The first y-axis is for CPU, Battery, Wi-Fi card and TMP100 sensor temperatures.
         The second y-axis is for battery, RF amd voltages and the third one for current.
 
         :return: None
@@ -381,6 +389,7 @@ class FieldTestLogPlotter:
         # Plot temperatures
         self.df.plot(title=figure_title,
                      ax=ax_temp, x='Timestamp', y=CPU_TEMP, color=COLOR_CPU_TEMP, lw=2)
+        self.df.plot(ax=ax_temp, x='Timestamp', y=BATT_TEMP, color=COLOR_BATT_TEMP, lw=2)
         self.df.plot(ax=ax_temp, x='Timestamp', y=WIFI_TEMP, color=COLOR_WIFI_TEMP, lw=2)
         self.df.plot(ax=ax_temp, x='Timestamp', y=TMP100, color=COLOR_TMP100, lw=2, grid=True,
                      xlabel=LABEL_TIME_SECONDS, ylabel=LABEL_TEMPERATURE,
@@ -438,7 +447,7 @@ class FieldTestLogPlotter:
     def plot_temperature_and_current(self):
         """
         Plots temperature and current values as a function of time.
-        The first y-axis is for CPU, Wi-Fi card and TMP100 sensor temperatures.
+        The first y-axis is for CPU, Battery, Wi-Fi card and TMP100 sensor temperatures.
         The second y-axis is for current values.
 
         :return: None
@@ -463,6 +472,7 @@ class FieldTestLogPlotter:
         # Plot temperatures
         self.df.plot(title=figure_title,
                      ax=ax_temp, x='Timestamp', y=CPU_TEMP, color=COLOR_CPU_TEMP, lw=2)
+        self.df.plot(ax=ax_temp, x='Timestamp', y=BATT_TEMP, color=COLOR_BATT_TEMP, lw=2)
         self.df.plot(ax=ax_temp, x='Timestamp', y=WIFI_TEMP, color=COLOR_WIFI_TEMP, lw=2)
         self.df.plot(ax=ax_temp, x='Timestamp', y=TMP100, color=COLOR_TMP100, lw=2, grid=True,
                      xlabel=LABEL_TIME_SECONDS, ylabel=LABEL_TEMPERATURE,
@@ -581,8 +591,8 @@ class FieldTestLogPlotter:
         :param x_axis: Name of the dataframe column to be used as X axis value.
                        Default value is 'Timestamp'. Other typical options:
                        'distance traveled [m]' or 'distance [m]'
-        :param x_start: Optional x axis slice start value. Default value is None.
-        :param x_stop: Optional x axis slice end value. Default value is None.
+        :param x_start: Optional x-axis slice start value. Default value is None.
+        :param x_stop: Optional x-axis slice end value. Default value is None.
 
         :return: None
         """
@@ -682,17 +692,15 @@ class FieldTestLogPlotter:
         # Rotate x-axis tick labels to make them fit better in the picture
         plt.setp(ax_signal_strength.get_xticklabels(), rotation=30, ha='right')
 
-        # TODO: Consider using fixed throughput scale. Scale (Mbps, Kbps etc.) could be
-        #  function parameter. It should ease up comparison of plots from different devices.
         # Determine y-axis scale
         if min(self.df['TX throughput [Bits/s]']) < min(self.df['RX throughput [Bits/s]']):
-            min_bitrate = int(min(self.df['TX throughput [Bits/s]']))
+            min_bitrate = min(self.df['TX throughput [Bits/s]'])
         else:
-            min_bitrate = int(min(self.df['RX throughput [Bits/s]']))
+            min_bitrate = min(self.df['RX throughput [Bits/s]'])
         if max(self.df['TX throughput [Bits/s]']) > max(self.df['RX throughput [Bits/s]']):
-            max_bitrate = int(max(self.df['TX throughput [Bits/s]']))
+            max_bitrate = max(self.df['TX throughput [Bits/s]'])
         else:
-            max_bitrate = int(max(self.df['RX throughput [Bits/s]']))
+            max_bitrate = max(self.df['RX throughput [Bits/s]'])
         y_interval = (max_bitrate - min_bitrate) / 10
         max_bitrate += y_interval
 
@@ -1081,8 +1089,8 @@ class FieldTestLogPlotter:
         max_timestamp += x_interval
 
         # Determine y-axis scale
-        min_bitrate = int(min(self.df['RX throughput [Bits/s]']))
-        max_bitrate = int(max(self.df['RX throughput [Bits/s]']))
+        min_bitrate = min(self.df['RX throughput [Bits/s]'])
+        max_bitrate = max(self.df['RX throughput [Bits/s]'])
         y_interval = (max_bitrate - min_bitrate) / 10
 
         if y_interval == 0:
@@ -1091,6 +1099,13 @@ class FieldTestLogPlotter:
             y_interval = int(y_interval)
         max_bitrate += y_interval
 
+        # Set throughput label names
+        rx_throughput_label = 'RX throughput [bit/s]'
+        if self.throughput_units == 'Kb':
+            rx_throughput_label = 'RX throughput [Kb/s]'
+        elif self.throughput_units == 'Mb':
+            rx_throughput_label = 'RX throughput [Mb/s]'
+
         subtitle = '_rx_throughput_per_time'
         figure_title = self.filename.replace(self.__homedir, '') + subtitle
 
@@ -1098,7 +1113,7 @@ class FieldTestLogPlotter:
                      grid=True, x='Timestamp', y='RX throughput [Bits/s]',
                      xticks=(np.arange(min_timestamp, max_timestamp, x_interval)),
                      yticks=(np.arange(min_bitrate, max_bitrate, y_interval)),
-                     label='RX throughput [bit/s]', color=COLOR_RX_THROUGHPUT, lw=2,
+                     label=rx_throughput_label, color=COLOR_RX_THROUGHPUT, lw=2,
                      figsize=FIGSIZE)
         # Label box upper right corner coordinate relative to base plot coordinate
         ax_throughput.legend(bbox_to_anchor=(-0.03, 1.0), loc='upper right')
@@ -1215,10 +1230,10 @@ if __name__ == '__main__':
             files = os.walk(subdir).__next__()[2]
             if len(files) > 0:
                 for file in files:
-                    if file.endswith(".csv"):
+                    if file.lower().endswith(".csv"):
                         csv_files.append(os.path.join(subdir, file))
     else:
-        if path.endswith(".csv"):
+        if path.lower().endswith(".csv"):
             csv_files.append(path)
 
     if not csv_files:
