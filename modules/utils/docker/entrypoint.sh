@@ -19,13 +19,12 @@ calculate_wifi_channel()
     fi
 }
 
-if [[ -z "${1}"  && -z "${2}" ]]; then
-    #mode="ap+mesh"
-    #ch="2412"
-    mode="mesh"
+if [ -f "/opt/mesh.conf" ]; then
+    source /opt/mesh.conf
+    mode=$CONCURRENCY
+    ch=$MCC_CHANNEL
 else
-   mode=$1
-   ch=$2
+    mode="mesh"
 fi
 
 if [ $mode == "provisioning" ]; then

@@ -63,8 +63,8 @@ elif [ "$OS" == "Buildroot" ]; then
 		chmod 755 /opt/container-data/mesh/mesh-11s.sh
 		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S9011sMesh /opt/container-data/mesh/.
 		chmod 755 /opt/container-data/mesh/S9011sMesh
-		cp /etc/umurmur.conf $meshcom_path/modules/utils/docker/umurmur.conf
         fi
+        cp /etc/umurmur.conf $meshcom_path/modules/utils/docker/umurmur.conf
         docker rm -f mesh_comms_vm
         docker run --name mesh_comms_vm -d --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm
         #Add restart policy of the container if it stops or device rebooted
