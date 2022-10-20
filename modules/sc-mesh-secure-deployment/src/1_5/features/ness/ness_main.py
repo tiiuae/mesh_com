@@ -86,7 +86,7 @@ class NESS:
                 latest_status_list.append(3)
                 flags_list.append(3)
         n = len(servers_list)
-        self.save_file_status(latest_status_list=latest_status_list, good_server_status_list=good_server_status_list, flags_list=flags_list, servers_list=servers_list)
+        self.save_file_status(latest_status_list=latest_status_list, good_server_status_list=good_server_status_list, flags_list=flags_list, servers_list=servers_list, mapp=mapp)
         return latest_status_list, good_server_status_list, flags_list, servers_list, n, mapp
 
     def run_decision(self, latest_status_list, good_server_status_list, flags_list, servers_list, n, i):

@@ -24,8 +24,8 @@ from features.quarantine import quarantine
 co = ConnectionMgr.ConnectionMgr()
 _executor = ThreadPoolExecutor()
 executor = ProcessPoolExecutor()
-mutual_int = 'wlan1'
-mesh_int = 'bat0'
+MUTUALINT = 'wlan1'
+MESHINT = 'bat0'
 client_q = {}
 ness = ness_main.NESS()
 qua = quarantine.Quarantine()
@@ -38,7 +38,7 @@ async def launchCA(ID, sectable):
     """
     with contextlib.suppress(OSError):
         ca = ca_main.CA(ID)
-    myip = co.get_ip_address(mesh_int)
+    myip = co.get_ip_address(MESHINT)
     max_count = 3
     flag_ctr = 0
     proc = multiprocessing.Process(target=ca.as_server, args=(myip,))
@@ -46,41 +46,43 @@ async def launchCA(ID, sectable):
     sleep(random.randint(1, 10))
     neigh = mesh_utils.get_macs_neighbors()
     for ne in neigh:
-        if ne not in sectable["MAC"]:  # means that this is neighbor but was authenticated by someone else
+        if ne not in sectable["MAC"].values:  # means that this is neighbor but was authenticated by someone else
             ne_ips = mesh_utils.get_neighbors_ip()
             for ip in ne_ips:
-                if ip not in sectable["IP"]:
+                if ip not in sectable["IP"].values:
                     info = {'ID': '---', 'MAC': ne, 'IP': ip,
                             'PubKey_fpr': "___", 'MA_level': -1}
-                    mut = mutual.Mutual(mutual_int)
+                    mut = mutual.Mutual(MUTUALINT)
                     mut.update_table(info)
-                IP = ip
-                sectable = pd.read_csv('auth/dev.csv')
         else:
             ind = sectable.index[sectable['MAC'] == ne].tolist()[0]
             IP = sectable.loc[ind]["IP"]
-        print("neighbor IP:", IP)
-        manager = multiprocessing.Manager()
-        return_dict = manager.dict()
-        p = multiprocessing.Process(target=ca.as_client, args=(IP, return_dict))
-        jobs = [p]
-        p.start()
-        for proc in jobs:
-            proc.join()
-        sleep(5)
-        for key in return_dict.keys():
-            count = np.unique(return_dict[key], return_counts=True)
-            if len(count[1]) > 1:
-                final = count[0][0] if count[1][0] > count[1][1] else count[0][1]
-            else:
-                final = count[0][0]
-        client_q[IP] = final
-        flag_ctr += 1
-        if flag_ctr == max_count:
-            p.terminate()
-            break
-    proc.terminate()
-    return client_q
+            if IP != myip:
+                print("neighbor IP:", IP)
+                manager = multiprocessing.Manager()
+                return_dict = manager.dict()
+                p = multiprocessing.Process(target=ca.as_client, args=(IP, return_dict))
+                jobs = [p]
+                p.start()
+                for proc in jobs:
+                    proc.join()
+                sleep(5)
+                for key in return_dict.keys():
+                    count = np.unique(return_dict[key], return_counts=True)
+                    if len(count[1]) > 1:
+                        final = count[0][0] if count[1][0] > count[1][1] else count[0][1]
+                    else:
+                        final = count[0][0]
+                try:
+                    client_q[IP] = final
+                except UnboundLocalError:
+                    print("Connection Refused")
+                flag_ctr += 1
+                if flag_ctr == max_count:
+                    p.terminate()
+                    break
+            proc.terminate()
+            return client_q
 
 
 def update_table_ca(df, result):
@@ -89,8 +91,6 @@ def update_table_ca(df, result):
     Note: this function should be called after the CA result is received.
     Note2: the new table is not being saved only converted to json and sent to the neighbors.
     """
-    filetable = 'auth/dev.csv'
-    old_table = pd.read_csv(filetable)
     df = df.assign(CA_Result=0)
     for index, row in df.iterrows():
         for res in result:
@@ -105,11 +105,47 @@ def update_table_ca(df, result):
                         df.loc[df['IP'] == IP, 'CA_Result'] = 3
                     df.loc[df['IP'] == IP, 'CA_ts'] = time()
     df.drop_duplicates(inplace=True)
-    if 'CA_Result' in set(old_table):
-        df.to_csv(filetable, mode='a', index=False)
-    else:
-        df.to_csv(filetable, mode='a', header=False, index=False)
     return df
+
+
+def continuous_authentication(sectable):
+    print("Starting Continuous Authentication")
+    loop_ca = asyncio.get_event_loop()
+    ca_task = loop_ca.create_task(launchCA(random.randint(1000, 64000), sectable))
+    with contextlib.suppress(asyncio.CancelledError):
+        result = loop_ca.run_until_complete(asyncio.gather(ca_task))
+    if result[0] is not None:
+        sectable = update_table_ca(sectable, result)
+        return sectable
+    else:
+        return None
+
+
+def only_ca():
+    try:
+        table = 'auth/dev.csv'
+        filetable = pd.read_csv(table)
+        filetable.drop_duplicates(inplace=True)
+        if not filetable.empty:
+            sectable = continuous_authentication(filetable)
+            if sectable is not None:
+                received = exchage_table(sectable)
+                for ind in received:
+                    new = pd.read_json(received[ind].decode())
+                    sectable = pd.concat([sectable, new], ignore_index=True)
+                sectable.drop_duplicates(inplace=True)
+                if 'CA_Result' in set(sectable):
+                    sectable.to_csv(table, index=False)
+                else:
+                    sectable.to_csv(table, mode='a', header=False, index=False)
+                return sectable
+            print("End of Continuous Authentication")
+
+        else:
+            print("Empty Security Table")
+            exit()
+    except FileNotFoundError:
+        print("SecTable not available. Need to be requested during provisioning")
 
 
 def exchage_table(df):
@@ -142,7 +178,7 @@ def client(q, debug=False):
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sock.bind(("0.0.0.0", 5005))
     data, addr = sock.recvfrom(1024)
-    print("mba: message received")
+    print("Message received")
     if debug:
         print(data, addr)
     q.put(data)
@@ -190,17 +226,6 @@ def checkiptables():
         subprocess.call(command, shell=False)
 
 
-def continuous_authentication(sectable):
-    print("Starting Continuous Authentication")
-    loop_ca = asyncio.get_event_loop()
-    ca_task = loop_ca.create_task(launchCA(random.randint(1000, 64000), sectable))
-    with contextlib.suppress(asyncio.CancelledError):
-        result = loop_ca.run_until_complete(asyncio.gather(ca_task))
-    sectable = update_table_ca(sectable, result)
-    print("End of Continuous Authentication")
-    return sectable
-
-
 def decision_engine(first_round, ness_result, sectable, ma, q):
     print("Starting Decision Engine")
     if first_round:
@@ -227,13 +252,7 @@ def sec_beat(first_round, ness_result):
     q = queue.Queue()
     checkiptables()
     ma = mba.MBA(mesh_utils.get_mesh_ip_address())
-    sectable = pd.read_csv('auth/dev.csv')
-    sectable.drop_duplicates(inplace=True)
-    sectable = continuous_authentication(sectable)
-    received = exchage_table(sectable)
-    for ind in received:
-        new = pd.read_json(received[ind].decode())
-        sectable = pd.concat([sectable, new], ignore_index=True)
+    sectable = only_ca()
     ness_result, first_round, mapp = decision_engine(first_round, ness_result, sectable, ma, q)
     quarantine(ness_result, q, sectable, ma, mapp)
     return first_round, ness_result
@@ -241,7 +260,7 @@ def sec_beat(first_round, ness_result):
 
 def mutual_authentication():
     print("Starting Mutual Authentication")
-    mut = mutual.Mutual(mutual_int)
+    mut = mutual.Mutual(MUTUALINT)
     loop = asyncio.get_event_loop()
     mutual_task = loop.create_task(mut.start())
     with contextlib.suppress(asyncio.CancelledError):
