@@ -1,7 +1,11 @@
+#! /usr/bin/python3
+
 from new_main import *
 from features.mutual import mutual
 import os
+from time import time, sleep
 from features.mutual.utils import primitives as pri
+from features.mutual.utils import wifi_ssrc as wf
 
 menu_options = {
     1: 'Mutual Authentication (MA)',
@@ -10,7 +14,9 @@ menu_options = {
     4: 'Continuous Authentication (CA) + Decision Engine',
     5: 'Show Security Table',
     6: 'Check Neighbors',
-    7: "Exit"
+    7: 'Security Beat',
+    8: 'Quarantine',
+    9: "Exit"
 }
 
 
@@ -28,6 +34,9 @@ def banner():
     """)
 
 
+AUTHSERVER = False
+
+
 def print_menu():
     banner()
     for key in menu_options.keys():
@@ -36,7 +45,7 @@ def print_menu():
 
 def aux_auth():
     while True:
-        mut = mutual.Mutual(mutual_int)
+        mut = mutual.Mutual(MUTUALINT)
         client, addr = mut.server()
         sig, client_cert, cliID = mut.decode_cert(client)
         node_name = addr[0].replace('.', '_')
@@ -45,15 +54,18 @@ def aux_auth():
 
 
 def option1():
+    global AUTHSERVER
     print('\'Mutual Authentication\'')
-    mutual_authentication()
+    if not AUTHSERVER:  # already
+        mutual_authentication()
+        AUTHSERVER = True
     p = threading.Thread(target=aux_auth, daemon=True, args=())
     p.start()
 
 
 def option2():
     print('\'Run Only Mesh\'')
-    mut = mutual.Mutual(mutual_int)
+    mut = mutual.Mutual(MUTUALINT)
     try:
         mut.start_mesh()
     except TypeError:
@@ -66,20 +78,7 @@ def option3():
     if not mesh_utils.verify_mesh_status():  # verifying that mesh is running
         print("Mesh network not established")
         option2()
-    try:
-        sectable = pd.read_csv('auth/dev.csv')
-        if not sectable.empty:
-            sectable = continuous_authentication(sectable)
-            received = exchage_table(sectable)
-            for ind in received:
-                new = pd.read_json(received[ind].decode())
-                sectable = pd.concat([sectable, new], ignore_index=True)
-            return sectable
-        else:
-            print("Empty Security Table")
-            exit()
-    except FileNotFoundError:
-        print("SecTable not available. Need to be requested during provisioning")
+    return only_ca()
 
 
 def option4():
@@ -87,6 +86,7 @@ def option4():
     sectable = option3()
     ness_result, first_round, mapp = decision_engine(True, {}, sectable, mba.MBA(mesh_utils.get_mesh_ip_address()),
                                                      queue.Queue())
+    return ness_result, first_round, mapp
 
 
 def option5():
@@ -108,12 +108,36 @@ def option6():
     if mesh_utils.verify_mesh_status():  # verifying that mesh is running
         neigh = mesh_utils.get_macs_neighbors()
         for ne in neigh:
-            print(str(ne) + ' connected')
+            print(f'{str(ne)} connected')
     else:
         print("No mesh established")
 
 
+def option7():
+    original_time = time()
+    end_time = 60  # one minute
+    sec_beat_time = 5
+    os.system('clear')
+    print('\'SecBeat\'')
+    print(f'Running SecBeat every {sec_beat_time} seconds, during {end_time} minute')
+    first_round = True  # flag for the decision engine. If not information available, create a table.
+    ness_result = {}
+    while time() < original_time + end_time:
+        if mesh_utils.verify_mesh_status():  # verifying that mesh is running
+            sleep(sec_beat_time - time() % sec_beat_time)  # sec beat time
+            first_round, ness_result = sec_beat(first_round, ness_result)
+
+
+def option8():
+    os.system('clear')
+    print('\'Quarantine\'')
+    q = queue.Queue()
+
+    # quarantine(ness_result, q, sectable, ma, mapp)
+
+
 if __name__ == '__main__':
+    wf.killall('wlan1')
     while True:
         print_menu()
         option = ''
@@ -123,7 +147,7 @@ if __name__ == '__main__':
             print('Wrong input. Please enter a number ...')
         # Check what choice was entered and act accordingly
         if option == 1:
-            option1()  # 'Mutual Authentication (MA)',
+            option1()  # 1: 'Mutual Authentication (MA)',
         elif option == 2:
             option2()  # 2: 'Only Mesh Network',
         elif option == 3:
@@ -135,7 +159,11 @@ if __name__ == '__main__':
         elif option == 6:
             option6()  # 6: 'Check Neighbors',
         elif option == 7:
+            option7()  # 7: 'SecBeat',
+        elif option == 8:
+            option8()  # 8: 'Quarantine',
+        elif option == 9:
             print('Exiting....')
             exit()
         else:
-            print('Invalid option. Please enter a number between 1 and 7.')
+            print('Invalid option. Please enter a number between 1 and 9.')

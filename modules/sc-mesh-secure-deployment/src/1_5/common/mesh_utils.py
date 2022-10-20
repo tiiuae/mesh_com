@@ -109,7 +109,7 @@ def get_neighbors_ip():
 
     # start the thread pool
     for i in range(num_threads):
-        worker = Thread(target=thread_pinger, args=(i, ips_q), daemon=True).start()
+        worker = Thread(target=thread_pinger, args=(i ,ips_q), daemon=True).start()
 
     # fill queue
     for ip in ips:
