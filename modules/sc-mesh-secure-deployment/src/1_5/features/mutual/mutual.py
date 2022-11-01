@@ -136,8 +136,11 @@ class Mutual:
         sig = self.signature()
         client_sig = client[:len(sig)]
         client_cert = client[len(sig):]
-        cliID = client[-5:] ##### ID must be 5 bits
-        return client_sig, client_cert, cliID.decode('utf-8')
+        cliID = client[-5:]  ##### ID must be 5 bits
+        try:
+            return client_sig, client_cert, cliID.decode('utf-8')
+        except AttributeError:
+            return client_sig, client_cert, cliID
 
     def set_password(self, node_name):
         password = co.get_password()
@@ -185,6 +188,7 @@ class Mutual:
             TypeError
             print("No password provided for the mesh. Please get the password via provisioning server")
             exit()
+
     def define_role(self):
         candidate = wf.scan_wifi(self.interface)  # scan wifi to authenticate with
         if candidate:  # client
@@ -193,12 +197,16 @@ class Mutual:
             cli = True
         else:  # server
             client, addr = self.server()
-            sig, client_cert, cliID = self.decode_cert(client)
-            print("Client ID", cliID)
-            print('4) local key')
-            self.exchange(cliID, addr[0])
-            cli = False
+            client_cert, sig, cliID, cli = self.send_my_key(client, addr)
         return addr, client_cert, sig, cliID, cli
+
+    def send_my_key(self, client, addr):
+        sig, client_cert, cliID = self.decode_cert(client)
+        print("Client ID", cliID)
+        print('4) local key')
+        self.exchange(cliID, addr[0])
+        cli = False
+        return client_cert, sig, cliID, cli
 
     def cert_validation(self, sig, node_name, cliID, cli, addr):
         if pri.verify_certificate(sig, node_name, self.digest(), self.root_cert):
@@ -227,7 +235,7 @@ class Mutual:
                     fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode(), self.interface)
                 client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
             elif pri.verify_certificate(sig, node_name, self.digest(), self.root_cert):
-                print(colored('> Valid Certificate', 'green'))
+                # print(colored('> Valid Certificate', 'green'))
                 print("4.1) Setting Password")
                 encrypt_pass = self.set_password(node_name)
                 self.start_mesh()
@@ -244,9 +252,7 @@ class Mutual:
             pri.delete_key(node_name)
             os.remove(node_name + '.der')
 
-
     async def start(self):
-        set_mesh = False
         addr, client_cert, sig, cliID, cli = self.define_role()
         node_name = addr[0].replace('.', '_')
         pri.import_cert(client_cert, node_name)
