@@ -1,11 +1,6 @@
 #! /usr/bin/python3
 
 from new_main import *
-from features.mutual import mutual
-import os
-from time import time, sleep
-from features.mutual.utils import primitives as pri
-from features.mutual.utils import wifi_ssrc as wf
 
 menu_options = {
     1: 'Mutual Authentication (MA)',
@@ -15,8 +10,9 @@ menu_options = {
     5: 'Show Security Table',
     6: 'Check Neighbors',
     7: 'Security Beat',
-    8: 'Quarantine',
-    9: "Exit"
+    8: 'Exchange Table',
+    9: 'Quarantine',
+    0: "Exit"
 }
 
 
@@ -43,23 +39,26 @@ def print_menu():
         print(key, '--', menu_options[key])
 
 
-def aux_auth():
+def aux_auth(semasphore):
     while True:
-        mut = mutual.Mutual(MUTUALINT)
-        client, addr = mut.server()
-        sig, client_cert, cliID = mut.decode_cert(client)
-        node_name = addr[0].replace('.', '_')
-        pri.import_cert(client_cert, node_name)
-        mut.cert_validation(sig, node_name, cliID, False, addr)
+        with semasphore:
+            mut = mutual.Mutual(MUTUALINT)
+            client, addr = mut.server()
+            sig, client_cert, cliID = mut.decode_cert(client)
+            node_name = addr[0].replace('.', '_')
+            pri.import_cert(client_cert, node_name)
+            mut.send_my_key(cliID, addr)
+            mut.cert_validation(sig, node_name, cliID, False, addr)
 
 
 def option1():
+    semasphore = threading.Semaphore(2)
     global AUTHSERVER
     print('\'Mutual Authentication\'')
     if not AUTHSERVER:  # already
         mutual_authentication()
         AUTHSERVER = True
-    p = threading.Thread(target=aux_auth, daemon=True, args=())
+    p = threading.Thread(target=aux_auth, daemon=True, args=(semasphore,))
     p.start()
 
 
@@ -68,6 +67,17 @@ def option2():
     mut = mutual.Mutual(MUTUALINT)
     try:
         mut.start_mesh()
+        mut.create_table()
+        sleep(2)
+        if mesh_utils.verify_mesh_status():  # verifying that mesh is running
+            print("Mesh Running")
+            mesh_utils.get_neighbors_ip()
+            neigh = mesh_utils.get_arp()
+            for ne in neigh:
+                info = {'ID': ne, 'MAC': neigh[ne], 'IP': ne,
+                        'PubKey_fpr': "----", 'MA_level': 1}
+                print(info)
+                mut.update_table(info)
     except TypeError:
         print("No password provided for the mesh. Please get the password via provisioning server")
         exit()
@@ -78,7 +88,7 @@ def option3():
     if not mesh_utils.verify_mesh_status():  # verifying that mesh is running
         print("Mesh network not established")
         option2()
-    return only_ca()
+    return only_ca(mod=True)
 
 
 def option4():
@@ -130,6 +140,24 @@ def option7():
 
 def option8():
     os.system('clear')
+    print('\'Exchange Security Table\'')
+    table = 'auth/dev.csv'
+    try:
+        sectable = pd.read_csv(table)
+        sectable.drop_duplicates(inplace=True)
+        received = exchage_table(sectable, True)
+        print(received)
+        for ind in received:
+            new = pd.read_json(received[ind].decode())
+            sectable = pd.concat([sectable, new], ignore_index=True)
+        sectable.drop_duplicates(inplace=True)
+        sectable.to_csv(table, mode='w', header=True, index=False)
+    except FileNotFoundError:
+        print("SecTable not available. Need to be requested during provisioning")
+
+
+def option9():
+    os.system('clear')
     print('\'Quarantine\'')
     q = queue.Queue()
 
@@ -161,9 +189,12 @@ if __name__ == '__main__':
         elif option == 7:
             option7()  # 7: 'SecBeat',
         elif option == 8:
-            option8()  # 8: 'Quarantine',
+            option8()  # 8: 'Exchange Table',
         elif option == 9:
+            option8()  # 9: 'Quarantine',
+        elif option == 0:
             print('Exiting....')
-            exit()
+            # needs to close all the threads
+            sys.exit()
         else:
-            print('Invalid option. Please enter a number between 1 and 9.')
+            print('Invalid option. Please enter a number between 0 and 9.')

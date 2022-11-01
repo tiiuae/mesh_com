@@ -82,7 +82,7 @@ def get_neighbors_ip():
     # build IP array
     ips = []
     final = []
-    for i in range(1, 50):
+    for i in range(1, 10):
         ips.append('.'.join(aux) + '.' + str(i))
 
     def thread_pinger(i, q):
@@ -109,7 +109,7 @@ def get_neighbors_ip():
 
     # start the thread pool
     for i in range(num_threads):
-        worker = Thread(target=thread_pinger, args=(i ,ips_q), daemon=True).start()
+        worker = Thread(target=thread_pinger, args=(i, ips_q), daemon=True).start()
 
     # fill queue
     for ip in ips:
@@ -127,3 +127,21 @@ def get_neighbors_ip():
         final.append(msg)
     final.remove(my_ip)
     return final
+
+
+def get_arp():
+    neig = {}
+    # get_neighbors_ip()
+    # time.sleep(2)
+    args = ['ip', 'neigh', 'show', 'dev', 'bat0', 'nud', 'stale']
+    output = subprocess.check_output(args, shell=False)
+
+    aux = output.decode().split('\n')
+    aux.remove('')
+    for entry in aux:
+        string = entry.split()
+        ip = string[0]
+        if len(ip.split('.')) > 1:
+            mac = string[-2]
+            neig[ip] = mac
+    return neig
