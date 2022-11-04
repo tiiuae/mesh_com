@@ -40,6 +40,26 @@ async def launchCA(sectable):
     return client_q
 
 
+# if not mod:
+#     neigh = mesh_utils.get_macs_neighbors()
+#     for ne in neigh:
+#         if ne not in sectable["MAC"].values:  # means that this is neighbor but was authenticated by someone else
+#             ne_ips = mesh_utils.get_neighbors_ip()
+#             for ip in ne_ips:
+#                 if ip not in sectable["IP"].values:
+#                     info = {'ID': '---', 'MAC': ne, 'IP': ip,
+#                             'PubKey_fpr': "___", 'MA_level': -1}
+#                     mut = mutual.Mutual(MUTUALINT)
+#                     mut.update_table(info)
+#         sectable = pd.read_csv('aux/dev.csv')
+#         ind = sectable.index[sectable['MAC'] == ne].tolist()[0]
+#         IP = sectable.loc[ind]["IP"]
+#         if IP != myip:
+#             flag_ctr = ca_client(IP, flag_ctr, max_count, ca)
+# else:  # modular version MAC are not the ones in neighbors but are the bat0
+#     neigh = mesh_utils.get_arp()
+
+
 def ca_server(myip):
     with contextlib.suppress(OSError):
         ca = CA(random.randint(1000, 64000))
@@ -61,13 +81,10 @@ def ca_client(IP, flag_ctr, max_count, ca):
     sleep(5)
     for key in return_dict.keys():
         count = np.unique(return_dict[key], return_counts=True)
-        try:
-            if len(count[1]) > 1:
-                final = count[0][0] if count[1][0] > count[1][1] else count[0][1]
-            else:
-                final = count[0][0]
-        except IndexError:
-            final = 1
+        if len(count[1]) > 1:
+            final = count[0][0] if count[1][0] > count[1][1] else count[0][1]
+        else:
+            final = count[0][0]
     try:
         client_q[IP] = final
     except UnboundLocalError:
@@ -80,14 +97,13 @@ def ca_client(IP, flag_ctr, max_count, ca):
     return flag_ctr
 
 
-def update_table_ca(df, result, myID):
-    print(result)
+def update_table_ca(df, result):
     """
     function to update the mutual authentication table with the CA result.
     Note: this function should be called after the CA result is received.
     Note2: the new table is not being saved only converted to json and sent to the neighbors.
     """
-    #myID = int(list(set(df.loc[df['IP'] == co.get_ip_address(MESHINT), "ID"]))[0])
+    myID = int(list(set(df.loc[df['IP'] == co.get_ip_address(MESHINT), "ID"]))[0])
     df = df.assign(CA_Result=0)
     for index, row in df.iterrows():
         for res in result:
@@ -96,11 +112,11 @@ def update_table_ca(df, result, myID):
                     IP = row['IP']
                     if res[ip] in ['pass', 1]:
                         df.loc[index, 'CA_Result'] = 1
-                    elif res[ip] == 'fail' or res[ip] == 0:
+                    elif res[ip] == 'fail':
                         df.loc[df['IP'] == IP, 'CA_Result'] = 2
                     else:
                         df.loc[df['IP'] == IP, 'CA_Result'] = 3
                     # df.loc[df['IP'] == IP, 'CA_ts'] = time()
-                    df.loc[df['IP'] == IP, 'CA_Server'] = myID
+                    df.loc[df['IP'] == IP, 'CA_server'] = myID
     df.drop_duplicates(inplace=True)
     return df
