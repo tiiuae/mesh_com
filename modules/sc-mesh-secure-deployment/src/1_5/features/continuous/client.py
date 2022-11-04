@@ -83,6 +83,7 @@ def initiate_client(server_ip, ID, return_dict):
                         break
                     print("Resending message")
                     c.send(msg_with_crc_bytes)  # Resend message to server
+                print("IP: ", server_ip)
                 print("Result = ", result)
                 print('*********************************************************************')
                 print(' ')
@@ -108,7 +109,7 @@ def initiate_client(server_ip, ID, return_dict):
         return_dict[auth_result] = partial_result
         print("Share storage cost: ", sys.getsizeof(sent_shares))
         return result["auth_result"]
-    except ConnectionRefusedError:
+    except (ConnectionRefusedError, OSError):
         return_dict = 3
         return 3
 

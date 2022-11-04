@@ -167,7 +167,7 @@ def initiate_server(ip):
         print('Client address:', addr)
         print(' ')
         # start thread to handle client
-        Thread(target=multi_threaded_client, args=(c, addr, lock)).start()
+        Thread(target=multi_threaded_client, args=(c, addr, lock), daemon=True).start()
     c.send(bytes('Closing connection', 'utf-8'))
     c.close()  # close client socket
     print('Connection closed')
