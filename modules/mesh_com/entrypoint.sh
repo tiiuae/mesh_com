@@ -6,6 +6,34 @@ source /opt/ros/galactic/setup.bash
 # (other Python packages seem to reside under /usr/lib/python3/dist-packages)
 export PYTHONPATH=/opt/ros/galactic/lib/python3.8/site-packages
 
+# Needed in order to make ROS2 nodes exit gracefully.
+# SIGTERM signal is converted to SIGINT.
+_term() {
+    # FILL UP PROCESS SEARCH PATTERN HERE TO FIND PROPER PROCESS FOR SIGINT:
+    pattern="mesh_com/mesh_publisher"
+    pid_value="$(ps -ax | grep $pattern | grep -v grep | awk '{ print $1 }')"
+    if [ "$pid_value" != "" ]; then
+        pid=$pid_value
+        echo "Send SIGINT to pid $pid"
+    else
+        pid=1
+        echo "Pattern not found, send SIGINT to pid $pid"
+    fi
+    kill -s SIGINT $pid
+
+    pattern="mesh_com/mesh_subscriber"
+    pid_value="$(ps -ax | grep $pattern | grep -v grep | awk '{ print $1 }')"
+    if [ "$pid_value" != "" ]; then
+        pid=$pid_value
+        echo "Send SIGINT to pid $pid"
+    else
+        pid=1
+        echo "Pattern not found, send SIGINT to pid $pid"
+    fi
+    kill -s SIGINT $pid
+}
+trap _term SIGTERM
+
 if [ "$1" == "init" ]; then
     echo "Start mesh executor"
 
@@ -81,6 +109,18 @@ else
     # Start mesh publisher
     ros2 run mesh_com mesh_publisher --ros-args -r __ns:=/$DRONE_DEVICE_ID &
     # Start mesh subscriber
-    ros2 run mesh_com mesh_subscriber --ros-args -r __ns:=/$DRONE_DEVICE_ID
+    ros2 run mesh_com mesh_subscriber --ros-args -r __ns:=/$DRONE_DEVICE_ID &
+    child=$!
+    echo "Waiting for pid $child"
+    wait $child
+    RESULT=$?
+
+    if [ $RESULT -ne 0 ]; then
+	    echo "ERROR: Mesh pub&sub node failed with code $RESULT" >&2
+        exit $RESULT
+    else
+        echo "INFO: Mesh pub&sub node finished successfully, but returning 125 code for docker to restart properly." >&2
+        exit 125
+    fi
 
 fi
