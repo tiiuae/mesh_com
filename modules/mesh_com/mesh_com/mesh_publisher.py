@@ -4,6 +4,8 @@ from rclpy.qos import QoSPresetProfiles
 
 from std_msgs.msg import String
 import socket
+import signal
+
 from .src.socket_helper import recv_msg, send_msg
 
 
@@ -40,19 +42,28 @@ class MeshPublisher(Node):
         self.mesh_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.mesh_socket.settimeout(1)
 
+# Python does not register SIGINT if it is not called from an interactive shell.
+# So we need our own signal handler.
+def sigint_handler(_signo, _stack_frame):
+    raise KeyboardInterrupt
 
 def main(args=None):
+    signal.signal(signal.SIGINT, sigint_handler)
+
     rclpy.init(args=args)
 
     mesh_publisher = MeshPublisher()
 
-    rclpy.spin(mesh_publisher)
-
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    mesh_publisher.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(mesh_publisher)
+    finally:
+        # Destroy the node explicitly
+        # (optional - otherwise it will be done automatically
+        # when the garbage collector destroys the node object)
+        print('mesh_publisher.destroy_node')
+        mesh_publisher.destroy_node()
+        print('rclpy.shutdown')
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':

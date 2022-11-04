@@ -6,6 +6,7 @@ from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSHistoryPolicy
 from std_msgs.msg import String
 import socket
+import signal
 
 from .src.socket_helper import send_msg
 
@@ -64,19 +65,28 @@ class MeshSubscriber(Node):
             self.backup_timer = self.create_timer(
                 2.0, self.backup_caller)
 
+# Python does not register SIGINT if it is not called from an interactive shell.
+# So we need our own signal handler.
+def sigint_handler(_signo, _stack_frame):
+    raise KeyboardInterrupt
 
 def main(args=None):
+    signal.signal(signal.SIGINT, sigint_handler)
+
     rclpy.init(args=args)
 
     mesh_subscriber = MeshSubscriber()
 
-    rclpy.spin(mesh_subscriber)
-
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    mesh_subscriber.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(mesh_subscriber)
+    finally:
+        # Destroy the node explicitly
+        # (optional - otherwise it will be done automatically
+        # when the garbage collector destroys the node object)
+        print('mesh_subscriber.destroy_node')
+        mesh_subscriber.destroy_node()
+        print('rclpy.shutdown')
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
