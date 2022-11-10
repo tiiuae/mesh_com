@@ -1,4 +1,7 @@
-#!/bin/bash -e
+#!/bin/bash
+# Do not use -e flag in this script.
+# -e will cause the script to exit after first wait command and
+# the ROS2 node will not have the oportunity exit gracefully.
 
 source /opt/ros/galactic/setup.bash
 
@@ -32,7 +35,8 @@ _term() {
     fi
     kill -s SIGINT $pid
 }
-trap _term SIGTERM
+# Use SIGTERM or TERM, does not seem to make any difference.
+trap _term TERM
 
 if [ "$1" == "init" ]; then
     echo "Start mesh executor"
@@ -102,21 +106,29 @@ if [ "$1" == "init" ]; then
     # route add default gw $gateway_ip bat0
     # sleep 86400
 else
-    echo "Start mesh pub&sub"
+    echo "INFO: Start mesh pub&sub"
 
     mkdir -p ~/.ros/log
 
     # Start mesh publisher
-    ros2 run mesh_com mesh_publisher --ros-args -r __ns:=/$DRONE_DEVICE_ID &
+    ros-with-env ros2 run mesh_com mesh_publisher --ros-args -r __ns:=/$DRONE_DEVICE_ID &
+    pub_child=$!
     # Start mesh subscriber
-    ros2 run mesh_com mesh_subscriber --ros-args -r __ns:=/$DRONE_DEVICE_ID &
-    child=$!
-    echo "Waiting for pid $child"
-    wait $child
+    ros-with-env ros2 run mesh_com mesh_subscriber --ros-args -r __ns:=/$DRONE_DEVICE_ID &
+    sub_child=$!
+    echo "INFO: Waiting for subscriber pid $sub_child"
+    # Calling "wait" will then wait for the job with the specified by $child to finish, or for any signals to be fired.
+    # Due to "or for any signals to be fired", "wait" will also handle SIGTERM and it will shutdown before
+    # the node ends gracefully.
+    # The solution is to add a second "wait" call and remove the trap between the two calls.
+    wait $sub_child
+    trap - TERM
+    wait $sub_child
+    wait $pub_child
     RESULT=$?
 
     if [ $RESULT -ne 0 ]; then
-	    echo "ERROR: Mesh pub&sub node failed with code $RESULT" >&2
+        echo "ERROR: Mesh pub&sub node failed with code $RESULT" >&2
         exit $RESULT
     else
         echo "INFO: Mesh pub&sub node finished successfully, but returning 125 code for docker to restart properly." >&2
