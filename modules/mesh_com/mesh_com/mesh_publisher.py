@@ -56,14 +56,18 @@ def main(args=None):
 
     try:
         rclpy.spin(mesh_publisher)
+    except KeyboardInterrupt:
+        # Hide the KeyboardInterrupt exception not handled.
+        pass
     finally:
         # Destroy the node explicitly
         # (optional - otherwise it will be done automatically
         # when the garbage collector destroys the node object)
-        print('mesh_publisher.destroy_node')
+        print('INFO: mesh_publisher.destroy_node')
         mesh_publisher.destroy_node()
-        print('rclpy.shutdown')
+        print('INFO: rclpy.shutdown')
         rclpy.shutdown()
+        print('INFO: Publisher node shutdown gracefully.')
 
 
 if __name__ == '__main__':
