@@ -1,7 +1,4 @@
-#!/bin/bash
-# Do not use -e flag in this script.
-# -e will cause the script to exit after first wait command and
-# the ROS2 node will not have the oportunity exit gracefully.
+#!/bin/bash -e
 
 source /opt/ros/galactic/setup.bash
 
@@ -117,11 +114,14 @@ else
     ros-with-env ros2 run mesh_com mesh_subscriber --ros-args -r __ns:=/$DRONE_DEVICE_ID &
     sub_child=$!
     echo "INFO: Waiting for subscriber pid $sub_child"
-    # Calling "wait" will then wait for the job with the specified by $child to finish, or for any signals to be fired.
-    # Due to "or for any signals to be fired", "wait" will also handle SIGTERM and it will shutdown before
-    # the node ends gracefully.
-    # The solution is to add a second "wait" call and remove the trap between the two calls.
-    wait $sub_child
+    # * Calling "wait" will then wait for the job with the specified by $child to finish, or for any signals to be fired.
+    #   Due to "or for any signals to be fired", "wait" will also handle SIGTERM and it will shutdown before
+    #   the node ends gracefully.
+    #   The solution is to add a second "wait" call and remove the trap between the two calls.
+    # * Do not use -e flag in the first wait call because wait will exit with error after catching SIGTERM.
+    set +e
+    wait $child
+    set -e
     trap - TERM
     wait $sub_child
     wait $pub_child
