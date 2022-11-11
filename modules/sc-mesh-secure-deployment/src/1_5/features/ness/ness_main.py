@@ -34,8 +34,8 @@ class NESS:
         out = []
         for i in range(n):
             l = len(sec_list[i])
-            if sec_list[i][l - 1] == 1:
-                out.append(i)
+            #if sec_list[i][l - 1] == 1: # commenting this, let's assume all are benign
+            out.append(i)
         return out
 
     def create_servers_flags_list(self, sec_list, n, p):
@@ -54,14 +54,14 @@ class NESS:
     def get_table(self, df):
         flags_map = {65: 1, 131: 2, 132: 2, 133: 2, 134: 2, 194: 3}  # needs to add disconection (-1)
         mappids = self.mapping(set(df["ID"].tolist()))
-        df2 = df.replace({"CA_server": mappids})
+        df2 = df.replace({"CA_Server": mappids})
         # df2 = df2.replace({"ID": mapp})
         new_list = []
         last_status = []
         for i in df2["ID"]:
-            df2.loc[df2['CA_server'].isnull(), "CA_server"] = list(pd.Series(i).map(mappids))[0]
+            df2.loc[(df2['CA_Server'].isnull()) & (df2["ID"] == i), "CA_Server"] = int(list(pd.Series(i).map(mappids))[0])
             table = [list(pd.Series(i).map(mappids))[0]]
-            servers = list(df2.loc[df2['ID'] == i, "CA_server"])
+            servers = list(df2.loc[df2['ID'] == i, "CA_Server"])
             table.append(servers)
             flags = list(df2.loc[df2['ID'] == i, "CA_Result"])
             table.append(flags)
@@ -227,19 +227,19 @@ class NESS:
                 #
                 # Preparing tuples for the query into Pyke engine
                 #
-                if latest_status:
-                    f = open('last_result.json')
-                    json_object = json.load(f)
-                    latest_status_list = json_object['latest_status_list']
-                    good_server_status_list = json_object['good_server_status_list']
-                    flags_list = json_object['flags_list']
-                    servers_list = json_object['servers_list']
-                    mapp = json_object['mapp']
-                else:
-                    latest_status_list = tuple(init_latest_status_list)
-                    good_server_status_list = tuple(init_good_server_status_list)
-                    flags_list = tuple(init_flags_table[i])
-                    servers_list = tuple(init_servers_table[i])
+                # if latest_status:
+                #     f = open('last_result.json')
+                #     json_object = json.load(f)
+                #     latest_status_list = json_object['latest_status_list']
+                #     good_server_status_list = json_object['good_server_status_list']
+                #     flags_list = json_object['flags_list']
+                #     servers_list = json_object['servers_list']
+                #     mapp = json_object['mapp']
+                # else:
+                latest_status_list = tuple(init_latest_status_list)
+                good_server_status_list = tuple(init_good_server_status_list)
+                flags_list = tuple(init_flags_table[i])
+                servers_list = tuple(init_servers_table[i])
                 nt = tuple(n_list)
                 it = tuple(i_list)
 
