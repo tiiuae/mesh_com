@@ -55,7 +55,6 @@ class Mutual:
         """
         self.interface = interface
         print('Loading keys')
-        self.table = self.create_table()
         self.root_cert = root_cert
         self.local_cert = local_cert
         self.debug = True
@@ -64,6 +63,8 @@ class Mutual:
         print("loading root_cert")
         pri.import_cert(root_cert, 'root')
         print("my ID: ", self.myID)
+        self.table = self.create_table()
+
 
     def create_table(self):
         '''
@@ -241,6 +242,9 @@ class Mutual:
                 self.start_mesh()
                 client_mac, client_mesh_ip = self.send_password(cliID, addr, self.my_mac_mesh, self.my_ip_mesh,
                                                                 encrypt_pass)
+            info = {'ID': self.myID, 'MAC': self.my_mac_mesh, 'IP': self.my_ip_mesh,
+                    'PubKey_fpr': pri.hashSig(local_cert)[0], 'MA_level': 1}
+            self.update_table(info)
             info = {'ID': cliID, 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(),
                     'PubKey_fpr': client_fpr, 'MA_level': 1}
             self.update_table(info)  # #update csv file
