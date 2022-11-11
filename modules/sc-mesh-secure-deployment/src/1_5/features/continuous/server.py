@@ -20,7 +20,8 @@ def multi_threaded_client(c, addr, lock):
     c.send(bytes('Connected to server', 'utf-8'))  # Transmit tcp msg as a byte with encoding format str to client
 
     # Session Initializations Parameters
-    secret = 1234  # this should be stored on HSM
+    #secret = 1234  # this should be stored on HSM
+    secret=int(open("secret.txt",'r').read())
     total_period = 20  # Total period for the session
     period = 2  # Period for continuous authentication
     time_margin = 0.2 * period  # Time margin for freshness = 20 % of period

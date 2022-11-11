@@ -1,0 +1,7 @@
+Status,CodeValue,SecurityLevel
+Nothing to Signal,65.0,1.0
+Uncertain,131.0,2.0
+Not Checked,132.0,2.0
+SecTable data Consistency or Servers trust Issues,133.0,2.0
+SecTable data Consistency for Not Checked case,134.0,2.0
+Suspected Malicious,194.0,3.0

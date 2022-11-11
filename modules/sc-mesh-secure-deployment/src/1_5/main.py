@@ -1,32 +1,34 @@
 from header import *
 
 
-def continuous_authentication(sectable):
+def continuous_authentication(sectable, myID):
     print("Starting Continuous Authentication")
+    aux = sectable.iloc[:, :5]
+    sectable = aux.drop_duplicates()
     loop_ca = asyncio.get_event_loop()
     ca_task = loop_ca.create_task(ca_utils.launchCA(sectable))
     with contextlib.suppress(asyncio.CancelledError):
         result = loop_ca.run_until_complete(asyncio.gather(ca_task))
     if result[0] is not None:
-        sectable = ca_utils.update_table_ca(sectable, result)
+        sectable = ca_utils.update_table_ca(sectable, result, myID)
         return sectable
     else:
         return None
 
 
-def only_ca():
+def only_ca(myID):
     try:
         table = 'auth/dev.csv'
         filetable = pd.read_csv(table)
         filetable.drop_duplicates(inplace=True)
         if not filetable.empty:
-            sectable = continuous_authentication(filetable)
+            if "Ness_Result" in filetable.columns:
+                filetable.drop(["Ness_Result"], axis=1, inplace=True)
+            sectable = continuous_authentication(filetable, myID)
+            sleep(2)
             if sectable is not None:
-                received = ut.exchage_table(sectable)
-                for ind in received:
-                    new = pd.read_json(received[ind].decode())
-                    sectable = pd.concat([sectable, new], ignore_index=True)
-                sectable.drop_duplicates(inplace=True)
+                # ut.exchage_table(sectable)
+                sleep(2)
                 if 'CA_Result' in set(sectable):
                     sectable.to_csv(table, index=False)
                 else:
@@ -54,27 +56,41 @@ def announcing(message):
 
 def decision_engine(sectable, ma, q):
     print("Starting Decision Engine")
-    table_file = 'auth/dev.csv'
+    table_file = 'auth/decision_table.csv'
     output, mapp = ness.get_table(sectable)
-    if "Ness_Result" not in sectable.columns:
-        threading.Thread(target=ma.client, args=(q,), daemon=True).start()
-        ness_result = ness.run_all(output)
-    else:
-        ness_result = ness.run_all(output, True)
+    threading.Thread(target=ma.client, args=(q,), daemon=True).start()
+    ness_result = ness.run_all(output)
+    # if "Ness_Result" not in sectable.columns:
+    #     threading.Thread(target=ma.client, args=(q,), daemon=True).start()
+    #     ness_result = ness.run_all(output)
+    # else:
+    #     ness_result = ness.run_all(output, True)
     ness.adapt_table(ness_result, mapp)
     sectable = ness.ness_result_to_table(sectable, ness_result, mapp)
     sectable.to_csv(table_file, mode='w', header=True, index=False)
-    print("Decision Engine Done")
+    print("Security Table with Decision")
+    information = pd.read_csv("common/information.csv")
+    print(information)
+    print("\n\n")
+    print(sectable)
+    print("\nDecision Engine Done")
     return ness_result, mapp
 
 
 def quaran(ness_result, q, sectable, ma, mapp):
+    quarantineTime = 20  # seconds
     for node in ness_result:
         if ness_result[node] == 194 or (not q.empty() and q.get() == 'malicious'):
             print("Malicious Node: ", ness.remapping(mapp, node))
             mac = sectable.iloc[node]['IP']
             threading.Thread(target=ma.server, args=(f"malicious: {mac}", True), daemon=True).start()
             threading.Thread(target=qua.block, args=(mac,), daemon=True).start()
+            for i in range(quarantineTime, 0, -1):
+                print(f"Blocking Node: {str(node)} for {str(i)} seconds", end='\r')
+                sleep(1)
+            threading.Thread(target=qua.unblock, args=(mac,), daemon=True).start()
+        else:
+            print("Nothing to do")
 
 
 def sec_beat(myID):
@@ -82,9 +98,10 @@ def sec_beat(myID):
     ut.checkiptables()
     ma = mba.MBA(mesh_utils.get_mesh_ip_address())
     sectable = only_ca(myID)
-    ness_result, first_round, mapp = decision_engine(sectable, ma, q)
-    quarantine(ness_result, q, sectable, ma, mapp)
-    return first_round, ness_result
+    ness_result, mapp = decision_engine(sectable, ma, q)
+
+
+# quaran(ness_result, q, sectable, ma, mapp)
 
 
 def mutual_authentication():
