@@ -31,7 +31,8 @@ def banner():
 
 
 AUTHSERVER = False
-
+mut = mutual.Mutual(MUTUALINT)
+myID = mut.myID
 
 def print_menu():
     banner()
@@ -97,7 +98,7 @@ def CA():
     if not mesh_utils.verify_mesh_status():  # verifying that mesh is running
         print("Mesh network not established")
         only_mesh()
-    return only_ca()
+    return only_ca(myID)
 
 
 def DE():
@@ -140,36 +141,32 @@ def show_neighbors():
         print("No mesh established")
 
 
-def sec_beat():
+def sbeat():
     os.system('clear')
     original_time = time()
-    end_time = 60  # one minute
+    end_time = 5  # one minute
     sec_beat_time = 5
     os.system('clear')
     print('\'SecBeat\'')
-    print(f'Running SecBeat every {sec_beat_time} seconds, during {end_time} minute')
-    ness_result = {}
+    print(f'Running SecBeat every {sec_beat_time} seconds, during {end_time} minutes')
     while time() < original_time + end_time:
         if mesh_utils.verify_mesh_status():  # verifying that mesh is running
             sleep(sec_beat_time - time() % sec_beat_time)  # sec beat time
-            first_round, ness_result = sec_beat(ness_result)
+            sec_beat(myID)
 
 
-def exchage_table():
+def extable():
     os.system('clear')
     print('\'Exchange Security Table\'')
     table = 'auth/dev.csv'
     try:
         mesh_utils.get_neighbors_ip()
-        sectable = pd.read_csv(table)
-        sectable.drop_duplicates(inplace=True)
-        received = ut.exchage_table(sectable)
-        print(received)
-        for ind in received:
-            new = pd.read_json(received[ind].decode())
-            sectable = pd.concat([sectable, new], ignore_index=True)
-        sectable.drop_duplicates(inplace=True)
-        sectable.to_csv(table, mode='w', header=True, index=False)
+        try:
+            sectable = pd.read_csv(table)
+            sectable.drop_duplicates(inplace=True)
+            ut.exchage_table(sectable)
+        except Exception:
+            pass
     except FileNotFoundError:
         print("SecTable not available. Need to be requested during provisioning")
 
@@ -202,10 +199,9 @@ if __name__ == '__main__':
             print('Exiting....')
             sys.exit()
         elif option == 1:
-            MA()  # 1: 'Mutual Authentication (MA)',
-
+            MA()                # 1: 'Mutual Authentication (MA)',
         elif option == 2:
-            only_mesh()  # 2: 'Only Mesh Network',
+            only_mesh()         # 2: 'Only Mesh Network',
         elif option == 3:
             CA()                # 3: 'Continuous Authentication (CA)',
         elif option == 4:
@@ -215,9 +211,9 @@ if __name__ == '__main__':
         elif option == 6:
             show_neighbors()    # 6: 'Check Neighbors',
         elif option == 7:
-            sec_beat()          # 7: 'SecBeat',
+            sbeat()             # 7: 'SecBeat',
         elif option == 8:
-            exchage_table()     # 8: 'Exchange Table',
+            extable()           # 8: 'Exchange Table',
         elif option == 9:
             Quarantine()        # 9: 'Quarantine',
         else:
