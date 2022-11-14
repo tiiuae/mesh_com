@@ -3,5 +3,5 @@ matplotlib
 geopy
 tabulate
 numpy
-ipyleaflet
+ipyleaflet == 0.17.0
 ipywidgets

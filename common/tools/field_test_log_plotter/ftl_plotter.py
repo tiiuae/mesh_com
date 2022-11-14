@@ -1151,18 +1151,18 @@ class FieldTestLogPlotter:
         base_icon = AwesomeIcon(name='home', icon_color='antiquewhite')
         base_marker = Marker(location=(self.__base_latitude, self.__base_longitude),
                              title='Base', icon=base_icon)
-        m.add_layer(base_marker)
+        m.add(base_marker)
 
         # Starting point for scooter/drone
         start_icon = AwesomeIcon(name='flag', marker_color='green', icon_color='antiquewhite')
         start_marker = Marker(location=coordinates[0], title='Start', icon=start_icon)
-        m.add_layer(start_marker)
+        m.add(start_marker)
 
         # Endpoint for scooter/drone
         end_icon = AwesomeIcon(name='flag-checkered', marker_color='red',
                                icon_color='antiquewhite')
         end_marker = Marker(location=coordinates[len(coordinates) - 1], title='End', icon=end_icon)
-        m.add_layer(end_marker)
+        m.add(end_marker)
         # AntPath to display the direction of the coordinates:
         ant_path = AntPath(
             locations=coordinates,
@@ -1172,14 +1172,14 @@ class FieldTestLogPlotter:
             pulse_color='#3f6fba'
         )
         # Add the AntPath layer:
-        m.add_layer(ant_path)
+        m.add(ant_path)
 
         # Create measure control
         measure = MeasureControl(position='topleft', active_color='red',
                                  primary_length_unit='meters', primary_area_unit='sqmeters')
         measure.completed_color = 'red'
         # Add control to map
-        m.add_control(measure)
+        m.add(measure)
 
         # Save map as HTML file.
         m.save(self.filename + '.html')
