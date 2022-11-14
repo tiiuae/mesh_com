@@ -110,6 +110,8 @@ else
     # Start mesh publisher
     ros-with-env ros2 run mesh_com mesh_publisher --ros-args -r __ns:=/$DRONE_DEVICE_ID &
     pub_child=$!
+    # Quick fix. Give time to the publisher to stop using the keys.
+    sleep 4
     # Start mesh subscriber
     ros-with-env ros2 run mesh_com mesh_subscriber --ros-args -r __ns:=/$DRONE_DEVICE_ID &
     sub_child=$!
