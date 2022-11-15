@@ -1,9 +1,8 @@
 import glob
 import gpsd
-import subprocess
 
 
-def read_value(file : str) -> str:
+def read_value(file: str) -> str:
     try:
         with open(file, 'r') as f:
             value = f.readline()
@@ -14,12 +13,21 @@ def read_value(file : str) -> str:
         return "NaN"
 
 
-def get_hwmon_path(path : str) -> str:
+def get_hwmon_path_from_options(paths: [str]) -> str:
+    for path in paths:
+        p = get_hwmon_path(path)
+        if p is not "NaN":
+            return p
+    return "NaN"
+
+
+def get_hwmon_path(path: str) -> str:
     # hwmon directory should contain only one entry which is of format hwmon*
     try:
         return glob.glob(path)[0]
     except:
         return "NaN"
+
 
 # ----------------------------------------
 
@@ -46,6 +54,8 @@ class InfoParser:
         self.__voltage_nrf = "NaN"
         self.__current_3v3 = "NaN"
         self.__voltage_3v3 = "NaN"
+        self.__current_dc = "NaN"
+        self.__voltage_dc = "NaN"
 
     # ----------------------------------------
 
@@ -94,42 +104,56 @@ class InfoParser:
     def get_3v3_voltage(self):
         return self.__voltage_3v3
 
+    def get_dc_current(self):
+        return self.__current_dc
+
+    def get_dc_voltage(self):
+        return self.__voltage_dc
+
     # ----------------------------------------
 
     def __update_battery_status(self):
         self.__battery_voltage = read_value("/sys/class/power_supply/max1726x_battery/voltage_now")
         self.__battery_current = read_value("/sys/class/power_supply/max1726x_battery/current_now")
 
-        #print(f"battery voltage: {self.battery_voltage}")
-        #print(f"discharging current: {self.battery_current}")
-
     def __get_cpu_load(self) -> str:
         load = read_value("/proc/loadavg")
         return load.split()[0]
 
-    def __update_ina209_status(self):
-        self.__current_nrf = read_value(get_hwmon_path("/sys/class/i2c-adapter/i2c-10/10-0040/hwmon/hwmon*/curr1_input"))
-        self.__voltage_nrf = read_value(get_hwmon_path("/sys/class/i2c-adapter/i2c-10/10-0040/hwmon/hwmon*/in1_input"))
+    def __update_ina2xx_status(self):
+        self.__current_nrf = read_value(
+            get_hwmon_path_from_options(
+                ["/sys/class/i2c-adapter/i2c-1/1-0040/hwmon/hwmon*/curr1_input",
+                 "/sys/class/i2c-adapter/i2c-10/10-0040/hwmon/hwmon*/curr1_input"]))
+        self.__voltage_nrf = read_value(
+            get_hwmon_path_from_options(
+                ["/sys/class/i2c-adapter/i2c-1/1-0040/hwmon/hwmon*/in1_input",
+                 "/sys/class/i2c-adapter/i2c-10/10-0040/hwmon/hwmon*/in1_input"]))
 
-        #print(f"nrf current: {nrf_current}")
-        #print(f"nrf voltage: {nrf_voltage}")
+        self.__current_3v3 = read_value(
+            get_hwmon_path_from_options(
+                ["/sys/class/i2c-adapter/i2c-1/1-0045/hwmon/hwmon*/curr1_input",
+                 "/sys/class/i2c-adapter/i2c-10/10-0045/hwmon/hwmon*/curr1_input"]))
+        self.__voltage_3v3 = read_value(
+            get_hwmon_path_from_options(
+                ["/sys/class/i2c-adapter/i2c-1/1-0045/hwmon/hwmon*/in1_input",
+                 "/sys/class/i2c-adapter/i2c-10/10-0045/hwmon/hwmon*/in1_input"]))
 
-        self.__current_3v3 = read_value(get_hwmon_path("/sys/class/i2c-adapter/i2c-10/10-0045/hwmon/hwmon*/curr1_input"))
-        self.__voltage_3v3 = read_value(get_hwmon_path("/sys/class/i2c-adapter/i2c-10/10-0045/hwmon/hwmon*/in1_input"))
+        self.__current_dc = read_value(
+            get_hwmon_path("/sys/class/i2c-adapter/i2c-0/0-0041/hwmon/hwmon*/curr1_input"))
 
-        #print(f"3v3 current: {_3v3_current}")
-        #print(f"3v3 voltage: {_3v3_voltage}")
+        self.__voltage_dc = read_value(
+            get_hwmon_path("/sys/class/i2c-adapter/i2c-0/0-0041/hwmon/hwmon*/in1_input"))
 
     def __update_temperatures(self):
         self.__cpu_temp = read_value("/sys/class/thermal/thermal_zone0/temp")
         self.__bat_temp = read_value("/sys/class/thermal/thermal_zone1/temp")
-        self.__tmp100 = read_value(get_hwmon_path("/sys/class/i2c-adapter/i2c-10/10-0049/driver/10-0049/hwmon/hwmon*/temp1_input"))
-        self.__wifi_temp = read_value(get_hwmon_path("/sys/class/ieee80211/phy0/device/hwmon/hwmon*/temp1_input"))
-
-        #print(f"cpu_temp: {self.cpu_temp}")
-        #print(f"bat_temp: {self.bat_temp}")
-        #print(f"tmp100: {self.tmp100}")
-        #print(f"wifi_temp: {self.wifi_temp}")
+        self.__tmp100 = read_value(
+            get_hwmon_path_from_options(
+                ["/sys/class/i2c-adapter/i2c-1/1-0049/hwmon/hwmon*/temp1_input",
+                 "/sys/class/i2c-adapter/i2c-10/10-0049/hwmon/hwmon*/temp1_input"]))
+        self.__wifi_temp = read_value(
+            get_hwmon_path("/sys/class/ieee80211/phy0/device/hwmon/hwmon*/temp1_input"))
 
     def __update_gpsd_data(self):
         if not self.__gpsdConnected:
@@ -147,7 +171,7 @@ class InfoParser:
             self.__latitude = -999999
             self.__longitude = -999999
             self.__altitude = 0
-            self.__gps_time ="NaN"
+            self.__gps_time = "NaN"
             self.__pdop = 0
 
     # ----------------------------------------
@@ -159,7 +183,7 @@ class InfoParser:
         self.__update_gpsd_data()
         self.__update_temperatures()
         self.__update_battery_status()
-        self.__update_ina209_status()
-        #print(f"lat: {self.latitude}")
-        #print(f"lon: {self.longitude}")
-        #print(f"alt: {self.altitude}")
+        self.__update_ina2xx_status()
+        # print(f"lat: {self.latitude}")
+        # print(f"lon: {self.longitude}")
+        # print(f"alt: {self.altitude}")

@@ -134,6 +134,8 @@ if __name__ == '__main__':
     ftl.register_logger_function("nRF current [mA]", info.get_nrf_current)
     ftl.register_logger_function("3v3 voltage [mV]", info.get_3v3_voltage)
     ftl.register_logger_function("3v3 current [mA]", info.get_3v3_current)
+    ftl.register_logger_function("DCin (XT30) voltage [mV]", info.get_dc_voltage)
+    ftl.register_logger_function("DCin (XT30) current [mA]", info.get_dc_current)
 
     ftl.create_csv(f"{wifi_stats.get_mac_addr()}{uc_arg}")
 
