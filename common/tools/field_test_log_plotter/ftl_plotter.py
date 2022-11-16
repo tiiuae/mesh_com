@@ -100,6 +100,11 @@ class FieldTestLogPlotter:
         # Reindex DF after any possible line drops
         self.df.reset_index(drop=True, inplace=True)
 
+        if 'DCin (XT30) voltage [mV]' not in self.df.columns:
+            self.df['DCin (XT30) voltage [mV]'] = None
+        if 'DCin (XT30) current [mA]' not in self.df.columns:
+            self.df['DCin (XT30) current [mA]'] = None
+
         if self.df.empty:
             raise Exception('Dataframe is empty!')
 
@@ -321,9 +326,7 @@ class FieldTestLogPlotter:
         else:
             self.df['battery temp [mC]'] = np.NaN
         self.df.rename(columns={'battery temp [mC]': BATT_TEMP}, inplace=True)
-        # In some logs Wi-Fi card temperature has been NaN. Treat it as zero.
         self.df.rename(columns={'wifi temp [mC]': WIFI_TEMP}, inplace=True)
-        self.df[WIFI_TEMP].fillna(0, inplace=True)
         self.df[WIFI_TEMP] = self.df[WIFI_TEMP] / 1000
 
         self.df['tmp100 [mC]'] = self.df['tmp100 [mC]'] / 1000
@@ -332,18 +335,22 @@ class FieldTestLogPlotter:
         # Convert µV and uA to V / A
         self.df['battery voltage [uV]'] = self.df['battery voltage [uV]'] / 1000000
         self.df.rename(columns={'battery voltage [uV]': BATT_VOLTAGE}, inplace=True)
-        self.df['battery current [uA]'] = abs(self.df['battery current [uA]'] / 1000000)
+        self.df['battery current [uA]'] = self.df['battery current [uA]'] / 1000000
         self.df.rename(columns={'battery current [uA]': BATT_CURRENT}, inplace=True)
 
         # Convert mV and mA to V / A
         self.df['nRF voltage [mV]'] = self.df['nRF voltage [mV]'] / 1000
         self.df.rename(columns={'nRF voltage [mV]': NRF_VOLTAGE}, inplace=True)
-        self.df['nRF current [mA]'] = abs(self.df['nRF current [mA]'] / 1000)
+        self.df['nRF current [mA]'] = self.df['nRF current [mA]'] / 1000
         self.df.rename(columns={'nRF current [mA]': NRF_CURRENT}, inplace=True)
         self.df['3v3 voltage [mV]'] = self.df['3v3 voltage [mV]'] / 1000
         self.df.rename(columns={'3v3 voltage [mV]': MPCIE_VOLTAGE}, inplace=True)
-        self.df['3v3 current [mA]'] = abs(self.df['3v3 current [mA]'] / 1000)
+        self.df['3v3 current [mA]'] = self.df['3v3 current [mA]'] / 1000
         self.df.rename(columns={'3v3 current [mA]': MPCIE_CURRENT}, inplace=True)
+        self.df['DCin (XT30) voltage [mV]'] = self.df['DCin (XT30) voltage [mV]'] / 1000
+        self.df.rename(columns={'DCin (XT30) voltage [mV]': DCIN_VOLTAGE}, inplace=True)
+        self.df['DCin (XT30) current [mA]'] = self.df['DCin (XT30) current [mA]'] / 1000
+        self.df.rename(columns={'DCin (XT30) current [mA]': DCIN_CURRENT}, inplace=True)
 
         tp_divider = 1
         # Convert throughput values
@@ -390,7 +397,8 @@ class FieldTestLogPlotter:
         self.df.plot(title=figure_title,
                      ax=ax_temp, x='Timestamp', y=CPU_TEMP, color=COLOR_CPU_TEMP, lw=2)
         self.df.plot(ax=ax_temp, x='Timestamp', y=BATT_TEMP, color=COLOR_BATT_TEMP, lw=2)
-        self.df.plot(ax=ax_temp, x='Timestamp', y=WIFI_TEMP, color=COLOR_WIFI_TEMP, lw=2)
+        if self.df[WIFI_TEMP].notnull().values.any():
+            self.df.plot(ax=ax_temp, x='Timestamp', y=WIFI_TEMP, color=COLOR_WIFI_TEMP, lw=2)
         self.df.plot(ax=ax_temp, x='Timestamp', y=TMP100, color=COLOR_TMP100, lw=2, grid=True,
                      xlabel=LABEL_TIME_SECONDS, ylabel=LABEL_TEMPERATURE,
                      xticks=(np.arange(min_time, max_time, interval)),
@@ -398,27 +406,25 @@ class FieldTestLogPlotter:
                      figsize=FIGSIZE)
         # Get dataframe row index according to max distance
         rows = self.df.index[self.df['distance [m]'] == max(self.df['distance [m]'])].tolist()
-
-        # Set vertical split line for turning point. Note! Using first index match.
-        ax_temp.axvline((self.df['Timestamp'][rows[0]]), color=COLOR_TURNING_POINT, lw=3,
-                        linestyle='--', label='Turning point')
+        # Set vertical split line for turning point in case some turning point exists
+        if rows[0] != 0:
+            ax_temp.axvline((self.df['Timestamp'][rows[0]]), color=COLOR_TURNING_POINT, lw=3,
+                            linestyle='--', label='Turning point')
         # Show legend
         ax_temp.legend(bbox_to_anchor=(-0.03, 1.0), loc='upper right')
         # Rotate x-axis tick labels to make them fit better in the picture
         plt.setp(ax_temp.get_xticklabels(), rotation=30, ha='right')
 
         # Determine 2nd y-axis scale
-        voltage_max = max(self.df[BATT_VOLTAGE])
-        if voltage_max < max(self.df[NRF_VOLTAGE]):
-            voltage_max = max(self.df[NRF_VOLTAGE])
-        if voltage_max < max(self.df[MPCIE_VOLTAGE]):
-            voltage_max = max(self.df[MPCIE_VOLTAGE])
+        voltage_max = self.df[[BATT_VOLTAGE, NRF_VOLTAGE, MPCIE_VOLTAGE, DCIN_VOLTAGE]].max().max()
         voltage_max += 0.25  # 0.25 V margin on top
         interval = 0.5  # 0.5 V interval
 
         # Plot voltage figures
         self.df.plot(ax=ax_voltage, x='Timestamp', y=BATT_VOLTAGE, color=COLOR_BATT_VOLTAGE)
         self.df.plot(ax=ax_voltage, x='Timestamp', y=NRF_VOLTAGE, color=COLOR_RF_VOLTAGE)
+        if self.df[DCIN_VOLTAGE].notnull().values.any():
+            self.df.plot(ax=ax_voltage, x='Timestamp', y=DCIN_VOLTAGE, color=COLOR_DCIN_VOLTAGE)
         self.df.plot(ax=ax_voltage, x='Timestamp', y=MPCIE_VOLTAGE, color=COLOR_3V3_VOLTAGE,
                      grid=True, ylabel=LABEL_VOLTAGE, yticks=(np.arange(0, voltage_max, interval)))
 
@@ -426,21 +432,25 @@ class FieldTestLogPlotter:
         ax_voltage.legend(bbox_to_anchor=(1.03, 1.0), loc='upper left')
 
         # Determine 3rd y-axis scale
-        curr_max = max(self.df[BATT_CURRENT])
-        if curr_max < max(self.df[NRF_CURRENT]):
-            curr_max = max(self.df[NRF_CURRENT])
-        if curr_max < max(self.df[MPCIE_CURRENT]):
-            curr_max = max(self.df[MPCIE_CURRENT])
-        curr_max += 0.25  # 0.25 A margin on top
-        interval = 0.5  # 0.5 A interval
+        curr_min = self.df[[BATT_CURRENT, NRF_CURRENT, MPCIE_CURRENT, DCIN_CURRENT]].min().min()
+        curr_max = self.df[[BATT_CURRENT, NRF_CURRENT, MPCIE_CURRENT, DCIN_CURRENT]].max().max()
+        interval = 0.1  # 0.1 A interval
+        curr_max += interval  # 0.1 A margin on the top
+        curr_min -= interval  # 0.1 A margin on the bottom
+        # Round limits using one decimal accuracy
+        curr_max = round(curr_max, 1)
+        curr_min = round(curr_min, 1)
 
         # Plot current figures
         self.df.plot(ax=ax_current, x='Timestamp', y=BATT_CURRENT, color=COLOR_BATT_CURRENT)
         self.df.plot(ax=ax_current, x='Timestamp', y=NRF_CURRENT, color=COLOR_RF_CURRENT)
+        if self.df[DCIN_CURRENT].notnull().values.any():
+            self.df.plot(ax=ax_current, x='Timestamp', y=DCIN_CURRENT, color=COLOR_DCIN_CURRENT)
         self.df.plot(ax=ax_current, x='Timestamp', y=MPCIE_CURRENT, color=COLOR_3V3_CURRENT,
-                     grid=True, ylabel=LABEL_CURRENT, yticks=(np.arange(0, curr_max, interval)))
+                     grid=True, ylabel=LABEL_CURRENT, yticks=(np.arange(curr_min,
+                                                                        curr_max, interval)))
         # Label box lower left corner coordinate relative to base plot coordinate
-        ax_current.legend(bbox_to_anchor=(1.18, 1.0), loc='upper left')
+        ax_current.legend(bbox_to_anchor=(1.20, 1.0), loc='upper left')
         # Save the figure
         plt.savefig(self.filename + subtitle + ".png", dpi=MY_DPI)
 
@@ -481,29 +491,33 @@ class FieldTestLogPlotter:
                      figsize=FIGSIZE)
         # Get dataframe row index according to max distance
         rows = self.df.index[self.df['distance [m]'] == max(self.df['distance [m]'])].tolist()
-
-        # Set vertical split line for turning point. Note! Using first index match.
-        ax_temp.axvline((self.df['Timestamp'][rows[0]]), color=COLOR_TURNING_POINT, lw=3,
-                        linestyle='--', label='Turning point')
+        # Set vertical split line for turning point in case some turning point exists
+        if rows[0] != 0:
+            ax_temp.axvline((self.df['Timestamp'][rows[0]]), color=COLOR_TURNING_POINT, lw=3,
+                            linestyle='--', label='Turning point')
         # Show legend
         ax_temp.legend(bbox_to_anchor=(-0.03, 1.0), loc='upper right')
         # Rotate x-axis tick labels to make them fit better in the picture
         plt.setp(ax_temp.get_xticklabels(), rotation=30, ha='right')
 
         # Determine y-axis scale
-        curr_max = max(self.df[BATT_CURRENT])
-        if curr_max < max(self.df[NRF_CURRENT]):
-            curr_max = max(self.df[NRF_CURRENT])
-        if curr_max < max(self.df[MPCIE_CURRENT]):
-            curr_max = max(self.df[MPCIE_CURRENT])
-        curr_max += 0.25  # 0.25 A margin on top
-        interval = 0.5  # 0.5 A interval
+        curr_min = self.df[[BATT_CURRENT, NRF_CURRENT, MPCIE_CURRENT, DCIN_CURRENT]].min().min()
+        curr_max = self.df[[BATT_CURRENT, NRF_CURRENT, MPCIE_CURRENT, DCIN_CURRENT]].max().max()
+        interval = 0.1  # 0.1 A interval
+        curr_max += interval  # 0.1 A margin on the top
+        curr_min -= interval  # 0.1 A margin on the bottom
+        # Round limits using one decimal accuracy
+        curr_max = round(curr_max, 1)
+        curr_min = round(curr_min, 1)
 
         # Plot current figures
         self.df.plot(ax=ax_current, x='Timestamp', y=BATT_CURRENT, color=COLOR_BATT_CURRENT)
         self.df.plot(ax=ax_current, x='Timestamp', y=NRF_CURRENT, color=COLOR_RF_CURRENT)
+        if self.df[DCIN_CURRENT].notnull().values.any():
+            self.df.plot(ax=ax_current, x='Timestamp', y=DCIN_CURRENT, color=COLOR_DCIN_CURRENT)
         self.df.plot(ax=ax_current, x='Timestamp', y=MPCIE_CURRENT, color=COLOR_3V3_CURRENT,
-                     grid=True, ylabel=LABEL_CURRENT, yticks=(np.arange(0, curr_max, interval)))
+                     grid=True, ylabel=LABEL_CURRENT, yticks=(np.arange(curr_min,
+                                                                        curr_max, interval)))
         # 2nd y-axis legend
         ax_current.legend(bbox_to_anchor=(1.03, 1.0), loc='upper left')
         # Save the figure
@@ -531,11 +545,7 @@ class FieldTestLogPlotter:
         max_time += interval
 
         # Determine y-axis scale
-        voltage_max = max(self.df[BATT_VOLTAGE])
-        if voltage_max < max(self.df[NRF_VOLTAGE]):
-            voltage_max = max(self.df[NRF_VOLTAGE])
-        if voltage_max < max(self.df[MPCIE_VOLTAGE]):
-            voltage_max = max(self.df[MPCIE_VOLTAGE])
+        voltage_max = self.df[[BATT_VOLTAGE, NRF_VOLTAGE, MPCIE_VOLTAGE, DCIN_VOLTAGE]].max().max()
         voltage_max += 0.25  # 0.25 V margin on top
         voltage_interval = 0.5  # 0.5 V interval
 
@@ -545,36 +555,42 @@ class FieldTestLogPlotter:
         # Plot voltage figures
         self.df.plot(ax=ax_voltage, x='Timestamp', y=BATT_VOLTAGE, color=COLOR_BATT_VOLTAGE)
         self.df.plot(ax=ax_voltage, x='Timestamp', y=NRF_VOLTAGE, color=COLOR_RF_VOLTAGE)
+        if self.df[DCIN_VOLTAGE].notnull().values.any():
+            self.df.plot(ax=ax_voltage, x='Timestamp', y=DCIN_VOLTAGE, color=COLOR_DCIN_VOLTAGE)
         self.df.plot(ax=ax_voltage, x='Timestamp', y=MPCIE_VOLTAGE, color=COLOR_3V3_VOLTAGE,
-                     grid=True, xlabel=LABEL_TIME_SECONDS, ylabel=LABEL_TEMPERATURE,
+                     grid=True, xlabel=LABEL_TIME_SECONDS, ylabel=LABEL_VOLTAGE,
                      xticks=(np.arange(min_time, max_time, interval)),
                      yticks=(np.arange(0, voltage_max, voltage_interval)),
                      title=figure_title, figsize=FIGSIZE)
         # Get dataframe row index according to max distance
         rows = self.df.index[self.df['distance [m]'] == max(self.df['distance [m]'])].tolist()
-
-        # Set vertical split line for turning point. Note! Using first index match.
-        ax_voltage.axvline((self.df['Timestamp'][rows[0]]), color=COLOR_TURNING_POINT, lw=3,
-                           linestyle='--', label='Turning point')
+        # Set vertical split line for turning point in case some turning point exists
+        if rows[0] != 0:
+            ax_voltage.axvline((self.df['Timestamp'][rows[0]]), color=COLOR_TURNING_POINT, lw=3,
+                               linestyle='--', label='Turning point')
         # Label box upper right corner coordinate relative to base plot coordinate
         ax_voltage.legend(bbox_to_anchor=(-0.03, 1.0), loc='upper right')
         # Rotate x-axis tick labels to make them fit better in the picture
         plt.setp(ax_voltage.get_xticklabels(), rotation=30, ha='right')
 
         # Determine y-axis scale
-        curr_max = max(self.df[BATT_CURRENT])
-        if curr_max < max(self.df[NRF_CURRENT]):
-            curr_max = max(self.df[NRF_CURRENT])
-        if curr_max < max(self.df[MPCIE_CURRENT]):
-            curr_max = max(self.df[MPCIE_CURRENT])
-        curr_max += 0.25  # 0.25 A margin on top
-        interval = 0.5  # 0.5 A interval
+        curr_min = self.df[[BATT_CURRENT, NRF_CURRENT, MPCIE_CURRENT, DCIN_CURRENT]].min().min()
+        curr_max = self.df[[BATT_CURRENT, NRF_CURRENT, MPCIE_CURRENT, DCIN_CURRENT]].max().max()
+        interval = 0.1  # 0.1 A interval
+        curr_max += interval  # 0.1 A margin on the top
+        curr_min -= interval  # 0.1 A margin on the bottom
+        # Round limits using one decimal accuracy
+        curr_max = round(curr_max, 1)
+        curr_min = round(curr_min, 1)
 
         # Plot current figures
         self.df.plot(ax=ax_current, x='Timestamp', y=BATT_CURRENT, color=COLOR_BATT_CURRENT)
         self.df.plot(ax=ax_current, x='Timestamp', y=NRF_CURRENT, color=COLOR_RF_CURRENT)
+        if self.df[DCIN_CURRENT].notnull().values.any():
+            self.df.plot(ax=ax_current, x='Timestamp', y=DCIN_CURRENT, color=COLOR_DCIN_CURRENT)
         self.df.plot(ax=ax_current, x='Timestamp', y=MPCIE_CURRENT, color=COLOR_3V3_CURRENT,
-                     grid=True, ylabel=LABEL_CURRENT, yticks=(np.arange(0, curr_max, interval)))
+                     grid=True, ylabel=LABEL_CURRENT, yticks=(np.arange(curr_min,
+                                                                        curr_max, interval)))
         # 2nd y-axis legend
         ax_current.legend(bbox_to_anchor=(1.03, 1.0), loc='upper left')
         # Save the figure
@@ -798,10 +814,9 @@ class FieldTestLogPlotter:
         subtitle = '_rssi_and_distance'
         figure_title = self.filename.replace(self.__homedir, '') + subtitle
         self.df.plot(kind='line', ax=ax_rssi, title=figure_title,
-                     grid=True, x='distance [m]', y=rssi_dbm,
+                     grid=True, x='distance [m]', y=rssi_dbm, ylabel=LABEL_SIGNAL_STRENGTH,
                      xticks=(np.arange(min_distance, max_distance, interval)),
-                     yticks=(np.arange(min_rssi,
-                                       max_rssi, y_interval)),
+                     yticks=(np.arange(min_rssi, max_rssi, y_interval)),
                      color=COLOR_RSSI, lw=2, figsize=FIGSIZE)
 
         # Label box upper right corner coordinate relative to base plot coordinate
@@ -866,7 +881,7 @@ class FieldTestLogPlotter:
                      grid=True, x='distance traveled [m]', y=rssi_dbm,
                      xticks=(np.arange(min_distance, max_distance, interval)),
                      yticks=(np.arange(min_rssi, max_rssi, y_interval)),
-                     figsize=FIGSIZE, color=COLOR_RSSI)
+                     figsize=FIGSIZE, color=COLOR_RSSI, ylabel=LABEL_SIGNAL_STRENGTH)
 
         # Set vertical split line for turning point
         ax_rssi.axvline(max(self.df['distance [m]']), color=COLOR_TURNING_POINT, linestyle='--',
@@ -943,7 +958,7 @@ class FieldTestLogPlotter:
                      grid=True, x=x_axis, y=rssi_dbm,
                      xticks=(np.arange(min_time, max_time, x_interval)),
                      yticks=(np.arange(min_rssi, max_rssi, y_interval)),
-                     figsize=FIGSIZE, color=COLOR_RSSI)
+                     figsize=FIGSIZE, color=COLOR_RSSI, ylabel=LABEL_SIGNAL_STRENGTH)
 
         # Label box upper right corner coordinate relative to base plot coordinate
         ax_rssi.legend(bbox_to_anchor=(-0.01, 1.0), loc='upper right')
@@ -1005,12 +1020,15 @@ class FieldTestLogPlotter:
         # Set throughput label names
         rx_throughput_label = 'RX throughput [bit/s]'
         tx_throughput_label = 'TX throughput [bit/s]'
+        label_throughput = LABEL_THROUGHPUT
         if self.throughput_units == 'Kb':
             rx_throughput_label = 'RX throughput [Kb/s]'
             tx_throughput_label = 'TX throughput [Kb/s]'
+            label_throughput = 'Throughput [Kb/s]'
         elif self.throughput_units == 'Mb':
             rx_throughput_label = 'RX throughput [Mb/s]'
             tx_throughput_label = 'TX throughput [Mb/s]'
+            label_throughput = 'Throughput [Mb/s]'
 
         subtitle = '_throughput_per_distance_traveled'
         figure_title = self.filename.replace(self.__homedir, '') + subtitle
@@ -1024,7 +1042,7 @@ class FieldTestLogPlotter:
                      xticks=(np.arange(min_distance, max_distance, x_interval)),
                      yticks=(np.arange(min_bitrate, max_bitrate, y_interval)),
                      label=tx_throughput_label, color=COLOR_TX_THROUGHPUT, lw=2,
-                     figsize=FIGSIZE)
+                     figsize=FIGSIZE, ylabel=label_throughput)
 
         # Set vertical split line for turning point
         ax_throughput.axvline(max(self.df['distance [m]']), color=COLOR_TURNING_POINT,
@@ -1101,10 +1119,13 @@ class FieldTestLogPlotter:
 
         # Set throughput label names
         rx_throughput_label = 'RX throughput [bit/s]'
+        label_throughput = LABEL_THROUGHPUT
         if self.throughput_units == 'Kb':
             rx_throughput_label = 'RX throughput [Kb/s]'
+            label_throughput = 'Throughput [Kb/s]'
         elif self.throughput_units == 'Mb':
             rx_throughput_label = 'RX throughput [Mb/s]'
+            label_throughput = 'Throughput [Mb/s]'
 
         subtitle = '_rx_throughput_per_time'
         figure_title = self.filename.replace(self.__homedir, '') + subtitle
@@ -1114,7 +1135,7 @@ class FieldTestLogPlotter:
                      xticks=(np.arange(min_timestamp, max_timestamp, x_interval)),
                      yticks=(np.arange(min_bitrate, max_bitrate, y_interval)),
                      label=rx_throughput_label, color=COLOR_RX_THROUGHPUT, lw=2,
-                     figsize=FIGSIZE)
+                     figsize=FIGSIZE, ylabel=label_throughput)
         # Label box upper right corner coordinate relative to base plot coordinate
         ax_throughput.legend(bbox_to_anchor=(-0.03, 1.0), loc='upper right')
         # Rotate x-axis tick labels to make them fit better in the picture
