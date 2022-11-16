@@ -158,7 +158,7 @@ elif [ "$mode" == "ap+mesh_p2p" ]; then
   # AP setup
 
   pcie_radio_mac="$(ip -brief link | grep "$wifidev" | awk '{print $3; exit}')"
-  ssid="lite#$(echo "$pcie_radio_mac" | cut -b 13-14,16-17)"
+  ssid="p2p#$(echo "$pcie_radio_mac" | cut -b 13-14,16-17)"
 
   ifname_ap="$wifidev-1"
   iw dev "$wifidev" interface add "$ifname_ap" type managed addr "00:01:$(echo "$pcie_radio_mac" | cut -b 7-17)"
