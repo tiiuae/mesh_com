@@ -138,7 +138,9 @@ EOF
 elif [ "$mode" == "ap+mesh_p2p" ]; then
   # chanbw config
   mount -t debugfs none /sys/kernel/debug
-  echo 20 > /sys/kernel/debug/ieee80211/phy0/ath9k/chanbw
+  if [ -f "/sys/kernel/debug/ieee80211/phy0/ath9k/chanbw" ]; then
+      echo 20 > /sys/kernel/debug/ieee80211/phy0/ath9k/chanbw
+  fi
 
   wifidev="$(ifconfig -a | grep wlp1* | awk -F':' '{ print $1 }')"
   # Radio parameters
