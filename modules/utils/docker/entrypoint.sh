@@ -80,7 +80,7 @@ if [ "$mode" = "sta+mesh" ]; then
   wpa_supplicant -Dnl80211 -i$iface -c ap.conf -B
   sleep 3
   udhcpc -i $iface
-elif [ "$mode" = "ap+mesh" ]; then
+elif [ "$mode" = "ap+mesh_mcc" ]; then
   # Create bridge br-lan
   brctl addbr br-lan
   ifname_ap="$(ifconfig -a | grep wlan* | awk -F':' '{ print $1 }')"
@@ -135,7 +135,7 @@ EOF
   echo "bindaddr = "\"$gw_ip\"";" >> /etc/umurmur.conf
   sleep 10
   umurmurd
-elif [ "$mode" == "ap+mesh_p2p" ]; then
+elif [ "$mode" == "ap+mesh_scc" ]; then
   # chanbw config
   mount -t debugfs none /sys/kernel/debug
   if [ -f "/sys/kernel/debug/ieee80211/phy0/ath9k/chanbw" ]; then
