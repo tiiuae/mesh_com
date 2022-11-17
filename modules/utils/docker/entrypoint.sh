@@ -23,6 +23,11 @@ if [ -f "/opt/mesh.conf" ]; then
     source /opt/mesh.conf
     mode=$CONCURRENCY
     ch=$MCC_CHANNEL
+    ipaddr=$IP
+    nmask=$MASK
+    cc=$COUNTRY
+    psk=$KEY
+    txpwr=$TXPOWER
 else
     mode="mesh"
 fi
@@ -75,7 +80,7 @@ if [ "$mode" = "sta+mesh" ]; then
   wpa_supplicant -Dnl80211 -i$iface -c ap.conf -B
   sleep 3
   udhcpc -i $iface
-elif [ "$mode" = "ap+mesh" ]; then
+elif [ "$mode" = "ap+mesh_mcc" ]; then
   # Create bridge br-lan
   brctl addbr br-lan
   ifname_ap="$(ifconfig -a | grep wlan* | awk -F':' '{ print $1 }')"
@@ -130,6 +135,79 @@ EOF
   echo "bindaddr = "\"$gw_ip\"";" >> /etc/umurmur.conf
   sleep 10
   umurmurd
+elif [ "$mode" == "ap+mesh_scc" ]; then
+  # chanbw config
+  mount -t debugfs none /sys/kernel/debug
+  if [ -f "/sys/kernel/debug/ieee80211/phy0/ath9k/chanbw" ]; then
+      echo 20 > /sys/kernel/debug/ieee80211/phy0/ath9k/chanbw
+  fi
+
+  wifidev="$(ifconfig -a | grep wlp1* | awk -F':' '{ print $1 }')"
+  # Radio parameters
+  iw dev "$wifidev" set txpower limit "$txpwr"00
+
+  # RPi activity led config
+  echo "phy0tx" > /sys/class/leds/led0/trigger
+
+  #Create static mac addr for Batman if
+  eth0_mac="$(ip -brief link | grep eth0 | awk '{print $3; exit}')"
+  batif_mac="00:00:$(echo "$eth0_mac" | cut -b 7-17)"
+  ifconfig bat0 hw ether "$batif_mac"
+
+  brctl addbr br-lan
+  # AP setup
+
+  pcie_radio_mac="$(ip -brief link | grep "$wifidev" | awk '{print $3; exit}')"
+  ssid="p2p#$(echo "$pcie_radio_mac" | cut -b 13-14,16-17)"
+
+  ifname_ap="$wifidev-1"
+  iw dev "$wifidev" interface add "$ifname_ap" type managed addr "00:01:$(echo "$pcie_radio_mac" | cut -b 7-17)"
+
+  # Set frequency band and channel from given frequency
+   calculate_wifi_channel $ch
+
+# AP hostapd config
+cat <<EOF >/var/run/hostapd.conf
+ctrl_interface=/var/run/hostapd
+interface=$ifname_ap
+hw_mode=$retval_band
+channel=$retval_channel
+
+ieee80211h=1
+ieee80211d=1
+country_code=$cc
+
+ssid=$ssid
+auth_algs=1
+wpa=2
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+wpa_passphrase=$psk
+
+wmm_enabled=1
+#beacon_int=1000
+
+### IEEE 802.11n
+ieee80211n=1
+#ht_capab=[HT40+][LDPC][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1][DSSS_CCK-40]
+
+### IEEE 802.11ac
+#ieee80211ac=1
+#vht_capab=[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]
+EOF
+
+  # Start AP
+  /usr/sbin/hostapd -B /var/run/hostapd.conf -dd -f /tmp/hostapd_"$ifname_ap".log
+
+  # Bridge AP and Mesh
+  brctl addif br-lan bat0 "$ifname_ap"
+  ifconfig br-lan "$ipaddr" netmask "$nmask"
+  ifconfig br-lan up
+  echo
+  ifconfig br-lan
+  iptables -P FORWARD ACCEPT
+  ip addr flush dev bat0
+  echo "Mesh Point + AP done."
 else
   brctl addbr br-lan
   # Bridge eth1 and Mesh
