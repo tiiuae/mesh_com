@@ -67,6 +67,15 @@ if [ "$1" == "init" ]; then
             route add default gw $gateway_ip bat0
         fi
         sleep 86400
+    elif [ "$DRONE_TYPE" == "singlemesh" ]; then
+        # 192.168.248.11-192.168.248.253
+        DEFAULT_MESH_IP="192.168.248.$[ $RANDOM % 243 + 11 ]"
+        /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+        echo "mesh setup done"
+            # mesh class is gs
+        gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
+        route add default gw $gateway_ip bat0
+        sleep 86400
     else
         echo "drone type not implemented: $DRONE_TYPE"
         exit 1
@@ -81,7 +90,7 @@ if [ "$1" == "init" ]; then
     # 2            <ip>                          $DEFAULT_MESH_IP
     # 3            <mask>                        $DEFAULT_MESH_MASK
     # 4            <AP MAC>                      $DEFAULT_MESH_MAC
-    # 5            <WEP key>                     $DEFAULT_MESH_KEY
+    # 5            <key>                         $DEFAULT_MESH_KEY
     # 6            <essid>                       $DEFAULT_MESH_ESSID
     # 7            <freq>                        $DEFAULT_MESH_FREQ
     # 8	           <txpower>                     $DEFAULT_MESH_TX
