@@ -148,7 +148,7 @@ EOF
       iw phy "$phyname" interface add "$wifidev" type mp
 
       echo "Longer range tweak.."
-      iw phy "$phyname" set distance 6000
+      iw phy "$phyname" set distance 1000
 
       echo "$wifidev create 11s.."
       ifconfig "$wifidev" mtu 1560
