@@ -174,11 +174,13 @@ EOF
         echo "started alfred"
         (batadv-vis -i bat0 -s)&
         echo "started batadv-vis"
-     elif [ "$routing_algo" == "olsr" ]; then
+      elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$2" netmask "$3"
-        # Enable debug level as necessary
-        (olsrd -i "$wifidev" -d 0)&
-     fi
+        olsrd -i "$wifidev" &> /tmp/olsrd.log &
+      elif [ "$routing_algo" == "qos-olsr" ]; then
+      	ifconfig "$wifidev" "$2" netmask "$3"
+        qos-olsrd -i "$wifidev" &> /tmp/qos-olsrd.log &
+      fi
 
       # Radio parameters
       iw dev "$wifidev" set txpower limit "$8"00
