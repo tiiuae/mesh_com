@@ -28,6 +28,8 @@ if [ -f "/opt/mesh.conf" ]; then
     cc=$COUNTRY
     psk=$KEY
     txpwr=$TXPOWER
+    algo=$ROUTING
+    mesh_if=$MESH_VIF
 else
     mode="mesh"
 fi
@@ -73,6 +75,11 @@ psk="ssrcdemo"
 EOF
 }
 
+###Deciding IP address to be assigned to br-lan from WiFi MAC
+mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
+ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
+br_lan_ip="192.168.1."$((16#$ip_random))
+
 if [ "$mode" = "sta+mesh" ]; then
   create_ap_config
   #Connect to default GW AP
@@ -109,8 +116,16 @@ EOF
   # Start AP
   /usr/sbin/hostapd -B /var/run/hostapd.conf -f /tmp/hostapd.log
   # Bridge AP and Mesh
-  brctl addif br-lan bat0 "$ifname_ap"
-  br_lan_ip="192.168.1.20"
+  if [ "$algo" = "olsr" ]; then
+        brctl addif br-lan "$mesh_if" "$ifname_ap"
+        iptables -A FORWARD --in-interface $mesh_if -j ACCEPT
+        killall olsrd 2>/dev/null   
+        (olsrd -i br-lan -d 0)&
+  else
+        ##batman-adv###
+        brctl addif br-lan bat0 "$ifname_ap"
+        iptables -A FORWARD --in-interface bat0 -j ACCEPT
+  fi
   ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
   ifconfig br-lan up
   echo
@@ -119,7 +134,6 @@ EOF
   iptables -P FORWARD ACCEPT
   route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
   route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
-  iptables -A FORWARD --in-interface bat0 -j ACCEPT
   iptables --table nat -A POSTROUTING --out-interface $ifname_ap -j MASQUERADE
 
   #setup minimalistic Mumble server configuration
@@ -212,10 +226,6 @@ else
   brctl addbr br-lan
   # Bridge eth1 and Mesh
   brctl addif br-lan bat0 eth1
-  ifname_mesh="$(ifconfig -a | grep wlp* | awk -F':' '{ print $1 }')"
-  mesh_if_mac="$(ip -brief link | grep "$ifname_mesh" | awk '{print $3; exit}')"
-  ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
-  br_lan_ip="192.168.1."$((16#$ip_random))
   echo $br_lan_ip
   ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
   ifconfig br-lan up
