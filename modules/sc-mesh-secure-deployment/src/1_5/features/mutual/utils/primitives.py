@@ -8,6 +8,7 @@ LIB = "/usr/lib/softhsm/libsofthsm2.so"
 os.environ['PYKCS11LIB'] = LIB
 
 debug = True
+mechanism = Mechanism(CKM_ECDSA, None) # Mechanism for EC sign and verify
 
 '''
 TODO:create a function to verify if keys exist and are valid
@@ -69,7 +70,8 @@ def decrypt_response(encr):  # assuming that data is on a file called payload.en
 def sign_hsm(msg):
     session = get_session()
     privKey = session.findObjects([(CKA_CLASS, CKO_PRIVATE_KEY)])[0]
-    sig = session.sign(privKey, msg)
+    #privKey = session.findObjects([(CKA_CLASS, CKO_PRIVATE_KEY), (CKA_KEY_TYPE, CKK_ECDSA)])[0]
+    sig = session.sign(privKey, msg, mechanism)
     # logout
     session.logout()
     session.closeSession()
@@ -132,7 +134,7 @@ def verify_hsm(msg, sig, name):
         aux = keys[key].to_dict()
         if aux['CKA_LABEL'] == name:
             pubKey = keys[key]  ##check here need to verify if not exported
-    ver = session.verify(pubKey, msg, sig)
+    ver = session.verify(pubKey, msg, sig, mechanism)
     # logout
     session.logout()
     session.closeSession()
