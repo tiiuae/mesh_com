@@ -139,8 +139,9 @@ EOF
         if [[ -d /sys/module/batman_adv ]]; then
           modprobe batman-adv
         fi
-      elif [ "$routing_algo" == "olsr" ]; then
-         killall olsrd 2>/dev/null
+      elif [[ "$routing_algo" == "olsr" || "$routing_algo" == "qos-olsr" ]]; then
+         killall "${routing_algo}d" 2>/dev/null
+	 rm "/tmp/${routing_algo}d.log" &>/dev/null
       fi
 
       echo "$wifidev down.."
@@ -174,12 +175,9 @@ EOF
         echo "started alfred"
         (batadv-vis -i bat0 -s)&
         echo "started batadv-vis"
-      elif [ "$routing_algo" == "olsr" ]; then
+      elif [[ "$routing_algo" == "olsr" || "$routing_algo" == "qos-olsr" ]]; then
         ifconfig "$wifidev" "$2" netmask "$3"
-        olsrd -i "$wifidev" &> /tmp/olsrd.log &
-      elif [ "$routing_algo" == "qos-olsr" ]; then
-      	ifconfig "$wifidev" "$2" netmask "$3"
-        qos-olsrd -i "$wifidev" &> /tmp/qos-olsrd.log &
+        "${routing_algo}d" -i "$wifidev" &>"/tmp/${routing_algo}d.log" &
       fi
 
       # Radio parameters
@@ -294,8 +292,9 @@ off)
         killall alfred 2>/dev/null
         killall batadv-vis 2>/dev/null
         rm -f /var/run/alfred.sock 2>/dev/null
-      elif [ "$routing_algo" == "olsr" ]; then
-        killall olsrd 2>/dev/null
+      elif [[ "$routing_algo" == "olsr" || "$routing_algo" == "qos-olsr" ]]; then
+        killall "${routing_algo}d" 2>/dev/null
+	rm "/tmp/${routing_algo}d.log" &>/dev/null
       fi
       ;;
 *)
