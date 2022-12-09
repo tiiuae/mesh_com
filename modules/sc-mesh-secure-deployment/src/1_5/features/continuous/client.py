@@ -5,9 +5,15 @@ import random
 import socket
 import sys
 import time
+import pandas as pd
 
 from .functions import client_functions
 
+import sys
+
+sys.path.insert(0, '../../')
+
+from features.mutual.mutual import *
 
 def initiate_client(server_ip, ID, return_dict):
     c = socket.socket()  # create server socket c with default param ipv4, TCP
@@ -21,10 +27,34 @@ def initiate_client(server_ip, ID, return_dict):
         c.send(bytes(str(ID), 'utf-8'))  # Send client name to server
 
         # receive byte sent by server and print it
-        print(c.recv(1024).decode())  # decode byte to string
+        message = c.recv(1024).decode()  # decode byte to string
+        print(message)
+
+        if message == 'Connected to server, need to exchange public keys':
+            received_cert = c.recv(1024)
+            mut = Mutual('wlan1')
+            server_cert = received_cert[:-5]
+            servID = received_cert[-5:].decode('utf-8')
+            # Save server public key certificate to {cliID}.der
+            with open(f'{servID}.der', 'wb') as writer:
+                writer.write(server_cert)
+
+            print('Sending my public key')
+            cert = open(mut.local_cert, 'rb').read()
+            message = cert + mut.myID.encode('utf-8')
+            c.send(message)
+
+            # Derive secret key and store it to secret_{servID}.der
+            print('Deriving secret')
+            pri.derive_ecdh_secret(servID, servID)
 
         # Initialization
-        secret = 1234
+        filetable = pd.read_csv('auth/dev.csv')
+        servID = filetable[filetable['IP'] == server_ip]['ID'].iloc[0] # Get the server ID
+        secret_filename = f'secrets/secret_{servID}.der'
+        secret_byte = open(secret_filename, 'rb').read()
+        secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
+        #secret = 1234
         server_id = server_ip
         client_id = socket.gethostbyname(socket.gethostname())
         crc_key = '1001'  # CRC key
