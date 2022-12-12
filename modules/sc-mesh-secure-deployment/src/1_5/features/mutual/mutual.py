@@ -136,20 +136,20 @@ class Mutual:
     def decode_cert(self, client):
         sig = self.signature()
         client_sig = client[:len(sig)]
-        client_cert = client[len(sig):]
+        client_cert = client[len(sig):-5]
         cliID = client[-5:]  ##### ID must be 5 bits
         try:
             return client_sig, client_cert, cliID.decode('utf-8')
         except AttributeError:
             return client_sig, client_cert, cliID
 
-    def set_password(self, node_name):
+    def set_password(self, node_name, cliID):
         password = co.get_password()
         if password == '':  # this means still not connected with anyone
             password = co.create_password()  # create a password (only if no mesh exist)
             co.util.update_mesh_password(password)  # update password in config file
         print(password)
-        encrypt_pass = pri.encrypt_response(password, node_name)
+        encrypt_pass = pri.encrypt_response(password, cliID)
         if self.debug:
             print(f'encrypted pass: {str(encrypt_pass)}')
         return encrypt_pass
@@ -214,10 +214,11 @@ class Mutual:
             print(colored('> Valid Certificate', 'green'))
             print('Authenticated, now send my pubkey')
             client_fpr, _ = pri.hashSig(node_name + '.der')
+            pri.derive_ecdh_secret(node_name, cliID)
             if cli:  # client
                 print('5) get password')
                 enc_pass, _ = fs.server_auth(self.myID, self.interface)
-                password = pri.decrypt_response(enc_pass)
+                password = pri.decrypt_response(enc_pass, cliID)
                 print(bytes(password).decode())
                 co.util.update_mesh_password(bytes(password).decode())
                 self.start_mesh()
@@ -238,7 +239,7 @@ class Mutual:
             elif pri.verify_certificate(sig, node_name, self.digest(), self.root_cert):
                 # print(colored('> Valid Certificate', 'green'))
                 print("4.1) Setting Password")
-                encrypt_pass = self.set_password(node_name)
+                encrypt_pass = self.set_password(node_name, cliID)
                 self.start_mesh()
                 client_mac, client_mesh_ip = self.send_password(cliID, addr, self.my_mac_mesh, self.my_ip_mesh,
                                                                 encrypt_pass)
