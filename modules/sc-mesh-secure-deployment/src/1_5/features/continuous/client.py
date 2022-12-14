@@ -30,9 +30,10 @@ def initiate_client(server_ip, ID, return_dict):
         message = c.recv(1024).decode()  # decode byte to string
         print(message)
 
+        mut = Mutual('wlan1')
+
         if message == 'Connected to server, need to exchange public keys':
             received_cert = c.recv(1024)
-            mut = Mutual('wlan1')
             server_cert = received_cert[:-5]
             servID = received_cert[-5:].decode('utf-8')
             # Save server public key certificate to {cliID}.der
@@ -44,15 +45,16 @@ def initiate_client(server_ip, ID, return_dict):
             message = cert + mut.myID.encode('utf-8')
             c.send(message)
 
-            # Derive secret key and store it to secret_{servID}.der
-            print('Deriving secret')
-            pri.derive_ecdh_secret(servID, servID)
-
         # Initialization
         filetable = pd.read_csv('auth/dev.csv')
         servID = filetable[filetable['IP'] == server_ip]['ID'].iloc[0] # Get the server ID
         secret_filename = f'secrets/secret_{servID}.der'
-        secret_byte = open(secret_filename, 'rb').read()
+        #secret_byte = open(secret_filename, 'rb').read()
+
+        # Derive secret key and store it to secret_{servID}.der
+        print('Deriving secret')
+        pri.derive_ecdh_secret(servID, servID, mut.local_cert, mut.salt)
+        secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, mut.salt)
         secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
         #secret = 1234
         server_id = server_ip
