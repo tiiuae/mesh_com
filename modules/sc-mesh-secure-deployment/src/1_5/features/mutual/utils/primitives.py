@@ -40,9 +40,10 @@ def exit():
     session.logout()
     session.closeSession()
 
-def derive_ecdh_secret(node_name, cliID):
+def derive_ecdh_secret(node_name, cliID, local_cert, salt):
     '''
-    Derive the shared secret for EC keys
+    Derive the shared secret for EC keys and store it in an encrypted file
+    File encryption using the deriving node's public key (local_cert) + salt
     '''
     pubKey_filename = f'{node_name}.der'
     if not os.path.exists('secrets/'):
@@ -50,6 +51,7 @@ def derive_ecdh_secret(node_name, cliID):
     secret_filename = f'secrets/secret_{cliID}.der'
     command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--id', '01', '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE', '--output-file', secret_filename]
     subprocess.call(command, shell=False)
+    encrypt_file(secret_filename,local_cert, salt) # Encrpyt file using pubkey + salt
 
 '''
 def encrypt_response(message,
@@ -82,10 +84,11 @@ def decrypt_response(encr):  # assuming that data is on a file called payload.en
     return dec
 '''
 
-def encrypt_response(message, cliID):
+def encrypt_response(message, cliID, local_cert, salt):
     secret_filename = f'secrets/secret_{cliID}.der'
-    secret = open(secret_filename, 'rb')
-    password = secret.read()
+    #secret = open(secret_filename, 'rb')
+    #password = secret.read()
+    password = decrypt_file(secret_filename, local_cert, salt)
     #salt = os.urandom(16)
     salt = bytes('', 'utf-8')
     kdf = PBKDF2HMAC(
@@ -102,10 +105,11 @@ def encrypt_response(message, cliID):
         print(f'> Encrypted message: {encr}')
     return encr
 
-def decrypt_response(encr, cliID):
+def decrypt_response(encr, cliID, local_cert, salt):
     secret_filename = f'secrets/secret_{cliID}.der'
-    secret = open(secret_filename, 'rb')
-    password = secret.read()
+    #secret = open(secret_filename, 'rb')
+    #password = secret.read()
+    password = decrypt_file(secret_filename, local_cert, salt)
     #salt = os.urandom(16)
     salt = bytes('', 'utf-8')
     kdf = PBKDF2HMAC(
@@ -246,6 +250,7 @@ def chunks(file_obj, size=10000):
         yield chunks
 
 
+'''
 def encrypt_file(file_name, key_name):
     encr = []
     session = get_session()
@@ -268,9 +273,6 @@ def encrypt_file(file_name, key_name):
 
 
 def decrypt_file(file_name):
-    ''''
-    not working
-    '''
     decr = []
     session = get_session()
     privKey = session.findObjects([(CKA_CLASS, CKO_PRIVATE_KEY)])[0]
@@ -285,6 +287,43 @@ def decrypt_file(file_name):
     session.logout()
     session.closeSession()
     return decr
+'''
+
+def encrypt_file(file_name, key_name, salt):
+    '''
+    Encrpyt file_name using key derived from key_name + salt
+    '''
+    password = open(key_name, 'rb').read()
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=390000,
+    )
+    key = base64.urlsafe_b64encode(kdf.derive(password))
+    f = Fernet(key)
+    message = open(file_name, 'rb').read()
+
+    encrypted = f.encrypt(message)
+    with open(file_name, 'wb') as writer:
+        writer.write(encrypted)
+
+def decrypt_file(file_name, key_name, salt):
+    '''
+    Decrypt file_name
+    '''
+    password = open(key_name, 'rb').read()
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=390000,
+    )
+    key = base64.urlsafe_b64encode(kdf.derive(password))
+    f = Fernet(key)
+    encrypted = open(file_name, 'rb').read()
+    decrypted = f.decrypt(encrypted)
+    return decrypted
 
 
 def get_labels():

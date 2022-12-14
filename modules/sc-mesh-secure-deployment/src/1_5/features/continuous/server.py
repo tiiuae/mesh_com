@@ -28,34 +28,33 @@ def multi_threaded_client(c, addr, lock):
     cliID = filetable[filetable['IP'] == addr[0]]['ID'].iloc[0]  # Get the client ID
     print("cliID: ", cliID)
     secret_filename = f'secrets/secret_{cliID}.der'
+    mut = Mutual('wlan1')
     if not os.path.isfile(secret_filename):
         print('Secret does not exist, notifying client to exchange public keys')
         c.send(bytes('Connected to server, need to exchange public keys', 'utf-8'))
 
         print('Sending my public key')
-        mut = Mutual('wlan1')
         cert = open(mut.local_cert, 'rb').read()
         message = cert + mut.myID.encode('utf-8')
         c.send(message)
 
         received_cert = c.recv(1024)
-        mut = Mutual('wlan1')
         client_cert = received_cert[:-5]
         cliID = received_cert[-5:].decode('utf-8')
         # Save client public key certificate to {cliID}.der
         with open(f'{cliID}.der', 'wb') as writer:
             writer.write(client_cert)
 
-        # Derive secret key and store it to secret_{cliID}.der
-        print('Deriving secret')
-        pri.derive_ecdh_secret(cliID, cliID)
-
     else:
         c.send(bytes('Connected to server', 'utf-8'))  # Transmit tcp msg as a byte with encoding format str to client
 
+    # Derive secret key and store it to secret_{cliID}.der
+    print('Deriving secret')
+    pri.derive_ecdh_secret(cliID, cliID, mut.local_cert, mut.salt)
 
     # Session Initializations Parameters
-    secret_byte = open(secret_filename, 'rb').read()
+    #secret_byte = open(secret_filename, 'rb').read()
+    secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, mut.salt)
     secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
     #secret = 1234  # this should be stored on HSM
     #secret=int(open("secret.txt",'r').read())

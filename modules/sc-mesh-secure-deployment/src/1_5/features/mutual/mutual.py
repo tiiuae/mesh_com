@@ -64,6 +64,7 @@ class Mutual:
         pri.import_cert(root_cert, 'root')
         print("my ID: ", self.myID)
         self.table = self.create_table()
+        self.salt = os.urandom(16)
 
 
     def create_table(self):
@@ -149,7 +150,7 @@ class Mutual:
             password = co.create_password()  # create a password (only if no mesh exist)
             co.util.update_mesh_password(password)  # update password in config file
         print(password)
-        encrypt_pass = pri.encrypt_response(password, cliID)
+        encrypt_pass = pri.encrypt_response(password, cliID, self.local_cert, self.salt)
         if self.debug:
             print(f'encrypted pass: {str(encrypt_pass)}')
         return encrypt_pass
@@ -214,11 +215,11 @@ class Mutual:
             print(colored('> Valid Certificate', 'green'))
             print('Authenticated, now send my pubkey')
             client_fpr, _ = pri.hashSig(node_name + '.der')
-            pri.derive_ecdh_secret(node_name, cliID)
+            pri.derive_ecdh_secret(node_name, cliID, self.local_cert, self.salt)
             if cli:  # client
                 print('5) get password')
                 enc_pass, _ = fs.server_auth(self.myID, self.interface)
-                password = pri.decrypt_response(enc_pass, cliID)
+                password = pri.decrypt_response(enc_pass, cliID, self.local_cert, self.salt)
                 print(bytes(password).decode())
                 co.util.update_mesh_password(bytes(password).decode())
                 self.start_mesh()
