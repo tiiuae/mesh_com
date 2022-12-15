@@ -86,7 +86,8 @@ class ConnectionMgr:
                 mesh_config.write(f'PHY={phy_name}' + '\n')
             if confc['gw_service']:
                 print("============================================")
-                Thread(target=main.AutoGateway, daemon=True).start()
+                gw_service = main.AutoGateway()
+                Thread(target=gw_service.run, daemon=True).start()
             if config['type'] == '11s':
                 self.mesh_mode = "11s"
             if config['type'] == 'ibss':
