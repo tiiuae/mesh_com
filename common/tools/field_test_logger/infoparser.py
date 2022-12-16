@@ -16,7 +16,7 @@ def read_value(file: str) -> str:
 def get_hwmon_path_from_options(paths: [str]) -> str:
     for path in paths:
         p = get_hwmon_path(path)
-        if p is not "NaN":
+        if p != "NaN":
             return p
     return "NaN"
 
@@ -178,7 +178,7 @@ class InfoParser:
 
     def update(self):
         """
-        Update variables with latest info
+        Update variables with the latest info
         """
         self.__update_gpsd_data()
         self.__update_temperatures()
