@@ -10,6 +10,7 @@ import pandas as pd
 from .functions import client_functions
 
 import sys
+import os
 
 sys.path.insert(0, '../../')
 
@@ -36,8 +37,13 @@ def initiate_client(server_ip, ID, return_dict):
             received_cert = c.recv(1024)
             server_cert = received_cert[:-5]
             servID = received_cert[-5:].decode('utf-8')
-            # Save server public key certificate to {cliID}.der
-            with open(f'{servID}.der', 'wb') as writer:
+
+            # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
+            if not os.path.exists('pubKeys/'):
+                os.mkdir('pubKeys/')
+
+            # Save server public key certificate to pubKeys/{servID}.der
+            with open(f'pubKeys/{servID}.der', 'wb') as writer:
                 writer.write(server_cert)
 
             print('Sending my public key')
@@ -52,9 +58,10 @@ def initiate_client(server_ip, ID, return_dict):
         #secret_byte = open(secret_filename, 'rb').read()
 
         # Derive secret key and store it to secret_{servID}.der
+        salt = os.urandom(16) # Random 16 byte salt
         print('Deriving secret')
-        pri.derive_ecdh_secret(servID, servID, mut.local_cert, mut.salt)
-        secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, mut.salt)
+        pri.derive_ecdh_secret('', servID, mut.local_cert, salt)
+        secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, salt)
         secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
         #secret = 1234
         server_id = server_ip

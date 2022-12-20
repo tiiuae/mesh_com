@@ -61,7 +61,7 @@ class Mutual:
         self.cli = False
         self.myID = pri.get_labels()
         print("loading root_cert")
-        pri.import_cert(root_cert, 'root')
+        pri.import_cert(root_cert, 'root','')
         print("my ID: ", self.myID)
         self.table = self.create_table()
         self.salt = os.urandom(16)
@@ -261,7 +261,7 @@ class Mutual:
     async def start(self):
         addr, client_cert, sig, cliID, cli = self.define_role()
         node_name = addr[0].replace('.', '_')
-        pri.import_cert(client_cert, node_name)
+        pri.import_cert(client_cert, node_name, cliID)
         self.cert_validation(sig, node_name, cliID, cli, addr)
 
     def test(self):  # unit test
