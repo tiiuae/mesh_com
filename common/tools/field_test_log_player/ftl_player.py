@@ -11,6 +11,8 @@ import time
 from datetime import datetime
 
 import matplotlib.pyplot as plt
+import matplotlib.font_manager
+import matplotlib.patches as mpl_patches
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -45,6 +47,7 @@ class Node:
         self.my_mac = None  # node MAC address
         self.__matched_row_offset = 0  # row offset
         self.__matched_time_s = 0  # offset in seconds to the laziest one
+        self.my_current_active_neighbours = []
 
         try:
             self.__load_data_from_file(_path, _filename)
@@ -105,6 +108,9 @@ class Node:
             self.__f_timestamps = [
                 time.mktime(datetime.strptime(str(ts), "%Y-%m-%d %H:%M:%S").timetuple()) for ts in
                 df[timestamp_name].values.tolist()]
+
+        df[neighbours_name].replace('', np.nan, inplace=True)
+        df.dropna(subset=[neighbours_name], inplace=True)
 
         # originators column not available in old field test logger files
         if originators_name in df.columns:
@@ -208,8 +214,8 @@ class Node:
         for index, n in enumerate(timetable):
             if n > self.__matched_time_s + seconds_offset:
                 self.__matched_row_offset = index
-                # print(index, n)
                 return
+        self.__matched_row_offset = len(timetable) - 1  # not found, set last item index
 
     def set_time_offset(self, seconds):
         """
@@ -401,6 +407,16 @@ class NodeNetwork:
                 self.pause = False
             else:
                 self.pause = True
+        elif event.key == "+":
+            self.sec_offset_from_start += 30
+        elif event.key == "-":
+            if self.sec_offset_from_start - 30 >= 0:
+                self.sec_offset_from_start -= 30
+            else:
+                self.sec_offset_from_start = 0
+                print("Can't rewind as already in the beginning of the log file!")
+
+        print(f"{self.sec_offset_from_start}")
 
     @staticmethod
     def __mac_value_csv_to_set(csv):
@@ -426,6 +442,7 @@ class NodeNetwork:
         """
         # print(f"call {_from=} -> {_to=}")
         for node in self.network_nodes:
+            # print(node.my_mac, node.my_current_active_neighbours)
             if node.my_mac == _from:
                 # print(f"FOUND {node.my_mac=}")
                 self.active_path_list.append(_from)
@@ -436,12 +453,17 @@ class NodeNetwork:
                     if self.active_path_list[-1] == _to:
                         return
                     if pair[0] == _to:
+                        # check that next hop is in active neighbour list
+                        if pair[1] not in node.my_current_active_neighbours:
+                            return
                         # print(f"to = {pair[0]}\nnexthop = {pair[1]}")
                         # return if nexthop is to-target
                         if pair[1] == _to:
                             self.active_path_list.append(pair[1])
                         else:  # continue searching recursively
                             _from = pair[1]
+                            if pair[1] in self.active_path_list:
+                                return
                             self.collect_active_path(_from, _to)
 
     def __collect_node_data(self):
@@ -504,20 +526,22 @@ class NodeNetwork:
         self.nx_data_path.clear()
         self.edge_labels = {}
 
+        text_legend = f"{'mac':<18}{'rx(kbit/s)':<10} {'tx(kbit/s)':<10}\n"
+
         # static node positions
         for node in self.network_nodes:
             node.update_row_offset_from_seconds_offset(self.sec_offset_from_start)
 
+            node.my_current_active_neighbours = []
+
             print(f"\n--- Neighbour info from {node.my_mac}: ---")
+
+            text_legend += f"{node.my_mac:<18}{round(node.get_tx_throughput() / 1000):>10} {round(node.get_rx_throughput() / 1000):>10}\n"
 
             if self.indoor_mode:
                 self.nx_graph.add_node(node.get_mac(), pos=nx.circular_layout(self.nx_graph))
             else:
                 self.nx_graph.add_node(node.get_mac(), pos=node.get_location_utm())
-                if self.rxtx:
-                    pylab.text(node.get_location_utm()[0], node.get_location_utm()[1] + 10,
-                           f"TX:{round(node.get_tx_throughput() / 1000)}\n"
-                           f"RX:{round(node.get_rx_throughput() / 1000)} (kbit/s)")
 
             # check neighbour_list and add/remove connections
             nodes = node.get_neighbours().split(";")
@@ -526,6 +550,7 @@ class NodeNetwork:
                 # add active connection
                 if float(_seen) < 2.0 and (node.my_mac, _mac) not in self.nx_graph.edges:
                     self.nx_graph.add_edge(node.my_mac, _mac, color='gray', weight=4)
+                    node.my_current_active_neighbours.append(_mac)
 
                 # if not seen 2s, remove connection
                 if float(_seen) >= 2.0 and (node.my_mac, _mac) in self.nx_graph.edges:
@@ -541,6 +566,15 @@ class NodeNetwork:
                     label = f"{mac_and_rssi[n2]}({node.get_noise()}){mac_and_mcs[n2]}"
                     print(f"{n2} {label}")
                     self.edge_labels[(node.my_mac, n2)] = label
+
+        if self.rxtx:
+            font = matplotlib.font_manager.FontProperties(family="monospace", size=12)
+            text_legend += f"\ntime:{str(self.sec_offset_from_start)}\n"
+            handles = [mpl_patches.Rectangle((0, 0), 1, 1, fc="white", ec="white",
+                                             lw=0, alpha=0)] * 2
+            pylab.legend(handles, [text_legend], loc='best', fontsize='small', prop=font,
+                         fancybox=True, framealpha=0.7,
+                         handlelength=0, handletextpad=0)
 
     def __sync_node_timestamps(self):
         """
@@ -607,6 +641,7 @@ class NodeNetwork:
 
             # find sync time
             self.__sync_node_timestamps()
+
             while True:
                 # Collect data from Node objects
                 self.__collect_node_data()
@@ -622,7 +657,7 @@ def show_usage():
     -m travelled path trace for a given MAC address (node)
     -i indoor environment, when GPS use not possible.  Nodes are plotted to the circumference of
        the circle and timestamps are taken from system time instead of GSP time.
-    -t rx/tx kbit/s values from each node.  Currently supported in outdoor mode.
+    -t rx/tx kbit/s values from each node.
     -a active path tracking between given MAC addresses
 
     Python script will synchronize CSV log files based on the GPS timestamp.  Drawing starts
@@ -633,6 +668,8 @@ def show_usage():
 
     Active keys during plotting:
     spacebar    - pause/resume, zooming possible during pause
+    +           - skip next 30seconds in log file
+    -           - rewind 30seconds in log file
 
     Installation:
     - pip3 install -r requirements.txt
