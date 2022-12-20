@@ -45,11 +45,16 @@ def derive_ecdh_secret(node_name, cliID, local_cert, salt):
     Derive the shared secret for EC keys and store it in an encrypted file
     File encryption using the deriving node's public key (local_cert) + salt
     '''
-    pubKey_filename = f'{node_name}.der'
+    myID = get_labels()
+    if node_name == '':
+        pubKey_filename = f'pubKeys/{cliID}.der' # when called from cont auth, node_name = '', select public key from pubKeys/cliID.der
+    else:
+        pubKey_filename = f'{node_name}.der' # when called from mutual, node_name != '', select public key from node_name.der
+
     if not os.path.exists('secrets/'):
         os.mkdir('secrets/')
     secret_filename = f'secrets/secret_{cliID}.der'
-    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--id', '01', '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE', '--output-file', secret_filename]
+    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--label', myID, '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE', '--output-file', secret_filename]
     subprocess.call(command, shell=False)
     encrypt_file(secret_filename,local_cert, salt) # Encrpyt file using pubkey + salt
 
@@ -166,21 +171,34 @@ def verify_key_exists(node_name):
         return True
 
 
-def import_cert(client_key, node_name):
+def import_cert(client_key, node_name, cliID):
     exist = verify_key_exists(node_name)
     if exist:
         delete_key(node_name)
     filename = f'{node_name}.der'
+    filename_2 = f'pubKeys/{cliID}.der'
     if node_name == 'root':
         filename = client_key
         ID = str(999)
     else:
-        ID = node_name.split('_')[-1]
+        ID = node_name.split('_')[-1] # Should we just store it as node ID?
         try:
             with open(filename, 'wb') as writer:
                 writer.write(client_key.read())
         except AttributeError:
             with open(filename, 'wb') as writer:
+                writer.write(client_key)
+
+        # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
+        if not os.path.exists('pubKeys/'):
+            os.mkdir('pubKeys/')
+
+        # File 'pubKeys/cliID.der' is required to derive secret during continuous authentication
+        try:
+            with open(filename_2, 'wb') as writer:
+                writer.write(client_key.read())
+        except AttributeError:
+            with open(filename_2, 'wb') as writer:
                 writer.write(client_key)
     command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--write-object', filename, '--type',
                'pubkey', '--id', ID, '--label', node_name]

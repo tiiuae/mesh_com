@@ -9,6 +9,7 @@ from .functions import server_functions
 import asyncio
 import pandas as pd
 import sys
+import os
 
 sys.path.insert(0, '../../')
 
@@ -29,8 +30,8 @@ def multi_threaded_client(c, addr, lock):
     print("cliID: ", cliID)
     secret_filename = f'secrets/secret_{cliID}.der'
     mut = Mutual('wlan1')
-    if not os.path.isfile(secret_filename):
-        print('Secret does not exist, notifying client to exchange public keys')
+    if not os.path.isfile(f'pubKeys/{cliID}.der'):
+        print('Public key does not exist, notifying client to exchange public keys')
         c.send(bytes('Connected to server, need to exchange public keys', 'utf-8'))
 
         print('Sending my public key')
@@ -41,20 +42,26 @@ def multi_threaded_client(c, addr, lock):
         received_cert = c.recv(1024)
         client_cert = received_cert[:-5]
         cliID = received_cert[-5:].decode('utf-8')
-        # Save client public key certificate to {cliID}.der
-        with open(f'{cliID}.der', 'wb') as writer:
+
+        # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
+        if not os.path.exists('pubKeys/'):
+            os.mkdir('pubKeys/')
+
+        # Save client public key certificate to pubKeys/{cliID}.der
+        with open(f'pubKeys/{cliID}.der', 'wb') as writer:
             writer.write(client_cert)
 
     else:
         c.send(bytes('Connected to server', 'utf-8'))  # Transmit tcp msg as a byte with encoding format str to client
 
     # Derive secret key and store it to secret_{cliID}.der
+    salt = os.urandom(16)  # Random 16 byte salt
     print('Deriving secret')
-    pri.derive_ecdh_secret(cliID, cliID, mut.local_cert, mut.salt)
+    pri.derive_ecdh_secret('', cliID, mut.local_cert, salt)
 
     # Session Initializations Parameters
     #secret_byte = open(secret_filename, 'rb').read()
-    secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, mut.salt)
+    secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, salt)
     secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
     #secret = 1234  # this should be stored on HSM
     #secret=int(open("secret.txt",'r').read())
