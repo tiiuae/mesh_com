@@ -12,6 +12,7 @@ class CA:
     def as_client(self, server_ip):
         client.initiate_client(server_ip, self.ID)
 
-    def as_server(self, ip, return_dict, id_dict, num_neighbors, ips_sectable):
+    def as_server(self, ip, return_dict):
         with contextlib.suppress(OSError):
-            server.initiate_server(ip, return_dict, id_dict, num_neighbors, ips_sectable)
+            server.initiate_server(ip, return_dict)
+            
