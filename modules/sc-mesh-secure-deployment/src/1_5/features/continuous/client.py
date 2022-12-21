@@ -15,10 +15,9 @@ sys.path.insert(0, '../../')
 
 from features.mutual.mutual import *
 
-def initiate_client(server_ip, ID, return_dict):
+def initiate_client(server_ip, ID):
     c = socket.socket()  # create server socket c with default param ipv4, TCP
     partial_result = []
-
     # connect to server socket
     try:
         c.connect((server_ip, 9999))
@@ -30,9 +29,9 @@ def initiate_client(server_ip, ID, return_dict):
         message = c.recv(1024).decode()  # decode byte to string
         print(message)
 
-        mut = Mutual('wlan1')
 
         if message == 'Connected to server, need to exchange public keys':
+            mut = Mutual('wlan1')
             received_cert = c.recv(1024)
             server_cert = received_cert[:-5]
             servID = received_cert[-5:].decode('utf-8')
@@ -138,10 +137,7 @@ def initiate_client(server_ip, ID, return_dict):
                 print('Connection closed')
                 break
             flag_ctr += 1
-        return_dict[auth_result] = partial_result
         print("Share storage cost: ", sys.getsizeof(sent_shares))
-        return result["auth_result"]
     except (ConnectionRefusedError, OSError):
-        return_dict = 3
         return 3
 

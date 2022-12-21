@@ -43,22 +43,11 @@ async def launchCA(sectable):
 def ca_server(myip):
     with contextlib.suppress(OSError):
         ca = CA(random.randint(1000, 64000))
-    proc = multiprocessing.Process(target=ca.as_server, args=(myip,), daemon=True)
-    proc.start()
-    sleep(random.randint(1, 10))
-    return proc
-
-
-def ca_client(IP, flag_ctr, max_count, ca):
-    print("neighbor IP:", IP)
     manager = multiprocessing.Manager()
     return_dict = manager.dict()
-    p = multiprocessing.Process(target=ca.as_client, args=(IP, return_dict), daemon=True)
-    jobs = [p]
-    p.start()
-    for proc in jobs:
-        proc.join()
-    sleep(5)
+    proc = multiprocessing.Process(target=ca.as_server, args=(myip, return_dict), daemon=True)
+    proc.start()
+    sleep(random.randint(1, 10))
     for key in return_dict.keys():
         count = np.unique(return_dict[key], return_counts=True)
         try:
@@ -68,11 +57,22 @@ def ca_client(IP, flag_ctr, max_count, ca):
                 final = count[0][0]
         except IndexError:
             final = 1
-    try:
-        client_q[IP] = final
-    except UnboundLocalError:
-        print("Connection Refused")
-        pass
+        try:
+            client_q[key] = final
+        except UnboundLocalError:
+            print("Connection Refused")
+            pass
+    return proc
+
+
+def ca_client(IP, flag_ctr, max_count, ca):
+    print("neighbor IP:", IP)
+    p = multiprocessing.Process(target=ca.as_client, args=(IP), daemon=True)
+    jobs = [p]
+    p.start()
+    for proc in jobs:
+        proc.join()
+    sleep(5)
     flag_ctr += 1
     if flag_ctr == max_count:
         p.terminate()
@@ -104,3 +104,6 @@ def update_table_ca(df, result, myID):
                     df.loc[df['IP'] == IP, 'CA_Server'] = myID
     df.drop_duplicates(inplace=True)
     return df
+
+
+

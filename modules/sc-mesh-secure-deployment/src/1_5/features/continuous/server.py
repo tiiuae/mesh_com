@@ -14,15 +14,14 @@ sys.path.insert(0, '../../')
 
 from features.mutual.mutual import *
 
-def multi_threaded_client(c, addr, lock):
+def multi_threaded_client(c, addr, lock, return_dict):
+    partial_res = []
     lock.acquire()
     # receive client's name
     name = c.recv(1024).decode()
     print('====================================================================')
     print('Connected with ', addr, name)
     print('====================================================================')
-
-
     # Exchange public keys and derive secret for client if it does not already exist
     filetable = pd.read_csv('auth/dev.csv')
     cliID = filetable[filetable['IP'] == addr[0]]['ID'].iloc[0]  # Get the client ID
@@ -176,16 +175,17 @@ def multi_threaded_client(c, addr, lock):
                 #     pass
             print('*********************************************************************')
             print(' ')
+            partial_res.append(result[16]) # 16 is the number of the element of the auth_result (it being getting as string)
             if time_flag == max_count:
                 c.send(bytes('Closing connection', 'utf-8'))
                 c.close()  # close client socket
                 print('Connection closed')
                 lock.release()
+                return_dict[addr[0]] = partial_res
                 break
             time_flag = time_flag + 1
 
-
-def initiate_server(ip):
+def initiate_server(ip, return_dict):
     s = socket.socket()  # create server socket s with default param ipv4, TCP
     print('Socket Created')
 
@@ -203,8 +203,9 @@ def initiate_server(ip):
         print('Connected to client', c)
         print('Client address:', addr)
         print(' ')
+        return_dict[addr[0]] = []
         # start thread to handle client
-        Thread(target=multi_threaded_client, args=(c, addr, lock), daemon=True).start()
+        Thread(target=multi_threaded_client, args=(c, addr, lock, return_dict), daemon=True).start()
     c.send(bytes('Closing connection', 'utf-8'))
     c.close()  # close client socket
     print('Connection closed')
