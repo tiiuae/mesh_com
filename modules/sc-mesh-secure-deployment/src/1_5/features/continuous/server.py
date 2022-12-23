@@ -28,7 +28,7 @@ def multi_threaded_client(c, addr, lock):
     filetable = pd.read_csv('auth/dev.csv')
     cliID = filetable[filetable['IP'] == addr[0]]['ID'].iloc[0]  # Get the client ID
     print("cliID: ", cliID)
-    secret_filename = f'secrets/secret_{cliID}.der'
+    #secret_filename = f'secrets/secret_{cliID}.der'
     mut = Mutual('wlan1')
     if not os.path.isfile(f'pubKeys/{cliID}.der'):
         print('Public key does not exist, notifying client to exchange public keys')
@@ -55,14 +55,16 @@ def multi_threaded_client(c, addr, lock):
         c.send(bytes('Connected to server', 'utf-8'))  # Transmit tcp msg as a byte with encoding format str to client
 
     # Derive secret key and store it to secret_{cliID}.der
-    salt = os.urandom(16)  # Random 16 byte salt
-    print('Deriving secret')
-    pri.derive_ecdh_secret('', cliID, mut.local_cert, salt)
+    #salt = os.urandom(16)  # Random 16 byte salt
+    #print('Deriving secret')
+    #pri.derive_ecdh_secret('', cliID, mut.local_cert, salt)
 
     # Session Initializations Parameters
     #secret_byte = open(secret_filename, 'rb').read()
-    secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, salt)
+    #secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, salt)
+    secret_byte = pri.derive_ecdh_secret(cliID)
     secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
+    print("Secret = ", secret)
     #secret = 1234  # this should be stored on HSM
     #secret=int(open("secret.txt",'r').read())
     total_period = 20  # Total period for the session

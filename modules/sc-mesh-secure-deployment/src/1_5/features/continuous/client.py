@@ -54,15 +54,17 @@ def initiate_client(server_ip, ID, return_dict):
         # Initialization
         filetable = pd.read_csv('auth/dev.csv')
         servID = filetable[filetable['IP'] == server_ip]['ID'].iloc[0] # Get the server ID
-        secret_filename = f'secrets/secret_{servID}.der'
+        #secret_filename = f'secrets/secret_{servID}.der'
         #secret_byte = open(secret_filename, 'rb').read()
 
         # Derive secret key and store it to secret_{servID}.der
-        salt = os.urandom(16) # Random 16 byte salt
-        print('Deriving secret')
-        pri.derive_ecdh_secret('', servID, mut.local_cert, salt)
-        secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, salt)
+        #salt = os.urandom(16) # Random 16 byte salt
+        #print('Deriving secret')
+        #pri.derive_ecdh_secret('', servID, mut.local_cert, salt)
+        #secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, salt)
+        secret_byte = pri.derive_ecdh_secret(servID)
         secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
+        print("Secret = ", secret)
         #secret = 1234
         server_id = server_ip
         client_id = socket.gethostbyname(socket.gethostname())
@@ -82,7 +84,9 @@ def initiate_client(server_ip, ID, return_dict):
         #auth_result = "pass"  # initialization
         auth_result = 1  # initialization
         while flag_ctr <= max_count:
+            print('Checkpoint 1, flag_ctr = ', flag_ctr)
             request = c.recv(1024).decode()
+            print('Checkpoint 2, request = ', request)
             if request == 'Request to authenticate':
                 print("Processing authentication request")
                 # Generate share and share authenticator

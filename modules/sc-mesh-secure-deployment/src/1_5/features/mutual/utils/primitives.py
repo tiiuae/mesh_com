@@ -40,6 +40,7 @@ def exit():
     session.logout()
     session.closeSession()
 
+"""
 def derive_ecdh_secret(node_name, cliID, local_cert, salt):
     '''
     Derive the shared secret for EC keys and store it in an encrypted file
@@ -57,6 +58,20 @@ def derive_ecdh_secret(node_name, cliID, local_cert, salt):
     command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--label', myID, '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE', '--output-file', secret_filename]
     subprocess.call(command, shell=False)
     encrypt_file(secret_filename,local_cert, salt) # Encrpyt file using pubkey + salt
+"""
+
+def derive_ecdh_secret(cliID):
+    '''
+    Derives ecdh secret for given client ID and returns the secret in bytes
+    '''
+    myID = get_labels()
+    pubKey_filename = f'pubKeys/{cliID}.der'  # select public key from pubKeys/cliID.der
+    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--label', myID, '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE']
+    # Output of ecdh derive is the secret byte + b'Using derive algorithm 0x00001050 ECDH1-DERIVE\n'
+    # Extracting the secret byte
+    secret_byte = subprocess.check_output(command, shell=False).rstrip(b'Using derive algorithm 0x00001050 ECDH1-DERIVE\n')
+    secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
+    return secret_byte
 
 '''
 def encrypt_response(message,
@@ -89,11 +104,12 @@ def decrypt_response(encr):  # assuming that data is on a file called payload.en
     return dec
 '''
 
-def encrypt_response(message, cliID, local_cert, salt):
-    secret_filename = f'secrets/secret_{cliID}.der'
+def encrypt_response(message, cliID):
+    #secret_filename = f'secrets/secret_{cliID}.der'
     #secret = open(secret_filename, 'rb')
     #password = secret.read()
-    password = decrypt_file(secret_filename, local_cert, salt)
+    #password = decrypt_file(secret_filename, local_cert, salt)
+    password = derive_ecdh_secret(cliID)
     #salt = os.urandom(16)
     salt = bytes('', 'utf-8')
     kdf = PBKDF2HMAC(
@@ -110,11 +126,12 @@ def encrypt_response(message, cliID, local_cert, salt):
         print(f'> Encrypted message: {encr}')
     return encr
 
-def decrypt_response(encr, cliID, local_cert, salt):
-    secret_filename = f'secrets/secret_{cliID}.der'
+def decrypt_response(encr, cliID):
+    #secret_filename = f'secrets/secret_{cliID}.der'
     #secret = open(secret_filename, 'rb')
     #password = secret.read()
-    password = decrypt_file(secret_filename, local_cert, salt)
+    #password = decrypt_file(secret_filename, local_cert, salt)
+    password = derive_ecdh_secret(cliID)
     #salt = os.urandom(16)
     salt = bytes('', 'utf-8')
     kdf = PBKDF2HMAC(
