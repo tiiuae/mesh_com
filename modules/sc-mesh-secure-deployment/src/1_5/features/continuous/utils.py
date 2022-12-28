@@ -30,8 +30,11 @@ async def launchCA(sectable):
     max_count = 3
     flag_ctr = 0
     server_proc = ca_server(myip)
-    neigh = mesh_utils.get_arp()
-    ip2_send = list(set(sectable['IP'].tolist() + list(neigh.keys())))
+    # neigh = mesh_utils.get_arp()
+    # ip2_send = list(set(sectable['IP'].tolist() + list(neigh.keys())))
+    ip2_send = list(set(sectable['IP'].tolist() + mesh_utils.get_neighbors_ip()))
+    print('Checkpoint, neighbor IPs = ', mesh_utils.get_neighbors_ip())
+    print('Checkpoint, ip2send = ', ip2_send)
     for IP in ip2_send:
         if IP != myip:
             flag_ctr = ca_client(IP, flag_ctr, max_count, ca)
@@ -103,4 +106,6 @@ def update_table_ca(df, result, myID):
                     # df.loc[df['IP'] == IP, 'CA_ts'] = time()
                     df.loc[df['IP'] == IP, 'CA_Server'] = myID
     df.drop_duplicates(inplace=True)
+    print('result: ', result)
+    print('df: ', df)
     return df

@@ -26,11 +26,17 @@ def multi_threaded_client(c, addr, lock):
 
     # Exchange public keys and derive secret for client if it does not already exist
     filetable = pd.read_csv('auth/dev.csv')
-    cliID = filetable[filetable['IP'] == addr[0]]['ID'].iloc[0]  # Get the client ID
-    print("cliID: ", cliID)
+    #cliID = filetable[filetable['IP'] == addr[0]]['ID'].iloc[0]  # Get the client ID
+    #print("cliID: ", cliID)
     #secret_filename = f'secrets/secret_{cliID}.der'
+
+    client_mesh_ip = addr[0]
+    print("client_mesh_ip = ", client_mesh_ip)
+    client_mesh_name = client_mesh_ip.replace('.', '_')
+    print("client_mesh_name = ", client_mesh_name)
+
     mut = Mutual('wlan1')
-    if not os.path.isfile(f'pubKeys/{cliID}.der'):
+    if not os.path.isfile(f'pubKeys/{client_mesh_name}.der'):
         print('Public key does not exist, notifying client to exchange public keys')
         c.send(bytes('Connected to server, need to exchange public keys', 'utf-8'))
 
@@ -48,7 +54,7 @@ def multi_threaded_client(c, addr, lock):
             os.mkdir('pubKeys/')
 
         # Save client public key certificate to pubKeys/{cliID}.der
-        with open(f'pubKeys/{cliID}.der', 'wb') as writer:
+        with open(f'pubKeys/{client_mesh_name}.der', 'wb') as writer:
             writer.write(client_cert)
 
     else:
@@ -62,7 +68,7 @@ def multi_threaded_client(c, addr, lock):
     # Session Initializations Parameters
     #secret_byte = open(secret_filename, 'rb').read()
     #secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, salt)
-    secret_byte = pri.derive_ecdh_secret(cliID)
+    secret_byte = pri.derive_ecdh_secret('', client_mesh_name)
     secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
     print("Secret = ", secret)
     #secret = 1234  # this should be stored on HSM
