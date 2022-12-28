@@ -47,7 +47,7 @@ def aux_auth(semasphore):
             client, addr = mut.server()
             sig, client_cert, cliID = mut.decode_cert(client)
             node_name = addr[0].replace('.', '_')
-            pri.import_cert(client_cert, node_name, cliID)
+            pri.import_cert(client_cert, node_name)
             mut.send_my_key(cliID, addr)
             mut.cert_validation(sig, node_name, cliID, False, addr)
             '''
