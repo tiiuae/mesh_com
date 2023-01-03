@@ -33,7 +33,7 @@ async def launchCA(sectable):
     manager = multiprocessing.Manager()
     return_dict = manager.dict()
 
-    ip2_send = list(set(sectable['IP'].tolist() + mesh_utils.get_neighbors_ip()))  # Need to confirm if we can use this
+    ip2_send = list(set(sectable['IP'].tolist() + mesh_utils.get_neighbors_ip()))
     print('Checkpoint, neighbor IPs = ', mesh_utils.get_neighbors_ip())
     print('Checkpoint, ip2send = ', ip2_send)
 
