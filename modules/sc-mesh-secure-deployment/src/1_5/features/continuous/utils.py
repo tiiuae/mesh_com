@@ -29,24 +29,51 @@ async def launchCA(sectable):
     myip = co.get_ip_address(MESHINT)
     max_count = 3
     flag_ctr = 0
-    server_proc = ca_server(myip)
-    # neigh = mesh_utils.get_arp()
-    # ip2_send = list(set(sectable['IP'].tolist() + list(neigh.keys())))
-    ip2_send = list(set(sectable['IP'].tolist() + mesh_utils.get_neighbors_ip()))
+
+    manager = multiprocessing.Manager()
+    return_dict = manager.dict()
+
+    ip2_send = list(set(sectable['IP'].tolist() + mesh_utils.get_neighbors_ip()))  # Need to confirm if we can use this
     print('Checkpoint, neighbor IPs = ', mesh_utils.get_neighbors_ip())
     print('Checkpoint, ip2send = ', ip2_send)
+
+    num_neighbors = len(ip2_send) - 1 # Number of neighbor nodes that need to be authenticated
+    server_proc = ca_server(myip, return_dict, num_neighbors)
+    # neigh = mesh_utils.get_arp()
+    # ip2_send = list(set(sectable['IP'].tolist() + list(neigh.keys())))
     for IP in ip2_send:
         if IP != myip:
             flag_ctr = ca_client(IP, flag_ctr, max_count, ca)
-    server_proc.terminate()
+    #server_proc.terminate()
     server_proc.join()
+    print("Checkpoint server proc terminating")
+
+
+    for key in return_dict.keys():
+        count = np.unique(return_dict[key], return_counts=True)
+        try:
+            if len(count[1]) > 1:
+                final = count[0][0] if count[1][0] > count[1][1] else count[0][1]
+            elif len(count[1]) == 0:
+                # Empty result
+                final = 0
+            else:
+                final = count[0][0]
+        except IndexError:
+            final = 1
+        try:
+            client_q[key] = final
+        except UnboundLocalError:
+            print("Connection Refused")
+            pass
+    print('Final return_dict: ', return_dict)
     return client_q
 
 
-def ca_server(myip):
+def ca_server(myip, return_dict, num_neighbors):
     with contextlib.suppress(OSError):
         ca = CA(random.randint(1000, 64000))
-    proc = multiprocessing.Process(target=ca.as_server, args=(myip,), daemon=True)
+    proc = multiprocessing.Process(target=ca.as_server, args=(myip, return_dict, num_neighbors), daemon=True)
     proc.start()
     sleep(random.randint(1, 10))
     return proc
@@ -54,28 +81,12 @@ def ca_server(myip):
 
 def ca_client(IP, flag_ctr, max_count, ca):
     print("neighbor IP:", IP)
-    manager = multiprocessing.Manager()
-    return_dict = manager.dict()
-    p = multiprocessing.Process(target=ca.as_client, args=(IP, return_dict), daemon=True)
+    p = multiprocessing.Process(target=ca.as_client, args=(IP,), daemon=True)
     jobs = [p]
     p.start()
     for proc in jobs:
         proc.join()
     sleep(5)
-    for key in return_dict.keys():
-        count = np.unique(return_dict[key], return_counts=True)
-        try:
-            if len(count[1]) > 1:
-                final = count[0][0] if count[1][0] > count[1][1] else count[0][1]
-            else:
-                final = count[0][0]
-        except IndexError:
-            final = 1
-    try:
-        client_q[IP] = final
-    except UnboundLocalError:
-        print("Connection Refused")
-        pass
     flag_ctr += 1
     if flag_ctr == max_count:
         p.terminate()
