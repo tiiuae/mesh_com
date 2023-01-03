@@ -16,9 +16,10 @@ sys.path.insert(0, '../../')
 
 from features.mutual.mutual import *
 
-def initiate_client(server_ip, ID, return_dict):
+def initiate_client(server_ip, ID):
     c = socket.socket()  # create server socket c with default param ipv4, TCP
     partial_result = []
+    local_cert = "/etc/ssl/certs/mesh_cert.der"
 
     # connect to server socket
     try:
@@ -31,15 +32,17 @@ def initiate_client(server_ip, ID, return_dict):
         message = c.recv(1024).decode()  # decode byte to string
         print(message)
 
-        mut = Mutual('wlan1')
+        #mut = Mutual('wlan1')
 
         client_mesh_name = server_ip.replace('.', '_')
         print("client_mesh_name = ", client_mesh_name)
 
         if message == 'Connected to server, need to exchange public keys':
             received_cert = c.recv(1024)
-            server_cert = received_cert[:-5]
-            servID = received_cert[-5:].decode('utf-8')
+            # Need to check if we really need to send ID here
+            #server_cert = received_cert[:-5]
+            #servID = received_cert[-5:].decode('utf-8')
+            server_cert = received_cert
 
             # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
             if not os.path.exists('pubKeys/'):
@@ -50,8 +53,9 @@ def initiate_client(server_ip, ID, return_dict):
                 writer.write(server_cert)
 
             print('Sending my public key')
-            cert = open(mut.local_cert, 'rb').read()
-            message = cert + mut.myID.encode('utf-8')
+            cert = open(local_cert, 'rb').read()
+            #message = cert + mut.myID.encode('utf-8')
+            message = cert
             c.send(message)
 
         # Initialization
@@ -152,10 +156,10 @@ def initiate_client(server_ip, ID, return_dict):
                 print('Connection closed')
                 break
             flag_ctr += 1
-        return_dict[auth_result] = partial_result
+        # Test
+        print("Test partial_result: ", partial_result)
         print("Share storage cost: ", sys.getsizeof(sent_shares))
-        return result["auth_result"]
     except (ConnectionRefusedError, OSError):
         return_dict = 3
-        return 3
+        #return 3 # Check if this needs to be returned at all
 

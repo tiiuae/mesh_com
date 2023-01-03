@@ -9,9 +9,9 @@ class CA:
     def __init__(self, ID):
         self.ID = ID
 
-    def as_client(self, server_ip, return_dict):
-        client.initiate_client(server_ip, self.ID, return_dict)
+    def as_client(self, server_ip):
+        client.initiate_client(server_ip, self.ID)
 
-    def as_server(self, ip):
+    def as_server(self, ip, return_dict, num_neighbors):
         with contextlib.suppress(OSError):
-            server.initiate_server(ip)
+            server.initiate_server(ip, return_dict, num_neighbors)
