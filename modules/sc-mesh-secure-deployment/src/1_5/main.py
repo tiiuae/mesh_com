@@ -5,6 +5,7 @@ def continuous_authentication(sectable, myID):
     print("Starting Continuous Authentication")
     aux = sectable.iloc[:, :5]
     sectable = aux.drop_duplicates()
+    sectable.drop(sectable.loc[sectable['MAC'] == '----'].index, inplace=True) # To avoid duplicates after exchange table for mesh neighbors not originally mutually authenticated
     loop_ca = asyncio.get_event_loop()
     ca_task = loop_ca.create_task(ca_utils.launchCA(sectable))
     with contextlib.suppress(asyncio.CancelledError):
