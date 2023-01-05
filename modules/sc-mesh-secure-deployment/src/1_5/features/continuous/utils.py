@@ -6,7 +6,7 @@ import numpy as np
 import sys
 
 from .ca_main import *
-from ..mutual import mutual
+from ..mutual.mutual import *
 
 sys.path.append('../../..')
 from common import ConnectionMgr, mesh_utils
@@ -32,22 +32,25 @@ async def launchCA(sectable):
 
     manager = multiprocessing.Manager()
     return_dict = manager.dict()
+    id_dict = manager.dict()
 
     ip2_send = list(set(sectable['IP'].tolist() + mesh_utils.get_neighbors_ip()))
+
+    #ip2_send = list(set(sectable['IP'].tolist() + list(neigh.keys())))
     print('Checkpoint, neighbor IPs = ', mesh_utils.get_neighbors_ip())
     print('Checkpoint, ip2send = ', ip2_send)
+    neigh = mesh_utils.get_arp()
+    print('Checkpoint, IP_get_arp = ', list(neigh.keys()))
 
     num_neighbors = len(ip2_send) - 1 # Number of neighbor nodes that need to be authenticated
-    server_proc = ca_server(myip, return_dict, num_neighbors)
-    # neigh = mesh_utils.get_arp()
-    # ip2_send = list(set(sectable['IP'].tolist() + list(neigh.keys())))
+    server_proc = ca_server(myip, return_dict, id_dict, num_neighbors, list(set(sectable['IP'].tolist())))
+
     for IP in ip2_send:
         if IP != myip:
             flag_ctr = ca_client(IP, flag_ctr, max_count, ca)
     #server_proc.terminate()
     server_proc.join()
     print("Checkpoint server proc terminating")
-
 
     for key in return_dict.keys():
         count = np.unique(return_dict[key], return_counts=True)
@@ -67,13 +70,14 @@ async def launchCA(sectable):
             print("Connection Refused")
             pass
     print('Final return_dict: ', return_dict)
-    return client_q
+    print('id_dict: ', id_dict)
+    return client_q, id_dict
 
 
-def ca_server(myip, return_dict, num_neighbors):
+def ca_server(myip, return_dict, id_dict, num_neighbors, ips_sectable):
     with contextlib.suppress(OSError):
         ca = CA(random.randint(1000, 64000))
-    proc = multiprocessing.Process(target=ca.as_server, args=(myip, return_dict, num_neighbors), daemon=True)
+    proc = multiprocessing.Process(target=ca.as_server, args=(myip, return_dict, id_dict, num_neighbors, ips_sectable), daemon=True)
     proc.start()
     sleep(random.randint(1, 10))
     return proc
@@ -103,6 +107,41 @@ def update_table_ca(df, result, myID):
     """
     #myID = int(list(set(df.loc[df['IP'] == co.get_ip_address(MESHINT), "ID"]))[0])
     df = df.assign(CA_Result=0)
+
+    for res_tuple in result:
+        res, cliIDs = res_tuple
+        for ip in res.keys():
+            if ip in df['IP'].values:
+                if res[ip] in ['pass', 1]:
+                    df.loc[df['IP'] == ip, 'CA_Result'] = 1
+                elif res[ip] == 'fail' or res[ip] == 0:
+                    df.loc[df['IP'] == ip, 'CA_Result'] = 2
+                else:
+                    df.loc[df['IP'] == ip, 'CA_Result'] = 3
+                df.loc[df['IP'] == ip, 'CA_Server'] = myID
+            else:
+                neigh = mesh_utils.get_arp()
+                try:
+                    mac = neigh[ip]
+                except KeyError:
+                    mac = '----'
+                client_mesh_name = ip.replace('.', '_')
+                client_fpr, _ = pri.hashSig(f'pubKeys/{client_mesh_name}.der')
+                if res[ip] in ['pass', 1]:
+                    CA_Result = 1
+                elif res[ip] == 'fail' or res[ip] == 0:
+                    CA_Result = 2
+                else:
+                    CA_Result = 3
+                # ip is used as ID (Need to check)
+                try:
+                    cliID = cliIDs[ip]
+                except KeyError:
+                    cliID = ip
+                info = {'ID': cliID, 'MAC': mac, 'IP': ip, 'PubKey_fpr': client_fpr, 'MA_level': 1, 'CA_Result': CA_Result,
+                        'CA_Server': myID} # Check if MA_level should be 1 or something else
+                df = df.append(info, ignore_index=True)
+    """
     for index, row in df.iterrows():
         for res in result:
             for ip in res.keys():
@@ -116,7 +155,9 @@ def update_table_ca(df, result, myID):
                         df.loc[df['IP'] == IP, 'CA_Result'] = 3
                     # df.loc[df['IP'] == IP, 'CA_ts'] = time()
                     df.loc[df['IP'] == IP, 'CA_Server'] = myID
+    """
     df.drop_duplicates(inplace=True)
     print('result: ', result)
     print('df: ', df)
+
     return df

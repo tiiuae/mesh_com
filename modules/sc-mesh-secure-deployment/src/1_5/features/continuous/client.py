@@ -37,11 +37,29 @@ def initiate_client(server_ip, ID):
         client_mesh_name = server_ip.replace('.', '_')
         print("client_mesh_name = ", client_mesh_name)
 
-        if message == 'Connected to server, need to exchange public keys':
+        if message == 'Connected to server, need to exchange public keys and ID':
             received_cert = c.recv(1024)
-            # Need to check if we really need to send ID here
-            #server_cert = received_cert[:-5]
-            #servID = received_cert[-5:].decode('utf-8')
+            server_cert = received_cert[:-5]
+            servID = received_cert[-5:].decode('utf-8')
+            #server_cert = received_cert
+
+            # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
+            if not os.path.exists('pubKeys/'):
+                os.mkdir('pubKeys/')
+
+            # Save server public key certificate to pubKeys/{client_mesh_name}.der
+            with open(f'pubKeys/{client_mesh_name}.der', 'wb') as writer:
+                writer.write(server_cert)
+
+            print('Sending my public key and ID')
+            cert = open(local_cert, 'rb').read()
+            myID = pri.get_labels()
+            message = cert + myID.encode('utf-8')
+            #message = cert
+            c.send(message)
+
+        elif message == 'Connected to server, need to exchange public keys':
+            received_cert = c.recv(1024)
             server_cert = received_cert
 
             # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
@@ -54,8 +72,16 @@ def initiate_client(server_ip, ID):
 
             print('Sending my public key')
             cert = open(local_cert, 'rb').read()
-            #message = cert + mut.myID.encode('utf-8')
             message = cert
+            c.send(message)
+
+        elif message == 'Connected to server, need to exchange ID':
+            received_message = c.recv(1024)
+            servID = received_message.decode('utf-8')
+
+            print('Sending my ID')
+            myID = pri.get_labels()
+            message = myID.encode('utf-8')
             c.send(message)
 
         # Initialization

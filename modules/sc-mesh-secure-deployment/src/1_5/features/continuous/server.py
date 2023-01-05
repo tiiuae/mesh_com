@@ -15,7 +15,7 @@ sys.path.insert(0, '../../')
 
 from features.mutual.mutual import *
 
-def multi_threaded_client(c, addr, lock, return_dict):
+def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable):
     lock.acquire()
     partial_res = []
     # receive client's name
@@ -39,20 +39,42 @@ def multi_threaded_client(c, addr, lock, return_dict):
     local_cert = "/etc/ssl/certs/mesh_cert.der"
 
     #mut = Mutual('wlan1')
-    if not os.path.isfile(f'pubKeys/{client_mesh_name}.der'):
+    if (not os.path.isfile(f'pubKeys/{client_mesh_name}.der')) and (client_mesh_ip not in ips_sectable):
+        print('Public key does not exist, notifying client to exchange public keys')
+        print('Node not in auth table, notifying client to exchange ID')
+        c.send(bytes('Connected to server, need to exchange public keys and ID', 'utf-8'))
+
+        print('Sending my public key and ID')
+        cert = open(local_cert, 'rb').read()
+        myID = pri.get_labels()
+        message = cert + myID.encode('utf-8')
+        #message = cert
+        c.send(message)
+
+        received_cert = c.recv(1024)
+        client_cert = received_cert[:-5]
+        cliID = received_cert[-5:].decode('utf-8')
+        #client_cert = received_cert
+        id_dict[addr[0]] = cliID # Used to insert row in auth table
+
+        # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
+        if not os.path.exists('pubKeys/'):
+            os.mkdir('pubKeys/')
+
+        # Save client public key certificate to pubKeys/{cliID}.der
+        with open(f'pubKeys/{client_mesh_name}.der', 'wb') as writer:
+            writer.write(client_cert)
+
+    elif not os.path.isfile(f'pubKeys/{client_mesh_name}.der'):
         print('Public key does not exist, notifying client to exchange public keys')
         c.send(bytes('Connected to server, need to exchange public keys', 'utf-8'))
 
         print('Sending my public key')
         cert = open(local_cert, 'rb').read()
-        # Need to check if we really need to send ID here
-        #message = cert + mut.myID.encode('utf-8')
         message = cert
         c.send(message)
 
         received_cert = c.recv(1024)
-        #client_cert = received_cert[:-5]
-        #cliID = received_cert[-5:].decode('utf-8')
         client_cert = received_cert
 
         # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
@@ -63,6 +85,18 @@ def multi_threaded_client(c, addr, lock, return_dict):
         with open(f'pubKeys/{client_mesh_name}.der', 'wb') as writer:
             writer.write(client_cert)
 
+    elif client_mesh_ip not in ips_sectable:
+        print('Node not in auth table, notifying client to exchange ID')
+        c.send(bytes('Connected to server, need to exchange ID', 'utf-8'))
+
+        print('Sending my ID')
+        myID = pri.get_labels()
+        message = myID.encode('utf-8')
+        c.send(message)
+
+        received_message = c.recv(1024)
+        cliID = received_message.decode('utf-8')
+        id_dict[addr[0]] = cliID  # Used to insert row in auth table
     else:
         c.send(bytes('Connected to server', 'utf-8'))  # Transmit tcp msg as a byte with encoding format str to client
 
@@ -227,7 +261,7 @@ def multi_threaded_client(c, addr, lock, return_dict):
     print('================================== Checkpoint, end of server for client', addr[0])
     lock.release()
 
-def initiate_server(ip, return_dict, num_neighbors):
+def initiate_server(ip, return_dict, id_dict, num_neighbors, ips_sectable):
     s = socket.socket()  # create server socket s with default param ipv4, TCP
     print('Socket Created')
     s.settimeout(45) # Setting timeout to prevent infinite blocking at s.accept() when the client node is not on
@@ -251,7 +285,7 @@ def initiate_server(ip, return_dict, num_neighbors):
         print(' ')
         return_dict[addr[0]] = []
         # start thread to handle client
-        thread = Thread(target=multi_threaded_client, args=(c, addr, lock, return_dict), daemon=True)
+        thread = Thread(target=multi_threaded_client, args=(c, addr, lock, return_dict, id_dict, ips_sectable), daemon=True)
         threads.append(thread)
         thread.start()
 
