@@ -1,7 +1,7 @@
 FROM ghcr.io/tiiuae/fog-ros-baseimage-builder:dp-4266_humble_upgrade AS builder
 
 # Install build dependencies
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
+RUN apt update -y && apt install -y --no-install-recommends \
     curl \
     python3-bloom \
     fakeroot \
@@ -25,19 +25,33 @@ RUN /packaging/build.sh
 
 FROM ghcr.io/tiiuae/fog-ros-baseimage:dp-4266_humble_upgrade
 
-# wpasupplicant pinned as to receive SSRC version (and not Ubuntu) of it which has some mesh-related customizations:
-# https://github.com/tiiuae/wpa
-RUN wget https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local/wpasupplicant_2.9.0-20-6~git20210701.43d8971_amd64.deb \
-    && dpkg -i wpasupplicant_*.deb \
-    && rm -rf wpasupplicant_*.deb
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    wifi-firmware \
+RUN apt update -y && apt install -y --no-install-recommends \
     iw \
     batctl \
     alfred \
     rfkill \
-    iproute2 \
-    && rm -rf /var/lib/apt/lists/*
+    iproute2
+
+# Ubuntu 22.04 has upgraded libssl to 3 and does not propose libssl1.1.
+# We can force the installation of libssl1.1 by adding the ubuntu 20.04 source.
+RUN echo "deb http://security.ubuntu.com/ubuntu focal-security main" | tee /etc/apt/sources.list.d/focal-security.list && \
+    apt update -y && \
+    apt install -y --no-install-recommends \
+        wget \
+        libdbus-1-3 \
+        libnl-genl-3-200 \
+        libnl-route-3-200 \
+        libpcsclite1 \
+        libssl1.1
+# wpasupplicant pinned as to receive SSRC version (and not Ubuntu) of it which has some mesh-related customizations:
+# https://github.com/tiiuae/w
+RUN wget \
+        https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local/wpasupplicant_2.9.0-20-6~git20210701.43d8971_amd64.deb \
+        https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local/wifi-firmware_1.0.0-5~git20210816.fecb07b_amd64.deb && \
+    dpkg -i wpasupplicant_*.deb && \
+    rm -rf wpasupplicant_*.deb && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /etc/apt/sources.list.d/focal-security.list
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 
