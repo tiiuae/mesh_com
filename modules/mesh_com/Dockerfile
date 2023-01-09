@@ -27,8 +27,10 @@ FROM ghcr.io/tiiuae/fog-ros-baseimage:dp-4266_humble_upgrade
 
 # wpasupplicant pinned as to receive SSRC version (and not Ubuntu) of it which has some mesh-related customizations:
 # https://github.com/tiiuae/wpa
+RUN wget https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local/wpasupplicant_2.9.0-20-6~git20210701.43d8971_amd64.deb \
+    && dpkg -i wpasupplicant_*.deb \
+    && rm -rf wpasupplicant_*.deb
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    wpasupplicant=2.9.0-20-6~git20210701.43d8971 \
     wifi-firmware \
     iw \
     batctl \
