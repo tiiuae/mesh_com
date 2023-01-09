@@ -1,10 +1,10 @@
 #!/bin/bash -e
 
-source /opt/ros/galactic/setup.bash
+source /opt/ros/humble/setup.bash
 
 # I don't know what we're doing wrong, but Python isn't able to resolve mesh packages without this.
 # (other Python packages seem to reside under /usr/lib/python3/dist-packages)
-export PYTHONPATH=/opt/ros/galactic/lib/python3.8/site-packages
+export PYTHONPATH=/opt/ros/${ROS_DISTRO}/lib/python3.8/site-packages
 
 # Needed in order to make ROS2 nodes exit gracefully.
 # SIGTERM signal is converted to SIGINT.
@@ -42,14 +42,14 @@ if [ "$1" == "init" ]; then
         # 192.168.240.1-192.168.246.254
         DEFAULT_MESH_IP="192.168.$[ $RANDOM % 7 + 240 ].$[ $RANDOM % 254 + 1 ]"
 
-        /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+        /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
         echo "mesh setup done"
         gateway_ip="192.168.247.10" # FIXME: hardcoded for now. later detect automatically.
         route add default gw $gateway_ip bat0
         sleep 86400
     elif [ "$DRONE_TYPE" == "groundstation" ]; then
         DEFAULT_MESH_IP="192.168.248.1"
-        /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+        /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
         echo "mesh setup done"
         sleep 86400
     elif [ "$DRONE_TYPE" == "fog" ]; then
@@ -60,7 +60,7 @@ if [ "$1" == "init" ]; then
             DEFAULT_MESH_IP="192.168.248.10"
         fi
 
-        /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+        /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
         echo "mesh setup done"
         if [ "$MESH_CLASS" == "gs" ]; then
             gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
@@ -70,7 +70,7 @@ if [ "$1" == "init" ]; then
     elif [ "$DRONE_TYPE" == "singlemesh" ]; then
         # 192.168.248.11-192.168.248.253
         DEFAULT_MESH_IP="192.168.248.$[ $RANDOM % 243 + 11 ]"
-        /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+        /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
         echo "mesh setup done"
             # mesh class is gs
         gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
@@ -106,8 +106,8 @@ if [ "$1" == "init" ]; then
     #     mesh-11s.sh ap
 
     #starting Default mesh
-    # /opt/ros/galactic/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-    # /opt/ros/galactic/lib/mesh_com/mesh_executor
+    # /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+    # /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
     # gateway_ip=$(python3 /usr/bin/default_mesh_router_select.py)
     # route add default gw $gateway_ip bat0
     # sleep 86400
