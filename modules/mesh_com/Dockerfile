@@ -30,7 +30,8 @@ RUN apt update -y && apt install -y --no-install-recommends \
     batctl \
     alfred \
     rfkill \
-    iproute2
+    iproute2 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Ubuntu 22.04 has upgraded libssl to 3 and does not propose libssl1.1.
 # We can force the installation of libssl1.1 by adding the ubuntu 20.04 source.
@@ -42,15 +43,13 @@ RUN echo "deb http://security.ubuntu.com/ubuntu focal-security main" | tee /etc/
         libnl-genl-3-200 \
         libnl-route-3-200 \
         libpcsclite1 \
-        libssl1.1
-# wpasupplicant pinned as to receive SSRC version (and not Ubuntu) of it which has some mesh-related customizations:
-# https://github.com/tiiuae/w
-RUN wget \
+        libssl1.1 && \
+    rm -rf /var/lib/apt/lists/* && \
+    wget \
         https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local/wpasupplicant_2.9.0-20-6~git20210701.43d8971_amd64.deb \
         https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local/wifi-firmware_1.0.0-5~git20210816.fecb07b_amd64.deb && \
     dpkg -i wpasupplicant_*.deb && \
     rm -rf wpasupplicant_*.deb && \
-    rm -rf /var/lib/apt/lists/* && \
     rm -rf /etc/apt/sources.list.d/focal-security.list
 
 ENTRYPOINT [ "/entrypoint.sh" ]
