@@ -259,9 +259,7 @@ class Mutual:
                 os.mkdir('pubKeys/')
 
             # Copy client certificate to pubKey/{client_mesh_ip}.der to use for secret derivation
-            print("Checkpoint, client_mesh_ip = ", client_mesh_ip.decode())
             client_mesh_name = client_mesh_ip.decode().replace('.','_')
-            print("Checkpoint, client_mesh_name = ", client_mesh_name)
             shutil.copyfile(f'{node_name}.der', f'pubKeys/{client_mesh_name}.der')
         else:
             info = {'ID': cliID, 'MAC': "00:00:00:00", 'IP': addr[0],

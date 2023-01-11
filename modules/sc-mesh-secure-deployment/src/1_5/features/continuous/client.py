@@ -15,6 +15,7 @@ import os
 sys.path.insert(0, '../../')
 
 from features.mutual.mutual import *
+from features.mutual.utils import primitives as pri
 
 def initiate_client(server_ip, ID):
     c = socket.socket()  # create server socket c with default param ipv4, TCP

@@ -29,7 +29,7 @@ def exchage_table(df):
             time.sleep(1)
 
 
-def exchange_server(debug=False):
+def exchange_server(debug=True):
     table = 'auth/dev.csv'
     sectable = pd.read_csv((table))
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -44,6 +44,8 @@ def exchange_server(debug=False):
         if debug:
             print(data, addr)
             print("Received: " + data.decode() + " from " + addr[0])
+        if debug:
+            print('Test sectable before update: ', sectable)
         try:
             new = pd.read_json(data.decode())
             if "CA_Result" in new.columns:
@@ -53,12 +55,14 @@ def exchange_server(debug=False):
                     pass
             sectable = pd.concat([sectable, new], ignore_index=True)
             sectable.drop_duplicates(inplace=True)
+            if debug:
+                print('Test sectable after update: ', sectable)
             sectable.to_csv(table, mode='w', header=True, index=False)
         except ValueError:
             pass
 
 
-def exchange_client(IP, message, debug=False):
+def exchange_client(IP, message, debug=True):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)  # UDP
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
