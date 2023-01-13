@@ -19,6 +19,7 @@ calculate_wifi_channel()
     fi
 }
 
+
 install_packages()
 {
   #install the python packages
@@ -50,7 +51,24 @@ install_packages()
   if [ "$ML" == "true" ]; then
 
     tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/machine_learning_packages.tar.gz
+    tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/machine_learning2.tar.gz
+
     cd /opt/mesh_com/modules/utils/package/machine_learning_packages
+
+    for f in {*.whl,*.gz};
+    do
+      name="$(echo $f | cut -d'-' -f1)"
+      if python -c 'import pkgutil; exit(not pkgutil.find_loader("$name"))'; then
+        echo $name "installed"
+      else
+        echo $name "not found"
+        echo "installing" $name
+        pip install --no-index "$f" --find-links .;
+    fi
+    done;
+    cd .. ;
+
+    cd /opt/mesh_com/modules/utils/package/machine_learning2
 
     for f in {*.whl,*.gz};
     do
@@ -69,7 +87,6 @@ install_packages()
     cp /opt/mesh_com/modules/utils/package/machine_learning_packages/pcap.cpython-39-aarch64-linux-gnu.so /usr/lib/python3.9/site-packages/.
   fi
 }
-
 configure()
 {
   if [ -f "/opt/mesh.conf" ]; then
