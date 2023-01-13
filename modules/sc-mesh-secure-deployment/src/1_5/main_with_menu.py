@@ -1,5 +1,6 @@
 #! /usr/bin/python3
 
+import contextlib
 from main import *
 
 menu_options = {
@@ -161,12 +162,10 @@ def extable():
     table = 'auth/dev.csv'
     try:
         mesh_utils.get_neighbors_ip()
-        try:
+        with contextlib.suppress(Exception):
             sectable = pd.read_csv(table)
             sectable.drop_duplicates(inplace=True)
             ut.exchage_table(sectable)
-        except Exception:
-            pass
     except FileNotFoundError:
         print("SecTable not available. Need to be requested during provisioning")
 
