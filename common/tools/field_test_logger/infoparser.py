@@ -42,6 +42,9 @@ class InfoParser:
         self.__longitude = -999999
         self.__gps_time = "NaN"
         self.__pdop = 0
+        self.__speed = 0
+        self.__climb = 0
+        self.__track = 0
         #
         self.__cpu_temp = "NaN"
         self.__wifi_temp = "NaN"
@@ -167,12 +170,18 @@ class InfoParser:
             self.__altitude = gps_response.alt
             self.__gps_time = gps_response.time
             self.__pdop = gps_response.pdop
+            self.__speed = gps_response.speed
+            self.__climb = gps_response.climb
+            self.__track = gps_response.track
         except:
             self.__latitude = -999999
             self.__longitude = -999999
             self.__altitude = 0
             self.__gps_time = "NaN"
             self.__pdop = 0
+            self.__speed = 0
+            self.__climb = 0
+            self.__track = 0
 
     # ----------------------------------------
 
