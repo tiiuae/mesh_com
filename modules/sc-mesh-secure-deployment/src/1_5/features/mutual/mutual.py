@@ -9,6 +9,7 @@ import pandas as pd
 from .utils import primitives as pri
 from termcolor import colored
 import sys
+import shutil
 
 sys.path.insert(0, '../../')
 '''
@@ -64,7 +65,7 @@ class Mutual:
         pri.import_cert(root_cert, 'root')
         print("my ID: ", self.myID)
         self.table = self.create_table()
-        self.salt = os.urandom(16)
+        #self.salt = os.urandom(16)
 
 
     def create_table(self):
@@ -150,7 +151,8 @@ class Mutual:
             password = co.create_password()  # create a password (only if no mesh exist)
             co.util.update_mesh_password(password)  # update password in config file
         print(password)
-        encrypt_pass = pri.encrypt_response(password, cliID, self.local_cert, self.salt)
+        secret_byte = pri.derive_ecdh_secret(node_name, '')
+        encrypt_pass = pri.encrypt_response(password, cliID, secret_byte)
         if self.debug:
             print(f'encrypted pass: {str(encrypt_pass)}')
         return encrypt_pass
@@ -215,11 +217,12 @@ class Mutual:
             print(colored('> Valid Certificate', 'green'))
             print('Authenticated, now send my pubkey')
             client_fpr, _ = pri.hashSig(node_name + '.der')
-            pri.derive_ecdh_secret(node_name, cliID, self.local_cert, self.salt)
+            #pri.derive_ecdh_secret(node_name, cliID, self.local_cert, self.salt)
             if cli:  # client
                 print('5) get password')
                 enc_pass, _ = fs.server_auth(self.myID, self.interface)
-                password = pri.decrypt_response(enc_pass, cliID, self.local_cert, self.salt)
+                secret_byte = pri.derive_ecdh_secret(node_name, '')
+                password = pri.decrypt_response(enc_pass, cliID, secret_byte)
                 print(bytes(password).decode())
                 co.util.update_mesh_password(bytes(password).decode())
                 self.start_mesh()
@@ -250,6 +253,14 @@ class Mutual:
             info = {'ID': cliID, 'MAC': client_mac.decode(), 'IP': client_mesh_ip.decode(),
                     'PubKey_fpr': client_fpr, 'MA_level': 1}
             self.update_table(info)  # #update csv file
+
+            # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
+            if not os.path.exists('pubKeys/'):
+                os.mkdir('pubKeys/')
+
+            # Copy client certificate to pubKey/{client_mesh_ip}.der to use for secret derivation
+            client_mesh_name = client_mesh_ip.decode().replace('.','_')
+            shutil.copyfile(f'{node_name}.der', f'pubKeys/{client_mesh_name}.der')
         else:
             info = {'ID': cliID, 'MAC': "00:00:00:00", 'IP': addr[0],
                     'PubKey_fpr': "___", 'MA_level': 0}

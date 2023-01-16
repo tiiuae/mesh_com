@@ -40,18 +40,41 @@ def exit():
     session.logout()
     session.closeSession()
 
+"""
 def derive_ecdh_secret(node_name, cliID, local_cert, salt):
     '''
     Derive the shared secret for EC keys and store it in an encrypted file
     File encryption using the deriving node's public key (local_cert) + salt
     '''
-    pubKey_filename = f'{node_name}.der'
+    myID = get_labels()
+    if node_name == '':
+        pubKey_filename = f'pubKeys/{cliID}.der' # when called from cont auth, node_name = '', select public key from pubKeys/cliID.der
+    else:
+        pubKey_filename = f'{node_name}.der' # when called from mutual, node_name != '', select public key from node_name.der
+
     if not os.path.exists('secrets/'):
         os.mkdir('secrets/')
     secret_filename = f'secrets/secret_{cliID}.der'
-    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--id', '01', '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE', '--output-file', secret_filename]
+    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--label', myID, '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE', '--output-file', secret_filename]
     subprocess.call(command, shell=False)
     encrypt_file(secret_filename,local_cert, salt) # Encrpyt file using pubkey + salt
+"""
+
+def derive_ecdh_secret(node_name, client_mesh_name):
+    '''
+    Derives ecdh secret for given node_name/ client mesh IP and returns the secret in bytes
+    '''
+    myID = get_labels()
+    if node_name == '':
+        pubKey_filename = f'pubKeys/{client_mesh_name}.der'  # when called from cont auth, node_name = '', select public key from pubKeys/client_mesh_name.der Eg. pubKeys/10_10_10_4.der
+    else:
+        pubKey_filename = f'{node_name}.der'  # when called from mutual, node_name != '', select public key from node_name.der
+    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--label', myID, '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE']
+    # Output of ecdh derive is the secret byte + b'Using derive algorithm 0x00001050 ECDH1-DERIVE\n'
+    # Extracting the secret byte
+    secret_byte = subprocess.check_output(command, shell=False).rstrip(b'Using derive algorithm 0x00001050 ECDH1-DERIVE\n')
+    secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
+    return secret_byte
 
 '''
 def encrypt_response(message,
@@ -84,11 +107,15 @@ def decrypt_response(encr):  # assuming that data is on a file called payload.en
     return dec
 '''
 
-def encrypt_response(message, cliID, local_cert, salt):
-    secret_filename = f'secrets/secret_{cliID}.der'
+def encrypt_response(message, cliID, password):
+    '''
+    encrypt message using key derived from password (secret_byte)
+    '''
+    #secret_filename = f'secrets/secret_{cliID}.der'
     #secret = open(secret_filename, 'rb')
     #password = secret.read()
-    password = decrypt_file(secret_filename, local_cert, salt)
+    #password = decrypt_file(secret_filename, local_cert, salt)
+    #password = derive_ecdh_secret(cliID)
     #salt = os.urandom(16)
     salt = bytes('', 'utf-8')
     kdf = PBKDF2HMAC(
@@ -105,11 +132,15 @@ def encrypt_response(message, cliID, local_cert, salt):
         print(f'> Encrypted message: {encr}')
     return encr
 
-def decrypt_response(encr, cliID, local_cert, salt):
-    secret_filename = f'secrets/secret_{cliID}.der'
+def decrypt_response(encr, cliID, password):
+    '''
+    decrypt message using key derived from password (secret_byte)
+    '''
+    #secret_filename = f'secrets/secret_{cliID}.der'
     #secret = open(secret_filename, 'rb')
     #password = secret.read()
-    password = decrypt_file(secret_filename, local_cert, salt)
+    #password = decrypt_file(secret_filename, local_cert, salt)
+    #password = derive_ecdh_secret(cliID)
     #salt = os.urandom(16)
     salt = bytes('', 'utf-8')
     kdf = PBKDF2HMAC(
@@ -165,7 +196,6 @@ def verify_key_exists(node_name):
     if k:
         return True
 
-
 def import_cert(client_key, node_name):
     exist = verify_key_exists(node_name)
     if exist:
@@ -186,6 +216,40 @@ def import_cert(client_key, node_name):
                'pubkey', '--id', ID, '--label', node_name]
     subprocess.call(command, shell=False)
 
+"""
+def import_cert(client_key, node_name, cliID):
+    exist = verify_key_exists(node_name)
+    if exist:
+        delete_key(node_name)
+    filename = f'{node_name}.der'
+    filename_2 = f'pubKeys/{cliID}.der'
+    if node_name == 'root':
+        filename = client_key
+        ID = str(999)
+    else:
+        ID = node_name.split('_')[-1] # Should we just store it as node ID?
+        try:
+            with open(filename, 'wb') as writer:
+                writer.write(client_key.read())
+        except AttributeError:
+            with open(filename, 'wb') as writer:
+                writer.write(client_key)
+
+        # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
+        if not os.path.exists('pubKeys/'):
+            os.mkdir('pubKeys/')
+
+        # File 'pubKeys/cliID.der' is required to derive secret during continuous authentication
+        try:
+            with open(filename_2, 'wb') as writer:
+                writer.write(client_key.read())
+        except AttributeError:
+            with open(filename_2, 'wb') as writer:
+                writer.write(client_key)
+    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--write-object', filename, '--type',
+               'pubkey', '--id', ID, '--label', node_name]
+    subprocess.call(command, shell=False)
+"""
 
 def verify_hsm(msg, sig, name):
     session = get_session()

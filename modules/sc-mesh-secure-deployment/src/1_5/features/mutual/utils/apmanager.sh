@@ -146,7 +146,9 @@ function default() {
         ssid="AuthAP_$1"
       fi
       password="ssrcpassword"
-      ip='50.10.10.1'
+      #ip='50.10.10.1'
+      net=$(( $RANDOM % 253 + 1 ))
+      ip=$net'.10.10.1'
 fi
 if [ -z "$2" ] # interface
   then

@@ -34,7 +34,7 @@ def message_generator(secret, server_id, client_id, msg, u, time_flag, sa):
     return msg_to_send
 
 
-def crc_generator(msg_to_send, crc_key, debug=True):
+def crc_generator(msg_to_send, crc_key, debug=False):
     bin_data = ''.join(format(ord(i), '08b') for i in msg_to_send)  # Convert json to binary
     data_with_crc = crc_functions.encodeData(bin_data, crc_key)
     if debug:
