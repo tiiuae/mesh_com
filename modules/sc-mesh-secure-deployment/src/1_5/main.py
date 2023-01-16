@@ -124,8 +124,8 @@ def start_servers():
     q = queue.Queue()
     ca_s = ca_utils.ca_server(mesh_utils.get_mesh_ip_address())  # port 9999
     process.append(ca_s)
-    ex_s = multiprocessing.Process(target=ut.exchange_server, args=(q,), daemon=True)  # port 5005
-    process.append(ex_s)
+    #ex_s = multiprocessing.Process(target=ut.exchange_server, args=(q,), daemon=True)  # port 5005
+    #process.append(ex_s)
     return process
 
 
@@ -138,6 +138,7 @@ if __name__ == "__main__":
     while True:
         if mesh_utils.verify_mesh_status():  # verifying that mesh is running
             sleep(sec_beat_time - time() % sec_beat_time)  # sec beat time
-            first_round, ness_result = sec_beat(ness_result, myID)
+            #first_round, ness_result = sec_beat(ness_result, myID)
+            sec_beat(myID)
         else:
             print("No mesh established")
