@@ -150,13 +150,11 @@ def sbeat():
     os.system('clear')
     print('\'SecBeat\'')
     sec_beat(myID)
-    """
     print(f'Running SecBeat every {sec_beat_time} seconds, during {end_time} minutes')
     while time() < original_time + end_time:
         if mesh_utils.verify_mesh_status():  # verifying that mesh is running
             sleep(sec_beat_time - time() % sec_beat_time)  # sec beat time
             sec_beat(myID)
-    """
 
 def extable():
     os.system('clear')
