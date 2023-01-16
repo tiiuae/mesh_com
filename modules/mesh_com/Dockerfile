@@ -1,4 +1,4 @@
-FROM ghcr.io/tiiuae/fog-ros-baseimage:builder-3dcb78d AS builder
+FROM ghcr.io/tiiuae/fog-ros-baseimage:builder-ae21266 AS builder
 
 # Install build dependencies
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
@@ -23,7 +23,7 @@ RUN /packaging/build.sh
 #  ▲               runtime ──┐
 #  └── build                 ▼
 
-FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-3dcb78d
+FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-ae21266
 
 # wpasupplicant pinned as to receive SSRC version (and not Ubuntu) of it which has some mesh-related customizations:
 # https://github.com/tiiuae/wpa
