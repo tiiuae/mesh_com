@@ -105,7 +105,8 @@ def DE():
     os.system('clear')
     print('\'Decision Engine\'')
     try:
-        sectable = pd.read_csv('auth/dev.csv')
+        #sectable = pd.read_csv('auth/dev.csv')
+        sectable = pd.read_csv('auth/global_table.csv')
         if 'CA_Result' not in sectable.columns:
             sectable = CA()
         if sectable.empty:
@@ -163,12 +164,19 @@ def extable():
     table = 'auth/dev.csv'
     try:
         mesh_utils.get_neighbors_ip()
+        """
         try:
             sectable = pd.read_csv(table)
             sectable.drop_duplicates(inplace=True)
             ut.exchage_table(sectable)
         except Exception:
             pass
+        """
+        sectable = pd.read_csv(table)
+        sectable.drop_duplicates(inplace=True)
+        start_server_thread = ut.start_server()
+        sleep(0.5) # So that messages are not sent and dropped before other nodes start server
+        ut.exchage_table(sectable, start_server_thread)
     except FileNotFoundError:
         print("SecTable not available. Need to be requested during provisioning")
 
