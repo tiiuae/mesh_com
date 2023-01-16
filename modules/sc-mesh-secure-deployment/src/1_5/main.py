@@ -93,50 +93,6 @@ def quaran(ness_result, q, sectable, ma, mapp):
         else:
             print("Nothing to do")
 
-def start_exchange_server(lock, debug = True):
-    '''
-    Start server to receive exchange table message during sec beat
-    '''
-    table = 'auth/exchange_table.csv'
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    #sectable = pd.read_csv((table))
-    # create new table to store received tables, add the source node IP
-    columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'MA_level', 'CA_Result', 'CA_Server', 'source_IP']
-    extable = pd.DataFrame(columns=columns)
-    extable.to_csv(table, header=columns, index=False)
-    try:
-        sock.bind(("0.0.0.0", 5005))
-        sock.listen()
-    except OSError:
-        pass
-    while 1:
-        data, addr = sock.recvfrom(4096)
-        print("Message received")
-        if debug:
-            print(data, addr)
-            print("Received: " + data.decode() + " from " + addr[0])
-
-        try:
-            new = pd.read_json(data.decode())
-            new['source_IP'] = addr[0]
-            """
-            if "CA_Result" in new.columns:
-                try:
-                    sectable.dropna(subset=['CA_Result', 'CA_Server'], how='all', inplace=True)
-                except KeyError:
-                    pass
-            """
-            new.drop_duplicates(inplace=True)
-            lock.acquire()
-            if debug:
-                print('Test exchange_table before update: ', pd.read_csv(table))
-            new.to_csv(table, mode='a', header=False, index=False) # Append to auth/extable.csv
-            if debug:
-                print('Test exchange_table after update: ', pd.read_csv(table))
-            lock.release()
-        except ValueError:
-            pass
-
 def sec_beat(myID):
     q = queue.Queue()
     ut.checkiptables()
