@@ -142,32 +142,12 @@ def sec_beat(myID):
     ut.checkiptables()
     ma = mba.MBA(mesh_utils.get_mesh_ip_address())
     # Start exchange table server so that it can receive messages as soon as other nodes complete cont auth
-    lock = threading.Lock()
-    threading.Thread(target=start_exchange_server, args=(lock,), daemon=True).start()
+    start_server_thread = ut.start_server()
     sectable = only_ca(myID)
     sectable.drop_duplicates(inplace=True)
-    #ut.exchage_table(sectable)
-    message = sectable.to_json()
-    neigh = mesh_utils.get_arp()
-    ip2_send = list(set(sectable['IP'].tolist() + list(neigh.keys())))
-    for IP in ip2_send:
-        if IP != mesh_utils.get_mesh_ip_address():
-            threading.Thread(target=ut.exchange_client, args=(IP, message,),
-                             daemon=True).start()  # lock variable add later
-            sleep(1)
-    sleep(10)
-    exchange_table = pd.read_csv('auth/exchange_table.csv')
-    exchange_table = exchange_table.drop(columns=['source_IP'])
-    sectable = pd.read_csv('auth/dev.csv')
-
-    sectable = pd.concat([sectable, exchange_table], ignore_index=True)
-    sectable.drop_duplicates(inplace=True)
-    sectable.to_csv('auth/global_table.csv', mode='w', header=True, index=False)
-    print('Global security table:')
-    print(sectable)
-    ness_result, mapp = decision_engine(sectable, ma, q)
-
-
+    ut.exchage_table(sectable, start_server_thread)
+    global_table = pd.read_csv('auth/global_table.csv')
+    ness_result, mapp = decision_engine(global_table, ma, q)
 # quaran(ness_result, q, sectable, ma, mapp)
 
 
