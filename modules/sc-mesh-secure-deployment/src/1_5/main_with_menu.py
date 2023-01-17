@@ -175,7 +175,7 @@ def Quarantine():
     print('\'Quarantine\'')
     ness_result, mapp = DE()
     q = queue.Queue()
-    table = 'auth/dev.csv'
+    table = 'auth/global_table.csv'
     try:
         sectable = pd.read_csv(table)
         ma = mba.MBA(mesh_utils.get_mesh_ip_address())
