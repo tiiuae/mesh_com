@@ -2,11 +2,17 @@ from PyKCS11 import *
 import subprocess
 import hashlib
 import os
+import sys
 
 import base64
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+from Crypto.Protocol.KDF import PBKDF2
+from Crypto.Hash import SHA256
+from Crypto.Util.Padding import unpad
+from Crypto.Cipher import AES
 
 BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
 LIB = "/usr/lib/softhsm/libsofthsm2.so"
@@ -18,6 +24,26 @@ mechanism = Mechanism(CKM_ECDSA, None) # Mechanism for EC sign and verify
 '''
 TODO:create a function to verify if keys exist and are valid
 '''
+mesh_if = 'wlan1' #check if we can get it from header
+mid = hashlib.blake2b(mesh_if.encode(), digest_size=4).hexdigest()
+
+def recover_pin():
+    try:
+        pin_aux = open('conf/output.txt').readlines() #need to make it absolute
+        # Determine salt and ciphertext
+        encryptedDataB64 = pin_aux[0].split('\n')[0]
+        encryptedData = base64.b64decode(encryptedDataB64)
+        salt = encryptedData[8:16]
+        ciphertext = encryptedData[16:]
+        # Reconstruct Key/IV-pair
+        pbkdf2Hash = PBKDF2(mid, salt, 32 + 16, count=100000, hmac_hash_module=SHA256)
+        key = pbkdf2Hash[:32]
+        iv = pbkdf2Hash[32:32 + 16]
+        # Decrypt with AES-256 / CBC / PKCS7 Padding
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        return unpad(cipher.decrypt(ciphertext), 16).decode().split('\n')[0]
+    except FileNotFoundError:
+        print("No pin found")
 
 
 def get_session():
@@ -26,7 +52,7 @@ def get_session():
     slot = pkcs11.getSlotList(tokenPresent=True)[0]
     try:
         session = pkcs11.openSession(slot, CKF_SERIAL_SESSION | CKF_RW_SESSION)
-        session.login("1234")
+        session.login(recover_pin())
         return session
     except PyKCS11Error:
         print('No previous keys')
@@ -40,26 +66,6 @@ def exit():
     session.logout()
     session.closeSession()
 
-"""
-def derive_ecdh_secret(node_name, cliID, local_cert, salt):
-    '''
-    Derive the shared secret for EC keys and store it in an encrypted file
-    File encryption using the deriving node's public key (local_cert) + salt
-    '''
-    myID = get_labels()
-    if node_name == '':
-        pubKey_filename = f'pubKeys/{cliID}.der' # when called from cont auth, node_name = '', select public key from pubKeys/cliID.der
-    else:
-        pubKey_filename = f'{node_name}.der' # when called from mutual, node_name != '', select public key from node_name.der
-
-    if not os.path.exists('secrets/'):
-        os.mkdir('secrets/')
-    secret_filename = f'secrets/secret_{cliID}.der'
-    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--label', myID, '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE', '--output-file', secret_filename]
-    subprocess.call(command, shell=False)
-    encrypt_file(secret_filename,local_cert, salt) # Encrpyt file using pubkey + salt
-"""
-
 def derive_ecdh_secret(node_name, client_mesh_name):
     '''
     Derives ecdh secret for given node_name/ client mesh IP and returns the secret in bytes
@@ -69,43 +75,13 @@ def derive_ecdh_secret(node_name, client_mesh_name):
         pubKey_filename = f'pubKeys/{client_mesh_name}.der'  # when called from cont auth, node_name = '', select public key from pubKeys/client_mesh_name.der Eg. pubKeys/10_10_10_4.der
     else:
         pubKey_filename = f'{node_name}.der'  # when called from mutual, node_name != '', select public key from node_name.der
-    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--label', myID, '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE']
+    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', recover_pin(), '--label', myID, '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE']
     # Output of ecdh derive is the secret byte + b'Using derive algorithm 0x00001050 ECDH1-DERIVE\n'
     # Extracting the secret byte
     secret_byte = subprocess.check_output(command, shell=False).rstrip(b'Using derive algorithm 0x00001050 ECDH1-DERIVE\n')
     secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
     return secret_byte
 
-'''
-def encrypt_response(message,
-                     name):  # assuming that data is on a file called payload.enc generated on the function get_data
-    session = get_session()
-    keys = session.findObjects()
-    for key in range(len(keys)):
-        aux = keys[key].to_dict()
-        if aux['CKA_LABEL'] == name:
-            pubKey = keys[key]
-    encr = session.encrypt(pubKey, message)
-    session.logout()
-    session.closeSession()
-    if debug:
-        print(f'> Encrypted message: {bytes(encr)}')
-    # logout
-    return bytes(encr)
-
-def decrypt_response(encr):  # assuming that data is on a file called payload.enc generated on the function get_data
-    session = get_session()
-    privKey = session.findObjects([(CKA_CLASS, CKO_PRIVATE_KEY)])[0]
-    dec = session.decrypt(privKey, encr)
-    if type(dec) == 'PyKCS11.ckbytelist':
-        dec = bytes(dec)
-    session.logout()
-    session.closeSession()
-    if debug:
-        print(f'> Decrypted message: {bytes(dec)}')
-    # logout
-    return dec
-'''
 
 def encrypt_response(message, cliID, password):
     '''
@@ -179,7 +155,7 @@ def delete_key(node_name):  # check if it is possible to delete on python (destr
         if aux['CKA_LABEL'] == node_name:
             aux = keys[key].to_dict()
             k.append(aux)
-    for _ in range(len(k)):
+    for _ in k:
         command = ['pkcs11-tool', '--module', LIB, '--delete-object', label, '--type=pubkey']
         subprocess.call(command, shell=False)
 
@@ -212,44 +188,10 @@ def import_cert(client_key, node_name):
         except AttributeError:
             with open(filename, 'wb') as writer:
                 writer.write(client_key)
-    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--write-object', filename, '--type',
+    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', recover_pin(), '--write-object', filename, '--type',
                'pubkey', '--id', ID, '--label', node_name]
     subprocess.call(command, shell=False)
 
-"""
-def import_cert(client_key, node_name, cliID):
-    exist = verify_key_exists(node_name)
-    if exist:
-        delete_key(node_name)
-    filename = f'{node_name}.der'
-    filename_2 = f'pubKeys/{cliID}.der'
-    if node_name == 'root':
-        filename = client_key
-        ID = str(999)
-    else:
-        ID = node_name.split('_')[-1] # Should we just store it as node ID?
-        try:
-            with open(filename, 'wb') as writer:
-                writer.write(client_key.read())
-        except AttributeError:
-            with open(filename, 'wb') as writer:
-                writer.write(client_key)
-
-        # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
-        if not os.path.exists('pubKeys/'):
-            os.mkdir('pubKeys/')
-
-        # File 'pubKeys/cliID.der' is required to derive secret during continuous authentication
-        try:
-            with open(filename_2, 'wb') as writer:
-                writer.write(client_key.read())
-        except AttributeError:
-            with open(filename_2, 'wb') as writer:
-                writer.write(client_key)
-    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--write-object', filename, '--type',
-               'pubkey', '--id', ID, '--label', node_name]
-    subprocess.call(command, shell=False)
-"""
 
 def verify_hsm(msg, sig, name):
     session = get_session()
@@ -314,44 +256,6 @@ def chunks(file_obj, size=10000):
         yield chunks
 
 
-'''
-def encrypt_file(file_name, key_name):
-    encr = []
-    session = get_session()
-    keys = session.findObjects()
-    for key in range(len(keys)):
-        aux = keys[key].to_dict()
-        if aux['CKA_LABEL'] == key_name:
-            pubKey = keys[key]
-    split_files = chunks(open(file_name))
-    for chunk in split_files:
-        size = len(chunk)
-    for ch in range(size):
-        c = session.encrypt(pubKey, chunk[ch])
-        if debug:
-            print(bytes(c))
-        encr.append(bytes(c))
-    session.logout()
-    session.closeSession()
-    return encr
-
-
-def decrypt_file(file_name):
-    decr = []
-    session = get_session()
-    privKey = session.findObjects([(CKA_CLASS, CKO_PRIVATE_KEY)])[0]
-    split_files = chunks(open(file_name))
-    for chunk in split_files:
-        size = len(chunk)
-    for ch in range(size):
-        c = session.decrypt(privKey, bytes(chunk[ch].split('\n')[0], encoding='utf-8'))
-        if debug:
-            print(bytes(c))
-        decr.append(bytes(c))
-    session.logout()
-    session.closeSession()
-    return decr
-'''
 
 def encrypt_file(file_name, key_name, salt):
     '''
@@ -386,11 +290,10 @@ def decrypt_file(file_name, key_name, salt):
     key = base64.urlsafe_b64encode(kdf.derive(password))
     f = Fernet(key)
     encrypted = open(file_name, 'rb').read()
-    decrypted = f.decrypt(encrypted)
-    return decrypted
+    return f.decrypt(encrypted)
 
 
-def get_labels():
+def get_labels(): #maybe this can be deleted now that we are having the id based on the mac
     labels = []
     session = get_session()
     keys = session.findObjects()

@@ -172,7 +172,7 @@ if [ "$meshVersion" == "1.5" ]; then
   ms1_5_path='/opt/mesh_com/modules/sc-mesh-secure-deployment/src/1_5'
   provisioning true
   cp $ms1_5_path/common/test/root_cert.der /etc/ssl/certs/
-  uid=$(echo n $mesh_if_mac | b2sum -l 32)
+  uid=$(echo -n $mesh_if_mac | b2sum -l 32)
   uid=${uid::-1}
   /bin/bash /opt/mesh_com/common/scripts/generate_keys.sh $uid
   cd $ms1_5_path

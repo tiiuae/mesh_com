@@ -50,12 +50,6 @@ def aux_auth(semasphore):
             pri.import_cert(client_cert, node_name)
             mut.send_my_key(cliID, addr)
             mut.cert_validation(sig, node_name, cliID, False, addr)
-            '''
-            only for demo
-            '''
-            command = ['route', 'del', '-net', '10.10.10.0', 'gw', '0.0.0.0', 'netmask', '255.255.255.0', 'dev', 'eth1']
-            subprocess.call(command, shell=False)
-
 
 def MA():
     os.system('clear')

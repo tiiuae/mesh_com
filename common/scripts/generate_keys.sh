@@ -1,4 +1,11 @@
 #!/bin/bash
+###
+### This file initialize the softhsm. It creates a random pin and store it in a file (store it in AES with the id)
+### the ID of the device should be passed as parameter, otherwise uses 'myKey' as ID.
+### to generate the ID based on mac (lines 164-176 of entrypoint):
+### mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
+###   uid=$(echo -n $mesh_if_mac | b2sum -l 32)
+###   uid=${uid::-1}; echo $uid
 
 #add line at the beginning of the file
 sed -i '1s/^/openssl_conf = openssl_init\n/' /etc/ssl/openssl.cnf
@@ -19,17 +26,20 @@ fi
 #loading softhsm library
 LIB='/usr/lib/softhsm/libsofthsm2.so'
 
+#random pin 
+pin=$((1 + $RANDOM % 99999999999))
+
 #intialize token
-softhsm2-util --init-token --slot 0 --label MyTestToken1 --pin 1234 --so-pin 1234 ## this should be done before?
+softhsm2-util --init-token --slot 0 --label secccoms --pin $pin --so-pin $pin ## this should be done before?
 
 #delete keys
-keys=$(pkcs11-tool --module=$LIB -O --login --pin 1234)
+keys=$(pkcs11-tool --module=$LIB -O --login --pin $pin)
 if [ ${#keys} -ne 0  ]
 then
   echo "Keys Found"
   echo "Deleting old keys"
-  pkcs11-tool --module=$LIB --login --pin 1234 --delete-object --type privkey --id 01
-  pkcs11-tool --module=$LIB --login --pin 1234 --delete-object --type pubkey --id 01
+  pkcs11-tool --module=$LIB --login --pin $pin --delete-object --type privkey --id 01
+  pkcs11-tool --module=$LIB --login --pin $pin --delete-object --type pubkey --id 01
 fi
 
 if [ -z "$1" ] # label or ID
@@ -41,8 +51,9 @@ fi
 
 #generate keys
 echo "Generating new keys"
-#pkcs11-tool --keypairgen --key-type="RSA:4096"  --login --pin=1234 --module=$LIB --label=$LABEL --id=01
-pkcs11-tool --keypairgen --key-type="EC:prime256v1"  --login --pin=1234 --module=$LIB --label=$LABEL --id=01
+#pkcs11-tool --keypairgen --key-type="RSA:4096"  --login --pin=$pin --module=$LIB --label=$LABEL --id=01
+pkcs11-tool --keypairgen --key-type="EC:prime256v1"  --login --pin=$pin --module=$LIB --label=$LABEL --id=01 #for EC
 #export to der
 pkcs11-tool --read-object --id 01 --type pubkey --module=$LIB --output-file /etc/ssl/certs/mesh_cert.der
 
+echo $pin | openssl enc -aes-256-cbc -md sha256 -a -pbkdf2 -iter 100000 -salt -pass pass:$LABEL > ../../modules/sc-mesh-secure-deployment/src/1_5/conf/output.txt
