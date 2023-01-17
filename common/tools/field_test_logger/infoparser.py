@@ -78,7 +78,7 @@ class InfoParser:
         return str(self.__pdop)
 
     def get_speed(self) -> str:
-        return str(self.__speed) if str(self.__speed).isnumeric() else "0"
+        return str(self.__speed)
 
     def get_climb(self) -> str:
         return str(self.__climb)
@@ -179,7 +179,7 @@ class InfoParser:
             self.__altitude = gps_response.alt
             self.__gps_time = gps_response.time
             self.__pdop = gps_response.pdop
-            self.__speed = gps_response.speed
+            self.__speed = gps_response.hspeed
             self.__climb = gps_response.climb
             self.__track = gps_response.track
         except:
