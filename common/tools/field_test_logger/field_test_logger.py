@@ -122,6 +122,9 @@ if __name__ == '__main__':
     ftl.register_logger_function("longitude", info.get_longitude)
     ftl.register_logger_function("altitude", info.get_altitude)
     ftl.register_logger_function("PDOP", info.get_pdop)
+    ftl.register_logger_function("speed", info.get_speed)
+    ftl.register_logger_function("climb", info.get_climb)
+    ftl.register_logger_function("track", info.get_track)
 
     ftl.register_logger_function("cpu temp [mC]", info.get_cpu_temp)
     ftl.register_logger_function("battery temp [mC]", info.get_bat_temp)
