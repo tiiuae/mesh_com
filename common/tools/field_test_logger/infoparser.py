@@ -77,6 +77,15 @@ class InfoParser:
     def get_pdop(self) -> str:
         return str(self.__pdop)
 
+    def get_speed(self) -> str:
+        return str(self.__speed) if str(self.__speed).isnumeric() else "0"
+
+    def get_climb(self) -> str:
+        return str(self.__climb)
+
+    def get_track(self) -> str:
+        return str(self.__track)
+
     def get_cpu_temp(self):
         return self.__cpu_temp
 
