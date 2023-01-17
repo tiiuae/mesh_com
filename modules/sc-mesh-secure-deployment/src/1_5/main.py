@@ -104,7 +104,8 @@ def sec_beat(myID):
     ut.exchage_table(sectable, start_server_thread)
     global_table = pd.read_csv('auth/global_table.csv')
     ness_result, mapp = decision_engine(global_table, ma, q)
-# quaran(ness_result, q, sectable, ma, mapp)
+    #quaran(ness_result, q, sectable, ma, mapp)
+    quaran(ness_result, q, global_table, ma, mapp)
 
 
 def mutual_authentication():

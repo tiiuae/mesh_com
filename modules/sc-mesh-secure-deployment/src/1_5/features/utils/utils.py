@@ -128,7 +128,7 @@ def exchange_server(debug=False):
         except socket.timeout:
             print('Socket timeout')
             break # If timeout, break while loop
-        sock.settimeout(10)  # Setting timeout to exit infinite loop if nothing is received for 30 seconds
+        sock.settimeout(15)  # Setting timeout to exit infinite loop if nothing is received for 15 seconds
 
 def exchange_client(IP, message, debug=False):
     print('Checkpoint inside exchange_client')
