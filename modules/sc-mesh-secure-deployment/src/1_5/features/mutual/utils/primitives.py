@@ -3,7 +3,7 @@ import subprocess
 import hashlib
 import os
 import sys
-
+import pathlib
 import base64
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
@@ -14,9 +14,17 @@ from Crypto.Hash import SHA256
 from Crypto.Util.Padding import unpad
 from Crypto.Cipher import AES
 
-BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
+BUF_SIZE = 65536  # let's read stuff in 64kb chunks!
 LIB = "/usr/lib/softhsm/libsofthsm2.so"
 os.environ['PYKCS11LIB'] = LIB
+
+mesh_com_path=pathlib.Path(__file__).resolve().parent.parent.parent.parent
+
+sys.path.append(os.path.abspath(mesh_com_path))
+
+import common.utils as ut
+util=ut.Utils()
+
 
 debug = True
 mechanism = Mechanism(CKM_ECDSA, None) # Mechanism for EC sign and verify
@@ -24,8 +32,8 @@ mechanism = Mechanism(CKM_ECDSA, None) # Mechanism for EC sign and verify
 '''
 TODO:create a function to verify if keys exist and are valid
 '''
-mesh_if = 'wlan1' #check if we can get it from header
-mid = hashlib.blake2b(mesh_if.encode(), digest_size=4).hexdigest()
+
+mid = hashlib.blake2b(util.get_mac_by_interface('wlp1s0').encode(), digest_size=4).hexdigest()
 
 def recover_pin():
     try:

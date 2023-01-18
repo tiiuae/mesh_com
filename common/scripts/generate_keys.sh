@@ -3,7 +3,7 @@
 ### This file initialize the softhsm. It creates a random pin and store it in a file (store it in AES with the id)
 ### the ID of the device should be passed as parameter, otherwise uses 'myKey' as ID.
 ### to generate the ID based on mac (lines 164-176 of entrypoint):
-### mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
+###    mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
 ###   uid=$(echo -n $mesh_if_mac | b2sum -l 32)
 ###   uid=${uid::-1}; echo $uid
 
@@ -26,6 +26,17 @@ fi
 #loading softhsm library
 LIB='/usr/lib/softhsm/libsofthsm2.so'
 
+
+softhsm2_output=$(softhsm2-util --show-slot)
+if [ ${#softhsm2_output} -ne 616 ]
+ then
+  echo "Token exists"
+  token_label=$(echo "$softhsm2_output" | grep 'Label:' | sed 's/^.*: //')
+  softhsm2-util --slot 1 --delete-token --token $token_label
+else
+  echo "No Token exists"
+fi
+
 #random pin 
 pin=$((1 + $RANDOM % 99999999999))
 
@@ -44,7 +55,11 @@ fi
 
 if [ -z "$1" ] # label or ID
    then
-     LABEL='myKey'
+    mesh_if=wlp1s0
+    mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
+    uid=$(echo -n $mesh_if_mac | b2sum -l 32)
+    uid=${uid::-1};
+    LABEL=$uid
    else
      LABEL=$1
 fi
@@ -56,4 +71,14 @@ pkcs11-tool --keypairgen --key-type="EC:prime256v1"  --login --pin=$pin --module
 #export to der
 pkcs11-tool --read-object --id 01 --type pubkey --module=$LIB --output-file /etc/ssl/certs/mesh_cert.der
 
-echo $pin | openssl enc -aes-256-cbc -md sha256 -a -pbkdf2 -iter 100000 -salt -pass pass:$LABEL > ../../modules/sc-mesh-secure-deployment/src/1_5/conf/output.txt
+output_path="../../modules/sc-mesh-secure-deployment/src/1_5/conf"
+
+### Check if a directory does not exist ###
+if [ ! -d $output_path ]
+then
+  mkdir -p $output_path
+fi
+
+echo $pin | openssl enc -aes-256-cbc -md sha256 -a -pbkdf2 -iter 100000 -salt -pass pass:$LABEL > $output_path/output.txt
+
+
