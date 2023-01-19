@@ -36,6 +36,7 @@ class ConnectionMgr:
         self.sta_mac = None
         # 11s :default mesh mode
         self.mesh_mode = "11s"
+        self.gw = False
 
     def starting_mesh(self):  # Get the mesh_com config
         """
@@ -46,6 +47,10 @@ class ConnectionMgr:
         elif self.mesh_mode == 'ibss':
             com = [self.config_mesh_path, self.mesh_if]
         subprocess.call(com, shell=False)
+        if self.gw:
+            print("============================================")
+            gw_service = main.AutoGateway()
+            Thread(target=gw_service.run, daemon=True).start()
 
     @property
     def create_mesh_config(self):
@@ -85,9 +90,7 @@ class ConnectionMgr:
                 mesh_config.write(f'MESH_VIF={mesh_vif}' + '\n')
                 mesh_config.write(f'PHY={phy_name}' + '\n')
             if confc['gw_service']:
-                print("============================================")
-                gw_service = main.AutoGateway()
-                Thread(target=gw_service.run, daemon=True).start()
+                self.gw = True
             if config['type'] == '11s':
                 self.mesh_mode = "11s"
             if config['type'] == 'ibss':
