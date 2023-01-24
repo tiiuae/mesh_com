@@ -6,6 +6,7 @@ import json
 import time
 import numpy as np
 import pandas as pd
+from simulator import main
 
 file_path = os.path.dirname(__file__)
 
@@ -14,7 +15,6 @@ class NESS:
 
     def __init__(self):
         self.engine = knowledge_engine.engine((__file__, '.compiled_krb'))
-        self.dataset = f'{file_path}/input-simulator/output.data'
 
     def create_status_list(self, sec_list, n):
         return [sec_list[i][len(sec_list[i]) - 1] for i in range(n)]
@@ -171,20 +171,13 @@ class NESS:
         return obj, len(obj)
 
     def test(self):
-        T_struct, n = self.read_file()
+        self.dataset = f'{file_path}/simulator/output.data'
+        if not os.path.isfile(self.dataset):
+            sim=main.Simulator()
+            sim.run()
 
-        n_list = [n]
-        sec_table_valid = 1
-
-        init_latest_status_list = self.create_status_list(T_struct, n)
-        init_latest_status_list1 = [init_latest_status_list]
-        init_good_server_status_list = self.create_good_server_list(T_struct, n)
-        p = 1
-        init_servers_table = self.create_servers_flags_list(T_struct, n, p)
-        p = 2
-        init_flags_table = self.create_servers_flags_list(T_struct, n, p)
-
-        self.run(init_latest_status_list, init_good_server_status_list, init_flags_table, init_servers_table, n)
+        output = self.read_file()
+        self.run_all(output[0])
 
     def ness_result_to_table(self, df, ness_result, mapp):
         df = df.assign(Ness_Result=0)

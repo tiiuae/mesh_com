@@ -40,9 +40,6 @@ fi
 #random pin 
 pin=$((1 + $RANDOM % 99999999999))
 
-#intialize token
-softhsm2-util --init-token --slot 0 --label secccoms --pin $pin --so-pin $pin ## this should be done before?
-
 #delete keys
 keys=$(pkcs11-tool --module=$LIB -O --login --pin $pin)
 if [ ${#keys} -ne 0  ]
@@ -52,6 +49,10 @@ then
   pkcs11-tool --module=$LIB --login --pin $pin --delete-object --type privkey --id 01
   pkcs11-tool --module=$LIB --login --pin $pin --delete-object --type pubkey --id 01
 fi
+
+#intialize token
+softhsm2-util --init-token --slot 0 --label secccoms --pin $pin --so-pin $pin ## this should be done before?
+
 
 if [ -z "$1" ] # label or ID
    then
@@ -71,7 +72,7 @@ pkcs11-tool --keypairgen --key-type="EC:prime256v1"  --login --pin=$pin --module
 #export to der
 pkcs11-tool --read-object --id 01 --type pubkey --module=$LIB --output-file /etc/ssl/certs/mesh_cert.der
 
-output_path="../../modules/sc-mesh-secure-deployment/src/1_5/conf"
+output_path="/opt"
 
 ### Check if a directory does not exist ###
 if [ ! -d $output_path ]
