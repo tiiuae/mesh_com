@@ -43,7 +43,9 @@ RUN echo "deb http://security.ubuntu.com/ubuntu focal-security main" | tee /etc/
         libnl-genl-3-200 \
         libnl-route-3-200 \
         libpcsclite1 \
-        libssl1.1 && \
+        libssl1.1 \
+        # ifconfig not installed by default anymore
+        net-tools && \
     rm -rf /var/lib/apt/lists/* && \
     wget \
         https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local/wpasupplicant_2.9.0-20-6~git20210701.43d8971_amd64.deb \
