@@ -37,7 +37,7 @@ mid = hashlib.blake2b(util.get_mac_by_interface('wlp1s0').encode(), digest_size=
 
 def recover_pin():
     try:
-        pin_aux = open('conf/output.txt').readlines() #need to make it absolute
+        pin_aux = open('/opt/output.txt').readlines() #need to make it absolute
         # Determine salt and ciphertext
         encryptedDataB64 = pin_aux[0].split('\n')[0]
         encryptedData = base64.b64decode(encryptedDataB64)
