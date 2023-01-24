@@ -139,7 +139,7 @@ class Mutual:
         msg_to_mac = json.dumps(msg_to_mac_dict)
         print("Message to MAC = ", msg_to_mac)
         # mac = MAC with secret as key (server id,client id,message,share u, time_flag)
-        mac = hmac.new(bytes(str(secret), 'utf-8'), msg_to_mac.encode('utf-8'), hashlib.sha256).digest()
+        mac = hmac.new(secret, msg_to_mac.encode('utf-8'), hashlib.sha256).digest()
         #print("MAC =", mac)
         # message to send = {server id,client id,message,share u, timestamp, sa, MAC(server id,client id,message,share u)secret}
         # msg_to_send = msg_to_mac + ',' + str(sa) + ',' + str(mac)
@@ -187,7 +187,7 @@ class Mutual:
         '''
         new_timestamp=datetime.fromtimestamp(timestamp)
         now = datetime.now()
-        if abs(now - new_timestamp) >= 20:
+        if abs(now - new_timestamp).seconds >= 20:
             return False
         print("Fresh Message")
         return True
@@ -205,14 +205,14 @@ class Mutual:
         }
         # convert dict to json
         msg_to_mac = json.dumps(msg_to_mac_dict)
-        if (
-            hmac.new(
+        my_mac =  hmac.new(
                 open(root_cert, 'rb').read(),
                 msg_to_mac.encode('utf-8'),
                 hashlib.sha256,
             ).digest()
-            != client_hmac
-        ):
+        if  base64.b64encode(my_mac).decode()  != client_hmac:
+            print(base64.b64encode(my_mac).decode())
+            print(client_hmac)
             return False
         print("Valid HMAC")
         return True
@@ -253,13 +253,12 @@ class Mutual:
         nonce = me['u']
         timestamp = me['time_flag']
         client_hmac = me['mac']
-        if self.verify_fresh(time):
-            if self.verify_hmac(client_sig, client_cert, cliID, nonce, timestamp, client_hmac):
-                return client_sig, client_cert, cliID.decode('utf-8')
-            print(colored('> Not valid HMAC', 'red'))
-        else:
-            print(colored('> Stale message', 'red'))
-
+        # if self.verify_fresh(timestamp): ##need to have nodes syncronized
+        if self.verify_hmac(client_sig, client_cert, cliID, nonce, timestamp, client_hmac):
+            return base64.b64decode(client_sig), base64.b64decode(client_cert), cliID
+        print(colored('> Not valid HMAC', 'red'))
+        # else:
+        #     print(colored('> Stale message', 'red'))
         return 0
 
     def set_password(self, node_name, cliID):
