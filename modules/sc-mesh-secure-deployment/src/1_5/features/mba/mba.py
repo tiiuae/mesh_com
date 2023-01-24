@@ -3,6 +3,9 @@ from time import sleep
 from threading import Thread
 import queue
 
+import os
+import sys
+
 
 class MBA:
     def __init__(self, addr):
@@ -40,12 +43,23 @@ class MBA:
     def test(self):
         """
         unit test should be run as
-        m = MBA('127.0.0.1')
+        m = mba.MBA('127.0.0.1')
         m.test()
+        stores log to test_logs/mba.txt
         """
+        if not os.path.exists('test_logs/'):
+            os.mkdir('test_logs/')
+        orig_stdout = sys.stdout
+        f = open('test_logs/mba.txt', 'w')
+        sys.stdout = f
+
         q = queue.Queue()
         sever_thread = Thread(target=self.server, args=("this is a test", True,), daemon=True)
         sever_thread.start()
         Thread(target=self.client, args=(q,)).start()  # client thread
         print(q.get())
+
+        sever_thread.join()
+        sys.stdout = orig_stdout
+        f.close()
 

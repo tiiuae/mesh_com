@@ -40,8 +40,8 @@ def initiate_client(server_ip, ID):
 
         if message == 'Connected to server, need to exchange public keys and ID':
             received_cert = c.recv(1024)
-            server_cert = received_cert[:-5]
-            servID = received_cert[-5:].decode('utf-8')
+            server_cert = received_cert[:-8]
+            servID = received_cert[-8:].decode('utf-8')
             #server_cert = received_cert
 
             # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
