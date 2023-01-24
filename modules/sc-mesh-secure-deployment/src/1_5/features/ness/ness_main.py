@@ -6,7 +6,7 @@ import json
 import time
 import numpy as np
 import pandas as pd
-from simulator import main
+from .simulator import main
 
 file_path = os.path.dirname(__file__)
 
