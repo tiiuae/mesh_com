@@ -10,14 +10,18 @@ import pandas as pd
 from .functions import client_functions
 
 import sys
+import os
 
 sys.path.insert(0, '../../')
 
 from features.mutual.mutual import *
+from features.mutual.utils import primitives as pri
 
 def initiate_client(server_ip, ID):
     c = socket.socket()  # create server socket c with default param ipv4, TCP
     partial_result = []
+    local_cert = "/etc/ssl/certs/mesh_cert.der"
+
     # connect to server socket
     try:
         c.connect((server_ip, 9999))
@@ -29,32 +33,72 @@ def initiate_client(server_ip, ID):
         message = c.recv(1024).decode()  # decode byte to string
         print(message)
 
+        #mut = Mutual('wlan1')
 
-        if message == 'Connected to server, need to exchange public keys':
-            mut = Mutual('wlan1')
+        client_mesh_name = server_ip.replace('.', '_')
+        print("client_mesh_name = ", client_mesh_name)
+
+        if message == 'Connected to server, need to exchange public keys and ID':
             received_cert = c.recv(1024)
-            server_cert = received_cert[:-5]
-            servID = received_cert[-5:].decode('utf-8')
-            # Save server public key certificate to {cliID}.der
-            with open(f'{servID}.der', 'wb') as writer:
+            server_cert = received_cert[:-8]
+            servID = received_cert[-8:].decode('utf-8')
+            #server_cert = received_cert
+
+            # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
+            if not os.path.exists('pubKeys/'):
+                os.mkdir('pubKeys/')
+
+            # Save server public key certificate to pubKeys/{client_mesh_name}.der
+            with open(f'pubKeys/{client_mesh_name}.der', 'wb') as writer:
+                writer.write(server_cert)
+
+            print('Sending my public key and ID')
+            cert = open(local_cert, 'rb').read()
+            myID = pri.get_labels()
+            message = cert + myID.encode('utf-8')
+            #message = cert
+            c.send(message)
+
+        elif message == 'Connected to server, need to exchange public keys':
+            received_cert = c.recv(1024)
+            server_cert = received_cert
+
+            # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
+            if not os.path.exists('pubKeys/'):
+                os.mkdir('pubKeys/')
+
+            # Save server public key certificate to pubKeys/{client_mesh_name}.der
+            with open(f'pubKeys/{client_mesh_name}.der', 'wb') as writer:
                 writer.write(server_cert)
 
             print('Sending my public key')
-            cert = open(mut.local_cert, 'rb').read()
-            message = cert + mut.myID.encode('utf-8')
+            cert = open(local_cert, 'rb').read()
+            message = cert
+            c.send(message)
+
+        elif message == 'Connected to server, need to exchange ID':
+            received_message = c.recv(1024)
+            servID = received_message.decode('utf-8')
+
+            print('Sending my ID')
+            myID = pri.get_labels()
+            message = myID.encode('utf-8')
             c.send(message)
 
         # Initialization
         filetable = pd.read_csv('auth/dev.csv')
-        servID = filetable[filetable['IP'] == server_ip]['ID'].iloc[0] # Get the server ID
-        secret_filename = f'secrets/secret_{servID}.der'
+        #servID = filetable[filetable['IP'] == server_ip]['ID'].iloc[0] # Get the server ID
+        #secret_filename = f'secrets/secret_{servID}.der'
         #secret_byte = open(secret_filename, 'rb').read()
 
         # Derive secret key and store it to secret_{servID}.der
-        print('Deriving secret')
-        pri.derive_ecdh_secret(servID, servID, mut.local_cert, mut.salt)
-        secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, mut.salt)
+        #salt = os.urandom(16) # Random 16 byte salt
+        #print('Deriving secret')
+        #pri.derive_ecdh_secret('', servID, mut.local_cert, salt)
+        #secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, salt)
+        secret_byte = pri.derive_ecdh_secret('', client_mesh_name)
         secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
+        print("Secret = ", secret)
         #secret = 1234
         server_id = server_ip
         client_id = socket.gethostbyname(socket.gethostname())
@@ -74,7 +118,9 @@ def initiate_client(server_ip, ID):
         #auth_result = "pass"  # initialization
         auth_result = 1  # initialization
         while flag_ctr <= max_count:
+            print('Checkpoint 1, flag_ctr = ', flag_ctr)
             request = c.recv(1024).decode()
+            print('Checkpoint 2, request = ', request)
             if request == 'Request to authenticate':
                 print("Processing authentication request")
                 # Generate share and share authenticator
@@ -137,7 +183,10 @@ def initiate_client(server_ip, ID):
                 print('Connection closed')
                 break
             flag_ctr += 1
+        # Test
+        print("Test partial_result: ", partial_result)
         print("Share storage cost: ", sys.getsizeof(sent_shares))
     except (ConnectionRefusedError, OSError):
-        return 3
+        return_dict = 3
+        #return 3 # Check if this needs to be returned at all
 

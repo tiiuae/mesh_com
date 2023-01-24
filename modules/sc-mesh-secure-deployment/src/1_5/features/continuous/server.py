@@ -9,52 +9,109 @@ from .functions import server_functions
 import asyncio
 import pandas as pd
 import sys
+import os
 
 sys.path.insert(0, '../../')
 
 from features.mutual.mutual import *
+from features.mutual.utils import primitives as pri
 
-def multi_threaded_client(c, addr, lock, return_dict):
-    partial_res = []
+def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable):
     lock.acquire()
+    partial_res = []
     # receive client's name
     name = c.recv(1024).decode()
     print('====================================================================')
     print('Connected with ', addr, name)
     print('====================================================================')
+
+
     # Exchange public keys and derive secret for client if it does not already exist
     filetable = pd.read_csv('auth/dev.csv')
-    cliID = filetable[filetable['IP'] == addr[0]]['ID'].iloc[0]  # Get the client ID
-    print("cliID: ", cliID)
-    secret_filename = f'secrets/secret_{cliID}.der'
-    mut = Mutual('wlan1')
-    if not os.path.isfile(secret_filename):
-        print('Secret does not exist, notifying client to exchange public keys')
-        c.send(bytes('Connected to server, need to exchange public keys', 'utf-8'))
+    #cliID = filetable[filetable['IP'] == addr[0]]['ID'].iloc[0]  # Get the client ID
+    #print("cliID: ", cliID)
+    #secret_filename = f'secrets/secret_{cliID}.der'
 
-        print('Sending my public key')
-        cert = open(mut.local_cert, 'rb').read()
-        message = cert + mut.myID.encode('utf-8')
+    client_mesh_ip = addr[0]
+    print("client_mesh_ip = ", client_mesh_ip)
+    client_mesh_name = client_mesh_ip.replace('.', '_')
+    print("client_mesh_name = ", client_mesh_name)
+
+    local_cert = "/etc/ssl/certs/mesh_cert.der"
+
+    #mut = Mutual('wlan1')
+    if (not os.path.isfile(f'pubKeys/{client_mesh_name}.der')) and (client_mesh_ip not in ips_sectable):
+        print('Public key does not exist, notifying client to exchange public keys')
+        print('Node not in auth table, notifying client to exchange ID')
+        c.send(bytes('Connected to server, need to exchange public keys and ID', 'utf-8'))
+
+        print('Sending my public key and ID')
+        cert = open(local_cert, 'rb').read()
+        myID = pri.get_labels()
+        message = cert + myID.encode('utf-8')
+        #message = cert
         c.send(message)
 
         received_cert = c.recv(1024)
-        client_cert = received_cert[:-5]
-        cliID = received_cert[-5:].decode('utf-8')
-        # Save client public key certificate to {cliID}.der
-        with open(f'{cliID}.der', 'wb') as writer:
+        client_cert = received_cert[:-8]
+        cliID = received_cert[-8:].decode('utf-8')
+        #client_cert = received_cert
+        id_dict[addr[0]] = cliID # Used to insert row in auth table
+
+        # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
+        if not os.path.exists('pubKeys/'):
+            os.mkdir('pubKeys/')
+
+        # Save client public key certificate to pubKeys/{cliID}.der
+        with open(f'pubKeys/{client_mesh_name}.der', 'wb') as writer:
             writer.write(client_cert)
 
+    elif not os.path.isfile(f'pubKeys/{client_mesh_name}.der'):
+        print('Public key does not exist, notifying client to exchange public keys')
+        c.send(bytes('Connected to server, need to exchange public keys', 'utf-8'))
+
+        print('Sending my public key')
+        cert = open(local_cert, 'rb').read()
+        message = cert
+        c.send(message)
+
+        received_cert = c.recv(1024)
+        client_cert = received_cert
+
+        # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
+        if not os.path.exists('pubKeys/'):
+            os.mkdir('pubKeys/')
+
+        # Save client public key certificate to pubKeys/{cliID}.der
+        with open(f'pubKeys/{client_mesh_name}.der', 'wb') as writer:
+            writer.write(client_cert)
+
+    elif client_mesh_ip not in ips_sectable:
+        print('Node not in auth table, notifying client to exchange ID')
+        c.send(bytes('Connected to server, need to exchange ID', 'utf-8'))
+
+        print('Sending my ID')
+        myID = pri.get_labels()
+        message = myID.encode('utf-8')
+        c.send(message)
+
+        received_message = c.recv(1024)
+        cliID = received_message.decode('utf-8')
+        id_dict[addr[0]] = cliID  # Used to insert row in auth table
     else:
         c.send(bytes('Connected to server', 'utf-8'))  # Transmit tcp msg as a byte with encoding format str to client
 
     # Derive secret key and store it to secret_{cliID}.der
-    print('Deriving secret')
-    pri.derive_ecdh_secret(cliID, cliID, mut.local_cert, mut.salt)
+    #salt = os.urandom(16)  # Random 16 byte salt
+    #print('Deriving secret')
+    #pri.derive_ecdh_secret('', cliID, mut.local_cert, salt)
 
     # Session Initializations Parameters
     #secret_byte = open(secret_filename, 'rb').read()
-    secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, mut.salt)
+    #secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, salt)
+    secret_byte = pri.derive_ecdh_secret('', client_mesh_name)
     secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
+    print("Secret = ", secret)
     #secret = 1234  # this should be stored on HSM
     #secret=int(open("secret.txt",'r').read())
     total_period = 20  # Total period for the session
@@ -75,8 +132,12 @@ def multi_threaded_client(c, addr, lock, return_dict):
     # within time margin
     c.settimeout(time_margin)
 
-    while time.time() - start_time <= total_period:
-        if (time_flag == 1) or (time.time() - start_timestamp >= period):
+    #while time.time() - start_time <= total_period:
+    while time_flag <= max_count:
+        #print('Checkpoint server inside while, client = ', client_mesh_ip, ', server time elapsed = ', time.time() - start_timestamp)
+        #if (time_flag == 1) or (time.time() - start_timestamp >= period):
+        if (time_flag == 0) or (time.time() - start_timestamp >= period):
+            print('Checkpoint server inside while if, client = ', client_mesh_ip, ', time_flag = ', time_flag)
             auth_result = "pass"  # initialized as pass
             c.send(bytes('Request to authenticate', 'utf-8'))  # Request to authenticate client
             print('Requested client for authentication')
@@ -91,6 +152,8 @@ def multi_threaded_client(c, addr, lock, return_dict):
                     print("Authentication message not received from client")
                     auth_result = "fail"
                     break
+
+                #print('Checkpoint received_byte: ', received_byte)
 
                 # convert byte into binary bits
                 msg_received = '0' + bin(int.from_bytes(received_byte, byteorder='big'))[2:].zfill(8)
@@ -175,20 +238,34 @@ def multi_threaded_client(c, addr, lock, return_dict):
                 #     pass
             print('*********************************************************************')
             print(' ')
-            partial_res.append(result[16]) # 16 is the number of the element of the auth_result (it being getting as string)
+            partial_res.append(auth_result)
+            """
             if time_flag == max_count:
                 c.send(bytes('Closing connection', 'utf-8'))
                 c.close()  # close client socket
                 print('Connection closed')
-                lock.release()
                 return_dict[addr[0]] = partial_res
+                print("Test return_dict: ", return_dict)
+                lock.release()
                 break
+            """
             time_flag = time_flag + 1
 
-def initiate_server(ip, return_dict):
+    c.send(bytes('Closing connection', 'utf-8'))
+    c.close()  # close client socket
+    print('Connection closed')
+    return_dict[addr[0]] = partial_res
+    print("Test return_dict: ", return_dict)
+
+    #print("Test partial_res server: ", partial_res)
+    #print('Checkpoint, server outside while loop time elapsed = ', time.time() - start_time)
+    print('================================== Checkpoint, end of server for client', addr[0])
+    lock.release()
+
+def initiate_server(ip, return_dict, id_dict, num_neighbors, ips_sectable):
     s = socket.socket()  # create server socket s with default param ipv4, TCP
     print('Socket Created')
-
+    s.settimeout(45) # Setting timeout to prevent infinite blocking at s.accept() when the client node is not on
     # to accept connections from clients, bind IP of server, a port number to the server socket
     s.bind((ip, 9999))
 
@@ -196,7 +273,11 @@ def initiate_server(ip, return_dict):
     s.listen(3)  # buffer for only 3 connections
     print('Waiting for connections')
 
-    while True:
+    threads = []
+
+    #while True:
+    for i in range(0, num_neighbors):
+        print("Server inside for loop, i = ", i)
         lock = Lock()
         # accept connection from client
         c, addr = s.accept()
@@ -205,8 +286,13 @@ def initiate_server(ip, return_dict):
         print(' ')
         return_dict[addr[0]] = []
         # start thread to handle client
-        Thread(target=multi_threaded_client, args=(c, addr, lock, return_dict), daemon=True).start()
-    c.send(bytes('Closing connection', 'utf-8'))
-    c.close()  # close client socket
+        thread = Thread(target=multi_threaded_client, args=(c, addr, lock, return_dict, id_dict, ips_sectable), daemon=True)
+        threads.append(thread)
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+    #c.send(bytes('Closing connection', 'utf-8'))
+    #c.close()  # close client socket
     print('Connection closed')
 
