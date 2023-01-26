@@ -1,3 +1,4 @@
+import os
 import subprocess
 import threading
 from os import path
@@ -6,6 +7,7 @@ import pandas as pd
 import netifaces
 import yaml
 import pathlib
+import logging
 
 script_path = pathlib.Path(__file__).parent.resolve()
 
@@ -153,3 +155,21 @@ class Utils:
         command2 = ['echo', mesh_ip, 'node', id, '>', '/etc/hosts']
         subprocess.call(command2, shell=False)
 
+    @staticmethod
+    def setup_logger(name):
+        if not path.isdir('logs'):
+            os.mkdir('logs')
+        # create a logger object
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+        # create a file handler
+        file_handler = logging.FileHandler('logs/'+name+'-log.txt', mode='w')
+        file_handler.setLevel(logging.DEBUG)
+        # create a formatter
+        formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s',
+                                      datefmt='%Y-%m-%d %H:%M:%S')
+        # add the formatter to the file handler
+        file_handler.setFormatter(formatter)
+        # add the file handler to the logger
+        logger.addHandler(file_handler)
+        return logger

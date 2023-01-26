@@ -1,5 +1,7 @@
 #! /bin/bash
 
+mesh_15_folder="/opt/mesh_com-mesh_com_1.5"
+
 calculate_wifi_channel()
 {
     # arguments:
@@ -23,10 +25,10 @@ calculate_wifi_channel()
 install_packages()
 {
   #install the python packages
-  if [ -d "/opt/mesh_com/modules/utils/package/python_packages" ]; then
-     echo "Directory /opt/mesh_com/modules/utils/package/python_packages exists."
+  if [ -d "$mesh_15_folder/modules/utils/package/python_packages" ]; then
+     echo "Directory $mesh_15_folder/modules/utils/package/python_packages exists."
   else
-     tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/python_packages.tar.gz
+     tar -C $mesh_15_folder/modules/utils/package/ -zxvf $mesh_15_folder/modules/utils/package/python_packages.tar.gz
   fi
 
   #pip install --no-index --find-links /opt/mesh_com/modules/utils/package/python_packages -r /opt/mesh_com/modules/utils/package/python_packages/requirements.txt
@@ -34,7 +36,7 @@ install_packages()
 
   #copy libraries for pypcap
 
-  cd /opt/mesh_com/modules/utils/package/python_packages
+  cd $mesh_15_folder/modules/utils/package/python_packages
   for f in {*.whl,*.gz};
   do
     name="$(echo $f | cut -d'-' -f1)"
@@ -50,25 +52,10 @@ install_packages()
 
   if [ "$ML" == "true" ]; then
 
-    tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/machine_learning_packages.tar.gz
-    tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/machine_learning2.tar.gz
+    tar -C $mesh_15_folder/modules/utils/package/ -zxvf $mesh_15_folder/modules/utils/package/machine_learning_packages.tar.gz
+    tar -C $mesh_15_folder/modules/utils/package/ -zxvf $mesh_15_folder/modules/utils/package/machine_learning2.tar.gz
 
-    cd /opt/mesh_com/modules/utils/package/machine_learning_packages
-
-    for f in {*.whl,*.gz};
-    do
-      name="$(echo $f | cut -d'-' -f1)"
-      if python -c 'import pkgutil; exit(not pkgutil.find_loader("$name"))'; then
-        echo $name "installed"
-      else
-        echo $name "not found"
-        echo "installing" $name
-        pip install --no-index "$f" --find-links .;
-    fi
-    done;
-    cd .. ;
-
-    cd /opt/mesh_com/modules/utils/package/machine_learning2
+    cd $mesh_15_folder/modules/utils/package/machine_learning_packages
 
     for f in {*.whl,*.gz};
     do
@@ -83,8 +70,23 @@ install_packages()
     done;
     cd .. ;
 
-    cp /opt/mesh_com/modules/utils/package/machine_learning_packages/libpcap.so.0.8 /usr/lib/.
-    cp /opt/mesh_com/modules/utils/package/machine_learning_packages/pcap.cpython-39-aarch64-linux-gnu.so /usr/lib/python3.9/site-packages/.
+    cd $mesh_15_folder/modules/utils/package/machine_learning2
+
+    for f in {*.whl,*.gz};
+    do
+      name="$(echo $f | cut -d'-' -f1)"
+      if python -c 'import pkgutil; exit(not pkgutil.find_loader("$name"))'; then
+        echo $name "installed"
+      else
+        echo $name "not found"
+        echo "installing" $name
+        pip install --no-index "$f" --find-links .;
+    fi
+    done;
+    cd .. ;
+
+    cp $mesh_15_folder/modules/utils/package/machine_learning_packages/libpcap.so.0.8 /usr/lib/.
+    cp $mesh_15_folder/modules/utils/package/machine_learning_packages/pcap.cpython-39-aarch64-linux-gnu.so /usr/lib/python3.9/site-packages/.
   fi
 }
 configure()
@@ -169,12 +171,12 @@ br_lan_ip="192.168.1."$((16#$ip_random))
 
 if [ "$meshVersion" == "1.5" ]; then
   install_packages
-  ms1_5_path='/opt/mesh_com/modules/sc-mesh-secure-deployment/src/1_5'
+  ms1_5_path=$mesh_15_folder'/modules/sc-mesh-secure-deployment/src/1_5'
   provisioning true
   cp $ms1_5_path/common/test/root_cert.der /etc/ssl/certs/
   uid=$(echo -n $mesh_if_mac | b2sum -l 32)
   uid=${uid::-1}
-  /bin/bash /opt/mesh_com/common/scripts/generate_keys.sh $uid
+  /bin/bash $mesh_15_folder/common/scripts/generate_keys.sh $uid
   cd $ms1_5_path
   python3 -u old_main.py
 fi
