@@ -171,6 +171,18 @@ class NESS:
         return obj, len(obj)
 
     def test(self):
+        """
+        unit test should be run as
+        ness = ness_main.NESS()
+        ness.test()
+        stores log to test_logs/ness.txt
+        """
+        if not os.path.exists('test_logs/'):
+            os.mkdir('test_logs/')
+        orig_stdout = sys.stdout
+        f = open('test_logs/ness.txt', 'w')
+        sys.stdout = f
+
         self.dataset = f'{file_path}/simulator/output.data'
         if not os.path.isfile(self.dataset):
             sim=main.Simulator()
@@ -178,6 +190,9 @@ class NESS:
 
         output = self.read_file()
         self.run_all(output[0])
+
+        sys.stdout = orig_stdout
+        f.close()
 
     def ness_result_to_table(self, df, ness_result, mapp):
         df = df.assign(Ness_Result=0)

@@ -31,3 +31,17 @@ class Quarantine:
     def iptablesSave(self):
         command = ['iptables-save', '>', 'iptables-', str(time.time()), '.save']
         subprocess.call(command, shell=False)
+
+    def test(self):
+        """
+        unit test should be run as
+        qua = quarantine.Quarantine()
+        qua.test()
+        stores log to test_logs/quarantine.txt
+        """
+        self.block('127.0.0.1')
+        command = ['ping', '-w', '4', '127.0.0.1']
+        subprocess.call(command, shell=False)
+        self.unblock('127.0.0.1')
+        command = ['ping', '-w', '4', '127.0.0.1']
+        subprocess.call(command, shell=False)

@@ -53,8 +53,8 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable):
         c.send(message)
 
         received_cert = c.recv(1024)
-        client_cert = received_cert[:-5]
-        cliID = received_cert[-5:].decode('utf-8')
+        client_cert = received_cert[:-8]
+        cliID = received_cert[-8:].decode('utf-8')
         #client_cert = received_cert
         id_dict[addr[0]] = cliID # Used to insert row in auth table
 
