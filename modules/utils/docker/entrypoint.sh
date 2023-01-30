@@ -150,6 +150,7 @@ EOF
   sleep 10
   umurmurd
 elif [ "$mode" == "ap+mesh_scc" ]; then
+  sleep 2
   # chanbw config
   mount -t debugfs none /sys/kernel/debug
   if [ -f "/sys/kernel/debug/ieee80211/phy0/ath9k/chanbw" ]; then
@@ -199,7 +200,7 @@ rsn_pairwise=CCMP
 wpa_passphrase=$psk
 
 wmm_enabled=1
-#beacon_int=1000
+beacon_int=1000
 
 ### IEEE 802.11n
 ieee80211n=1
