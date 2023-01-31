@@ -1,13 +1,14 @@
 import csv
 import os
 import time
+import sys
 from datetime import datetime
 
 import wifi_info
 import infoparser
 
 LOG_FOLDER_LOCATION = r"/root/field_test_logs/"
-LOGGING_INTERVAL_SECONDS = 1
+LOGGING_INTERVAL_SECONDS = 1  # LOGGING_INTERVAL_SECONDS needs to be >=0.4s
 
 
 def check_log_folder():
@@ -96,6 +97,9 @@ if __name__ == '__main__':
     ftl = FieldTestLogger()
     wifi_stats = wifi_info.WifiInfo(LOGGING_INTERVAL_SECONDS)
     info = infoparser.InfoParser()
+    uc_arg = ""
+    if len(sys.argv) > 1:
+        uc_arg = f"_{sys.argv[1]}"
 
     ftl.register_logger_function("Timestamp", timestamp)
     wifi_stats.update()
@@ -112,13 +116,18 @@ if __name__ == '__main__':
     ftl.register_logger_function("RX throughput [Bits/s]", wifi_stats.get_rx_throughput)
     ftl.register_logger_function("TX throughput [Bits/s]", wifi_stats.get_tx_throughput)
     ftl.register_logger_function("Neighbors", wifi_stats.get_neighbors)
+    ftl.register_logger_function("Originators", wifi_stats.get_originators)
 
     ftl.register_logger_function("latitude", info.get_latitude)
     ftl.register_logger_function("longitude", info.get_longitude)
     ftl.register_logger_function("altitude", info.get_altitude)
     ftl.register_logger_function("PDOP", info.get_pdop)
+    ftl.register_logger_function("speed", info.get_speed)
+    ftl.register_logger_function("climb", info.get_climb)
+    ftl.register_logger_function("track", info.get_track)
 
     ftl.register_logger_function("cpu temp [mC]", info.get_cpu_temp)
+    ftl.register_logger_function("battery temp [mC]", info.get_bat_temp)
     ftl.register_logger_function("wifi temp [mC]", info.get_wifi_temp)
     ftl.register_logger_function("tmp100 [mC]", info.get_tmp100)
 
@@ -128,11 +137,18 @@ if __name__ == '__main__':
     ftl.register_logger_function("nRF current [mA]", info.get_nrf_current)
     ftl.register_logger_function("3v3 voltage [mV]", info.get_3v3_voltage)
     ftl.register_logger_function("3v3 current [mA]", info.get_3v3_current)
+    ftl.register_logger_function("DCin (XT30) voltage [mV]", info.get_dc_voltage)
+    ftl.register_logger_function("DCin (XT30) current [mA]", info.get_dc_current)
 
-    ftl.create_csv(wifi_stats.get_mac_addr())
+    ftl.create_csv(f"{wifi_stats.get_mac_addr()}{uc_arg}")
 
     while True:
+        start = time.time()
         wifi_stats.update()
         info.update()
         ftl.append_csv()
-        time.sleep(LOGGING_INTERVAL_SECONDS)
+        d = time.time() - start
+
+        # adjust delay for precise logging interval
+        if d < LOGGING_INTERVAL_SECONDS:
+            time.sleep(LOGGING_INTERVAL_SECONDS - d)

@@ -1,11 +1,14 @@
 import subprocess
+import re
 
 EXPECTED_INTERFACE = "wlp1s0"
+
 
 class WifiInfo:
 
     def __init__(self, interval):
         self.__neighbors = ""
+        self.__originators = ""
         self.__channel = ""
         self.__country = ""
         self.__txpower = ""
@@ -30,6 +33,9 @@ class WifiInfo:
 
     def get_neighbors(self):
         return self.__neighbors
+
+    def get_originators(self):
+        return self.__originators
 
     def get_channel(self):
         return self.__channel
@@ -226,7 +232,7 @@ class WifiInfo:
         #print(f"tx throughput: {self.tx_throughput}")
 
     def __update_batman_neighbors(self):
-        batctl_cmd = ['batctl', 'n', '-H']
+        batctl_cmd = ['batctl', 'n', '-n', '-H']
 
         batctl_proc = subprocess.Popen(batctl_cmd,
                                        stdout=subprocess.PIPE)
@@ -246,6 +252,27 @@ class WifiInfo:
         self.__neighbors = nodes[:-1]
         #print(self.neighbors)
 
+    def __update_batman_originators(self):
+        batctl_cmd = ['batctl', 'o', '-n', '-H']
+
+        batctl_proc = subprocess.Popen(batctl_cmd,
+                                       stdout=subprocess.PIPE)
+
+        out = batctl_proc.communicate()[0].decode().rstrip()
+        # Remove parentheses and square brackets
+        out = re.sub('[()\\[\\]]', '', out)
+
+        lines = out.split("\n")
+        nodes = ""
+
+        for line in lines:
+            node_stats = line.split()
+            if len(node_stats) == 6 and node_stats[0] == '*':
+                nodes = f"{nodes}{node_stats[1]},{node_stats[4]};"
+
+        # Remove semicolon after last node in list
+        self.__originators = nodes[:-1]
+
     # ----------------------------------------
 
     def update(self):
@@ -258,3 +285,4 @@ class WifiInfo:
         self.__update_mcs_and_rssi()
         self.__update_throughputs()
         self.__update_batman_neighbors()
+        self.__update_batman_originators()

@@ -26,12 +26,15 @@ SNR = 'snr [dB]'
 CPU_TEMP = 'cpu temp [C]'
 WIFI_TEMP = 'wifi temp [C]'
 TMP100 = 'tmp100 [C]'
+BATT_TEMP = 'battery temp [C]'
 BATT_VOLTAGE = 'battery voltage [V]'
 BATT_CURRENT = 'battery current [A]'
 NRF_VOLTAGE = 'nRF voltage [V]'
 NRF_CURRENT = 'nRF current [A]'
 MPCIE_VOLTAGE = 'mPCIe voltage [V]'
 MPCIE_CURRENT = 'mPCIe current [A]'
+DCIN_VOLTAGE = 'DCin voltage [V]'
+DCIN_CURRENT = 'DCin current [A]'
 
 # Fixed color codes for plots.
 # Ref. https://datascientyst.com/full-list-named-colors-pandas-python-matplotlib/
@@ -41,14 +44,17 @@ COLOR_TURNING_POINT = 'lightcoral'
 COLOR_CPU_TEMP = 'darkorange'
 COLOR_WIFI_TEMP = 'palegreen'
 COLOR_TMP100 = 'deeppink'
+COLOR_BATT_TEMP = 'teal'
 
 COLOR_BATT_VOLTAGE = 'green'
 COLOR_RF_VOLTAGE = 'plum'
 COLOR_3V3_VOLTAGE = 'crimson'
+COLOR_DCIN_VOLTAGE = 'goldenrod'
 
 COLOR_BATT_CURRENT = 'fuchsia'
 COLOR_RF_CURRENT = 'darksalmon'
 COLOR_3V3_CURRENT = 'blue'
+COLOR_DCIN_CURRENT = 'cadetblue'
 
 COLOR_RSSI = 'black'  # Was crimson, cornflowerblue
 COLOR_NOISE = 'red'  # Was dodgerblue
