@@ -1,4 +1,4 @@
-FROM ghcr.io/tiiuae/fog-ros-baseimage-builder:dp-4266_humble_upgrade AS builder
+FROM ghcr.io/tiiuae/fog-ros-baseimage-builder:v2.0.0 AS builder
 
 # Install build dependencies
 RUN apt update -y && apt install -y --no-install-recommends \
@@ -23,7 +23,7 @@ RUN /packaging/build.sh
 #  ▲               runtime ──┐
 #  └── build                 ▼
 
-FROM ghcr.io/tiiuae/fog-ros-baseimage:dp-4266_humble_upgrade
+FROM ghcr.io/tiiuae/fog-ros-baseimage:v2.0.0
 
 RUN apt update -y && apt install -y --no-install-recommends \
     iw \
