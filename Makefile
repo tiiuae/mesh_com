@@ -1,4 +1,4 @@
-ROS_DISTRO ?= galactic
+ROS_DISTRO ?= humble
 
 #root folders
 root_dir:=$(shell pwd)
