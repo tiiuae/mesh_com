@@ -10,13 +10,15 @@ import asyncio
 import pandas as pd
 import sys
 import os
+import traceback
+import random
 
 sys.path.insert(0, '../../')
 
 from features.mutual.mutual import *
 from features.mutual.utils import primitives as pri
 
-def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable):
+def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, logger):
     lock.acquire()
     partial_res = []
     # receive client's name
@@ -109,14 +111,25 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable):
     # Session Initializations Parameters
     #secret_byte = open(secret_filename, 'rb').read()
     #secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, salt)
-    secret_byte = pri.derive_ecdh_secret('', client_mesh_name)
+    try:
+        secret_byte = pri.derive_ecdh_secret('', client_mesh_name)
+        if logger:
+            logger.info("Secret key derived in server for client %s", client_mesh_ip)
+    except Exception as e:
+        print("Secret key derivation failed in server for client ", client_mesh_ip, "with exception ", e)
+        traceback.print_exc()
+        if logger:
+            logger.error("Secret key derivation failed in server for client %s with exception %s", client_mesh_ip, e)
+        lock.release()
+        #return
+
     secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
     print("Secret = ", secret)
     #secret = 1234  # this should be stored on HSM
     #secret=int(open("secret.txt",'r').read())
     total_period = 20  # Total period for the session
     period = 2  # Period for continuous authentication
-    time_margin = 0.2 * period  # Time margin for freshness = 20 % of period
+    time_margin = 0.4 * period  # Time margin for freshness = 40 % of period
     crc_key = '1001'  # CRC key
     start_time = time.time()  # session start time
     start_timestamp = start_time
@@ -222,6 +235,8 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable):
                 c.send(bytes(result, 'utf-8'))
             else:
                 num_of_fails = num_of_fails + 1
+                if auth_result == "fail":
+                    auth_result = 0
                 # exponential backoff = auth period ^ num of failures
                 # max(period, 2) to avoid diminishing exponential when period < 1
                 backoff_period = max(period, 2) ** num_of_fails
@@ -262,16 +277,26 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable):
     print('================================== Checkpoint, end of server for client', addr[0])
     lock.release()
 
-def initiate_server(ip, return_dict, id_dict, num_neighbors, ips_sectable):
-    s = socket.socket()  # create server socket s with default param ipv4, TCP
-    print('Socket Created')
-    s.settimeout(45) # Setting timeout to prevent infinite blocking at s.accept() when the client node is not on
-    # to accept connections from clients, bind IP of server, a port number to the server socket
-    s.bind((ip, 9999))
+def initiate_server(ip, return_dict, id_dict, num_neighbors, ips_sectable, logger=None):
 
-    # wait for clients to connect (tcp listener)
-    s.listen(3)  # buffer for only 3 connections
-    print('Waiting for connections')
+    try:
+        s = socket.socket()  # create server socket s with default param ipv4, TCP
+        s.settimeout(45)  # Setting timeout to prevent infinite blocking at s.accept() when the client node is not on
+        # to accept connections from clients, bind IP of server, a port number to the server socket
+        s.bind((ip, 9999))
+        print('Socket Created')
+
+        # wait for clients to connect (tcp listener)
+        s.listen(3)  # buffer for only 3 connections
+        print('Waiting for connections')
+
+        if logger:
+            logger.info("Server socket created at (%s, 9999)", ip)
+    except socket.error:
+        print("Server socket creation failed")
+        if logger:
+            logger.error("Server socket creation failed")
+        return
 
     threads = []
 
@@ -286,7 +311,7 @@ def initiate_server(ip, return_dict, id_dict, num_neighbors, ips_sectable):
         print(' ')
         return_dict[addr[0]] = []
         # start thread to handle client
-        thread = Thread(target=multi_threaded_client, args=(c, addr, lock, return_dict, id_dict, ips_sectable), daemon=True)
+        thread = Thread(target=multi_threaded_client, args=(c, addr, lock, return_dict, id_dict, ips_sectable, logger), daemon=True)
         threads.append(thread)
         thread.start()
 

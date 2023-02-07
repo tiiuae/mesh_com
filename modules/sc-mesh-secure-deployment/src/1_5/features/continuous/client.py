@@ -11,13 +11,14 @@ from .functions import client_functions
 
 import sys
 import os
+import traceback
 
 sys.path.insert(0, '../../')
 
 from features.mutual.mutual import *
 from features.mutual.utils import primitives as pri
 
-def initiate_client(server_ip, ID):
+def initiate_client(server_ip, ID, logger=None):
     c = socket.socket()  # create server socket c with default param ipv4, TCP
     partial_result = []
     local_cert = "/etc/ssl/certs/mesh_cert.der"
@@ -25,6 +26,9 @@ def initiate_client(server_ip, ID):
     # connect to server socket
     try:
         c.connect((server_ip, 9999))
+
+        if logger:
+            logger.info("Client connected to server (%s, 9999)", server_ip)
 
         # name = input("Enter your name:")  # Taking input from client
         c.send(bytes(str(ID), 'utf-8'))  # Send client name to server
@@ -96,7 +100,17 @@ def initiate_client(server_ip, ID):
         #print('Deriving secret')
         #pri.derive_ecdh_secret('', servID, mut.local_cert, salt)
         #secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, salt)
-        secret_byte = pri.derive_ecdh_secret('', client_mesh_name)
+        try:
+            secret_byte = pri.derive_ecdh_secret('', client_mesh_name)
+            if logger:
+                logger.info("Secret key derived in client for server %s", server_ip)
+        except Exception as e:
+            print("Secret key derivation failed in client for server ", server_ip, "with exception ", e)
+            traceback.print_exc()
+            if logger:
+                logger.error("Secret key derivation failed in client for server %s with exception %s", server_ip,
+                             e)
+            #return
         secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
         print("Secret = ", secret)
         #secret = 1234
@@ -188,5 +202,7 @@ def initiate_client(server_ip, ID):
         print("Share storage cost: ", sys.getsizeof(sent_shares))
     except (ConnectionRefusedError, OSError):
         return_dict = 3
+        if logger:
+            logger.error("Connection refused from server (%s, 9999)", server_ip)
         #return 3 # Check if this needs to be returned at all
 

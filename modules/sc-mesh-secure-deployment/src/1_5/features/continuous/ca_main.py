@@ -4,14 +4,18 @@ import subprocess
 from . import server
 from . import client
 import multiprocessing
-from common import ConnectionMgr, mesh_utils
+from common import ConnectionMgr, mesh_utils, utils
 import pandas as pd
 import numpy as np
 from queue import Queue
-
+from time import sleep
+import asyncio
 import logging
+import random
 
 co = ConnectionMgr.ConnectionMgr()
+MUTUALINT = 'wlan1'
+MESHINT = 'bat0'
 
 import sys
 import os
@@ -25,80 +29,99 @@ class CA:
     def __init__(self, ID):
         self.ID = ID
 
-    def as_client(self, server_ip):
-        client.initiate_client(server_ip, self.ID)
+    def as_client(self, server_ip, logger=None):
+        client.initiate_client(server_ip, self.ID, logger)
 
-    def as_server(self, ip, return_dict, id_dict, num_neighbors, ips_sectable):
+    def as_server(self, ip, return_dict, id_dict, num_neighbors, ips_sectable, logger=None):
         with contextlib.suppress(OSError):
-            server.initiate_server(ip, return_dict, id_dict, num_neighbors, ips_sectable)
+            server.initiate_server(ip, return_dict, id_dict, num_neighbors, ips_sectable, logger)
 
     def test(self):
-        """
+        '''
         unit test should be run as
         ca = ca_main.CA(random.randint(1000, 64000))
         ca.test()
-        stores log to test_logs/cont_auth.txt
-        """
-        if not os.path.exists('test_logs/'):
-            os.mkdir('test_logs/')
-        orig_stdout = sys.stdout
-        f = open('test_logs/cont_auth.txt', 'w')
-        sys.stdout = f
-        # Secret key derivation test
-        print('====================================================================')
-        print('Secret Key Derivation Test:')
-        # Generate dummy EC key pair
-        LIB = '/usr/lib/softhsm/libsofthsm2.so'
-        pin = pri.recover_pin()
-        command = ['pkcs11-tool', '--keypairgen', '--key-type', 'EC:prime256v1', '--login', '--pin', pin, '--module', LIB, '--label', 'test', '--id', '401']
-        subprocess.call(command, shell=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        # Export to test.der
-        command = ['pkcs11-tool','--read-object', '--id', '401', '--type', 'pubkey', '--module', LIB, '--output-file', 'test.der']
-        subprocess.call(command, shell=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        secret_byte = pri.derive_ecdh_secret('test', '') # Secret derivation
-        secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
-        print('Derived secret = ', secret) # Key has been derived
-        #logging.basicConfig(level=logging.DEBUG, filename='mylog.log')
-        #logging.info('Derived secret = ', secret)
-
-        # Delete test key pair
-        command = ['pkcs11-tool', '--login', '--pin', pin, '--module', LIB, '--delete-object', '--type', 'privkey', '--label', 'test']
-        subprocess.call(command, shell=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        command = ['pkcs11-tool', '--login', '--pin', pin, '--module', LIB, '--delete-object', '--type', 'pubkey', '--label', 'test']
-        subprocess.call(command, shell=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        # Authentication
-        print('====================================================================')
-        print('Authentication Test:')
+        stores log to logs/continuous_1_node-log.txt
+        '''
+        common_ut = utils.Utils()
+        logger = common_ut.setup_logger('continuous_1_node')
         ip = '127.0.0.1'
         manager = multiprocessing.Manager()
         return_dict = manager.dict()
         id_dict = manager.dict()
-        server_proc = multiprocessing.Process(target=self.as_server, args=(ip, return_dict, id_dict, 1, [ip]), daemon=True)
+        server_proc = multiprocessing.Process(target=self.as_server, args=(ip, return_dict, id_dict, 1, [ip], logger),
+                                              daemon=True)
         server_proc.start()
-        client_proc = multiprocessing.Process(target=self.as_client, args=(ip,), daemon=True)
+        client_proc = multiprocessing.Process(target=self.as_client, args=(ip, logger), daemon=True)
         client_proc.start()
         client_proc.join()
         server_proc.join()
 
-        print("CA Result dict = ", return_dict[ip]) # Authentication result 1 = pass, 0 = fail
+        print("CA Result dict = ", return_dict)  # Authentication result 1 = pass, 0 = fail
 
-        sys.stdout = orig_stdout
-        f.close()
+        logger.info("Continuous authentication complete")
+        logger.debug("Result dict = %s", return_dict)
+
+        common_ut.close_logger(logger)
+
+    def test_multiple_nodes(self, num_nodes):
+        """
+        prerequisite: mesh must be established between the nodes
+        unit test should be run as
+        ca = ca_main.CA(random.randint(1000, 64000))
+        ca.test_multiple_nodes(num_nodes)
+        stores log to logs/continuous_{num_nodes}}_nodes-log.txt
+        """
+        common_ut = utils.Utils()
+        logger = common_ut.setup_logger(f'continuous_{num_nodes}_nodes')
+
+        sectable = pd.read_csv('auth/dev.csv')
+
+        myip = co.get_ip_address(MESHINT)
+        max_count = 3
+        flag_ctr = 0
+
+        manager = multiprocessing.Manager()
+        return_dict = manager.dict()
+        id_dict = manager.dict()
+
+        ip2_send = list(set(sectable['IP'].tolist() + mesh_utils.get_neighbors_ip()))
+        print('Checkpoint, neighbor IPs = ', mesh_utils.get_neighbors_ip())
+        num_neighbors = len(ip2_send) - 1  # Number of neighbor nodes that need to be authenticated
+        server_proc = multiprocessing.Process(target=self.as_server, args=(myip, return_dict, id_dict, num_neighbors, list(set(sectable['IP'].tolist())), logger), daemon=True)
+        server_proc.start()
+        sleep(random.randint(1, 10))
+
+        client_jobs = []
+        for IP in ip2_send:
+            if IP != myip:
+                client_proc = multiprocessing.Process(target=self.as_client, args=(IP, logger), daemon=True)
+                client_proc.start()
+                client_jobs.append(client_proc)
+                #client_proc.join()
+
+        for client_proc in client_jobs:
+            client_proc.join()
+
+
+        server_proc.join()
+        print("CA Result dict = ", return_dict) # Authentication result 1 = pass, 0 = fail
+        logger.info("Continuous authentication complete")
+        logger.debug("Result dict = %s", return_dict)
+
+        common_ut.close_logger(logger)
 
     def test_exchange_table(self):
         """
+        prerequisite: mesh must be established between the nodes and security table must be created by running one round of continuous authentication
         unit test should be run as
         ca = ca_main.CA(random.randint(1000, 64000))
         ca.test_exchange_table()
-        stores log to test_logs/exchange_table.txt
-        global table is stored in test_logs/global_table.csv
+        stores log to logs/exchange_table_1_node-log.txt
+        global table is stored in logs/global_table.csv
         """
-        if not os.path.exists('test_logs/'):
-            os.mkdir('test_logs/')
-        orig_stdout = sys.stdout
-        f = open('test_logs/exchange_table.txt', 'w')
-        sys.stdout = f
+        common_ut = utils.Utils()
+        logger = common_ut.setup_logger('exchange_table_1_node')
 
         sectable = pd.read_csv('test_inputs/dev.csv') # Read sample test security table
         ip = '10.10.10.4'  # My sample mesh IP
@@ -154,9 +177,37 @@ class CA:
 
         exchange_table = exchange_table.drop(columns=['Source_IP', 'Destination_IP', 'To_Send'])
         exchange_table.drop_duplicates(inplace=True)
-        exchange_table.to_csv('test_logs/global_table.csv', mode='w', header=True, index=False)
+        try:
+            exchange_table.to_csv('logs/global_table.csv', mode='w', header=True, index=False)
+            logger.info("Global table created")
+        except Exception as e:
+            logger.error("Global table creation failed with exception %s", e)
         print('Global security table:')
         print(exchange_table)
+        logger.debug("Global table:\n%s", exchange_table)
 
-        sys.stdout = orig_stdout
-        f.close()
+        common_ut.close_logger(logger)
+
+    def test_exchange_table_multiple_nodes(self, num_nodes):
+        """
+        prerequisite: mesh must be established between the nodes
+        unit test should be run as
+        ca = ca_main.CA(random.randint(1000, 64000))
+        ca.test_exchange_table_multiple_nodes(num_nodes)
+        stores log to logs/exchange_table_{num_nodes}_nodes-log.txt
+        """
+        common_ut = utils.Utils()
+        logger = common_ut.setup_logger(f'exchange_table_{num_nodes}_nodes')
+        try:
+            sectable = pd.read_csv('auth/dev.csv')
+            sectable.drop_duplicates(inplace=True)
+            start_server_thread = ut.start_server()
+            sleep(0.5) # So that messages are not sent and dropped before other nodes start server
+            ut.exchage_table(sectable, start_server_thread, logger)
+        except FileNotFoundError:
+            print("SecTable not available. Need to be requested during provisioning")
+        common_ut.close_logger(logger)
+
+
+
+
