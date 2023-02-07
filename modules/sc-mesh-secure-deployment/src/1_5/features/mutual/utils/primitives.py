@@ -13,6 +13,7 @@ from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA256
 from Crypto.Util.Padding import unpad
 from Crypto.Cipher import AES
+from common import utils
 
 BUF_SIZE = 65536  # let's read stuff in 64kb chunks!
 LIB = "/usr/lib/softhsm/libsofthsm2.so"
@@ -301,7 +302,9 @@ def decrypt_file(file_name, key_name, salt):
     return f.decrypt(encrypted)
 
 
-def get_labels(): #maybe this can be deleted now that we are having the id based on the mac
+def get_labels():
+    # Computing ID based on mac
+    """
     labels = []
     session = get_session()
     keys = session.findObjects()
@@ -310,7 +313,13 @@ def get_labels(): #maybe this can be deleted now that we are having the id based
         if aux['CKA_CLASS'] == 'CKO_PRIVATE_KEY':
             labels.append(aux['CKA_LABEL'])
     return list(set(labels))[0]
-
+    """
+    ut = utils.Utils()
+    mesh_if_mac = ut.get_mac_by_interface('wlp1s0')
+    command = [f'echo -n {mesh_if_mac} | b2sum -l 32']
+    output = subprocess.run(command, shell=True, capture_output=True, text=True)
+    label = output.stdout[:-4]
+    return label
 
 def main():
     clean_all()
