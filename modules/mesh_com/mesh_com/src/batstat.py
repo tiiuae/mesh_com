@@ -227,7 +227,7 @@ class Batman:
 
     @staticmethod
     def _timestamp() -> str:
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
 
     def _create_template(self):
         """
