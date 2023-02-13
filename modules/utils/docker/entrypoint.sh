@@ -1,5 +1,7 @@
 #! /bin/bash
 
+COMMS_PCB_VERSION_FILE="/opt/comms_pcb_version"
+
 calculate_wifi_channel()
 {
     # arguments:
@@ -225,8 +227,25 @@ EOF
   echo "Mesh Point + AP done."
 else
   brctl addbr br-lan
-  # Bridge eth1 and Mesh
-  brctl addif br-lan bat0 eth1
+  # Bridge ethernet and Mesh
+  
+  eth_port="eth1"
+  if [ -f "$COMMS_PCB_VERSION_FILE" ]; then
+    source "$COMMS_PCB_VERSION_FILE"
+    # Sleeve 1.x has PCB version 0
+    if (( $(echo "$COMMS_PCB_VERSION == 0" |bc -l) )); then
+      eth_port="eth1"
+    # CM1.5 PCB version is 0.5
+    elif (( $(echo "$COMMS_PCB_VERSION == 0.5" |bc -l) )); then
+      eth_port="eth0"
+    # CM2.x PCB version starts from 1
+    elif (( $(echo "$COMMS_PCB_VERSION >= 1" |bc -l) )); then
+      eth_port="lan1"
+    fi
+  fi
+  echo $eth_port
+
+  brctl addif br-lan bat0 $eth_port
   echo $br_lan_ip
   ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
   ifconfig br-lan up
