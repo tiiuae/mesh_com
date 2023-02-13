@@ -1,6 +1,6 @@
 #! /bin/bash
 
-COMMS_PCB_VERSION_FILE="/opt/comms_pcb_version"
+COMMS_PCB_VERSION_FILE="/opt/hardware/comms_pcb_version"
 
 calculate_wifi_channel()
 {
