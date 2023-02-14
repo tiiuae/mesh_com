@@ -175,7 +175,7 @@ class Mutual:
             wf.connect_wifi(candidate, self.interface)
             if logger:
                 logger.info("Client connected to AP")
-                command = ['iw', 'dev', self.interface, 'info']
+                command = ['iw', 'dev', self.interface, 'link']
                 iw = subprocess.run(command, shell=False, capture_output=True, text=True)
                 logger.debug("iw output:\n%s", iw.stdout)
         except Exception as e:

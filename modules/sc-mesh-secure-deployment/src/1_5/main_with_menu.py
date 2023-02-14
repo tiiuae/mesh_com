@@ -43,6 +43,13 @@ def print_menu():
 def aux_auth(semasphore):
     while True:
         with semasphore:
+            command = ["ps | grep 'wpa_supplicant -B -i wlan1 -c conf/ap.conf' -m 1 | awk '{print $1}'"]
+            output = subprocess.run(command, shell=True, capture_output=True, text=True)
+            pid = (output.stdout).replace('\n','')
+            command = ['kill', pid]
+            subprocess.run(command, shell=False)
+            #print('Checkpoint wpa_supplicant for ap connect killed')
+
             mut = mutual.Mutual(MUTUALINT)
             client, addr = mut.server()
             client_cert, sig, cliID, cli = mut.send_my_key(client, addr)
