@@ -173,3 +173,9 @@ class Utils:
         # add the file handler to the logger
         logger.addHandler(file_handler)
         return logger
+
+    @staticmethod
+    def close_logger(logger):
+        for handler in list(logger.handlers):
+            handler.close()
+            logger.removeHandler(handler)

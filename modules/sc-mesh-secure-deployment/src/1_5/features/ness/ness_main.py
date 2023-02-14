@@ -7,6 +7,8 @@ import time
 import numpy as np
 import pandas as pd
 from .simulator import main
+from common import utils
+import traceback
 
 file_path = os.path.dirname(__file__)
 
@@ -175,13 +177,10 @@ class NESS:
         unit test should be run as
         ness = ness_main.NESS()
         ness.test()
-        stores log to test_logs/ness.txt
+        stores log to logs/ness-log.txt
         """
-        if not os.path.exists('test_logs/'):
-            os.mkdir('test_logs/')
-        orig_stdout = sys.stdout
-        f = open('test_logs/ness.txt', 'w')
-        sys.stdout = f
+        common_ut = utils.Utils()
+        logger = common_ut.setup_logger('ness')
 
         self.dataset = f'{file_path}/simulator/output.data'
         if not os.path.isfile(self.dataset):
@@ -189,10 +188,16 @@ class NESS:
             sim.run()
 
         output = self.read_file()
-        self.run_all(output[0])
+        logger.debug("Data:\n%s", output[0])
+        try:
+            result = self.run_all(output[0])
+            logger.info("Decision engine executed")
+            logger.debug("Result:\n%s", result)
+        except Exception as e:
+            traceback.print_exc()
+            logger.error("Decision engine failed with exception %s", e)
 
-        sys.stdout = orig_stdout
-        f.close()
+        common_ut.close_logger(logger)
 
     def ness_result_to_table(self, df, ness_result, mapp):
         df = df.assign(Ness_Result=0)

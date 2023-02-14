@@ -17,6 +17,9 @@ import hmac
 import hashlib
 from datetime import datetime
 import pickle
+from common import utils
+import traceback
+import subprocess
 
 sys.path.insert(0, '../../')
 '''
@@ -147,37 +150,79 @@ class Mutual:
         msg_to_send_dict["mac"] = base64.b64encode(mac).decode()
         return msg_to_send_dict
 
-    def exchange(self, candidate, serverIP):
+    def exchange(self, candidate, serverIP, logger=None):
         '''
         function to exchange info as a client
         '''
         message = self.message_generator(open(root_cert, 'rb').read())
-        fs.client_auth(candidate, serverIP, json.dumps(message).encode(), self.interface)
+        try:
+            fs.client_auth(candidate, serverIP, json.dumps(message).encode(), self.interface)
+            if logger:
+                logger.info("Client socket created")
+        except Exception as e:
+            print("Client connection failed with exception ", e)
+            traceback.print_exc()
+            if logger:
+                logger.error("Client connection failed with exception %s", e)
+            sys.exit()
 
-    def client(self, candidate):
+    def client(self, candidate, logger=None):
         '''
         Function to conect to wifi AP and then exchange data
         '''
         print(f'AuthAP available: {candidate}')
-        wf.connect_wifi(candidate, self.interface)
+        try:
+            wf.connect_wifi(candidate, self.interface)
+            if logger:
+                logger.info("Client connected to AP")
+                command = ['iw', 'dev', self.interface, 'link']
+                iw = subprocess.run(command, shell=False, capture_output=True, text=True)
+                logger.debug("iw output:\n%s", iw.stdout)
+        except Exception as e:
+            print("Connection to AP failed with exception ", e)
+            traceback.print_exc()
+            if logger:
+                logger.error("Connection to AP failed with exception %s", e)
+            sys.exit()
         print('2) sending signature of root certificate')
         serverIP = (".".join(co.get_ip_address(self.interface).split(".")[:3]) + ".1")
-        self.exchange(candidate, serverIP)
+        self.exchange(candidate, serverIP, logger)
         print('3) getting node certificate')
         server_sig, addr = fs.server_auth(self.myID, self.interface)
         self.cli = True
         return server_sig, addr
 
-    def server(self):
+    def server(self, logger=None):
         '''
         Server (AP)
         '''
         print('No AP available')
         print("I'm an authentication server. Creating AP")
-        wf.create_ap(self.myID, self.interface)  # create AuthAPnodeID for authentication
+        try:
+            wf.create_ap(self.myID, self.interface)  # create AuthAPnodeID for authentication
+            if logger:
+                logger.info("AP created at server")
+                command = ['iw', 'dev', self.interface, 'info']
+                iw = subprocess.run(command, shell=False, capture_output=True, text=True)
+                logger.debug("iw output:\n%s", iw.stdout)
+        except Exception as e:
+            print("AP creation failed with exception ", e)
+            traceback.print_exc()
+            if logger:
+                logger.error("AP creation failed with exception %s", e)
+            sys.exit()
         time.sleep(2)
         print('1) server default')
-        client_cert, addr = fs.server_auth(self.myID, self.interface)
+        try:
+            client_cert, addr = fs.server_auth(self.myID, self.interface)
+            if logger:
+                logger.info("Server socket created")
+        except Exception as e:
+            print("Server socket creation failed with exception ", e)
+            traceback.print_exc()
+            if logger:
+                logger.error("Server socket creation failed with exception %s", e)
+            sys.exit()
         return client_cert, addr
 
     def verify_fresh(self, timestamp):
@@ -414,8 +459,42 @@ class Mutual:
         self.cert_validation(sig, node_name, cliID, cli, addr)
 
     def test(self):  # unit test
-        raise NotImplementedError
+        """
+        role = server or client
+        mut = mutual.Mutual(MUTUALINT)
+        mut.test()
+        """
+        common_ut = utils.Utils()
+        logger = common_ut.setup_logger('mutual')
 
+        #addr, client_cert, sig, cliID, cli = self.define_role()
+        # define_role()
+        try:
+            candidate = wf.scan_wifi(self.interface)  # scan wifi to authenticate with
+            if candidate:  # client
+                sigs, addr = self.client(candidate, logger)
+                sig, client_cert, cliID = self.decode_cert(sigs)
+                cli = True
+            else:  # server
+                client, addr = self.server(logger)
+                client_cert, sig, cliID, cli = self.send_my_key(client, addr)
+            #command = [f'netstat -an | grep {ip}']
+            #netstat = subprocess.run(command, shell=True, capture_output=True, text=True)
+            #print(netstat.stdout)
+            #logger.debug("Socket status:\n%s", netstat.stdout)
+
+            node_name = addr[0].replace('.', '_')
+            pri.import_cert(client_cert, node_name)
+            self.cert_validation(sig, node_name, cliID, cli, addr)
+            logger.info("Authentication complete")
+            sectable = pd.read_csv('auth/dev.csv')
+            logger.debug("Security table after mutual authentication:\n%s", sectable.drop_duplicates())
+        except Exception as e:
+            print("Mutual authentication failed with exception ", e)
+            traceback.print_exc()
+            logger.error("Mutual authentication failed with exception %s", e)
+
+        common_ut.close_logger(logger)
 
 if __name__ == "__main__":
     mutual = Mutual('wlan1')

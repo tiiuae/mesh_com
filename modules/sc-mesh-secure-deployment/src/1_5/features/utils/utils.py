@@ -39,7 +39,7 @@ def start_server():
     thread.start()
     return thread
 
-def exchage_table(sectable, start_server_thread, debug=True):
+def exchage_table(sectable, start_server_thread, logger=None, debug=True):
     #threading.Thread(target=exchange_server, args=(), daemon=True).start()
     #time.sleep(0.5) # So that messages are not sent and dropped before other nodes start server
 
@@ -97,9 +97,18 @@ def exchage_table(sectable, start_server_thread, debug=True):
 
     exchange_table = exchange_table.drop(columns=['Source_IP', 'Destination_IP', 'To_Send'])
     exchange_table.drop_duplicates(inplace=True)
-    exchange_table.to_csv('auth/global_table.csv', mode='w', header=True, index=False)
+    try:
+        exchange_table.to_csv('auth/global_table.csv', mode='w', header=True, index=False)
+        if logger:
+            logger.info("Global table created")
+    except Exception as e:
+        print("Global table creation failed with exception ", e)
+        if logger:
+            logger.error("Global table creation failed with exception %s", e)
     print('Global security table:')
     print(exchange_table)
+    if logger:
+        logger.debug("Global table:\n%s", exchange_table)
 
 def exchange_server(debug=False):
     table = 'auth/dev.csv'
