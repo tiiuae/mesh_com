@@ -43,10 +43,12 @@ elif [ "$OS" == "Buildroot" ]; then
             mkdir -p /opt/container-data/mesh
             mv /opt/mesh_com* /opt/container-data/mesh/
         fi
-        # Copy hardware identification file into container-data 
-        if [ -f "/etc/comms_pcb_version" ]; then
-            mkdir -p /opt/container-data/mesh/hardware
-            cp /etc/comms_pcb_version /opt/container-data/mesh/hardware/comms_pcb_version       
+        # Copy hardware identification file into container-data
+        if [ ! -d "/opt/container-data/mesh/hardware" ]; then 
+            if [ -f "/etc/comms_pcb_version" ]; then
+                mkdir -p /opt/container-data/mesh/hardware
+                cp /etc/comms_pcb_version /opt/container-data/mesh/hardware/comms_pcb_version
+            fi
         fi
         # change rootfs location once its mounted in dedicated partation
         if [ -f "/root/rootfs.tgz" ]; then
