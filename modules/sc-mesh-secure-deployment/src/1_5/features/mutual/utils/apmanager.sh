@@ -9,6 +9,8 @@ features_folder=$(dirname $feature_folder)
 folder=$(dirname $features_folder)
 src=$(dirname $folder)
 
+static_ip_flag=1 # Assigns ip in auth_ap.yaml to Auth_AP. Set to 0 if random ip is needed
+
 
 [ ! -d "/etc/wpa_supplicant/" ] && mkdir "/etc/wpa_supplicant/"
 
@@ -146,9 +148,20 @@ function default() {
         ssid="AuthAP_$1"
       fi
       password="ssrcpassword"
-      #ip='50.10.10.1'
-      net=$(( $RANDOM % 253 + 1 ))
-      ip=$net'.10.10.1'
+
+      if [ $static_ip_flag -eq 1 ];
+      then
+        #echo "Static Auth_AP IP"
+        yaml() {
+          python3 -c "import yaml;print(yaml.safe_load(open('$1'))$2)"
+          }
+        ip=$(yaml $feature_folder/1_5/features/mutual/utils/auth_ap.yaml "['ip']")
+        #ip='50.10.10.1'
+      else
+        #echo "Random Auth_AP IP"
+        net=$(( $RANDOM % 253 + 1 ))
+        ip=$net'.10.10.1'
+      fi
 fi
 if [ -z "$2" ] # interface
   then
