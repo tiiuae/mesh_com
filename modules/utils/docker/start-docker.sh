@@ -43,6 +43,11 @@ elif [ "$OS" == "Buildroot" ]; then
             mkdir -p /opt/container-data/mesh
             mv /opt/mesh_com* /opt/container-data/mesh/
         fi
+        # Copy hardware identificatin file into container-data 
+        if [ -f "/etc/comms_pcb_version" ]; then
+            mkdir -p /opt/container-data/hardware
+            cp /etc/comms_pcb_version /opt/container-data/hardware/comms_pcb_version       
+        fi
         # change rootfs location once its mounted in dedicated partation
         if [ -f "/root/rootfs.tgz" ]; then
             echo "import rootfs.tgz commms vm"
