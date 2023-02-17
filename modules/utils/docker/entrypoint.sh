@@ -174,6 +174,7 @@ if [ "$meshVersion" == "1.5" ]; then
   ms1_5_path=$mesh_15_folder'/modules/sc-mesh-secure-deployment/src/1_5'
   provisioning true
   cp $ms1_5_path/common/test/root_cert.der /etc/ssl/certs/
+  touch /var/lib/dhcp/dhcpd.leases
   uid=$(echo -n $mesh_if_mac | b2sum -l 32)
   uid=${uid::-1}
   /bin/bash $mesh_15_folder/common/scripts/generate_keys.sh $uid
@@ -350,7 +351,9 @@ else
   iptables --table nat -A POSTROUTING --out-interface $br_lan_ip -j MASQUERADE
 
 #start gw manager
-nohup python -u /opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw/main.py
+#nohup python -u /opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw/main.py
+# current path is /opt/mesh_com-mesh_com_1.5/modules/sc-mesh-secure-deployment/src/1_5
+nohup python -u ../gw/main.py
 
 fi
 

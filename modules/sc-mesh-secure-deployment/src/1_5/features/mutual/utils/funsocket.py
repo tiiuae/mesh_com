@@ -22,7 +22,7 @@ def client_auth(ID, ser_ip, message, interface='wlan0'):
     print(f'Starting client Auth with {str(HOST)}:{PORT}')
     ipaddr = co.get_ip_address(interface)  # assuming that wlan0 will be (or connected to) the 'AP'
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((ipaddr, random.randint(1000, 64000)))
+        #s.bind((ipaddr, random.randint(1000, 64000)))
         s.connect((HOST, PORT))
 
         #command = [f'netstat -an | grep {ipaddr}']
