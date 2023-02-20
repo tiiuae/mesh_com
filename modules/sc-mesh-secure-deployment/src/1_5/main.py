@@ -60,7 +60,7 @@ def decision_engine(sectable, ma, q):
     table_file = 'auth/decision_table.csv'
     output, mapp = ness.get_table(sectable)
     threading.Thread(target=ma.client, args=(q,), daemon=True).start()
-    ness_result = ness.run_all(output)
+    ness_result = ness.run_all_new(output)
     # if "Ness_Result" not in sectable.columns:
     #     threading.Thread(target=ma.client, args=(q,), daemon=True).start()
     #     ness_result = ness.run_all(output)
