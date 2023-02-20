@@ -12,6 +12,13 @@ import traceback
 
 file_path = os.path.dirname(__file__)
 
+class NodeType:
+    BENIGN = 65
+    SUSPICIOUS = 194
+    MALICIOUS = 2 #from CA
+    UNCERTAIN = 131
+    NOT_CHECKED = 132
+    INCONSISTENT = 133
 
 class NESS:
 
@@ -58,6 +65,7 @@ class NESS:
         mappids = self.mapping(set(df["ID"].tolist()))
         df2 = df.replace({"CA_Server": mappids})
         # df2 = df2.replace({"ID": mapp})
+        df2["CA_Server"] = df2["CA_Server"].astype('Int64')
         new_list = []
         last_status = []
         for i in df2["ID"]:
@@ -78,7 +86,7 @@ class NESS:
         for l in new_list:
             if l not in finaltable:
                 finaltable.append(l)
-        return finaltable, mappids
+        return sorted(finaltable, key=lambda x: x[0]), mappids
 
     def adapt_table(self, result, mapp):
         if not os.path.isfile('last_result.json'):
@@ -119,7 +127,6 @@ class NESS:
         self.engine.assert_('ness_fact', 'is_number_nodes', ('number_nodes', n))
         print("\nAdded fact:")
         self.engine.get_kb('ness_fact').dump_specific_facts()
-
         self.engine.activate('ness_check')
         #	print('open is assigned to %r' % open)
         print("\nInferring for Good or Uncertain status...")
@@ -138,7 +145,6 @@ class NESS:
         except Exception:
             krb_traceback.print_exc()
             sys.exit(1)
-
         if res == 1:
             print("\nAction is: ", act, "for node ", i[0])
         else:
@@ -263,4 +269,27 @@ class NESS:
                 print("Action Code issued is ", act_code)
 
                 result[nnode] = act_code
+        return result
+
+    def run_all_new(self, output):
+        '''
+        Notchecked  status not implemented
+        Uncertain  status not implemented on CA
+        '''
+        result = {}
+        for node in output:
+            if len(node) != 4:
+                result[node[0]] = NodeType.INCONSISTENT
+                continue
+            node_id, num_servers, flags, ca_result = node
+            if len(flags) != len(num_servers):
+                result[node_id] = NodeType.INCONSISTENT
+                continue
+            count_malicious = flags.count(NodeType.MALICIOUS)
+            if count_malicious == len(num_servers):
+                result[node_id] = NodeType.MALICIOUS
+            elif count_malicious > len(num_servers) / 2:
+                result[node_id] = NodeType.SUSPICIOUS
+            else:
+                result[node_id] = NodeType.BENIGN
         return result
