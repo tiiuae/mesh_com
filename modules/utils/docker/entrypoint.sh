@@ -1,6 +1,6 @@
 #! /bin/bash
 
-mesh_15_folder="/opt/mesh_com-mesh_com_1.5"
+mesh_15_folder="/opt/mesh_com"
 
 calculate_wifi_channel()
 {
