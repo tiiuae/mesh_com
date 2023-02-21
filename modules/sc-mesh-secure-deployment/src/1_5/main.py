@@ -83,7 +83,8 @@ def quaran(ness_result, q, sectable, ma, mapp):
     for node in ness_result:
         if ness_result[node] == 194 or (not q.empty() and q.get() == 'malicious'):
             print("Malicious Node: ", ness.remapping(mapp, node))
-            mac = sectable.iloc[node]['IP']
+            #mac = sectable.iloc[node]['IP']
+            mac = sectable[sectable['ID'] == ness.remapping(mapp, node)]['IP'].unique()[0]
             threading.Thread(target=ma.server, args=(f"malicious: {mac}", True), daemon=True).start()
             threading.Thread(target=qua.block, args=(mac,), daemon=True).start()
             for i in range(quarantineTime, 0, -1):

@@ -147,16 +147,22 @@ def show_neighbors():
 def sbeat():
     os.system('clear')
     original_time = time()
-    end_time = 5  # one minute
-    sec_beat_time = 5
+    end_time = 100
+    sec_beat_time = 120
     os.system('clear')
     print('\'SecBeat\'')
+    print(f'Running SecBeat every {sec_beat_time} seconds, during {end_time} seconds')
+    sec_beat_start_time = original_time
+    count = 1
+    print('\nSecurity beat no. ', count)
     sec_beat(myID)
-    print(f'Running SecBeat every {sec_beat_time} seconds, during {end_time} minutes')
     while time() < original_time + end_time:
-        if mesh_utils.verify_mesh_status():  # verifying that mesh is running
-            sleep(sec_beat_time - time() % sec_beat_time)  # sec beat time
+        if mesh_utils.verify_mesh_status() and time() - sec_beat_start_time >= sec_beat_time:  # verifying that mesh is running
+            #sleep(sec_beat_time - time() % sec_beat_time)  # sec beat time
+            count = count + 1
+            print('\nSecurity beat no. ', count)
             sec_beat(myID)
+            sec_beat_start_time = time()
 
 def extable():
     os.system('clear')
