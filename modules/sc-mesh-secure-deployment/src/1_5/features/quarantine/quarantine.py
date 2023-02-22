@@ -11,13 +11,17 @@ class Quarantine:
     def __init__(self):
         self.interface = mesh_utils.get_mesh_interface('bat0')
 
-    def block(self, ip):
+    def block(self, ip, quarantineTime):
         #command = [str(script_path) + '/traffic_block.sh', mac, self.interface]
         #command = ['iptables', '-A', 'INPUT', '-p', 'ALL', '-m', 'mac', '--mac-source', mac, '-j', 'DROP']
         command = ['iptables', '-I', 'INPUT', '-p', 'ALL', '-s', ip, '-j', 'DROP']
         subprocess.call(command, shell=False)
         print(f'blocking IP: {str(ip)} on interface {str(self.interface)}')
         self.iptablesSave()
+        for i in range(quarantineTime, 0, -1):
+            print(f"Blocking IP: {str(ip)} for {str(i)} seconds", end='\r')
+            time.sleep(1)
+        self.unblock(ip)
 
 
     def unblock(self, ip):

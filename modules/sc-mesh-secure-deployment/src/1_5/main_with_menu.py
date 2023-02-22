@@ -69,7 +69,7 @@ def MA():
         AUTHSERVER = True
     p = threading.Thread(target=aux_auth, daemon=True, args=(semasphore,))
     p.start()
-
+    return p
 
 def only_mesh():
     os.system('clear')
