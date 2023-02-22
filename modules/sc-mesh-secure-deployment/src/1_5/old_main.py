@@ -1,6 +1,7 @@
 import yaml
 from main_with_menu import *
 
+MA_thread = None
 def readfile():
     with open("features.yaml", "r") as stream:
         try:
@@ -10,8 +11,9 @@ def readfile():
 
 
 def initialize(feature):
+    global MA_thread
     if feature == 'mutual':
-            MA()
+            MA_thread = MA()
     if feature == 'continuous':
             CA()
     if feature == 'NESS':
@@ -31,4 +33,6 @@ if __name__ == "__main__":
     for index in features:
         if features[index]:
             initialize(index)
-
+    # wait for Auth_AP to start in background for future nodes
+    if MA_thread:
+        MA_thread.join()

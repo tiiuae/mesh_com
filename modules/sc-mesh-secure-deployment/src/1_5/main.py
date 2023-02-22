@@ -86,11 +86,7 @@ def quaran(ness_result, q, sectable, ma, mapp):
             #mac = sectable.iloc[node]['IP']
             mac = sectable[sectable['ID'] == ness.remapping(mapp, node)]['IP'].unique()[0]
             threading.Thread(target=ma.server, args=(f"malicious: {mac}", True), daemon=True).start()
-            threading.Thread(target=qua.block, args=(mac,), daemon=True).start()
-            for i in range(quarantineTime, 0, -1):
-                print(f"Blocking Node: {str(node)} for {str(i)} seconds", end='\r')
-                sleep(1)
-            threading.Thread(target=qua.unblock, args=(mac,), daemon=True).start()
+            threading.Thread(target=qua.block, args=(mac, quarantineTime), daemon=True).start()
         else:
             print("Nothing to do")
 
