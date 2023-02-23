@@ -1,6 +1,6 @@
 #! /bin/bash
-#meshcom_path=$(pwd | awk -F 'mesh_com' '{print $1 FS "/"}')
-meshcom_path=$(pwd | awk -F 'mesh_com-mesh_com_1.5' '{print $1 FS}')
+meshcom_path=$(pwd | awk -F 'mesh_com' '{print $1 FS "/"}')
+#meshcom_path=$(pwd | awk -F 'mesh_com-mesh_com_1.5' '{print $1 FS}')
 sc_path=$(pwd | awk -F 'sc-mesh-secure-deployment' '{print $1 FS "/"}')
 
 cp $meshcom_path/common/scripts/mesh-11s.sh  /opt/.
