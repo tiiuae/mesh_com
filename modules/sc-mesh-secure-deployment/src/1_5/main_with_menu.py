@@ -180,8 +180,6 @@ def sbeat_client():
     sbeat_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sbeat_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sbeat_sock.bind(("0.0.0.0", 6007))
-    # Need to make it same as that in sec_best in main_with_menu.py
-    # Maybe declare in header?
     # Wait for a security beat period -> If a security beat is received, break while loop and start security beat. If it is not received, breadcast security beat and start it.
     sbeat_sock.settimeout(sec_beat_time + 15) # 15 seconds buffer time as socket takes some time to start receiving udp packets here
     print("====================================================================")
@@ -190,8 +188,6 @@ def sbeat_client():
     while True:
         try:
             data, addr = sbeat_sock.recvfrom(1024)
-            #print("Checkpoint data = ", data)
-            #print("Checkpoint decoded data = ", data.decode())
             if data.decode() == 'SecBeat':
                 print("Security beat received")
                 sbeat_sock.close()
@@ -210,11 +206,11 @@ def sbeat_server():
     sbeat_sock.setblocking(False)
     print("Broadcasting security beat")
     sbeat_sock.sendto(bytes('SecBeat', "utf-8"),('10.10.10.255', 6007))  # mesh_utils.get_mesh_ip_address() # bat0 broadcast ip
-    sleep(0.5)
+    sleep(0.1)
     sbeat_sock.sendto(bytes('SecBeat', "utf-8"), ('10.10.10.255', 6007))
-    sleep(0.5)
+    sleep(0.1)
     sbeat_sock.sendto(bytes('SecBeat', "utf-8"), ('10.10.10.255', 6007))
-    sleep(0.5)
+    sleep(0.1)
     sbeat_sock.sendto(bytes('SecBeat', "utf-8"), ('10.10.10.255', 6007))
     sbeat_sock.close()
 
