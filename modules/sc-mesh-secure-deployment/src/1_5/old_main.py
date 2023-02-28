@@ -19,7 +19,7 @@ def initialize(feature):
     if feature == 'NESS':
             DE()
     if feature == 'secbeat':
-            sbeat()
+            sbeat_client()
     if feature == 'quarantine':
             Quarantine()
     if feature == 'only_mesh':

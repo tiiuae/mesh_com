@@ -331,7 +331,11 @@ class Mutual:
         except ConnectionRefusedError:
             time.sleep(7)
             fs.client_auth(cliID, addr[0], encrypt_pass, self.interface)
-        client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
+        try:
+            client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
+        except Exception as e:
+            time.sleep(10)
+            client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
         if self.debug:
             print(f'Client Mesh IP: {str(client_mesh_ip)}')
         try:
@@ -340,7 +344,11 @@ class Mutual:
         except ConnectionRefusedError:
             time.sleep(7)
             fs.client_auth(cliID, addr[0], my_mac_mesh.encode(), self.interface)
-        client_mac, _ = fs.server_auth(self.myID, self.interface)
+        try:
+            client_mac, _ = fs.server_auth(self.myID, self.interface)
+        except Exception as e:
+            time.sleep(10)
+            client_mac, _ = fs.server_auth(self.myID, self.interface)
         if self.debug:
             print(f'Client Mesh MAC: {str(client_mesh_ip)}')
         try:
@@ -408,17 +416,25 @@ class Mutual:
                 self.start_mesh()
                 try:
                     fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode(), self.interface)  # send my mesh ip
-                except ConnectionRefusedError:
+                except Exception as e:
                     time.sleep(2)
-                    fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode(), self.interface)
+                    try:
+                        fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode(), self.interface)
+                    except Exception as e:
+                        time.sleep(10)
+                        fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode(), self.interface)  # send my mesh ip
                 client_mac, _ = fs.server_auth(self.myID, self.interface)
                 print(f'Client MAC: {str(client_mac)}')
                 try:
                     time.sleep(2)
                     fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode(), self.interface)  # send my mac
-                except ConnectionRefusedError:
+                except Exception as e:
                     time.sleep(2)
-                    fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode(), self.interface)
+                    try:
+                        fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode(), self.interface)
+                    except Exception as e:
+                        time.sleep(10)
+                        fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode(), self.interface)
                 client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
             elif pri.verify_certificate(sig, node_name, self.digest(), self.root_cert):
                 # print(colored('> Valid Certificate', 'green'))

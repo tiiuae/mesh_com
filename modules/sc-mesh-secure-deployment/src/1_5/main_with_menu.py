@@ -33,6 +33,7 @@ def banner():
 AUTHSERVER = False
 mut = mutual.Mutual(MUTUALINT)
 myID = mut.myID
+sec_beat_time = 100  # Security beat period in seconds
 
 def print_menu():
     banner()
@@ -145,24 +146,77 @@ def show_neighbors():
 
 
 def sbeat():
-    os.system('clear')
+    #os.system('clear')
     original_time = time()
-    end_time = 100
-    sec_beat_time = 120
-    os.system('clear')
+    end_time = 1000 # Total time to run security beat in seconds
+    #os.system('clear')
     print('\'SecBeat\'')
     print(f'Running SecBeat every {sec_beat_time} seconds, during {end_time} seconds')
     sec_beat_start_time = original_time
     count = 1
-    print('\nSecurity beat no. ', count)
-    sec_beat(myID)
+    print("====================================================================")
+    print('Security beat no. ', count)
+    print("====================================================================")
+    # Start server socket to broadcast SecBeat
+    threading.Thread(target=sbeat_server, daemon=True, args=()).start()
+    threading.Thread(target=sec_beat, daemon=True, args=(myID,)).start()
+
+
+    #sec_beat(myID)
     while time() < original_time + end_time:
         if mesh_utils.verify_mesh_status() and time() - sec_beat_start_time >= sec_beat_time:  # verifying that mesh is running
             #sleep(sec_beat_time - time() % sec_beat_time)  # sec beat time
-            count = count + 1
-            print('\nSecurity beat no. ', count)
-            sec_beat(myID)
             sec_beat_start_time = time()
+            count = count + 1
+            print("====================================================================")
+            print('Security beat no. ', count)
+            print("====================================================================")
+            threading.Thread(target=sbeat_server, daemon=True, args=()).start()
+            threading.Thread(target=sec_beat, daemon=True, args=(myID,)).start()
+            #sec_beat(myID)
+
+def sbeat_client():
+    # Start client to listen for security beat
+    sbeat_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sbeat_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    sbeat_sock.bind(("0.0.0.0", 6007))
+    # Need to make it same as that in sec_best in main_with_menu.py
+    # Maybe declare in header?
+    # Wait for a security beat period -> If a security beat is received, break while loop and start security beat. If it is not received, breadcast security beat and start it.
+    sbeat_sock.settimeout(sec_beat_time + 15) # 15 seconds buffer time as socket takes some time to start receiving udp packets here
+    print("====================================================================")
+    print("Waiting for security beat")
+    print("====================================================================")
+    while True:
+        try:
+            data, addr = sbeat_sock.recvfrom(1024)
+            #print("Checkpoint data = ", data)
+            #print("Checkpoint decoded data = ", data.decode())
+            if data.decode() == 'SecBeat':
+                print("Security beat received")
+                sbeat_sock.close()
+                break
+        except socket.timeout:
+            print("No security beat received during 1 security beat period")
+            break
+    print("Starting security beat")
+    # sbeat()
+    threading.Thread(target=sbeat, daemon=True, args=()).start()
+
+def sbeat_server():
+    sbeat_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)  # UDP
+    sbeat_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sbeat_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    sbeat_sock.setblocking(False)
+    print("Broadcasting security beat")
+    sbeat_sock.sendto(bytes('SecBeat', "utf-8"),('10.10.10.255', 6007))  # mesh_utils.get_mesh_ip_address() # bat0 broadcast ip
+    sleep(0.5)
+    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), ('10.10.10.255', 6007))
+    sleep(0.5)
+    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), ('10.10.10.255', 6007))
+    sleep(0.5)
+    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), ('10.10.10.255', 6007))
+    sbeat_sock.close()
 
 def extable():
     os.system('clear')
