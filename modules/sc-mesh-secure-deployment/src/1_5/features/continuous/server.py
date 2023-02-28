@@ -281,7 +281,7 @@ def initiate_server(ip, return_dict, id_dict, num_neighbors, ips_sectable, logge
 
     try:
         s = socket.socket()  # create server socket s with default param ipv4, TCP
-        s.settimeout(45)  # Setting timeout to prevent infinite blocking at s.accept() when the client node is not on
+        s.settimeout(20)  # Setting timeout to prevent infinite blocking at s.accept() when the client node is not on
         # to accept connections from clients, bind IP of server, a port number to the server socket
         s.bind((ip, 9999))
         print('Socket Created')

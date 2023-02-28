@@ -6,7 +6,14 @@ def continuous_authentication(sectable, myID):
     aux = sectable.iloc[:, :5]
     sectable = aux.drop_duplicates()
     sectable.drop(sectable.loc[sectable['MAC'] == '----'].index, inplace=True) # To avoid duplicates after exchange table for mesh neighbors not originally mutually authenticated
-    loop_ca = asyncio.get_event_loop()
+    # loop_ca = asyncio.get_event_loop()
+    try:
+        loop_ca = asyncio.get_event_loop()
+    except RuntimeError as ex:
+        if "There is no current event loop in thread" in str(ex):
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop_ca = asyncio.get_event_loop()
     ca_task = loop_ca.create_task(ca_utils.launchCA(sectable))
     with contextlib.suppress(asyncio.CancelledError):
         result = loop_ca.run_until_complete(asyncio.gather(ca_task))
@@ -103,7 +110,6 @@ def sec_beat(myID):
     ness_result, mapp = decision_engine(global_table, ma, q)
     #quaran(ness_result, q, sectable, ma, mapp)
     quaran(ness_result, q, global_table, ma, mapp)
-
 
 def mutual_authentication():
     print("Starting Mutual Authentication")
