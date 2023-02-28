@@ -1,5 +1,5 @@
 from header import *
-
+from main_with_menu import *
 
 def continuous_authentication(sectable, myID):
     print("Starting Continuous Authentication")
@@ -132,17 +132,36 @@ def start_servers():
     #process.append(ex_s)
     return process
 
+MA_thread = None
+def readfile():
+    with open("features.yaml", "r") as stream:
+        try:
+            return yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+
+
+def initialize(feature):
+    global MA_thread
+    if feature == 'mutual':
+            MA_thread = MA()
+    if feature == 'continuous':
+            CA()
+    if feature == 'NESS':
+            DE()
+    if feature == 'secbeat':
+            sbeat_client()
+    if feature == 'quarantine':
+            Quarantine()
+    if feature == 'only_mesh':
+            only_mesh()
 
 if __name__ == "__main__":
-    sec_beat_time = 5
-    # Mutual Authentication
-    myID = mutual_authentication()
-    ness_result = {}
-    start_servers()
-    while True:
-        if mesh_utils.verify_mesh_status():  # verifying that mesh is running
-            sleep(sec_beat_time - time() % sec_beat_time)  # sec beat time
-            #first_round, ness_result = sec_beat(ness_result, myID)
-            sec_beat(myID)
-        else:
-            print("No mesh established")
+    threadList = []
+    features = readfile()
+    for index in features:
+        if features[index]:
+            initialize(index)
+    # wait for Auth_AP to start in background for future nodes
+    if MA_thread:
+        MA_thread.join()

@@ -179,7 +179,7 @@ if [ "$meshVersion" == "1.5" ]; then
   uid=${uid::-1}
   /bin/bash $mesh_15_folder/common/scripts/generate_keys.sh $uid
   cd $ms1_5_path
-  python3 -u old_main.py
+  python3 -u main.py
 fi
 
 
