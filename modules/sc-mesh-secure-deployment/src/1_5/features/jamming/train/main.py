@@ -131,7 +131,7 @@ def train(model, loaders, len_train_data):
             # series, targets = mixup_fn(series, targets) # Test accuracy multiclass: 0.9959919839679359, bin accuracy: 0.998997995991984
             # without mixup with crop and horizontal flip => Test accuracy multiclass: 0.998997995991984, bin accuracy: 1.0
 
-            # plot_series(series, targets)
+            plot_series(series, targets)
 
             # x_fft = torch.abs(torch.fft.rfft(series))
 
