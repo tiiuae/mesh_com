@@ -159,9 +159,16 @@ psk="ssrcdemo"
 EOF
 }
 
+bug_initializing()
+{
+/sbin/ip link set wlan0 down
+/sbin/ip link set wlan0 name wlan1
+/sbin/ip link set wlan1 up
+}
+
 
 configure
-
+bug_initializing
 
 ###Deciding IP address to be assigned to br-lan from WiFi MAC
 mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
@@ -172,8 +179,12 @@ br_lan_ip="192.168.1."$((16#$ip_random))
 if [ "$meshVersion" == "1.5" ]; then
   install_packages
   ms1_5_path=$mesh_15_folder'/modules/sc-mesh-secure-deployment/src/1_5'
+  mesh_random_ip="10.10.10."$((16#$ip_random))
+  sed -i "s/ip: .*/ip: $mesh_random_ip/" $ms1_5_path'/common/mesh_com_11s.conf' # this is for testing only, must be provided
+  auth_ap="1$(shuf -i 2-99 -n 1).10.10.1"
+  sed -i "s/ip: .*/ip: $auth_ap/" $ms1_5_path'/features/mutual/utils/auth_ap.yaml'
   provisioning true
-  cp $ms1_5_path/common/test/root_cert.der /etc/ssl/certs/
+  cp $ms1_5_path/common/test/root_cert.der /etc/ssl/certs/ # this is for testing only, must be provided
   touch /var/lib/dhcp/dhcpd.leases
   uid=$(echo -n $mesh_if_mac | b2sum -l 32)
   uid=${uid::-1}
