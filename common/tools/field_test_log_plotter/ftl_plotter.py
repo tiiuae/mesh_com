@@ -80,7 +80,7 @@ class FieldTestLogPlotter:
                         self.df.loc[i, 'latitude'] = self.df.loc[i-1, 'latitude']
                         self.df.loc[i, 'longitude'] = self.df.loc[i-1, 'longitude']
 
-        # Coordinates have been cleaned/fixed by now execp in such case where df
+        # Coordinates have been cleaned/fixed by now except in such case where df
         # didn't contain any valid coordinates. Replace any NaN values with integers.
         self.df['latitude'].replace(np.NaN, self.__base_latitude, inplace=True)
         self.df['longitude'].replace(np.NaN, self.__base_longitude, inplace=True)
