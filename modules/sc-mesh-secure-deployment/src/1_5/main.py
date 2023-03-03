@@ -1,5 +1,6 @@
 from header import *
 from main_with_menu import *
+import yaml
 
 def continuous_authentication(sectable, myID):
     print("Starting Continuous Authentication")
@@ -123,14 +124,14 @@ def mutual_authentication():
     return mut.myID
 
 
-def start_servers():
-    process = []
-    q = queue.Queue()
-    ca_s = ca_utils.ca_server(mesh_utils.get_mesh_ip_address())  # port 9999
-    process.append(ca_s)
-    #ex_s = multiprocessing.Process(target=ut.exchange_server, args=(q,), daemon=True)  # port 5005
-    #process.append(ex_s)
-    return process
+# def start_servers():
+#     process = []
+#     q = queue.Queue()
+#     ca_s = ca_utils.ca_server(mesh_utils.get_mesh_ip_address())  # port 9999
+#     process.append(ca_s)
+#     #ex_s = multiprocessing.Process(target=ut.exchange_server, args=(q,), daemon=True)  # port 5005
+#     #process.append(ex_s)
+#     return process
 
 MA_thread = None
 def readfile():

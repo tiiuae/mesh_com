@@ -1,6 +1,17 @@
 #! /bin/bash
 
-mesh_15_folder="/opt/mesh_com"
+MESH_FOLDER="/opt/mesh_com"
+
+# Define constants
+MESH_VERSION="1.5"
+MESH_FOLDER="/opt/mesh_com"
+SC_MESH_FOLDER="$MESH_FOLDER/modules/sc-mesh-secure-deployment/src/1_5"
+COMMON_FOLDER="$SC_MESH_FOLDER/common"
+FEATURES_FOLDER="$SC_MESH_FOLDER/features/mutual/utils"
+ROOT_CERT="$COMMON_FOLDER/test/root_cert.der"
+MESH_COM_CONF="$COMMON_FOLDER/mesh_com_11s.conf"
+AUTH_AP_CONF="$FEATURES_FOLDER/auth_ap.yaml"
+DHCPD_LEASES="/var/lib/dhcp/dhcpd.leases"
 
 calculate_wifi_channel()
 {
@@ -25,10 +36,10 @@ calculate_wifi_channel()
 install_packages()
 {
   #install the python packages
-  if [ -d "$mesh_15_folder/modules/utils/package/python_packages" ]; then
-     echo "Directory $mesh_15_folder/modules/utils/package/python_packages exists."
+  if [ -d "$MESH_FOLDER/modules/utils/package/python_packages" ]; then
+     echo "Directory $MESH_FOLDER/modules/utils/package/python_packages exists."
   else
-     tar -C $mesh_15_folder/modules/utils/package/ -zxvf $mesh_15_folder/modules/utils/package/python_packages.tar.gz
+     tar -C $MESH_FOLDER/modules/utils/package/ -zxvf $MESH_FOLDER/modules/utils/package/python_packages.tar.gz
   fi
 
   #pip install --no-index --find-links /opt/mesh_com/modules/utils/package/python_packages -r /opt/mesh_com/modules/utils/package/python_packages/requirements.txt
@@ -36,7 +47,7 @@ install_packages()
 
   #copy libraries for pypcap
 
-  cd $mesh_15_folder/modules/utils/package/python_packages
+  cd $MESH_FOLDER/modules/utils/package/python_packages
   for f in {*.whl,*.gz};
   do
     name="$(echo $f | cut -d'-' -f1)"
@@ -52,25 +63,10 @@ install_packages()
 
   if [ "$ML" == "true" ]; then
 
-    tar -C $mesh_15_folder/modules/utils/package/ -zxvf $mesh_15_folder/modules/utils/package/machine_learning_packages.tar.gz
-    tar -C $mesh_15_folder/modules/utils/package/ -zxvf $mesh_15_folder/modules/utils/package/machine_learning2.tar.gz
+    tar -C $MESH_FOLDER/modules/utils/package/ -zxvf $MESH_FOLDER/modules/utils/package/machine_learning_packages.tar.gz
+    tar -C $MESH_FOLDER/modules/utils/package/ -zxvf $MESH_FOLDER/modules/utils/package/machine_learning2.tar.gz
 
-    cd $mesh_15_folder/modules/utils/package/machine_learning_packages
-
-    for f in {*.whl,*.gz};
-    do
-      name="$(echo $f | cut -d'-' -f1)"
-      if python -c 'import pkgutil; exit(not pkgutil.find_loader("$name"))'; then
-        echo $name "installed"
-      else
-        echo $name "not found"
-        echo "installing" $name
-        pip install --no-index "$f" --find-links .;
-    fi
-    done;
-    cd .. ;
-
-    cd $mesh_15_folder/modules/utils/package/machine_learning2
+    cd $MESH_FOLDER/modules/utils/package/machine_learning_packages
 
     for f in {*.whl,*.gz};
     do
@@ -85,10 +81,26 @@ install_packages()
     done;
     cd .. ;
 
-    cp $mesh_15_folder/modules/utils/package/machine_learning_packages/libpcap.so.0.8 /usr/lib/.
-    cp $mesh_15_folder/modules/utils/package/machine_learning_packages/pcap.cpython-39-aarch64-linux-gnu.so /usr/lib/python3.9/site-packages/.
+    cd $MESH_FOLDER/modules/utils/package/machine_learning2
+
+    for f in {*.whl,*.gz};
+    do
+      name="$(echo $f | cut -d'-' -f1)"
+      if python -c 'import pkgutil; exit(not pkgutil.find_loader("$name"))'; then
+        echo $name "installed"
+      else
+        echo $name "not found"
+        echo "installing" $name
+        pip install --no-index "$f" --find-links .;
+    fi
+    done;
+    cd .. ;
+
+    cp $MESH_FOLDER/modules/utils/package/machine_learning_packages/libpcap.so.0.8 /usr/lib/.
+    cp $MESH_FOLDER/modules/utils/package/machine_learning_packages/pcap.cpython-39-aarch64-linux-gnu.so /usr/lib/python3.9/site-packages/.
   fi
 }
+
 configure()
 {
   if [ -f "/opt/mesh.conf" ]; then
@@ -160,8 +172,54 @@ EOF
 }
 
 
-configure
+bug_initializing()
+{
+/sbin/ip link set wlan0 down
+/sbin/ip link set wlan0 name wlan1
+/sbin/ip link set wlan1 up
+}
 
+
+generate_random_mesh_ip() {
+  local last_oct=$((16#$1))
+  local random_ip="10.10.10.$((last_oct))"
+  echo "$random_ip"
+}
+
+update_mesh_com_conf() {
+  local random_ip="$1"
+  sed -i "s/ip: .*/ip: $random_ip/" "$MESH_COM_CONF"
+}
+
+
+update_auth_ap_conf() {
+  local auth_ap="$1"
+  sed -i "s/ip: .*/ip: $auth_ap/" "$AUTH_AP_CONF"
+}
+
+get_available_networks() {
+  /sbin/ip -4 -o addr show scope global |
+    awk '{gsub(/\/.*/,"",$4); print $4}' |
+    awk '{split($1,a,"[.]"); print a[1],a[2],a[3]}' OFS="." |
+    sort -u
+}
+
+
+start_mesh() {
+  cd "$SC_MESH_FOLDER"
+  python3 -u main.py
+}
+
+
+get_unused_network() {
+  local used_networks="$1"
+  local available_networks=($(seq 15 50 | grep -Fxv -e{10,"used_networks[@]"} | shuf))
+  local unused_network="1${available_networks[0]}.0.0"
+  echo "$unused_network"
+}
+
+configure
+bug_initializing
 
 ###Deciding IP address to be assigned to br-lan from WiFi MAC
 mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
@@ -169,17 +227,42 @@ ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
 br_lan_ip="192.168.1."$((16#$ip_random))
 
 
-if [ "$meshVersion" == "1.5" ]; then
+if [ "$MESH_VERSION" == "1.5" ]; then
   install_packages
-  ms1_5_path=$mesh_15_folder'/modules/sc-mesh-secure-deployment/src/1_5'
+  # Generate a random IP address for the mesh network
+  ip_random="$(openssl rand -hex 1)"
+  random_ip="$(generate_random_mesh_ip "$ip_random")"
+
+  # Update mesh configuration file with the random IP
+  update_mesh_com_conf "$random_ip"
+
+  # Check if the network is available and generate a new one if necessary
+  used_networks=($(get_available_networks))
+  if [[ "${#used_networks[@]}" -gt 0 ]]; then
+    unused_network="$(get_unused_network "${used_networks[@]}")"
+    auth_ap="$unused_network.1"
+  else
+     auth_net="1$(shuf -i 15-50 -n 1).0.0"
+     auth_ap=$auth_net".1"
+  fi
+
+  # Update authentication AP configuration file with the new IP
+  update_auth_ap_conf "$auth_ap"
+
   provisioning true
-  cp $ms1_5_path/common/test/root_cert.der /etc/ssl/certs/
-  touch /var/lib/dhcp/dhcpd.leases
+
+  # Copy the root certificate for testing purposes
+  cp "$ROOT_CERT" "/etc/ssl/certs/"
+
+  # Create the DHCP leases file
+  touch "$DHCPD_LEASES"
+
+  cp $COMMON_FOLDER/test/root_cert.der /etc/ssl/certs/ # this is for testing only, must be provided
+
   uid=$(echo -n $mesh_if_mac | b2sum -l 32)
   uid=${uid::-1}
-  /bin/bash $mesh_15_folder/common/scripts/generate_keys.sh $uid
-  cd $ms1_5_path
-  python3 -u main.py
+  /bin/bash $MESH_FOLDER/common/scripts/generate_keys.sh $uid
+  start_mesh
 fi
 
 
