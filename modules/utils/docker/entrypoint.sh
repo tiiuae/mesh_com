@@ -258,7 +258,6 @@ if [ "$MESH_VERSION" == "1.5" ]; then
   touch "$DHCPD_LEASES"
 
   cp $COMMON_FOLDER/test/root_cert.der /etc/ssl/certs/ # this is for testing only, must be provided
-  touch /var/lib/dhcp/dhcpd.leases
 
   uid=$(echo -n $mesh_if_mac | b2sum -l 32)
   uid=${uid::-1}
