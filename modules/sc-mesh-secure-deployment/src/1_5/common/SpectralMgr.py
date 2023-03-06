@@ -22,6 +22,7 @@ class Spectral:
         self.VALUES = dict()
 
         data = spectral_bin.read(size)  # just read 2048 bytes
+        #data = spectral_bin.read(16384)
         count = 0
         pos = 0
         while pos < len(data):
@@ -47,12 +48,12 @@ class Spectral:
                 sum_square_sample = 0
                 samples = []
                 for raw_sample in sdata:
-                    if raw_sample == 0:
+                   if raw_sample == 0:
                         sample = 1
-                    else:
+                   else:
                         sample = raw_sample << max_exp
-                    sum_square_sample += sample * sample
-                    samples.append(sample)
+                   sum_square_sample += sample * sample
+                   samples.append(sample)
 
                 if sum_square_sample == 0:
                     sum_square_sample = 1
@@ -65,7 +66,7 @@ class Spectral:
                     subcarrier_freq = first_sc + i * self.sc_wide
                     sigval = noise + rssi + 20 * math.log10(sample) - sum_square_sample
                     self.VALUES[count] = (tsf, subcarrier_freq, noise, rssi, sigval)
-                    #CHECK1
+
                     print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (tsf, subcarrier_freq, noise, rssi, sigval))
                     count = count + 1
             # 40 MHz
@@ -120,9 +121,9 @@ class Spectral:
                     else:
                         sigval = noise_u + rssi_u + 20 * math.log10(sample) - sum_square_sample_upper
                     subcarrier_freq = first_sc + i * self.sc_wide
-                    self.VALUES[count] = (tsf, subcarrier_freq, (noise_l + noise_u) / 2, (rssi_l + rssi_u) / 2, sigval)
-                    #CHECK2
-                    print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (tsf, subcarrier_freq, (noise_l+noise_u)/2, (rssi_l + rssi_u) / 2, sigval))
+                    self.VALUES[count] = (subcarrier_freq, (noise_l + noise_u) / 2, (rssi_l + rssi_u) / 2, sigval, (max_mag_l + max_mag_u)/2)
+       
+                    print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f Max Magnitude %d" % (tsf, subcarrier_freq, (noise_l+noise_u)/2, (rssi_l + rssi_u) / 2, sigval, (max_mag_l + max_mag_u)/2))
                     count = count + 1
 
             # ath10k
@@ -138,10 +139,10 @@ class Spectral:
 
                 sdata = struct.unpack_from("64B", data, pos)
                 pos += 64
-                self.VALUES[count] = (tsf, freq1, noise, rssi, sdata)
-                #CHECK3
-                #print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (tsf, freq1, noise, rssi, sdata))
-                print("TSF: %d Freq: %d Noise: %d Rssi: %d" % (tsf, freq1, noise, rssi))
+
+                self.VALUES[count] = (freq1, noise, max_mag, gain_db, base_pwr_db, rssi, relpwr_db, avgpwr_db)
+
+                print(f"Channel Width: {chanwidth} Freq1: {freq1} Freq2: {freq2} Noise: {noise} Max Magnitude: {max_mag} Gain_db: {gain_db} Base Power_db: {base_pwr_db} TSF: {tsf} Max Index: {max_index} Rssi: {rssi} Rel Power_db: {relpwr_db} Avg Power_db: {avgpwr_db} Max_exp: {max_exp}")
                 count = count + 1
 
     def get_values(self):
@@ -150,7 +151,7 @@ class Spectral:
     @staticmethod
     def initialize_scan():
         driver = os.popen('ls /sys/kernel/debug/ieee80211/phy* | grep ath').read().strip()
-
+        
         if(driver == "ath9k"):
            # cmd_function =  "echo background > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
            cmd_function = "echo manual > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
@@ -163,6 +164,7 @@ class Spectral:
 
         elif(driver == "ath10k"):
            cmd_background = "echo background > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
+           #cmd_count = "echo 25 > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_count"
            cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
 
            os.popen(cmd_background)
@@ -187,14 +189,11 @@ class Spectral:
     def file_close(file_pointer):
         file_pointer.close()
 
-        
     @staticmethod
     def file_open(fn="data"):
         file_exists = os.path.exists(fn)
-        
-        if(file_exists):
+        if(file_exists):        
             return open(fn, 'rb')
         elif(file_exists == False):
             os.system("touch " + fn)
             return open(fn, 'rb')
-        
