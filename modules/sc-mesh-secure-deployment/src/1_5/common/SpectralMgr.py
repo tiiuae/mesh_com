@@ -20,6 +20,7 @@ class Spectral:
 
     def read(self, spectral_bin, size):
         self.VALUES = dict()
+
         data = spectral_bin.read(size)  # just read 2048 bytes
         count = 0
         pos = 0
@@ -32,7 +33,6 @@ class Spectral:
                 break
             # 20 MHz
             if stype == 1:
-
                 if pos >= len(data) - self.header_size - self.type1_packet_size + 1:
                     break
                 pos += self.header_size
@@ -65,6 +65,7 @@ class Spectral:
                     subcarrier_freq = first_sc + i * self.sc_wide
                     sigval = noise + rssi + 20 * math.log10(sample) - sum_square_sample
                     self.VALUES[count] = (tsf, subcarrier_freq, noise, rssi, sigval)
+                    #CHECK1
                     print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (tsf, subcarrier_freq, noise, rssi, sigval))
                     count = count + 1
             # 40 MHz
@@ -120,7 +121,8 @@ class Spectral:
                         sigval = noise_u + rssi_u + 20 * math.log10(sample) - sum_square_sample_upper
                     subcarrier_freq = first_sc + i * self.sc_wide
                     self.VALUES[count] = (tsf, subcarrier_freq, (noise_l + noise_u) / 2, (rssi_l + rssi_u) / 2, sigval)
-                    print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (tsf, subcarrier_freq, (noise_l+noise_u)/2, (noise_l+noise_u)/2, sigval))
+                    #CHECK2
+                    print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (tsf, subcarrier_freq, (noise_l+noise_u)/2, (rssi_l + rssi_u) / 2, sigval))
                     count = count + 1
 
             # ath10k
@@ -137,7 +139,9 @@ class Spectral:
                 sdata = struct.unpack_from("64B", data, pos)
                 pos += 64
                 self.VALUES[count] = (tsf, freq1, noise, rssi, sdata)
-                print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (tsf, freq1, noise, rssi, sdata))
+                #CHECK3
+                #print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (tsf, freq1, noise, rssi, sdata))
+                print("TSF: %d Freq: %d Noise: %d Rssi: %d" % (tsf, freq1, noise, rssi))
                 count = count + 1
 
     def get_values(self):
@@ -145,21 +149,36 @@ class Spectral:
 
     @staticmethod
     def initialize_scan():
+        driver = os.popen('ls /sys/kernel/debug/ieee80211/phy* | grep ath').read().strip()
 
-        # cmd_function =  "echo background > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
-        cmd_function = "echo manual > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
-        cmd_count = "echo 25 > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_count"
-        cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
+        if(driver == "ath9k"):
+           # cmd_function =  "echo background > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
+           cmd_function = "echo manual > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
+           cmd_count = "echo 25 > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_count"
+           cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
+   
+           os.popen(cmd_function)
+           os.popen(cmd_count)
+           os.popen(cmd_trigger)
 
-        os.popen(cmd_function)
-        os.popen(cmd_count)
-        os.popen(cmd_trigger)
+        elif(driver == "ath10k"):
+           cmd_background = "echo background > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
+           cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
+
+           os.popen(cmd_background)
+           os.popen(cmd_trigger)
+
 
     @staticmethod
     def execute_scan():
+        driver = os.popen('ls /sys/kernel/debug/ieee80211/phy* | grep ath').read().strip()        
 
-        cmd_scan = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
-        cmd_dump = "cat /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan0 > /tmp/data"
+        if (driver == "ath10k"):
+            do_scan_cmd = "iw dev wlp1s0 scan"
+            os.popen(do_scan_cmd)        
+
+        cmd_scan = f"echo trigger > /sys/kernel/debug/ieee80211/phy0/{driver}/spectral_scan_ctl"
+        cmd_dump = f"cat /sys/kernel/debug/ieee80211/phy0/{driver}/spectral_scan0 > /tmp/data"
 
         os.popen(cmd_scan)
         os.popen(cmd_dump)
@@ -168,8 +187,14 @@ class Spectral:
     def file_close(file_pointer):
         file_pointer.close()
 
+        
     @staticmethod
     def file_open(fn="data"):
-        return open(fn, 'rb')
-
-
+        file_exists = os.path.exists(fn)
+        
+        if(file_exists):
+            return open(fn, 'rb')
+        elif(file_exists == False):
+            os.system("touch " + fn)
+            return open(fn, 'rb')
+        
