@@ -14,7 +14,7 @@ class MeshPublisher(Node):
         super().__init__('mesh_publisher')
         self.publisher_ = self.create_publisher(String, 'mesh_visual',
                                                 QoSPresetProfiles.SYSTEM_DEFAULT.value)
-        timer_period = 10  # seconds
+        timer_period = 1  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
         self.PORT = 33221  # Port to listen on (non-privileged ports are > 1023)
