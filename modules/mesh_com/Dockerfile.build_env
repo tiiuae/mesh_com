@@ -1,5 +1,5 @@
 # fog-sw BUILDER
-ARG ROS_DISTRO="galactic"
+ARG ROS_DISTRO="humble"
 FROM ros:${ROS_DISTRO}-ros-base as fog-sw-builder
 
 ARG UID=1000
