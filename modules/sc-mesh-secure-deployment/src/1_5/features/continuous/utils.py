@@ -34,10 +34,11 @@ async def launchCA(sectable):
     return_dict = manager.dict()
     id_dict = manager.dict()
 
-    ip2_send = list(set(sectable['IP'].tolist() + mesh_utils.get_neighbors_ip()))
+    neighbor_ips = mesh_utils.get_neighbors_ip()
+    ip2_send = list(set(sectable['IP'].tolist() + neighbor_ips))
 
     #ip2_send = list(set(sectable['IP'].tolist() + list(neigh.keys())))
-    print('Checkpoint, neighbor IPs = ', mesh_utils.get_neighbors_ip())
+    print('Checkpoint, neighbor IPs = ', neighbor_ips)
     print('Checkpoint, ip2send = ', ip2_send)
     neigh = mesh_utils.get_arp()
     print('Checkpoint, IP_get_arp = ', list(neigh.keys()))

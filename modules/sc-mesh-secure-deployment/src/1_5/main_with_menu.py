@@ -33,7 +33,7 @@ def banner():
 AUTHSERVER = False
 mut = mutual.Mutual(MUTUALINT)
 myID = mut.myID
-sec_beat_time = 100  # Security beat period in seconds
+sec_beat_time = 120  # Security beat period in seconds
 
 def print_menu():
     banner()
@@ -82,7 +82,7 @@ def only_mesh():
         sleep(2)
         if mesh_utils.verify_mesh_status():  # verifying that mesh is running
             print("Mesh Running")
-            mesh_utils.get_neighbors_ip()
+            #mesh_utils.get_neighbors_ip()
             neigh = mesh_utils.get_arp()
             for ne in neigh:
                 info = {'ID': ne, 'MAC': neigh[ne], 'IP': ne,
@@ -148,7 +148,7 @@ def show_neighbors():
 def sbeat():
     #os.system('clear')
     original_time = time()
-    end_time = 1000 # Total time to run security beat in seconds
+    end_time = 1200 # Total time to run security beat in seconds
     #os.system('clear')
     print('\'SecBeat\'')
     print(f'Running SecBeat every {sec_beat_time} seconds, during {end_time} seconds')
@@ -200,18 +200,20 @@ def sbeat_client():
     threading.Thread(target=sbeat, daemon=True, args=()).start()
 
 def sbeat_server():
+    my_ip = mesh_utils.get_mesh_ip_address()
+    broadcast_ip = '.'.join(my_ip.split('.')[0:3]) + '.255' # bat0 broadcast ip
     sbeat_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)  # UDP
     sbeat_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sbeat_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sbeat_sock.setblocking(False)
     print("Broadcasting security beat")
-    sbeat_sock.sendto(bytes('SecBeat', "utf-8"),('10.10.10.255', 6007))  # mesh_utils.get_mesh_ip_address() # bat0 broadcast ip
+    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), (broadcast_ip, 6007))  # mesh_utils.get_mesh_ip_address() # bat0 broadcast ip
     sleep(0.1)
-    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), ('10.10.10.255', 6007))
+    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), (broadcast_ip, 6007))
     sleep(0.1)
-    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), ('10.10.10.255', 6007))
+    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), (broadcast_ip, 6007))
     sleep(0.1)
-    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), ('10.10.10.255', 6007))
+    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), (broadcast_ip, 6007))
     sbeat_sock.close()
 
 def extable():
@@ -219,8 +221,8 @@ def extable():
     print('\'Exchange Security Table\'')
     table = 'auth/dev.csv'
     try:
-        mesh_utils.get_neighbors_ip()
         """
+        mesh_utils.get_neighbors_ip()
         try:
             sectable = pd.read_csv(table)
             sectable.drop_duplicates(inplace=True)
