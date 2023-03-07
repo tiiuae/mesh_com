@@ -131,7 +131,7 @@ def train(model, loaders, len_train_data):
             # series, targets = mixup_fn(series, targets) # Test accuracy multiclass: 0.9959919839679359, bin accuracy: 0.998997995991984
             # without mixup with crop and horizontal flip => Test accuracy multiclass: 0.998997995991984, bin accuracy: 1.0
 
-            plot_series(series, targets)
+            # plot_series(series, targets)
 
             # x_fft = torch.abs(torch.fft.rfft(series))
 
@@ -183,7 +183,7 @@ def train(model, loaders, len_train_data):
 
             # Test with best model so far on the validation dataset
             if best_test_bin_acc < 1.0:
-                acc_test, bin_acc_test = test_classification(model, loaders)
+                acc_test, bin_acc_test = test(model, loaders)
                 if bin_acc_test > best_test_bin_acc:
                     best_test_bin_acc = bin_acc_test
                     torch.save(model.state_dict(), 'best_bin.pth')
@@ -193,7 +193,7 @@ def train(model, loaders, len_train_data):
 
             # Test with best model so far on the validation dataset
             if best_test_acc < 1.0:
-                if acc_test is None: acc_test, bin_acc_test = test_classification(model, loaders)
+                if acc_test is None: acc_test, bin_acc_test = test(model, loaders)
                 if bin_acc_test > best_test_bin_acc:
                     best_test_bin_acc = bin_acc_test
                     torch.save(model.state_dict(), 'best_bin.pth')
@@ -202,7 +202,7 @@ def train(model, loaders, len_train_data):
                     torch.save(model.state_dict(), 'best.pth')
         elif acc * 1.005 > best_acc:
             if best_test_acc < 1.0:
-                if acc_test is None: acc_test, bin_acc_test = test_classification(model, loaders)
+                if acc_test is None: acc_test, bin_acc_test = test(model, loaders)
                 if bin_acc_test > best_test_bin_acc:
                     best_test_bin_acc = bin_acc_test
                     torch.save(model.state_dict(), 'best_bin.pth')
@@ -239,14 +239,14 @@ def main():
     util.model_summary(model)
 
     # Train
-    train_classification(model, loaders, len_train_data)
+    train(model, loaders, len_train_data)
 
     # Test
-    test_classification(model, loaders, load_best=True)
+    test(model, loaders, load_best=True)
 
     plot_confusion_matrix(model, loaders, label_encoder)
 
 
 if __name__ == '__main__':
-    main_classification()
+    main()
     # main()

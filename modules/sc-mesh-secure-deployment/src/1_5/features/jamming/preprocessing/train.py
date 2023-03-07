@@ -47,7 +47,7 @@ def train_svm(train_features, train_labels, binary=True):
         # 'degree': [2, 3, 4, 5, 6]
     }
     rs_model = RandomizedSearchCV(
-        classifier, param_distributions=parameters, n_iter=50, cv=3, scoring=scoring, n_jobs=5, verbose=0
+        classifier, param_distributions=parameters, n_iter=10, cv=3, scoring=scoring, n_jobs=5, verbose=2
     )
     rs_model.fit(train_features, train_labels)
     best_estimator = rs_model.best_estimator_

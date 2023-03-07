@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 from torch.utils.data import WeightedRandomSampler
+from scipy.signal import butter, filtfilt
 
 import sys
 
@@ -75,7 +76,7 @@ def feature_engineer(df, eps=sys.float_info.epsilon):
     df['cnr'] = df['rssi'] - df['noise']
 
     # Phase noise (PN)
-    df['pn'] = 10 * np.log10(1e-10 + df['max_magnitude'] ** 2 / (2 * df['freq1'] * df['snr'] + eps))
+    df['pn'] = 10 * np.log10(np.maximum(df['max_magnitude'] ** 2 / (2 * df['freq1'] * df['snr'] + eps), eps))
 
     # Signal strength indicator (SSI)
     df['ssi'] = df['rssi'] - df['relpwr_db']
@@ -125,7 +126,7 @@ def generate_data_imputation(df, amount=2000, label='simulated', plot=False):
     normal5 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) > 3000) & (~df['label'].str.contains('inter_high'))]
     jamming5 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) > 3000) & (~df['label'].str.contains('_0dBm'))]
 
-    # ignore jam 5 60cm 0dbm
+    # Ignore jam 5 60cm 0dbm
     for i in range(amount):
         r = np.random.rand()
         normal = normal2 if r < 0.5 else normal5
@@ -164,6 +165,33 @@ def generate_data_imputation(df, amount=2000, label='simulated', plot=False):
     return df
 
 
+def apply_filter(df):
+    series = df['series_id'].unique()
+    for serie in series:
+        serie_df = df[df['series_id'] == serie].copy()
+        for col in serie_df.columns:
+            if col in ['max_magnitude', 'total_gain_db', 'base_pwr_db', 'rssi', 'relpwr_db', 'avgpwr_db']:
+                # Define the sampling frequency and cutoff frequency for the filter
+                fs = 100  # Sampling frequency (Hz)
+                fc = 10  # Cutoff frequency (Hz)
+
+                # Define the order of the filter
+                order = 3
+
+                # Define the coefficients of the low-pass filter using a Butterworth filter
+                nyq = 0.5 * fs
+                cutoff = fc / nyq
+                b, a = butter(order, cutoff, btype='low', analog=False)
+
+                # Apply the low-pass filter to the time series data
+                filtered_data = filtfilt(b, a, serie_df[col].to_numpy())
+                serie_df[col] = filtered_data
+
+        df[df['series_id'] == serie] = serie_df
+
+    return df
+
+
 def load_data(plot=False):
     if not os.path.exists('../data/preprocessed/enhanced.csv'):
         # Load data and compute number of series within it
@@ -175,13 +203,14 @@ def load_data(plot=False):
 
     # Load enhanced data with simulated data
     df = pd.read_csv('../data/preprocessed/enhanced.csv')
+    # df = apply_filter(df)
 
     # Expand amount of features by engineering some
     df = feature_engineer(df)
 
     # Reorder columns
-    reorder_cols = ['series_id', 'freq1', 'max_magnitude', 'total_gain_db', 'base_pwr_db', 'rssi', 'relpwr_db', 'avgpwr_db', 'snr', 'cnr', 'pn', 'ssi', 'pd', 'sinr', 'sir',
-                    'mr', 'pr', 'bin_label', 'label']
+    reorder_cols = ['series_id', 'freq1', 'max_magnitude', 'total_gain_db', 'base_pwr_db', 'rssi', 'relpwr_db', 'avgpwr_db',
+                    'snr', 'cnr', 'pn', 'ssi', 'pd', 'sinr', 'sir', 'mr', 'pr', 'bin_label', 'label']
     df = df[reorder_cols]
 
     # Encode labels

@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from scipy.signal import savgol_filter
 import plotly.express as px
 import matplotlib.pyplot as plt
+from scipy.signal import butter, filtfilt
 
 from util import SEED, NUM_MEASUREMENT, ORDERED_COLS, CHANNELS
 
@@ -36,8 +37,24 @@ def resize_to_length(df: pd.DataFrame, filter=False):
     for col in df.columns:
         if col not in ['freq1', 'freq2', 'tsf']:
             if filter:
-                filtered = savgol_filter(df[col].to_numpy(), 5, 2)
-                df_down[col] = tsaug.Resize(size=NUM_MEASUREMENT).augment(filtered)
+                # filtered = savgol_filter(df[col].to_numpy(), 10, 3)
+
+                # # Define the sampling frequency and cutoff frequency for the filter
+                fs = 100  # Sampling frequency (Hz)
+                fc = 10  # Cutoff frequency (Hz)
+
+                # Define the order of the filter
+                order = 3
+
+                # Define the coefficients of the low-pass filter using a Butterworth filter
+                nyq = 0.5 * fs
+                cutoff = fc / nyq
+                b, a = butter(order, cutoff, btype='low', analog=False)
+
+                # Apply the low-pass filter to the time series data
+                filtered_data = filtfilt(b, a, df[col].to_numpy())
+
+                df_down[col] = tsaug.Resize(size=NUM_MEASUREMENT).augment(filtered_data)
             else:
                 df_down[col] = tsaug.Resize(size=NUM_MEASUREMENT).augment(df[col].to_numpy())
 
