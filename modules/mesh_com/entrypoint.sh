@@ -38,6 +38,12 @@ trap _term TERM
 if [ "$1" == "init" ]; then
     echo "Start mesh executor"
 
+    # Enable IPv6. Required to run Alfred.
+    sysctl -w net.ipv6.conf.all.disable_ipv6=0
+    sysctl -w net.ipv6.conf.default.disable_ipv6=0
+    # Start executor. Required to publish ROS2 topic.
+    /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
+
     if [ "$DRONE_TYPE" == "recon" ]; then
         # 192.168.240.1-192.168.246.254
         DEFAULT_MESH_IP="192.168.$[ $RANDOM % 7 + 240 ].$[ $RANDOM % 254 + 1 ]"
@@ -107,7 +113,6 @@ if [ "$1" == "init" ]; then
 
     #starting Default mesh
     # /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-    # /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
     # gateway_ip=$(python3 /usr/bin/default_mesh_router_select.py)
     # route add default gw $gateway_ip bat0
     # sleep 86400
