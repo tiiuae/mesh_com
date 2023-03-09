@@ -83,7 +83,7 @@ def _cpython_packaging(msg):
     return vehicleGPSMsg
 
 
-class RIDLocSubscriber(Node):
+class RIDLocSubscriber(Node, yaml_file: str):
     def __init__(self):
         super().__init__('rid_location_subscriber')
         # https://docs.ros.org/en/rolling/Concepts/About-Quality-of-Service-Settings.html
@@ -98,6 +98,12 @@ class RIDLocSubscriber(Node):
             'fmu/vehicle_gps_position/out',
             self.listener_callback,
             qos)  # use QoS
+
+        self.yaml_data = yaml_data
+        self.rid_type = None
+        self.rid_sampling_rate = None
+        self.rid_certfile = None
+        self.rid_keyfile = None
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, msg):
@@ -105,12 +111,27 @@ class RIDLocSubscriber(Node):
         gps_msg = struct.pack('>I', ctypes.sizeof(byte_data)) + byte_data
         # Add data tx method based on mode of transport(broadcast/network)
 
+    def init_rid_config(self):
+        with open(self.yaml_file, 'r') as f:
+            parsed_yaml = yaml.safe_load(f)
+
+            if "rid_type" in parsed_yaml:
+                self.rid_type = parsed_yaml["rid_type"]
+
+            if "rid_sampling_rate" in parsed_yaml:
+                self.rid_sampling_rate = parsed_yaml["rid_sampling_rate"]
+
+            if "rid_certfile" in parsed_yaml:
+                self.rid_certfile = parsed_yaml["rid_certfile"]
+
+            if "rid_keyfile" in parsed_yaml:
+                self.rid_keyfile = parsed_yaml["rid_keyfile"]
 
 def main(args=None):
     rclpy.init(args=args)
 
-    rid_loc_subscriber = RIDLocSubscriber()
-
+    rid_loc_subscriber = RIDLocSubscriber("rid.yaml")
+    rid_loc_subscriber.init_rid_config()
     rclpy.spin(rid_loc_subscriber)
 
     # Destroy the node explicitly

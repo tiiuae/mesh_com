@@ -1,0 +1,5 @@
+rid_transport: nats
+rid_sampling_rate: 1000
+rid_certfile: certfile.pem
+rid_keyfile: keyfile.pem
+
