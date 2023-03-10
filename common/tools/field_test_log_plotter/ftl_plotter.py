@@ -109,7 +109,7 @@ class FieldTestLogPlotter:
 
         # Replace non-existing RSSI and/or MCS values with some defaults
         self.df['rssi [MAC,dBm;MAC,dBm ...]'].replace(np.nan,
-                                                      '00:00:00:00:00:00,-115 [-119, -118, -117]',
+                                                      '00:00:00:00:00:00,-115 [-115, -115, -115]',
                                                       inplace=True)
         self.df['RX MCS [MAC,MCS;MAC,MCS ...]'].replace(np.nan,
                                                         '00:00:00:00:00:00,-1',
@@ -203,11 +203,23 @@ class FieldTestLogPlotter:
                     self.df[rssi_ant1_dbm] = None
                 if rssi_ant2_dbm not in self.df.columns:
                     self.df[rssi_ant2_dbm] = None
-                # Assign data using row index
+
+                # Assign data using row index. Log is assumed to contain at least RSSI
+                # sum value in index 1. Antenna specific values are treated as optional
+                # and in case they are missing then default value is filled to dataframe
                 self.df.loc[df_row_index, rssi_dbm] = pd.to_numeric(rssi_data[1])
-                self.df.loc[df_row_index, rssi_ant0_dbm] = pd.to_numeric(rssi_data[2])
-                self.df.loc[df_row_index, rssi_ant1_dbm] = pd.to_numeric(rssi_data[3])
-                self.df.loc[df_row_index, rssi_ant2_dbm] = pd.to_numeric(rssi_data[4])
+                if len(rssi_data) > 2:
+                    self.df.loc[df_row_index, rssi_ant0_dbm] = pd.to_numeric(rssi_data[2])
+                else:
+                    self.df.loc[df_row_index, rssi_ant0_dbm] = OUT_OF_SCALE_RSSI
+                if len(rssi_data) > 3:
+                    self.df.loc[df_row_index, rssi_ant1_dbm] = pd.to_numeric(rssi_data[3])
+                else:
+                    self.df.loc[df_row_index, rssi_ant1_dbm] = OUT_OF_SCALE_RSSI
+                if len(rssi_data) > 4:
+                    self.df.loc[df_row_index, rssi_ant2_dbm] = pd.to_numeric(rssi_data[4])
+                else:
+                    self.df.loc[df_row_index, rssi_ant2_dbm] = OUT_OF_SCALE_RSSI
 
         # Convert string/object type data to float
         for _mac in self.mac_list:
@@ -976,9 +988,13 @@ class FieldTestLogPlotter:
 
         subtitle = '_rssi_levels_per_time_' + _mac
         figure_title = self.filename.replace(self.__homedir, '') + subtitle
-        self.df.plot(ax=ax_rssi, x=x_axis, y=rssi_ant0_dbm)
-        self.df.plot(ax=ax_rssi, x=x_axis, y=rssi_ant1_dbm)
-        self.df.plot(ax=ax_rssi, x=x_axis, y=rssi_ant2_dbm)
+        # Include only those antennas to plot that has some real RSSI levels
+        if self.df[rssi_ant0_dbm].max() > OUT_OF_SCALE_RSSI:
+            self.df.plot(ax=ax_rssi, x=x_axis, y=rssi_ant0_dbm)
+        if self.df[rssi_ant1_dbm].max() > OUT_OF_SCALE_RSSI:
+            self.df.plot(ax=ax_rssi, x=x_axis, y=rssi_ant1_dbm)
+        if self.df[rssi_ant2_dbm].max() > OUT_OF_SCALE_RSSI:
+            self.df.plot(ax=ax_rssi, x=x_axis, y=rssi_ant2_dbm)
         self.df.plot(ax=ax_rssi, title=figure_title,
                      grid=True, x=x_axis, y=rssi_dbm,
                      xticks=(np.arange(min_time, max_time, x_interval)),
