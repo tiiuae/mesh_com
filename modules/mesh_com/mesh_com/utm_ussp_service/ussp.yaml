@@ -1,5 +1,7 @@
 rid_transport: nats
 rid_sampling_rate: 1000
-rid_certfile: certfile.pem
-rid_keyfile: keyfile.pem
+rid_server: 127.0.0.1
+rid_port: 33222
+rid_certfile:
+rid_keyfile:
 

@@ -3,11 +3,11 @@ import ctypes
 import struct
 
 class dri_broadcast():
-    def __init__(self):
+    def __init__(self, server, port):
         super().__init__('dri_broadcast')
 
-        self.HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
-        self.PORT = 33222  # Port to listen on (non-privileged ports are > 1023)
+        self.HOST = server  # Standard loopback interface address (localhost)
+        self.PORT = port  # Port to listen on (non-privileged ports are > 1023)
         self.dri_astm_msg_socket = socket.socket()  # to remove python warning
         self.setup_socket()
 

@@ -1,6 +1,7 @@
 import ctypes
 import struct
-
+import yaml
+import sys
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
@@ -9,7 +10,8 @@ from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSHistoryPolicy
 
 from px4_msgs.msg import VehicleGpsPosition
-
+from transport.rid_nats import ridNatsClient
+from transport.dri_broadcast import dri_broadcast
 
 # Message structure to hold vehicle GPS position data.
 # Reference: https://github.com/PX4/px4_msgs/blob/master/msg/VehicleGpsPosition.msg.
@@ -83,7 +85,7 @@ def _cpython_packaging(msg):
     return vehicleGPSMsg
 
 
-class RIDLocSubscriber(Node, yaml_file: str):
+class RIDLocSubscriber(Node):
     def __init__(self):
         super().__init__('rid_location_subscriber')
         # https://docs.ros.org/en/rolling/Concepts/About-Quality-of-Service-Settings.html
@@ -98,17 +100,28 @@ class RIDLocSubscriber(Node, yaml_file: str):
             'fmu/vehicle_gps_position/out',
             self.listener_callback,
             qos)  # use QoS
-
-        self.yaml_data = yaml_data
+        self.subscription  # prevent unused variable warning
+        self.backup_timer = 0
+        self.backup_data = ""
+        self.yaml_file = "ussp.yaml"
         self.rid_type = None
         self.rid_sampling_rate = None
         self.rid_certfile = None
         self.rid_keyfile = None
-        self.subscription  # prevent unused variable warning
 
     def listener_callback(self, msg):
-        byte_data = _cpython_packaging(msg)
-        gps_msg = struct.pack('>I', ctypes.sizeof(byte_data)) + byte_data
+        if "rid_type" == "broadcast":
+            try:
+                byte_data = _cpython_packaging(msg)
+                gps_msg = struct.pack('>I', ctypes.sizeof(byte_data)) + byte_data
+                client.dri_loc_socket.sendall(gps_msg)
+            except (ConnectionRefusedError, socket.timeout, ConnectionResetError, ConnectionRefusedError):
+                self.client.setup_socket()
+        elif "rid_type" == "nats":
+            self.client.loop.run_until_complete(self.client.publish("my_topic", data))
+        else:
+            print("rid transport not supported")
+
         # Add data tx method based on mode of transport(broadcast/network)
 
     def init_rid_config(self):
@@ -127,10 +140,26 @@ class RIDLocSubscriber(Node, yaml_file: str):
             if "rid_keyfile" in parsed_yaml:
                 self.rid_keyfile = parsed_yaml["rid_keyfile"]
 
+            if "rid_server" in parsed_yaml:
+                self.rid_server = parsed_yaml["rid_server"]
+
+            if "rid_port" in parsed_yaml:
+                self.rid_port = parsed_yaml["rid_port"]
+
+    def init_rid_config(self):
+        if "rid_type" == "broadcast":
+            self.client = dri_broadcast(server=self.rid_server, port=self.rid_port)
+        elif "rid_type" == "nats":
+            self.client = ridNatsClient(server=self.rid_server, port=self.rid_port, certfile=self.rid_certfile, keyfile=self.rid_keyfile)
+            # Connect to NATS server
+            self.client.loop.run_until_complete(client.connect())
+        else:
+            print("rid transport not supported")
+
 def main(args=None):
     rclpy.init(args=args)
 
-    rid_loc_subscriber = RIDLocSubscriber("rid.yaml")
+    rid_loc_subscriber = RIDLocSubscriber()
     rid_loc_subscriber.init_rid_config()
     rclpy.spin(rid_loc_subscriber)
 
@@ -140,6 +169,9 @@ def main(args=None):
     rid_loc_subscriber.destroy_node()
     rclpy.shutdown()
 
+    if "rid_type" == "nats":
+        # Close connection to NATS server
+        self.client.loop.run_until_complete(self.client.close())
 
 if __name__ == '__main__':
     main()
