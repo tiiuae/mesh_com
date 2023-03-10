@@ -12,6 +12,8 @@ from scipy.signal import butter, filtfilt
 
 from util import SEED, NUM_MEASUREMENT, ORDERED_COLS, CHANNELS
 
+folders = ['floor', 'inter_mid', 'inter_high', 'jamming', 'crypto']
+
 
 def plot_timeserie(original: np.ndarray, filtered: np.ndarray, resized: np.ndarray):
     colors = px.colors.qualitative.G10
@@ -81,7 +83,7 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
         os.mkdir(storing_folder)
 
     # Loop through noise floor and normal files and extract features
-    for folder in ['floor', 'inter_mid', 'inter_high']:
+    for folder in folders:
         all_series = None
         for file_name in glob.glob(f'{dataset_path}/{folder}/*.csv'):
             print(file_name)
@@ -171,7 +173,7 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
 
 def store_all_data(storing_folder='preprocessed'):
     all_data = None
-    for file_name in ['floor', 'inter_mid', 'inter_high', 'jamming']:
+    for file_name in folders:
         print(f'Loading {storing_folder}/{file_name}.csv')
         df = pd.read_csv(f'{storing_folder}/{file_name}.csv')
         all_data = df if all_data is None else pd.concat([all_data, df])
@@ -185,7 +187,7 @@ def split_data(storing_folder='preprocessed'):
 
     # Split data into train and test
     dataset = None
-    for file_name in ['floor', 'inter_mid', 'inter_high', 'jamming']:
+    for file_name in folders:
         print(f'Loading {storing_folder}/{file_name}.csv')
         df = pd.read_csv(f'{storing_folder}/{file_name}.csv')
         dataset = df if dataset is None else pd.concat([dataset, df])
@@ -204,7 +206,7 @@ def split_data(storing_folder='preprocessed'):
 
 def main():
     np.random.seed(0)
-    preprocess_raw_files()
+    # preprocess_raw_files()
     store_all_data()
     split_data()
 

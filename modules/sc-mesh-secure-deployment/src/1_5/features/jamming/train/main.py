@@ -64,7 +64,7 @@ def test(model, loaders, load_best=False):
         correct += (preds == y_batch).sum().item()
 
         # Compute normal vs. all
-        bin_preds = torch.where(preds > 2, 1, 0)
+        bin_preds = torch.where(preds > 3, 1, 0)
         bin_correct += (bin_preds == y_bin_batch).sum().item()
 
         total += y_batch.size(0)
@@ -168,7 +168,7 @@ def train(model, loaders, len_train_data):
             correct += (preds == targets).sum().item()
 
             # Compute normal vs. all
-            bin_preds = torch.where(preds > 2, 1, 0)
+            bin_preds = torch.where(preds > 3, 1, 0)
             bin_correct += (bin_preds == y_bin_batch).sum().item()
 
             total += targets.size(0)
@@ -233,7 +233,7 @@ def main():
     # model = InceptionTimePlus(15, 21).to(device)  # Test accuracy multiclass: 0.9832775919732442, bin accuracy: 1.0
     # model = XCMPlus(15, 21, 128).to(device) # Test accuracy multiclass: 0.9765886287625418, bin accuracy: 0.9966
     # model = ResCNN(15, 21).to(device) # Test accuracy multiclass: 0.9866220735785953, bin accuracy: 1.0
-    model = ResCNN(15, 22, separable=True, dropout=0.0).to(device)  # Test accuracy multiclass: 0.991638795986, bin accuracy: 1.0
+    model = ResCNN(15, 23, separable=True, dropout=0.0).to(device)  # Test accuracy multiclass: 0.991638795986, bin accuracy: 1.0
     # model = TCN(15, 21).to(device) # problems
     # model = xresnet1d18(15, 21).to(device)  # Test accuracy multiclass: 0.9866220735785953, bin accuracy: 1.0
     util.model_summary(model)

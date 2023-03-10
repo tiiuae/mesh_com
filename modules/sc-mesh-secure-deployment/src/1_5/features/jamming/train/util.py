@@ -19,12 +19,11 @@ mpl.style.use('classic')
 
 SEED = 1
 BATCH_SIZE = 256
-EPOCHS = 3000
+EPOCHS = 50
 LR = 0.005
 NUM_MEASUREMENT = 128
 TRUNCATE2, TRUNCATE5 = 128, 512
-CHANNELS = [2412, 2417, 2422, 2427, 2432, 2437, 2442, 2447, 2452, 2457, 2462, 5180, 5200, 5220, 5240, 5260, 5280, 5300,
-            5320, 5745, 5765, 5785, 5805, 5825, 5845]
+CHANNELS = [2412, 2417, 2422, 2427, 2432, 2437, 2442, 2447, 2452, 2457, 2462, 5180, 5200, 5220, 5240, 5260, 5280, 5300, 5320, 5745, 5765, 5785, 5805, 5825, 5845]
 FEATURES = ['noise', 'max_magnitude', 'total_gain_db', 'base_pwr_db', 'rssi', 'relpwr_db', 'avgpwr_db']
 STAT_FEATURES = ['mean', 'std', 'min', '25%', '50%', '75%', 'max', 'mad']
 LABELS = {'floor': 0, 'inter_mid': 1, 'inter_high': 2, 'jamming': 3}
@@ -267,14 +266,17 @@ def scores_contour(net, c, test_samples, test_targets, auroc, dataset, add_point
     # plt.show()
 
 
-def plot_timeseries(series: np.ndarray, target: np.ndarray, label_encoder: sklearn.preprocessing.LabelEncoder, features,
-                    jam_frequency='2.4'):
+def plot_timeseries(series: np.ndarray, target: np.ndarray, label_encoder: sklearn.preprocessing.LabelEncoder, features, jam_frequency='2.4'):
     if jam_frequency == '2.4':
         str_labels = ['floor', 'inter_mid', 'inter_high', 'jam_2GHz_20cm_0dBm', 'jam_2GHz_40cm_0dBm',
-                      'jam_2GHz_60cm_0dBm', 'simulated']
+                      'jam_2GHz_60cm_0dBm', 'simulated', 'crypto']
     else:
         str_labels = ['floor', 'inter_mid', 'inter_high', 'jam_5GHz_20cm_0dBm', 'jam_5GHz_40cm_0dBm',
-                      'jam_5GHz_60cm_0dBm', 'simulated']
+                      'jam_5GHz_60cm_0dBm', 'simulated', 'crypto']
+
+    permuted_indices = np.random.permutation(series.shape[0])
+    series = series[permuted_indices]
+    target = target[permuted_indices]
 
     subseries = []
     for str_label in str_labels:
@@ -307,8 +309,7 @@ def plot_timeseries(series: np.ndarray, target: np.ndarray, label_encoder: sklea
     plt.savefig('plots/plot2.pdf', dpi=300)
 
 
-def plot_timeseries_augment(series: np.ndarray, target: np.ndarray, label_encoder: sklearn.preprocessing.LabelEncoder,
-                            jam_frequency='2.4'):
+def plot_timeseries_augment(series: np.ndarray, target: np.ndarray, label_encoder: sklearn.preprocessing.LabelEncoder, jam_frequency='2.4'):
     if jam_frequency == '2.4':
         str_labels = ['floor', 'inter_mid', 'inter_high', 'jam_2GHz_20cm_0dBm', 'jam_2GHz_40cm_0dBm',
                       'jam_2GHz_60cm_0dBm']

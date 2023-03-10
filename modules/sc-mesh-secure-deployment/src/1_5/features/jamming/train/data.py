@@ -118,13 +118,14 @@ def impute_series(serie_type_1: pd.DataFrame, serie_type_2: pd.DataFrame, bounds
     return new_serie
 
 
-def generate_data_imputation(df, amount=2000, label='simulated', plot=False):
+def generate_data_imputation(df, amount=2000, label='simulated', plot=True):
+    print('generate_data_imputation')
     num_series = df['series_id'].nunique()
 
-    normal2 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) < 3000) & (~df['label'].str.contains('inter_high'))]
-    jamming2 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) < 3000) & (~df['label'].str.contains('_0dBm'))]
-    normal5 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) > 3000) & (~df['label'].str.contains('inter_high'))]
-    jamming5 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) > 3000) & (~df['label'].str.contains('_0dBm'))]
+    normal2 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) < 3000) & (~df['label'].str.contains('crypto'))]  # inter_high
+    jamming2 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) < 3000) & (~df['label'].str.contains('_10dBm'))]  # _0dBm
+    normal5 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) > 3000) & (~df['label'].str.contains('crypto'))]  # inter_high
+    jamming5 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) > 3000) & (~df['label'].str.contains('_10dBm'))]  # 0_dBm
 
     # Ignore jam 5 60cm 0dbm
     for i in range(amount):
@@ -216,6 +217,7 @@ def load_data(plot=False):
     # Encode labels
     label_encoder = LabelEncoder()
     df['label'] = label_encoder.fit_transform(df['label'])
+    print(label_encoder.classes_)
 
     # simulated_label = label_encoder.transform(['simulated'])
     # num_classes = len(label_encoder.classes_)
@@ -315,14 +317,14 @@ def create_resampler(label_encoder, train_ds):
     return sampler
 
 
-def create_loaders(data, label_encoder, batch_size, jobs=0):
+def create_loaders(data, label_encoder, batch_size, jobs=2):
     train_ds, val_ds, test_ds = data
 
     sampler = create_resampler(label_encoder, train_ds)
     train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=jobs, drop_last=True)
     # train_dl = DataLoader(train_ds, batch_size=batch_size, num_workers=jobs, drop_last=True, sampler=sampler)
-    val_dl = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=jobs)
-    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=jobs)
+    val_dl = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0)
+    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=0)
     return train_dl, val_dl, test_dl
 
 
