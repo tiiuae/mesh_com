@@ -42,7 +42,7 @@ if [ "$1" == "init" ]; then
     sysctl -w net.ipv6.conf.all.disable_ipv6=0
     sysctl -w net.ipv6.conf.default.disable_ipv6=0
     # Start executor. Required to publish ROS2 topic.
-    /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
+    # /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
 
     if [ "$DRONE_TYPE" == "recon" ]; then
         # 192.168.240.1-192.168.246.254
