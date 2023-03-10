@@ -33,15 +33,18 @@ Control options:
     -i: Enable this in indoor environment, when GPS use is not possible.  Nodes are plotted to the
         circumference of the circle and timestamps are taken from system time instead of GSP time.
     -a: active path tracking between given MAC addresses (optional)
+    -t  rx/tx kbit/s values from each node.
 ```
 Create animated graph from all the logs in specified directory and add trace from moving node:
 ```
 $ python3 ftl_player.py -p ~/logs/mesh_test -m 11:22:33:44:55:66
 ```
-Indoor example:
+Indoor example with active path tracking:
 ```
 $ python3 ftl_player.py -p ~/logs/mesh_test -i -a 11:22:33:44:55:66,11:22:33:44:55:77
 ```
 Active keys in plotter view:
 
     spacebar    - pause/resume, zooming possible during pause
+    +           - skip next 30seconds in log file
+    -           - rewind 30seconds in log file
