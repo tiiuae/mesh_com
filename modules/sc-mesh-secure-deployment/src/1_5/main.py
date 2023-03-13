@@ -46,7 +46,7 @@ def only_ca(myID):
             print("End of Continuous Authentication")
         else:
             print("Empty Security Table")
-            exit()
+            sys.exit()
     except FileNotFoundError:
         print("SecTable not available. Need to be requested during provisioning")
 
@@ -124,15 +124,6 @@ def mutual_authentication():
     return mut.myID
 
 
-# def start_servers():
-#     process = []
-#     q = queue.Queue()
-#     ca_s = ca_utils.ca_server(mesh_utils.get_mesh_ip_address())  # port 9999
-#     process.append(ca_s)
-#     #ex_s = multiprocessing.Process(target=ut.exchange_server, args=(q,), daemon=True)  # port 5005
-#     #process.append(ex_s)
-#     return process
-
 MA_thread = None
 def readfile():
     with open("features.yaml", "r") as stream:
@@ -140,22 +131,23 @@ def readfile():
             return yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
+            return None
 
 
 def initialize(feature):
     global MA_thread
     if feature == 'mutual':
-            MA_thread = MA()
+        MA_thread = MA()
     if feature == 'continuous':
-            CA()
+        CA()
     if feature == 'NESS':
-            DE()
+        DE()
     if feature == 'secbeat':
-            sbeat_client()
+        sbeat_client()
     if feature == 'quarantine':
-            Quarantine()
+        Quarantine()
     if feature == 'only_mesh':
-            only_mesh()
+        only_mesh()
 
 if __name__ == "__main__":
     threadList = []

@@ -22,8 +22,7 @@ def get_macs_neighbors():
     proc = subprocess.run(['batctl', 'n'], capture_output=True)
     splitout = proc.stdout.decode().split('\n')
     if len(splitout) > 3:
-        for aux in splitout[2:-1]:
-            macs.append(aux.split('\t')[1].split(' ')[2])
+        macs.extend(aux.split('\t')[1].split(' ')[2] for aux in splitout[2:-1])
     return macs
 
 
@@ -51,11 +50,11 @@ def get_mesh_ip_address(ifname='bat0'):
     Another option can be to get the ip from the conf file, but in this case it will need to be loaded here.
     return str
     """
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    return socket.inet_ntoa(fcntl.ioctl(
-        s.fileno(),
-        0x8915,  # SIOCGIFADDR
-        struct.pack('256s', bytes(ifname[:15], 'utf-8')))[20:24])
+    with  socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        return socket.inet_ntoa(fcntl.ioctl(
+            s.fileno(),
+            0x8915,  # SIOCGIFADDR
+            struct.pack('256s', bytes(ifname[:15], 'utf-8')))[20:24])
 
 
 def get_mesh_interface(pattern):
@@ -75,7 +74,7 @@ def get_neighbors_ip():
     ips = []
     final = []
     my_ip = get_mesh_ip_address()
-    aux = my_ip.split('.')[0:3]
+    aux = my_ip.split('.')[:3]
     for i in range(1, 255):
         if str(i) != my_ip.split('.')[3]:
             ips.append('.'.join(aux) + '.' + str(i)) # All ips in the mesh subnet except my_ip

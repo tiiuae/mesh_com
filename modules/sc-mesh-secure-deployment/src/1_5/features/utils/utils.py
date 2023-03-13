@@ -1,3 +1,4 @@
+import contextlib
 import queue
 import socket
 import sys
@@ -87,11 +88,7 @@ def exchage_table(sectable, start_server_thread, logger=None, debug=True):
             print('Compute IPs to send for next exchange:')
             exchange_table = compute_ips_to_send(exchange_table, neigh)
             print(exchange_table[['ID', 'CA_Server', 'Destination_IP', 'To_Send']])
-        if (exchange_table['To_Send'] == '').all():
-            # If 'To_Send' is empty for all rows of the table for given ip, set its send_flag to 0
-            send_flag = 0
-        else:
-            send_flag = 1
+        send_flag = 0 if (exchange_table['To_Send'] == '').all() else 1
         #print('send_flag: ', send_flag)
         count += 1
 
@@ -113,42 +110,37 @@ def exchage_table(sectable, start_server_thread, logger=None, debug=True):
 def exchange_server(debug=False):
     table = 'auth/dev.csv'
     sectable = pd.read_csv((table))
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        sock.bind(("0.0.0.0", 5005))
-        sock.listen()
-    except OSError:
-        pass
-    while 1:
-        try:
-            data, addr = sock.recvfrom(4096)
-            print("Message received from " + addr[0])
-            if debug:
-                print(data, addr)
-                print("Received: " + data.decode() + " from " + addr[0])
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        with contextlib.suppress(OSError):
+            sock.bind(("0.0.0.0", 5005))
+            sock.listen()
+        while 1:
             try:
-                new = pd.read_json(data.decode())
-                received_table_q.put(new)
-                print('Received_table_q size: ', received_table_q.qsize())
-                print('Received_table_q items: ')
-                print(received_table_q.queue)
-            except ValueError:
-                pass
-        except socket.timeout:
-            print('Socket timeout')
-            break # If timeout, break while loop
-        sock.settimeout(20)  # Setting timeout to exit infinite loop if nothing is received for 15 seconds
+                data, addr = sock.recvfrom(4096)
+                print("Message received from " + addr[0])
+                if debug:
+                    print(data, addr)
+                    print("Received: " + data.decode() + " from " + addr[0])
+                with contextlib.suppress(ValueError):
+                    new = pd.read_json(data.decode())
+                    received_table_q.put(new)
+                    print('Received_table_q size: ', received_table_q.qsize())
+                    print('Received_table_q items: ')
+                    print(received_table_q.queue)
+            except socket.timeout:
+                print('Socket timeout')
+                break # If timeout, break while loop
+            sock.settimeout(20)  # Setting timeout to exit infinite loop if nothing is received for 15 seconds
 
 def exchange_client(IP, message, debug=False):
     print('Checkpoint inside exchange_client')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)  # UDP
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.setblocking(False)
         # while num_message:
         if debug:
-            print("Sending: " + str(message) + " to " + IP)
+            print(f"Sending: {str(message)} to " + IP)
         sock.sendto(bytes(message, "utf-8"), (IP, 5005))
         # num_message -= 1
     # sleep(1)

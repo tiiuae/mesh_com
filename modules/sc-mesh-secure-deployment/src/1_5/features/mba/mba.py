@@ -17,11 +17,11 @@ class MBA:
 
     def client(self, q, debug=False, logger=None):
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            sock.bind(("0.0.0.0", 6006))
-            if logger:
-                logger.info("Client socket created")
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                sock.bind(("0.0.0.0", 6006))
+                if logger:
+                    logger.info("Client socket created")
         except socket.error:
             print("Client socket creation failed")
             if logger:
@@ -37,12 +37,12 @@ class MBA:
     def server(self, message, debug=False, logger=None):
         num_message = 5
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)  # UDP
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            sock.setblocking(False)
-            if logger:
-                logger.info("Server socket created")
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock: # UDP
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                sock.setblocking(False)
+                if logger:
+                    logger.info("Server socket created")
         except socket.error:
             print("Server socket creation failed")
             if logger:

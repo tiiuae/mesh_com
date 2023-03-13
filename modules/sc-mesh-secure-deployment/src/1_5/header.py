@@ -1,6 +1,4 @@
-from features.mutual import mutual
 import os
-from time import time, sleep
 from features.mutual.utils import primitives as pri
 from features.mutual.utils import wifi_ssrc as wf
 import sys
@@ -39,3 +37,6 @@ MESHINT = 'bat0'
 client_q = {}
 ness = ness_main.NESS()
 qua = quarantine.Quarantine()
+
+SEC_BEAT_TIME = 120  # Security beat period in seconds
+END_TIME_SEC_BEAT = 1200  # Total time to run security beat in seconds
