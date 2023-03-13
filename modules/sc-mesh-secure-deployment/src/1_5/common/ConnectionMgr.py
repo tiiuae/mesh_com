@@ -11,6 +11,7 @@ import random
 import string
 from threading import Thread
 import pathlib
+import sys
 
 from .utils import Utils
 
@@ -22,8 +23,12 @@ src_path = str(script_path).split('common')[0].split('1_5')[0]
 
 class ConnectionMgr:
     def __init__(self):
-        self.config_11s_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), src_path + "/bash/conf-11s-mesh.sh")
-        self.config_mesh_path = osh.path.join(getenv("MESH_COM_ROOT", ""), src_path + "bash/conf-mesh.sh")
+        self.config_11s_mesh_path = osh.path.join(
+            getenv("MESH_COM_ROOT", ""), f"{src_path}/bash/conf-11s-mesh.sh"
+        )
+        self.config_mesh_path = osh.path.join(
+            getenv("MESH_COM_ROOT", ""), f"{src_path}bash/conf-mesh.sh"
+        )
         self.mesh_ip = None
         self.mesh_if = None
         self.mesh_mac = None
@@ -65,42 +70,41 @@ class ConnectionMgr:
             print(confs)
         except (IOError, yaml.YAMLError) as error:
             print(error)
-            exit()
+            sys.exit()
         config = confs['secos']
-        if config['key'] != '':
-            if confc['mesh_service']:
-                mesh_vif = self.util.get_interface_by_pattern(confc['mesh_inf'])
-                cmd = f"iw dev {mesh_vif}" + " info | awk '/wiphy/ {printf \"phy\" $2}'"
-                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)  # check how to transform it Shell=False
-                phy_name = proc.communicate()[0].decode('utf-8').strip()
-            mesh_ip = config['ip']
-            mesh_mac = self.util.get_mac_by_interface(mesh_vif)
-            # Create mesh service config
-            Path("/opt/mesh_com").mkdir(parents=True, exist_ok=True)
-            with open('/opt/mesh.conf', 'w', encoding='UTF-8') as mesh_config:
-                mesh_config.write('MODE=mesh\n')
-                mesh_config.write(f'IP={mesh_ip}' + '\n')
-                mesh_config.write('MASK=255.255.255.0\n')
-                mesh_config.write('MAC=' + config['ap_mac'] + '\n')
-                mesh_config.write('KEY=' + config['key'] + '\n')
-                mesh_config.write('ESSID=' + config['ssid'] + '\n')
-                mesh_config.write('FREQ=' + str(config['frequency']) + '\n')
-                mesh_config.write('TXPOWER=' + str(config['tx_power']) + '\n')
-                mesh_config.write('COUNTRY=fi\n')
-                mesh_config.write(f'MESH_VIF={mesh_vif}' + '\n')
-                mesh_config.write(f'PHY={phy_name}' + '\n')
-            if confc['gw_service']:
-                self.gw = True
-            if config['type'] == '11s':
-                self.mesh_mode = "11s"
-            if config['type'] == 'ibss':
-                self.mesh_mode = "ibss"
-            self.mesh_if = self.util.get_interface_by_pattern(confc['mesh_inf'])
-            self.mesh_ip = mesh_ip
-            self.mesh_mac = mesh_mac
-            return self.mesh_ip, self.mesh_mac
-        else:
+        if config['key'] == '':
             return TypeError
+        if confc['mesh_service']:
+            mesh_vif = self.util.get_interface_by_pattern(confc['mesh_inf'])
+            cmd = f"iw dev {mesh_vif}" + " info | awk '/wiphy/ {printf \"phy\" $2}'"
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)  # check how to transform it Shell=False
+            phy_name = proc.communicate()[0].decode('utf-8').strip()
+        mesh_ip = config['ip']
+        mesh_mac = self.util.get_mac_by_interface(mesh_vif)
+        # Create mesh service config
+        Path("/opt/mesh_com").mkdir(parents=True, exist_ok=True)
+        with open('/opt/mesh.conf', 'w', encoding='UTF-8') as mesh_config:
+            mesh_config.write('MODE=mesh\n')
+            mesh_config.write(f'IP={mesh_ip}' + '\n')
+            mesh_config.write('MASK=255.255.255.0\n')
+            mesh_config.write('MAC=' + config['ap_mac'] + '\n')
+            mesh_config.write('KEY=' + config['key'] + '\n')
+            mesh_config.write('ESSID=' + config['ssid'] + '\n')
+            mesh_config.write('FREQ=' + str(config['frequency']) + '\n')
+            mesh_config.write('TXPOWER=' + str(config['tx_power']) + '\n')
+            mesh_config.write('COUNTRY=fi\n')
+            mesh_config.write(f'MESH_VIF={mesh_vif}' + '\n')
+            mesh_config.write(f'PHY={phy_name}' + '\n')
+        if confc['gw_service']:
+            self.gw = True
+        if config['type'] == '11s':
+            self.mesh_mode = "11s"
+        if config['type'] == 'ibss':
+            self.mesh_mode = "ibss"
+        self.mesh_if = self.util.get_interface_by_pattern(confc['mesh_inf'])
+        self.mesh_ip = mesh_ip
+        self.mesh_mac = mesh_mac
+        return self.mesh_ip, self.mesh_mac
 
     @staticmethod
     def set_provisioned_state(config):
@@ -112,9 +116,9 @@ class ConnectionMgr:
     def create_dhcpd_conf(self, start, end):
         config_lines = [
             '\n',
-            '\tstart="{}"'.format(start),
-            '\tend="{}"'.format(end),
-            '\tinterface="{}"'.format(self.auth_ap_if),
+            f'\tstart="{start}"',
+            f'\tend="{end}"',
+            f'\tinterface="{self.auth_ap_if}"',
             '\toption subnet 255.255.255.0',
             '\toption domain local',
         ]
@@ -138,12 +142,12 @@ class ConnectionMgr:
         config_lines = [
             '\n',
             'network={',
-            '\tinterface="{}"'.format(self.auth_ap_if),
-            '\tssid="{}"'.format(ssid),
-            '\tpsk="{}"'.format(psk),
+            f'\tinterface="{self.auth_ap_if}"',
+            f'\tssid="{ssid}"',
+            f'\tpsk="{psk}"',
             '\tkey_mgmt=WPA-PSK',
             '\tmode=2',
-            '}'
+            '}',
         ]
 
         config = '\n'.join(config_lines)
@@ -160,13 +164,7 @@ class ConnectionMgr:
 
     @staticmethod
     def create_sta_conf(ssid, psk):
-        config_lines = [
-            '\n',
-            'network={',
-            '\tssid="{}"'.format(ssid),
-            '\tpsk="{}"'.format(psk),
-            '}'
-        ]
+        config_lines = ['\n', 'network={', f'\tssid="{ssid}"', f'\tpsk="{psk}"', '}']
 
         config = '\n'.join(config_lines)
         print(config)
@@ -176,12 +174,12 @@ class ConnectionMgr:
 
     @staticmethod
     def get_ip_address(ifname):
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        return socket.inet_ntoa(fcntl.ioctl(
-            s.fileno(),
-            0x8915,  # SIOCGIFADDR
-            struct.pack('256s', ifname[:15].encode())
-        )[20:24])
+        with  socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            return socket.inet_ntoa(fcntl.ioctl(
+                s.fileno(),
+                0x8915,  # SIOCGIFADDR
+                struct.pack('256s', ifname[:15].encode())
+            )[20:24])
 
     def get_password(self):
         yaml_conf = self.util.read_yaml()

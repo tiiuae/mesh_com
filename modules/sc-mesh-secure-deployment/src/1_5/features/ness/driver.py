@@ -140,31 +140,30 @@ plt.show(block=False)
 #
 # Marshalling to prepare dashboard and Decision Function call if table valid
 #
-if sec_table_valid == 1:
-    print("Running Decision on all nodes as the Sec Table is valid")
-    print("Nodes status table: ", init_latest_status_list)
-    print("Known good Servers table: ", init_good_server_status_list)
-    print("All Servers table: ", init_servers_table)
-    print("All Flags table: ", init_flags_table)
-    for i in range(n):
-        #
-        # Marshalling layer:
-        # index of node to check
-        #
-        i_list = [i]
-        #
-        # Preparing tuples for the query into Pyke engine
-        #
-        latest_status_list = tuple(init_latest_status_list)
-        good_server_status_list = tuple(init_good_server_status_list)
-        # flags_list = tuple(init_flags_table[i])
-        # servers_list = tuple(init_servers_table[i])
-        flags_list = tuple(init_flags_table)
-        servers_list = tuple(init_servers_table)
-        nt = tuple(n_list)
-        it = tuple(i_list)
+print("Running Decision on all nodes as the Sec Table is valid")
+print("Nodes status table: ", init_latest_status_list)
+print("Known good Servers table: ", init_good_server_status_list)
+print("All Servers table: ", init_servers_table)
+print("All Flags table: ", init_flags_table)
+for i in range(n):
+    #
+    # Marshalling layer:
+    # index of node to check
+    #
+    i_list = [i]
+    #
+    # Preparing tuples for the query into Pyke engine
+    #
+    latest_status_list = tuple(init_latest_status_list)
+    good_server_status_list = tuple(init_good_server_status_list)
+    # flags_list = tuple(init_flags_table[i])
+    # servers_list = tuple(init_servers_table[i])
+    flags_list = tuple(init_flags_table)
+    servers_list = tuple(init_servers_table)
+    nt = tuple(n_list)
+    it = tuple(i_list)
 
-        act_code = run_decision(latest_status_list, good_server_status_list, flags_list, servers_list, nt, it)
-        print("\nAction Code issued is ", act_code)
+    act_code = run_decision(latest_status_list, good_server_status_list, flags_list, servers_list, nt, it)
+    print("\nAction Code issued is ", act_code)
 
 plt.show()

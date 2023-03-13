@@ -160,6 +160,14 @@ provisioning()
   fi
 }
 
+clean_up()
+{
+  cd SC_MESH_FOLDER
+  if [ -d "auth/*" ]
+  then
+    rm *.der; rm -r auth/; rm -r pubKeys/
+  fi
+}
 
 create_ap_config()
 {
@@ -228,6 +236,7 @@ br_lan_ip="192.168.1."$((16#$ip_random))
 
 
 if [ "$MESH_VERSION" == "1.5" ]; then
+  clean_up
   install_packages
   # Generate a random IP address for the mesh network
   ip_random="$(openssl rand -hex 1)"
@@ -426,7 +435,7 @@ else
   ifconfig br-lan up
   echo
   ifconfig br-lan
-  # Add forwading rules from AP to bat0 interface
+  # Add forwarding rules from AP to bat0 interface
   iptables -P FORWARD ACCEPT
   route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
   route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan

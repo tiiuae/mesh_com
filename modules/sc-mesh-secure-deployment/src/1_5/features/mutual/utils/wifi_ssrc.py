@@ -22,7 +22,7 @@ def scan_wifi(interface):
     aps = Cell.all(interface)
     max = 0
     for ap in list(aps):
-        if ap.ssid != None and 'AuthAP' in ap.ssid:
+        if ap.ssid is not None and 'AuthAP' in ap.ssid:
             qua = float(ap.quality.split('/')[0]) / float(ap.quality.split('/')[1])
             if qua > max:
                 possible = ap.ssid

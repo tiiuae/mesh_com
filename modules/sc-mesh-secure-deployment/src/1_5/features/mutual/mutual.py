@@ -42,16 +42,31 @@ root_cert = "/etc/ssl/certs/root_cert.der"
 local_cert = "/etc/ssl/certs/mesh_cert.der"
 
 try:
-    open(local_cert, 'rb')
+    with open(local_cert, 'rb') as file:
+        local_cert_data = file.read()
 except FileNotFoundError:
     print("Local certificate not found. Run generate_keys.sh")
-    exit()
+    sys.exit()
 try:
-    open(root_cert, 'rb')
+    with open(root_cert, 'rb') as file:
+        root_cert_data = file.read()
 except FileNotFoundError:
     print("Root certificate not found. Need to get it from provisioning")
-    exit()
+    sys.exit()
 
+
+
+def create_table():
+    '''
+    Function to create table of authenticated devices
+    '''
+    columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'MA_level']
+    if not path.isfile('auth/dev.csv'):
+        table = pd.DataFrame(columns=columns)
+        table.to_csv('auth/dev.csv', header=columns, index=False)
+    else:
+        table = pd.read_csv('auth/dev.csv')
+    return table
 
 class Mutual:
     """
@@ -74,21 +89,9 @@ class Mutual:
         print("loading root_cert")
         pri.import_cert(root_cert, 'root')
         print("my ID: ", self.myID)
-        self.table = self.create_table()
+        self.table = create_table()
         #self.salt = os.urandom(16)
 
-
-    def create_table(self):
-        '''
-        Function to create table of authenticated devices
-        '''
-        columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'MA_level']
-        if not path.isfile('auth/dev.csv'):
-            table = pd.DataFrame(columns=columns)
-            table.to_csv('auth/dev.csv', header=columns, index=False)
-        else:
-            table = pd.read_csv('auth/dev.csv')
-        return table
 
     def update_table(self, info):
         '''
@@ -131,12 +134,14 @@ class Mutual:
         Function to create an structure for the message, it is created a dictionary.
         The output is a json of a dictionary with the HMAC of the structure
         '''
+        with open(self.local_cert, 'rb') as file:
+            client_cert_data = file.read()
         msg_to_mac_dict = {
-        "root_sig": base64.b64encode(self.signature()).decode(),
-        "client_cert":base64.b64encode(open(self.local_cert,'rb').read()).decode(),
-        "id": self.myID,
-        "u": random.randint(1,9999999999),
-        "time_flag": time.time()
+            "root_sig": base64.b64encode(self.signature()).decode(),
+            "client_cert": base64.b64encode(client_cert_data).decode(),
+            "id": self.myID,
+            "u": random.randint(1, 9999999999),
+            "time_flag": time.time()
         }
         # convert dict to json
         msg_to_mac = json.dumps(msg_to_mac_dict)
@@ -154,7 +159,9 @@ class Mutual:
         '''
         function to exchange info as a client
         '''
-        message = self.message_generator(open(root_cert, 'rb').read())
+        with open(root_cert, 'rb') as file:
+            root_cert_data = file.read()
+        message = self.message_generator(root_cert_data.read())
         try:
             fs.client_auth(candidate, serverIP, json.dumps(message).encode(), self.interface)
             if logger:
@@ -206,11 +213,12 @@ class Mutual:
                 iw = subprocess.run(command, shell=False, capture_output=True, text=True)
                 logger.debug("iw output:\n%s", iw.stdout)
         except Exception as e:
-            print("AP creation failed with exception ", e)
-            traceback.print_exc()
-            if logger:
-                logger.error("AP creation failed with exception %s", e)
-            sys.exit()
+            self.server_exception(
+                "AP creation failed with exception ",
+                e,
+                logger,
+                "AP creation failed with exception %s",
+            )
         time.sleep(2)
         print('1) server default')
         try:
@@ -218,12 +226,21 @@ class Mutual:
             if logger:
                 logger.info("Server socket created")
         except Exception as e:
-            print("Server socket creation failed with exception ", e)
-            traceback.print_exc()
-            if logger:
-                logger.error("Server socket creation failed with exception %s", e)
-            sys.exit()
+            self.server_exception(
+                "Server socket creation failed with exception ",
+                e,
+                logger,
+                "Server socket creation failed with exception %s",
+            )
         return client_cert, addr
+
+    @staticmethod
+    def server_exception(arg0, e, logger, arg3):
+        print(arg0, e)
+        traceback.print_exc()
+        if logger:
+            logger.error(arg3, e)
+        sys.exit()
 
     def verify_fresh(self, timestamp):
         '''
@@ -250,8 +267,10 @@ class Mutual:
         }
         # convert dict to json
         msg_to_mac = json.dumps(msg_to_mac_dict)
+        with open(root_cert, 'rb') as file:
+            root_cert_data = file.read()
         my_mac =  hmac.new(
-                open(root_cert, 'rb').read(),
+                root_cert_data,
                 msg_to_mac.encode('utf-8'),
                 hashlib.sha256,
             ).digest()
@@ -369,7 +388,7 @@ class Mutual:
         except Exception:
             TypeError
             print("No password provided for the mesh. Please get the password via provisioning server")
-            exit()
+            sys.exit()
 
     def define_role(self):
         '''
