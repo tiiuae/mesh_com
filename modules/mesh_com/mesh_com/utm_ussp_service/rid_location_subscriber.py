@@ -9,9 +9,11 @@ from rclpy.qos import QoSReliabilityPolicy
 from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSHistoryPolicy
 
-from px4_msgs.msg import VehicleGpsPosition
+#from px4_msgs.msg import VehicleGpsPosition
+from px4_msgs.msg import SensorGps
 from transport.rid_nats import ridNatsClient
 from transport.dri_broadcast import dri_broadcast
+from astm.rid_astm_f3411 import rid_astm_f3411
 
 # Message structure to hold vehicle GPS position data.
 # Reference: https://github.com/PX4/px4_msgs/blob/master/msg/VehicleGpsPosition.msg.
@@ -84,7 +86,6 @@ def _cpython_packaging(msg):
 
     return vehicleGPSMsg
 
-
 class RIDLocSubscriber(Node):
     def __init__(self):
         super().__init__('rid_location_subscriber')
@@ -96,8 +97,10 @@ class RIDLocSubscriber(Node):
             durability=QoSDurabilityPolicy.VOLATILE)
 
         self.subscription = self.create_subscription(
-            VehicleGpsPosition,
-            'fmu/vehicle_gps_position/out',
+            #VehicleGpsPosition,
+            #'fmu/vehicle_gps_position/out',
+            SensorGps,
+            '/uae05/fmu/sensor_gps/in',
             self.listener_callback,
             qos)  # use QoS
         self.subscription  # prevent unused variable warning
@@ -108,17 +111,20 @@ class RIDLocSubscriber(Node):
         self.rid_sampling_rate = None
         self.rid_certfile = None
         self.rid_keyfile = None
+        self.client = None
 
-    def listener_callback(self, msg):
-        if "rid_type" == "broadcast":
+    async def listener_callback(self, msg):
+        if self.rid_type == "broadcast":
             try:
                 byte_data = _cpython_packaging(msg)
                 gps_msg = struct.pack('>I', ctypes.sizeof(byte_data)) + byte_data
-                client.dri_loc_socket.sendall(gps_msg)
+                self.client.dri_loc_socket.sendall(gps_msg)
             except (ConnectionRefusedError, socket.timeout, ConnectionResetError, ConnectionRefusedError):
                 self.client.setup_socket()
-        elif "rid_type" == "nats":
-            self.client.loop.run_until_complete(self.client.publish("my_topic", data))
+        elif self.rid_type == "nats":
+             jmsg = self.encoder.init_data_fields(msg.timestamp, "AirBone", msg.lat, msg.lon, msg.alt, msg.eph, msg.epv, "Unkown", "Unkown", "Unkown", "Unkown", msg.vel_m_s, msg.timestamp_time_relative, msg.vel_e_m_s, msg.vel_d_m_s)
+             jmsg = self.encoder.encode_data_fields()
+             await self.client.publish_async("rid", jmsg)
         else:
             print("rid transport not supported")
 
@@ -127,7 +133,6 @@ class RIDLocSubscriber(Node):
     def init_rid_config(self):
         with open(self.yaml_file, 'r') as f:
             parsed_yaml = yaml.safe_load(f)
-
             if "rid_type" in parsed_yaml:
                 self.rid_type = parsed_yaml["rid_type"]
 
@@ -146,13 +151,14 @@ class RIDLocSubscriber(Node):
             if "rid_port" in parsed_yaml:
                 self.rid_port = parsed_yaml["rid_port"]
 
-    def init_rid_config(self):
-        if "rid_type" == "broadcast":
+    def init_rid_transport(self):
+        if self.rid_type == "broadcast":
             self.client = dri_broadcast(server=self.rid_server, port=self.rid_port)
-        elif "rid_type" == "nats":
+        elif self.rid_type == "nats":
+            self.encoder = rid_astm_f3411()
             self.client = ridNatsClient(server=self.rid_server, port=self.rid_port, certfile=self.rid_certfile, keyfile=self.rid_keyfile)
             # Connect to NATS server
-            self.client.loop.run_until_complete(client.connect())
+            self.client.loop.run_until_complete(self.client.connect())
         else:
             print("rid transport not supported")
 
@@ -161,6 +167,7 @@ def main(args=None):
 
     rid_loc_subscriber = RIDLocSubscriber()
     rid_loc_subscriber.init_rid_config()
+    rid_loc_subscriber.init_rid_transport()
     rclpy.spin(rid_loc_subscriber)
 
     # Destroy the node explicitly

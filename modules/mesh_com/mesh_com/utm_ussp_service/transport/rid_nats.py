@@ -1,6 +1,7 @@
 import asyncio
 import json
 import ssl
+import concurrent.futures
 from nats.aio.client import Client as NATS
 
 class ridNatsClient:
@@ -21,16 +22,24 @@ class ridNatsClient:
 
         # Connect to NATS server with TLS enabled if ssl_context is provided
         if ssl_context:
-            await self.nc.connect(f"tls://{self.server}:{self.port}", loop=self.loop, ssl=ssl_context)
+            await self.nc.connect(f"tls://"+str(self.server)+":"+str(self.port), loop=self.loop, ssl=ssl_context)
         else:
-            await self.nc.connect(f"nats://{self.server}:{self.port}", loop=self.loop)
+            await self.nc.connect(f"nats://"+str(self.server)+":"+str(self.port))
 
-    async def publish(self, topic, data):
+    async def publish_async(self, topic, data):
         # Convert data to JSON string
         json_payload = json.dumps(data)
 
         # Publish message
         await self.nc.publish(topic, bytes(json_payload.encode('utf-8')))
+        #print(json_payload)
+
+    def publish(self, topic, data):
+        # Use a thread pool to run publish_async in a separate thread
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            loop = asyncio.get_event_loop()
+            future = loop.run_in_executor(executor, self.publish_async, topic, data)
+            return future.result()
 
     async def close(self):
         # Close connection to NATS server
