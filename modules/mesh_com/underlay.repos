@@ -1,0 +1,4 @@
+px4_msgs:
+    type: git
+    url: https://github.com/tiiuae/PX4-msgs.git
+    version: tags/3.0.0

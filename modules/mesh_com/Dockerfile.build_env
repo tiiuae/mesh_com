@@ -29,13 +29,19 @@ RUN groupadd -g $GID builder && \
 
 RUN echo "deb [trusted=yes] https://ssrc.jfrog.io/artifactory/ssrc-debian-public-remote focal fog-sw" >> /etc/apt/sources.list
 
+RUN mkdir -p /$PACKAGE_NAME/packaging
 WORKDIR /$PACKAGE_NAME
 
+COPY modules/mesh_com/packaging/rosdep.yaml* modules/mesh_com/packaging/rosdep.sh /$PACKAGE_NAME/packaging/
+COPY modules/mesh_com/underlay.repos modules/mesh_com/package.xml /$PACKAGE_NAME/packaging/
+
+RUN /$PACKAGE_NAME/packaging/rosdep.sh /$PACKAGE_NAME
 RUN chown -R builder:builder /$PACKAGE_NAME
 
 USER builder
 
 RUN rosdep update --include-eol-distros
+RUN /$PACKAGE_NAME/packaging/build_deps.sh /$PACKAGE_NAME
 
 VOLUME /$PACKAGE_NAME/sources
 WORKDIR /$PACKAGE_NAME/sources

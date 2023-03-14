@@ -22,6 +22,17 @@ RUN /packaging/build.sh
 
 #  ▲               runtime ──┐
 #  └── build                 ▼
+WORKDIR /mesh_com/src
+ADD . /mesh_com/src
+
+COPY modules/mesh_com/underlay.repos modules/mesh_com/package.xml /mesh_com/src/modules/mesh_com/packaging/
+
+RUN /mesh_com/src/modules/mesh_com/packaging/rosdep.sh /mesh_com/src/modules/mesh_com
+
+RUN rosdep update
+
+RUN /mesh_com/src/modules/mesh_com/package.sh 0 focal
+
 
 FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-ae21266
 
@@ -30,6 +41,8 @@ FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-ae21266
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     wpasupplicant=2.9.0-20-6~git20210701.43d8971 \
     wifi-firmware \
+    ros-galactic-rmw-fastrtps-cpp \
+    ros-galactic-px4-msgs \
     iw \
     batctl \
     alfred \
