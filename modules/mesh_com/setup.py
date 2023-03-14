@@ -2,6 +2,9 @@ from setuptools import setup
 
 package_name = 'mesh_com'
 submodules = "mesh_com/src"
+submodules = "mesh_com/utm_ussp_service"
+submodules = "mesh_com/utm_ussp_service/transport/"
+submodules = "mesh_com/utm_ussp_service/astm"
 
 setup(
     name=package_name,

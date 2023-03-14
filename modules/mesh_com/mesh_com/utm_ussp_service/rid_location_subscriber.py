@@ -8,12 +8,18 @@ from rclpy.qos import QoSProfile
 from rclpy.qos import QoSReliabilityPolicy
 from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSHistoryPolicy
-
-#from px4_msgs.msg import VehicleGpsPosition
 from px4_msgs.msg import SensorGps
-from transport.rid_nats import ridNatsClient
-from transport.dri_broadcast import dri_broadcast
-from astm.rid_astm_f3411 import rid_astm_f3411
+
+try:
+    # in deb import
+    from .transport.rid_nats import ridNatsClient
+    from .transport.dri_broadcast import dri_broadcast
+    from .astm.rid_astm_f3411 import rid_astm_f3411
+except ImportError:
+    # if executed as is .py
+    from transport.rid_nats import ridNatsClient
+    from transport.dri_broadcast import dri_broadcast
+    from astm.rid_astm_f3411 import rid_astm_f3411
 
 # Message structure to hold vehicle GPS position data.
 # Reference: https://github.com/PX4/px4_msgs/blob/master/msg/VehicleGpsPosition.msg.
