@@ -30,23 +30,19 @@ def only_ca(myID):
         table = 'auth/dev.csv'
         filetable = pd.read_csv(table)
         filetable.drop_duplicates(inplace=True)
-        if not filetable.empty:
-            if "Ness_Result" in filetable.columns:
-                filetable.drop(["Ness_Result"], axis=1, inplace=True)
-            sectable = continuous_authentication(filetable, myID)
+        if "Ness_Result" in filetable.columns:
+            filetable.drop(["Ness_Result"], axis=1, inplace=True)
+        sectable = continuous_authentication(filetable, myID)
+        sleep(2)
+        if sectable is not None:
+            # ut.exchage_table(sectable)
             sleep(2)
-            if sectable is not None:
-                # ut.exchage_table(sectable)
-                sleep(2)
-                if 'CA_Result' in set(sectable):
-                    sectable.to_csv(table, index=False)
-                else:
-                    sectable.to_csv(table, mode='a', header=False, index=False)
-                return sectable
-            print("End of Continuous Authentication")
-        else:
-            print("Empty Security Table")
-            sys.exit()
+            if 'CA_Result' in set(sectable):
+                sectable.to_csv(table, index=False)
+            else:
+                sectable.to_csv(table, mode='a', header=False, index=False)
+            return sectable
+        print("End of Continuous Authentication")
     except FileNotFoundError:
         print("SecTable not available. Need to be requested during provisioning")
 
@@ -125,6 +121,7 @@ def mutual_authentication():
 
 
 MA_thread = None
+sbeat_thread = None
 def readfile():
     with open("features.yaml", "r") as stream:
         try:
@@ -135,7 +132,7 @@ def readfile():
 
 
 def initialize(feature):
-    global MA_thread
+    global MA_thread, sbeat_thread
     if feature == 'mutual':
         MA_thread = MA()
     if feature == 'continuous':
@@ -143,7 +140,7 @@ def initialize(feature):
     if feature == 'NESS':
         DE()
     if feature == 'secbeat':
-        sbeat_client()
+        sbeat_thread = sbeat_client()
     if feature == 'quarantine':
         Quarantine()
     if feature == 'only_mesh':
@@ -158,3 +155,5 @@ if __name__ == "__main__":
     # wait for Auth_AP to start in background for future nodes
     if MA_thread:
         MA_thread.join()
+    if sbeat_thread:
+        sbeat_thread.join()
