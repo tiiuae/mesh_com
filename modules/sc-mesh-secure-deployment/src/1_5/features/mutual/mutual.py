@@ -54,20 +54,6 @@ except FileNotFoundError:
     print("Root certificate not found. Need to get it from provisioning")
     sys.exit()
 
-
-
-def create_table():
-    '''
-    Function to create table of authenticated devices
-    '''
-    columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'MA_level']
-    if not path.isfile('auth/dev.csv'):
-        table = pd.DataFrame(columns=columns)
-        table.to_csv('auth/dev.csv', header=columns, index=False)
-    else:
-        table = pd.read_csv('auth/dev.csv')
-    return table
-
 class Mutual:
     """
     set_level function to establish trust level of an imported key
@@ -89,9 +75,20 @@ class Mutual:
         print("loading root_cert")
         pri.import_cert(root_cert, 'root')
         print("my ID: ", self.myID)
-        self.table = create_table()
+        self.table = self.create_table()
         #self.salt = os.urandom(16)
 
+    def create_table(self):
+        '''
+        Function to create table of authenticated devices
+        '''
+        columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'MA_level']
+        if not path.isfile('auth/dev.csv'):
+            table = pd.DataFrame(columns=columns)
+            table.to_csv('auth/dev.csv', header=columns, index=False)
+        else:
+            table = pd.read_csv('auth/dev.csv')
+        return table
 
     def update_table(self, info):
         '''
@@ -161,7 +158,7 @@ class Mutual:
         '''
         with open(root_cert, 'rb') as file:
             root_cert_data = file.read()
-        message = self.message_generator(root_cert_data.read())
+        message = self.message_generator(root_cert_data)
         try:
             fs.client_auth(candidate, serverIP, json.dumps(message).encode(), self.interface)
             if logger:
