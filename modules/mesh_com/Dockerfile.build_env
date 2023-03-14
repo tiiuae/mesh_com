@@ -41,7 +41,7 @@ RUN chown -R builder:builder /$PACKAGE_NAME
 USER builder
 
 RUN rosdep update --include-eol-distros
-RUN /$PACKAGE_NAME/packaging/build_deps.sh /$PACKAGE_NAME
+#RUN /$PACKAGE_NAME/packaging/build_deps.sh /$PACKAGE_NAME
 
 VOLUME /$PACKAGE_NAME/sources
 WORKDIR /$PACKAGE_NAME/sources
