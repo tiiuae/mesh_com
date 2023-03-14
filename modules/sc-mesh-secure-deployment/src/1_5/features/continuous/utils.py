@@ -36,6 +36,7 @@ async def launchCA(sectable):
 
     neighbor_ips = mesh_utils.get_neighbors_ip()
     ip2_send = list(set(sectable['IP'].tolist() + neighbor_ips))
+    if myip in ip2_send: ip2_send.remove(myip) # remove node's own IP
 
     #ip2_send = list(set(sectable['IP'].tolist() + list(neigh.keys())))
     print('Checkpoint, neighbor IPs = ', neighbor_ips)
@@ -43,7 +44,7 @@ async def launchCA(sectable):
     neigh = mesh_utils.get_arp()
     print('Checkpoint, IP_get_arp = ', list(neigh.keys()))
 
-    num_neighbors = len(ip2_send) - 1 # Number of neighbor nodes that need to be authenticated
+    num_neighbors = len(ip2_send) # Number of neighbor nodes that need to be authenticated
     server_proc = ca_server(myip, return_dict, id_dict, num_neighbors, list(set(sectable['IP'].tolist())))
 
     for IP in ip2_send:

@@ -74,6 +74,9 @@ def only_mesh():
     print('\'Run Only Mesh\'')
     mut = mutual.Mutual(MUTUALINT)
     try:
+        if not readfile()['provisioning']:
+            password = blake2b(mut.digest().encode(), digest_size=24).hexdigest()
+            co.util.update_mesh_password(password)  # update password in config file
         mut.start_mesh()
         mut.create_table()
         sleep(2)
@@ -191,7 +194,9 @@ def sbeat_client():
             break
     print("Starting security beat")
     # sbeat()
-    threading.Thread(target=sbeat, daemon=True, args=()).start()
+    sbeat_thread = threading.Thread(target=sbeat, daemon=True, args=())
+    sbeat_thread.start()
+    return sbeat_thread
 
 def sbeat_server():
     my_ip = mesh_utils.get_mesh_ip_address()
