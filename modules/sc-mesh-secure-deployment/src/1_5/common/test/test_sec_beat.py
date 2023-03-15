@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, '../../')
 import header
 from main import *
 from common import utils

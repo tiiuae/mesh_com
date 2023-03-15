@@ -18,20 +18,15 @@ Finally, when all the parameters are ready, another code on utils (mesh.py) will
 ### Protocol 
 
 The following image shows the protocol of the mutual authentication:
-<img src="../images/protocol.png" width="40%" height="40%"> 
+<img src="./images/protocol.png" width="40%" height="40%"> 
 
-## Run Program
-### Normal Execution 
-```
-./nodeAuth.py
-```
+### Certificate Provisioning
 
-### Cleaning Execution
-This will clean all the keys generated as well as the files.
+Each node generates a pair of keys. Both keys are generated INSIDE the Hardware Security Module (HSM). Then, the public key is exported FROM HSM to a certificate (DER file). 
 
-```
-./nodeAuth.py -c
-```
+The certificate should be signed by the authentication server (or certification authority). In this PoC, we assume this step has already been performed. Thus, this means that the pair of keys has been created ON the Hardware Security Module (HSM) and the certificate has been signed by the CA during the out-of-the-box step. 
+
+For the PoC (MS 1.5) we use prime field Weierstrass 256-bit Elliptic Curves (Also known as secp256r1P-256). In addition, we use SOFT-HSM with the pkcs11-tool for key handling. 
 
 ## Code Flow
 ![Conceptual Diagram](images/node-auth.png)
