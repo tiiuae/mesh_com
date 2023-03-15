@@ -304,7 +304,6 @@ if [ "$mode" = "sta+mesh" ]; then
   wpa_supplicant -Dnl80211 -i$iface -c ap.conf -B
   sleep 3
   udhcpc -i $iface
-
 elif [ "$mode" = "ap+mesh_mcc" ]; then
   # Create bridge br-lan
   mesh_service
@@ -316,22 +315,23 @@ elif [ "$mode" = "ap+mesh_mcc" ]; then
   calculate_wifi_channel "$ch"
   ifconfig $ifname_ap up
 
- # AP hostapd config
-cat <<EOF >/var/run/hostapd.conf
-country_code=AE
-interface=$ifname_ap
-ssid=$ssid
-hw_mode=g
-channel=7
-macaddr_acl=0
-auth_algs=1
-ignore_broadcast_ssid=0
-wpa=2
-wpa_passphrase=ssrcdemo
-wpa_key_mgmt=WPA-PSK
-wpa_pairwise=TKIP
-rsn_pairwise=CCMP
+   # AP hostapd config
+    cat <<EOF >/var/run/hostapd.conf
+    country_code=AE
+    interface=$ifname_ap
+    ssid=$ssid
+    hw_mode=g
+    channel=7
+    macaddr_acl=0
+    auth_algs=1
+    ignore_broadcast_ssid=0
+    wpa=2
+    wpa_passphrase=ssrcdemo
+    wpa_key_mgmt=WPA-PSK
+    wpa_pairwise=TKIP
+    rsn_pairwise=CCMP
 EOF
+
   # Start AP
   /usr/sbin/hostapd -B /var/run/hostapd.conf -f /tmp/hostapd.log
   # Bridge AP and Mesh
@@ -368,210 +368,114 @@ EOF
   echo "bindaddr = "\"$gw_ip\"";" >> /etc/umurmur.conf
   sleep 10
   umurmurd
-elif [ "$mode" == "ap+mesh_scc" ]; then
-  sleep 2
-  # chanbw config
-  mount -t debugfs none /sys/kernel/debug
-  if [ -f "/sys/kernel/debug/ieee80211/phy0/ath9k/chanbw" ]; then
-      echo 20 > /sys/kernel/debug/ieee80211/phy0/ath9k/chanbw
-  fi
-
-  wifidev="$(ifconfig -a | grep wlp1* | awk -F':' '{ print $1 }')"
-  # Radio parameters
-  iw dev "$wifidev" set txpower limit "$txpwr"00
-
-  # RPi activity led config
-  echo "phy0tx" > /sys/class/leds/led0/trigger
-
-  #Create static mac addr for Batman if
-  eth0_mac="$(ip -brief link | grep eth0 | awk '{print $3; exit}')"
-  batif_mac="00:00:$(echo "$eth0_mac" | cut -b 7-17)"
-  ifconfig bat0 hw ether "$batif_mac"
-
-  brctl addbr br-lan
-  # AP setup
-
-  pcie_radio_mac="$(ip -brief link | grep "$wifidev" | awk '{print $3; exit}')"
-  ssid="p2p#$(echo "$pcie_radio_mac" | cut -b 13-14,16-17)"
-
-  ifname_ap="$wifidev-1"
-  iw dev "$wifidev" interface add "$ifname_ap" type managed addr "00:01:$(echo "$pcie_radio_mac" | cut -b 7-17)"
-
-  # Set frequency band and channel from given frequency
-   calculate_wifi_channel $ch
-
-# AP hostapd config
-cat <<EOF >/var/run/hostapd.conf
-ctrl_interface=/var/run/hostapd
-interface=$ifname_ap
-hw_mode=$retval_band
-channel=$retval_channel
-
-ieee80211h=1
-ieee80211d=1
-country_code=$cc
-
-ssid=$ssid
-auth_algs=1
-wpa=2
-wpa_key_mgmt=WPA-PSK
-rsn_pairwise=CCMP
-wpa_passphrase=$psk
-
-wmm_enabled=1
-beacon_int=1000
-
-### IEEE 802.11n
-ieee80211n=1
-#ht_capab=[HT40+][LDPC][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1][DSSS_CCK-40]
-
-### IEEE 802.11ac
-#ieee80211ac=1
-#vht_capab=[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]
-EOF
-
-  # Start AP
-  /usr/sbin/hostapd -B /var/run/hostapd.conf -dd -f /tmp/hostapd_"$ifname_ap".log
-
-  # Bridge AP and Mesh
-  brctl addif br-lan bat0 "$ifname_ap"
-  ifconfig br-lan "$ipaddr" netmask "$nmask"
-  ifconfig br-lan up
-  echo
-  ifconfig br-lan
-  iptables -P FORWARD ACCEPT
-  ip addr flush dev bat0
-  echo "Mesh Point + AP done."
-else
-  brctl addbr br-lan
-  # Bridge ethernet and Mesh
-
-  eth_port="eth1"
-  if [ -f "$COMMS_PCB_VERSION_FILE" ]; then
-    source "$COMMS_PCB_VERSION_FILE"
-    # Sleeve 1.x has PCB version 0
-    if (( $(echo "$COMMS_PCB_VERSION == 0" |bc -l) )); then
-      eth_port="eth1"
-    # CM1.5 PCB version is 0.5
-    elif (( $(echo "$COMMS_PCB_VERSION == 0.5" |bc -l) )); then
-      eth_port="eth0"
-    # CM2.x PCB version starts from 1
-    elif (( $(echo "$COMMS_PCB_VERSION >= 1" |bc -l) )); then
-      eth_port="lan1"
+  elif [ "$mode" == "ap+mesh_scc" ]; then
+    sleep 2
+    # chanbw config
+    mount -t debugfs none /sys/kernel/debug
+    if [ -f "/sys/kernel/debug/ieee80211/phy0/ath9k/chanbw" ]; then
+        echo 20 > /sys/kernel/debug/ieee80211/phy0/ath9k/chanbw
     fi
-  fi
-  echo $eth_port
 
-  brctl addif br-lan bat0 $eth_port
-  echo $br_lan_ip
-  ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
-  ifconfig br-lan up
-  echo
-  ifconfig br-lan
-  # Add forwading rules from AP to bat0 interface
-  iptables -P FORWARD ACCEPT
-  route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
-  route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
-  iptables -A FORWARD --in-interface bat0 -j ACCEPT
-  iptables --table nat -A POSTROUTING --out-interface $br_lan_ip -j MASQUERADE
+    wifidev="$(ifconfig -a | grep wlp1* | awk -F':' '{ print $1 }')"
+    # Radio parameters
+    iw dev "$wifidev" set txpower limit "$txpwr"00
 
-elif [ "$mode" == "ap+mesh_scc" ]; then
-  mesh_service
-  # chanbw config
-  mount -t debugfs none /sys/kernel/debug
-  if [ -f "/sys/kernel/debug/ieee80211/phy0/ath9k/chanbw" ]; then
-      echo 20 > /sys/kernel/debug/ieee80211/phy0/ath9k/chanbw
-  fi
+    # RPi activity led config
+    echo "phy0tx" > /sys/class/leds/led0/trigger
 
-  wifidev="$(ifconfig -a | grep wlp1* | awk -F':' '{ print $1 }')"
-  # Radio parameters
-  iw dev "$wifidev" set txpower limit "$txpwr"00
+    #Create static mac addr for Batman if
+    eth0_mac="$(ip -brief link | grep eth0 | awk '{print $3; exit}')"
+    batif_mac="00:00:$(echo "$eth0_mac" | cut -b 7-17)"
+    ifconfig bat0 hw ether "$batif_mac"
 
-  # RPi activity led config
-  echo "phy0tx" > /sys/class/leds/led0/trigger
+    brctl addbr br-lan
+    # AP setup
 
-  #Create static mac addr for Batman if
-  eth0_mac="$(ip -brief link | grep eth0 | awk '{print $3; exit}')"
-  batif_mac="00:00:$(echo "$eth0_mac" | cut -b 7-17)"
-  ifconfig bat0 hw ether "$batif_mac"
+    pcie_radio_mac="$(ip -brief link | grep "$wifidev" | awk '{print $3; exit}')"
+    ssid="p2p#$(echo "$pcie_radio_mac" | cut -b 13-14,16-17)"
 
-  brctl addbr br-lan
-  # AP setup
+    ifname_ap="$wifidev-1"
+    iw dev "$wifidev" interface add "$ifname_ap" type managed addr "00:01:$(echo "$pcie_radio_mac" | cut -b 7-17)"
 
-  pcie_radio_mac="$(ip -brief link | grep "$wifidev" | awk '{print $3; exit}')"
-  ssid="p2p#$(echo "$pcie_radio_mac" | cut -b 13-14,16-17)"
+    # Set frequency band and channel from given frequency
+     calculate_wifi_channel $ch
 
-  ifname_ap="$wifidev-1"
-  iw dev "$wifidev" interface add "$ifname_ap" type managed addr "00:01:$(echo "$pcie_radio_mac" | cut -b 7-17)"
+  # AP hostapd config
+  cat <<EOF >/var/run/hostapd.conf
+  ctrl_interface=/var/run/hostapd
+  interface=$ifname_ap
+  hw_mode=$retval_band
+  channel=$retval_channel
 
-  # Set frequency band and channel from given frequency
-   calculate_wifi_channel $ch
+  ieee80211h=1
+  ieee80211d=1
+  country_code=$cc
 
-# AP hostapd config
-cat <<EOF >/var/run/hostapd.conf
-ctrl_interface=/var/run/hostapd
-interface=$ifname_ap
-hw_mode=$retval_band
-channel=$retval_channel
+  ssid=$ssid
+  auth_algs=1
+  wpa=2
+  wpa_key_mgmt=WPA-PSK
+  rsn_pairwise=CCMP
+  wpa_passphrase=$psk
 
-ieee80211h=1
-ieee80211d=1
-country_code=$cc
+  wmm_enabled=1
+  beacon_int=1000
 
-ssid=$ssid
-auth_algs=1
-wpa=2
-wpa_key_mgmt=WPA-PSK
-rsn_pairwise=CCMP
-wpa_passphrase=$psk
+  ### IEEE 802.11n
+  ieee80211n=1
+  #ht_capab=[HT40+][LDPC][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1][DSSS_CCK-40]
 
-wmm_enabled=1
-#beacon_int=1000
-
-### IEEE 802.11n
-ieee80211n=1
-#ht_capab=[HT40+][LDPC][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1][DSSS_CCK-40]
-
-### IEEE 802.11ac
-#ieee80211ac=1
-#vht_capab=[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]
+  ### IEEE 802.11ac
+  #ieee80211ac=1
+  #vht_capab=[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]
 EOF
 
-  # Start AP
-  /usr/sbin/hostapd -B /var/run/hostapd.conf -dd -f /tmp/hostapd_"$ifname_ap".log
+    # Start AP
+    /usr/sbin/hostapd -B /var/run/hostapd.conf -dd -f /tmp/hostapd_"$ifname_ap".log
 
-  # Bridge AP and Mesh
-  brctl addif br-lan bat0 "$ifname_ap"
-  ifconfig br-lan "$ipaddr" netmask "$nmask"
-  ifconfig br-lan up
-  echo
-  ifconfig br-lan
-  iptables -P FORWARD ACCEPT
-  ip addr flush dev bat0
-  echo "Mesh Point + AP done."
-else
-  brctl addbr br-lan
-  # Bridge eth1 and Mesh
-  brctl addif br-lan bat0 eth1
-  echo $br_lan_ip
-  ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
-  ifconfig br-lan up
-  echo
-  ifconfig br-lan
-  # Add forwarding rules from AP to bat0 interface
-  iptables -P FORWARD ACCEPT
-  route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
-  route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
-  iptables -A FORWARD --in-interface bat0 -j ACCEPT
-  iptables --table nat -A POSTROUTING --out-interface $br_lan_ip -j MASQUERADE
+    # Bridge AP and Mesh
+    brctl addif br-lan bat0 "$ifname_ap"
+    ifconfig br-lan "$ipaddr" netmask "$nmask"
+    ifconfig br-lan up
+    echo
+    ifconfig br-lan
+    iptables -P FORWARD ACCEPT
+    ip addr flush dev bat0
+    echo "Mesh Point + AP done."
+  else
+    brctl addbr br-lan
+    # Bridge ethernet and Mesh
 
-#start gw manager
-#nohup python -u /opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw/main.py
-# current path is /opt/mesh_com-mesh_com_1.5/modules/sc-mesh-secure-deployment/src/1_5
-nohup python -u ../gw/main.py
+    eth_port="eth1"
+    if [ -f "$COMMS_PCB_VERSION_FILE" ]; then
+      source "$COMMS_PCB_VERSION_FILE"
+      # Sleeve 1.x has PCB version 0
+      if (( $(echo "$COMMS_PCB_VERSION == 0" |bc -l) )); then
+        eth_port="eth1"
+      # CM1.5 PCB version is 0.5
+      elif (( $(echo "$COMMS_PCB_VERSION == 0.5" |bc -l) )); then
+        eth_port="eth0"
+      # CM2.x PCB version starts from 1
+      elif (( $(echo "$COMMS_PCB_VERSION >= 1" |bc -l) )); then
+        eth_port="lan1"
+      fi
+    fi
+    echo $eth_port
 
+    brctl addif br-lan bat0 $eth_port
+    echo $br_lan_ip
+    ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
+    ifconfig br-lan up
+    echo
+    ifconfig br-lan
+    # Add forwading rules from AP to bat0 interface
+    iptables -P FORWARD ACCEPT
+    route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
+    route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
+    iptables -A FORWARD --in-interface bat0 -j ACCEPT
+    iptables --table nat -A POSTROUTING --out-interface $br_lan_ip -j MASQUERADE
 fi
 
 
 #start comms sleeve web server for companion phone
-#nohup python -u /opt/mesh_com/modules/utils/docker/comms_sleeve_server.py -ip $br_lan_ip -ap_if $ifname_ap  -mesh_if bat0
+nohup python -u /opt/mesh_com/modules/utils/docker/comms_sleeve_server.py -ip $br_lan_ip -ap_if $ifname_ap  -mesh_if bat0
