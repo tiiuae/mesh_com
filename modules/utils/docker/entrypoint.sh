@@ -116,7 +116,7 @@ configure()
       txpwr=$TXPOWER
       algo=$ROUTING
       mesh_if=$MESH_VIF
-      meshVersion=$MS15
+      meshVersion=$MSVERSION
       ML=$ML
   else
       mode="mesh"
@@ -164,8 +164,8 @@ provisioning()
 
 clean_up()
 {
-  cd SC_MESH_FOLDER
-  if [ -d "auth/*" ]
+  cd $SC_MESH_FOLDER
+  if [ -d "auth/" ]
   then
     rm *.der; rm -r auth/; rm -r pubKeys/
   fi
@@ -192,8 +192,19 @@ bug_initializing()
 
 generate_random_mesh_ip() {
   local last_oct=$((16#$1))
-  local random_ip="10.10.10.$((last_oct))"
-  echo "$random_ip"
+
+  # Loop until we generate a valid IP address
+  while true; do
+    # Generate a random number between 2 and 254
+    rand_num=$((2 + $RANDOM % 253))
+
+    # Use the random number as the last octet of the IP address
+    if [ "$rand_num" -ne "$last_oct" ]; then
+      local random_ip="10.10.10.$((rand_num))"
+      echo "$random_ip"
+      break
+    fi
+  done
 }
 
 update_mesh_com_conf() {
@@ -260,10 +271,14 @@ if [ "$MESH_VERSION" == "1.5" ]; then
   # Update authentication AP configuration file with the new IP
   update_auth_ap_conf "$auth_ap"
 
-  provisioning true
+  prov=$(cat $SC_MESH_FOLDER/features.yaml |grep provisioning | awk '{ print $2}')
 
-  # Copy the root certificate for testing purposes
-  cp "$ROOT_CERT" "/etc/ssl/certs/"
+  if ! $prov ; #no provisioning
+  then
+    provisioning true
+    # Copy the root certificate for testing purposes
+    cp "$ROOT_CERT" "/etc/ssl/certs/"
+  fi
 
   # Create the DHCP leases file
   touch "$DHCPD_LEASES"
