@@ -36,6 +36,8 @@ RUN /mesh_com/src/modules/mesh_com/package.sh 0 focal
 
 FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-ae21266
 
+ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+
 # wpasupplicant pinned as to receive SSRC version (and not Ubuntu) of it which has some mesh-related customizations:
 # https://github.com/tiiuae/wpa
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
