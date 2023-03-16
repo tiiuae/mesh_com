@@ -8,6 +8,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     dh-make \
     dh-python \
     python3-pytest \
+    python3-pip \
     ros-${ROS_DISTRO}-ament-flake8 \
     ros-${ROS_DISTRO}-ament-pep257 \
     && rm -rf /var/lib/apt/lists/*
@@ -47,6 +48,8 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     rfkill \
     iproute2 \
     && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install nats-py
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 
