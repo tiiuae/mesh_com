@@ -10,16 +10,9 @@ from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSHistoryPolicy
 from px4_msgs.msg import SensorGps
 
-try:
-    # in deb import
-    from .transport.rid_nats import ridNatsClient
-    from .transport.dri_broadcast import dri_broadcast
-    from .astm.rid_astm_f3411 import rid_astm_f3411
-except ImportError:
-    # if executed as is .py
-    from transport.rid_nats import ridNatsClient
-    from transport.dri_broadcast import dri_broadcast
-    from astm.rid_astm_f3411 import rid_astm_f3411
+from .transport.rid_nats import ridNatsClient
+from .transport.dri_broadcast import dri_broadcast
+from .astm.rid_astm_f3411 import rid_astm_f3411
 
 # Message structure to hold vehicle GPS position data.
 # Reference: https://github.com/PX4/px4_msgs/blob/master/msg/VehicleGpsPosition.msg.
@@ -103,16 +96,14 @@ class RIDLocSubscriber(Node):
             durability=QoSDurabilityPolicy.VOLATILE)
 
         self.subscription = self.create_subscription(
-            #VehicleGpsPosition,
-            #'fmu/vehicle_gps_position/out',
-            SensorGps,
-            '/uae05/fmu/sensor_gps/in',
+            VehicleGpsPosition,
+            'fmu/vehicle_gps_position/out',
             self.listener_callback,
             qos)  # use QoS
         self.subscription  # prevent unused variable warning
         self.backup_timer = 0
         self.backup_data = ""
-        self.yaml_file = "ussp.yaml"
+        self.yaml_file = "/opt/ros/galactic/share/ussp.yaml"
         self.rid_type = None
         self.rid_sampling_rate = None
         self.rid_certfile = None

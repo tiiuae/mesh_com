@@ -17,6 +17,7 @@ setup(
         ('share/' + package_name, ['launch/mesh_com.launch']),
         ('share/bin', ['../../common/scripts/mesh-ibss.sh']),
         ('share/bin', ['../../common/scripts/mesh-11s.sh']),
+        ('share/' + package_name, ['mesh_com/utm_ussp_service/ussp.yaml']),
        # ('share/bin', ['../../common/scripts/mesh-11s-mr.sh']),
     ],
     install_requires=['setuptools'],
