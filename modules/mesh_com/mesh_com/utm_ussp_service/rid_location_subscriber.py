@@ -8,7 +8,7 @@ from rclpy.qos import QoSProfile
 from rclpy.qos import QoSReliabilityPolicy
 from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSHistoryPolicy
-from px4_msgs.msg import SensorGps
+from px4_msgs.msg import VehicleGpsPosition
 
 from .transport.rid_nats import ridNatsClient
 from .transport.dri_broadcast import dri_broadcast
@@ -103,7 +103,7 @@ class RIDLocSubscriber(Node):
         self.subscription  # prevent unused variable warning
         self.backup_timer = 0
         self.backup_data = ""
-        self.yaml_file = "/opt/ros/galactic/share/ussp.yaml"
+        self.yaml_file = "/opt/ros/galactic/share/mesh_com/ussp.yaml"
         self.rid_type = None
         self.rid_sampling_rate = None
         self.rid_certfile = None
