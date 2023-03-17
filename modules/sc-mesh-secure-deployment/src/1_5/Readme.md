@@ -46,3 +46,4 @@ If the `provisioning` feature is true, then the `root_cert.der` file should be p
    * This file should be modified by the provisioning server. 
 3. For setting the mesh shield version and installing the machine learning packages, modify the file `mesh.conf` on the docker file
    * Currently only the last to variables are used in MS1.5 (MSVERSION and ML) --> this file needs to be integrated `with mesh_com_11s.conf` file
+   * If the $MSVERSION is set as 1.0 this brings compatibility with the previous version. 

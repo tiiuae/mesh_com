@@ -1,9 +1,7 @@
 #! /bin/bash
 
-MESH_FOLDER="/opt/mesh_com"
 
 # Define constants
-MESH_VERSION="1.5"
 MESH_FOLDER="/opt/mesh_com"
 SC_MESH_FOLDER="$MESH_FOLDER/modules/sc-mesh-secure-deployment/src/1_5"
 COMMON_FOLDER="$SC_MESH_FOLDER/common"
@@ -14,6 +12,36 @@ AUTH_AP_CONF="$FEATURES_FOLDER/auth_ap.yaml"
 DHCPD_LEASES="/var/lib/dhcp/dhcpd.leases"
 
 COMMS_PCB_VERSION_FILE="/opt/hardware/comms_pcb_version"
+
+
+
+configure()
+{
+  if [ -f "/opt/mesh.conf" ]; then
+      source /opt/mesh.conf
+      mode=$CONCURRENCY
+      ch=$MCC_CHANNEL
+      ipaddr=$IP
+      nmask=$MASK
+      cc=$COUNTR
+      psk=$KEY
+      txpwr=$TXPOWER
+      algo=$ROUTING
+      mesh_if=$MESH_VIF
+      meshVersion=$MSVERSION
+      ML=$ML
+  else
+      mode="mesh"
+  fi
+}
+
+configure
+###Deciding IP address to be assigned to br-lan from WiFi MAC
+mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
+ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
+br_lan_ip="192.168.1."$((16#$ip_random))
+ifname_ap="$(ifconfig -a | grep wlan* | awk -F':' '{ print $1 }')"
+
 
 calculate_wifi_channel()
 {
@@ -103,25 +131,6 @@ install_packages()
   fi
 }
 
-configure()
-{
-  if [ -f "/opt/mesh.conf" ]; then
-      source /opt/mesh.conf
-      mode=$CONCURRENCY
-      ch=$MCC_CHANNEL
-      ipaddr=$IP
-      nmask=$MASK
-      cc=$COUNTR
-      psk=$KEY
-      txpwr=$TXPOWER
-      algo=$ROUTING
-      mesh_if=$MESH_VIF
-      meshVersion=$MSVERSION
-      ML=$ML
-  else
-      mode="mesh"
-  fi
-}
 
 mesh_service()
 {
@@ -151,12 +160,10 @@ provisioning()
          ifconfig br-lan down
          brctl delbr br-lan
    fi
-   ifname_ap="$(ifconfig -a | grep wlan* | awk -F':' '{ print $1 }')"
-   ifname_mp="$(ifconfig -a | grep wlp1* | awk -F':' '{ print $1 }')"
    ifconfig $ifname_ap down
-   ifconfig $ifname_mp down
+   ifconfig $mesh_if down
    ifconfig $ifname_ap up
-   ifconfig $ifname_mp up
+   ifconfig $mesh_if up
    if [ -z "$1" ]; then
     exit 1
   fi
@@ -184,9 +191,12 @@ EOF
 
 bug_initializing()
 {
-/sbin/ip link set wlan0 down
-/sbin/ip link set wlan0 name wlan1
-/sbin/ip link set wlan1 up
+  iface=$(ifconfig -a | grep wlan* | awk -F':' '{ print $1 }')
+  if [ $iface == 'wlan0' ]; then
+    /sbin/ip link set wlan0 down
+    /sbin/ip link set wlan0 name wlan1
+    /sbin/ip link set wlan1 up
+  fi
 }
 
 
@@ -226,7 +236,7 @@ get_available_networks() {
 }
 
 
-start_mesh() {
+start_mesh_1_5() {
   cd "$SC_MESH_FOLDER"
   python3 -u main.py
 }
@@ -239,16 +249,45 @@ get_unused_network() {
   echo "$unused_network"
 }
 
-configure
+
+bridge_settings() {
+    brctl addbr br-lan
+    # Bridge ethernet and Mesh
+
+    eth_port="eth1"
+    if [ -f "$COMMS_PCB_VERSION_FILE" ]; then
+      source "$COMMS_PCB_VERSION_FILE"
+      # Sleeve 1.x has PCB version 0
+      if (( $(echo "$COMMS_PCB_VERSION == 0" |bc -l) )); then
+        eth_port="eth1"
+      # CM1.5 PCB version is 0.5
+      elif (( $(echo "$COMMS_PCB_VERSION == 0.5" |bc -l) )); then
+        eth_port="eth0"
+      # CM2.x PCB version starts from 1
+      elif (( $(echo "$COMMS_PCB_VERSION >= 1" |bc -l) )); then
+        eth_port="lan1"
+      fi
+    fi
+    echo $eth_port
+
+    brctl addif br-lan bat0 $eth_port
+    echo $br_lan_ip
+    ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
+    ifconfig br-lan up
+    echo
+    ifconfig br-lan
+    # Add forwarding rules from AP to $mesh_if interface
+    iptables -P FORWARD ACCEPT
+    route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
+    route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
+    iptables -A FORWARD --in-interface bat0 -j ACCEPT
+    iptables --table nat -A POSTROUTING --out-interface $br_lan_ip -j MASQUERADE
+}
+
 bug_initializing
 
-###Deciding IP address to be assigned to br-lan from WiFi MAC
-mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
-ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
-br_lan_ip="192.168.1."$((16#$ip_random))
 
-
-if [ "$MESH_VERSION" == "1.5" ]; then
+if [ "$meshVersion" == "1.5" ]; then
   clean_up
   install_packages
   # Generate a random IP address for the mesh network
@@ -288,7 +327,11 @@ if [ "$MESH_VERSION" == "1.5" ]; then
   uid=$(echo -n $mesh_if_mac | b2sum -l 32)
   uid=${uid::-1}
   /bin/bash $MESH_FOLDER/common/scripts/generate_keys.sh $uid
-  start_mesh
+  start_mesh_1_5
+else
+    provisioning true
+    mesh_service
+    bridge_settings
 fi
 
 
@@ -300,15 +343,13 @@ if [ "$mode" = "sta+mesh" ]; then
   mesh_service
   create_ap_config
   #Connect to default GW AP
-  iface=$(ifconfig -a | grep wlan* | awk -F':' '{ print $1 }')
-  wpa_supplicant -Dnl80211 -i$iface -c ap.conf -B
+  wpa_supplicant -Dnl80211 -i $ifname_ap-c ap.conf -B
   sleep 3
-  udhcpc -i $iface
+  udhcpc -i $ifname_ap
 elif [ "$mode" = "ap+mesh_mcc" ]; then
   # Create bridge br-lan
   mesh_service
   brctl addbr br-lan
-  ifname_ap="$(ifconfig -a | grep wlan* | awk -F':' '{ print $1 }')"
   ap_if_mac="$(ip -brief link | grep "$ifname_ap" | awk '{print $3; exit}')"
   ssid="comms_sleeve#$(echo "$ap_if_mac" | cut -b 13-14,16-17)"
   # Set frequency band and channel from given frequency
@@ -349,7 +390,7 @@ EOF
   ifconfig br-lan up
   echo
   ifconfig br-lan
-  # Add forwading rules from AP to bat0 interface
+  # Add forwarding rules from AP to $mesh_if interface
   iptables -P FORWARD ACCEPT
   route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
   route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
@@ -376,9 +417,8 @@ EOF
         echo 20 > /sys/kernel/debug/ieee80211/phy0/ath9k/chanbw
     fi
 
-    wifidev="$(ifconfig -a | grep wlp1* | awk -F':' '{ print $1 }')"
     # Radio parameters
-    iw dev "$wifidev" set txpower limit "$txpwr"00
+    iw dev "$mesh_if" set txpower limit "$txpwr"00
 
     # RPi activity led config
     echo "phy0tx" > /sys/class/leds/led0/trigger
@@ -386,16 +426,16 @@ EOF
     #Create static mac addr for Batman if
     eth0_mac="$(ip -brief link | grep eth0 | awk '{print $3; exit}')"
     batif_mac="00:00:$(echo "$eth0_mac" | cut -b 7-17)"
-    ifconfig bat0 hw ether "$batif_mac"
+    ifconfig $mesh_if hw ether "$batif_mac"
 
     brctl addbr br-lan
     # AP setup
 
-    pcie_radio_mac="$(ip -brief link | grep "$wifidev" | awk '{print $3; exit}')"
+    pcie_radio_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
     ssid="p2p#$(echo "$pcie_radio_mac" | cut -b 13-14,16-17)"
 
-    ifname_ap="$wifidev-1"
-    iw dev "$wifidev" interface add "$ifname_ap" type managed addr "00:01:$(echo "$pcie_radio_mac" | cut -b 7-17)"
+    ifname_ap="$mesh_if-1"
+    iw dev "$mesh_if" interface add "$ifname_ap" type managed addr "00:01:$(echo "$pcie_radio_mac" | cut -b 7-17)"
 
     # Set frequency band and channel from given frequency
      calculate_wifi_channel $ch
@@ -434,48 +474,19 @@ EOF
     /usr/sbin/hostapd -B /var/run/hostapd.conf -dd -f /tmp/hostapd_"$ifname_ap".log
 
     # Bridge AP and Mesh
-    brctl addif br-lan bat0 "$ifname_ap"
+    brctl addif br-lan $mesh_if "$ifname_ap"
     ifconfig br-lan "$ipaddr" netmask "$nmask"
     ifconfig br-lan up
     echo
     ifconfig br-lan
     iptables -P FORWARD ACCEPT
-    ip addr flush dev bat0
+    ip addr flush dev $mesh_if
     echo "Mesh Point + AP done."
   else
-    brctl addbr br-lan
-    # Bridge ethernet and Mesh
-
-    eth_port="eth1"
-    if [ -f "$COMMS_PCB_VERSION_FILE" ]; then
-      source "$COMMS_PCB_VERSION_FILE"
-      # Sleeve 1.x has PCB version 0
-      if (( $(echo "$COMMS_PCB_VERSION == 0" |bc -l) )); then
-        eth_port="eth1"
-      # CM1.5 PCB version is 0.5
-      elif (( $(echo "$COMMS_PCB_VERSION == 0.5" |bc -l) )); then
-        eth_port="eth0"
-      # CM2.x PCB version starts from 1
-      elif (( $(echo "$COMMS_PCB_VERSION >= 1" |bc -l) )); then
-        eth_port="lan1"
-      fi
-    fi
-    echo $eth_port
-
-    brctl addif br-lan bat0 $eth_port
-    echo $br_lan_ip
-    ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
-    ifconfig br-lan up
-    echo
-    ifconfig br-lan
-    # Add forwading rules from AP to bat0 interface
-    iptables -P FORWARD ACCEPT
-    route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
-    route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
-    iptables -A FORWARD --in-interface bat0 -j ACCEPT
-    iptables --table nat -A POSTROUTING --out-interface $br_lan_ip -j MASQUERADE
+    bridge_settings
 fi
 
 
 #start comms sleeve web server for companion phone
-nohup python -u /opt/mesh_com/modules/utils/docker/comms_sleeve_server.py -ip $br_lan_ip -ap_if $ifname_ap  -mesh_if bat0
+#nohup python -u /opt/mesh_com/modules/utils/docker/comms_sleeve_server.py -ip $br_lan_ip -ap_if $ifname_ap  -mesh_if $mesh_if
+nohup python -u $MESH_FOLDER/modules/sc-mesh-secure-deployment/src/gw/main.py
