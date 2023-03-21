@@ -80,7 +80,8 @@ class Node:
                          "altitude", "PDOP",
                          "cpu temp [mC]", "wifi temp [mC]", "tmp100 [mC]",
                          "battery voltage [uV]", "battery current [uA]", "nRF voltage [mV]",
-                         "nRF current [mA]", "3v3 voltage [mV]", "3v3 current [mA]"], inplace=True)
+                         "nRF current [mA]", "3v3 voltage [mV]", "3v3 current [mA]",
+                         "DCin (XT30) voltage [mV]", "DCin (XT30) current [mA]" ], inplace=True, errors='ignore')
 
         # Drop corrupted DF lines i.e. the ones where the
         # last expected csv file column is empty.
