@@ -40,7 +40,7 @@ configure
 mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
 ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
 br_lan_ip="192.168.1."$((16#$ip_random))
-ifname_ap="$(ifconfig -a | grep wlan* | awk -F':' '{ print $1 }')"
+ifname_ap="$(ifconfig -a | grep "wlan*" | awk -F':' '{ print $1 }')"
 
 
 calculate_wifi_channel()
@@ -77,15 +77,15 @@ install_packages()
 
   #copy libraries for pypcap
 
-  cd $MESH_FOLDER/modules/utils/package/python_packages
+  cd $MESH_FOLDER/modules/utils/package/python_packages || exit
   for f in {*.whl,*.gz};
   do
-    name="$(echo $f | cut -d'-' -f1)"
+    name="$(echo "$f" | cut -d"-" -f1)"
     if python -c 'import pkgutil; exit(not pkgutil.find_loader("$name"))'; then
-      echo $name "installed"
+      echo "$name" "installed"
     else
-      echo $name "not found"
-      echo "installing" $name
+      echo "$name" "not found"
+      echo "installing" "$name"
       pip install --no-index "$f" --find-links .;
   fi
   done;
@@ -96,31 +96,32 @@ install_packages()
     tar -C $MESH_FOLDER/modules/utils/package/ -zxvf $MESH_FOLDER/modules/utils/package/machine_learning_packages.tar.gz
     tar -C $MESH_FOLDER/modules/utils/package/ -zxvf $MESH_FOLDER/modules/utils/package/machine_learning2.tar.gz
 
-    cd $MESH_FOLDER/modules/utils/package/machine_learning_packages
+    cd $MESH_FOLDER/modules/utils/package/machine_learning_packages || exit
 
     for f in {*.whl,*.gz};
     do
-      name="$(echo $f | cut -d'-' -f1)"
+      name="$(echo "$f" | cut -d'-' -f1)"
       if python -c 'import pkgutil; exit(not pkgutil.find_loader("$name"))'; then
-        echo $name "installed"
+        echo "$name" "installed"
       else
-        echo $name "not found"
-        echo "installing" $name
+        echo "$name" "not found"
+        echo "installing" "$name"
         pip install --no-index "$f" --find-links .;
     fi
     done;
     cd .. ;
 
-    cd $MESH_FOLDER/modules/utils/package/machine_learning2
+    cd $MESH_FOLDER/modules/utils/package/machine_learning2 || exit
 
     for f in {*.whl,*.gz};
     do
-      name="$(echo $f | cut -d'-' -f1)"
+      name="$(echo "$f" | cut -d'-' -f1)"
       if python -c 'import pkgutil; exit(not pkgutil.find_loader("$name"))'; then
-        echo $name "installed"
+
+        echo "$name" "installed"
       else
-        echo $name "not found"
-        echo "installing" $name
+        echo "$name" "not found"
+        echo "installing" "$name"
         pip install --no-index "$f" --find-links .;
     fi
     done;
@@ -135,8 +136,8 @@ install_packages()
 mesh_service()
 {
   #start mesh service if mesh provisioning is done
-  hw_platform=$(cat /proc/cpuinfo | grep Model | awk '{print $5}')
-  if [ $hw_platform == "Compute" ]; then
+  hw_platform=$(grep Model /proc/cpuinfo| awk '{print $5}')
+  if [ "$hw_platform" == "Compute" ]; then
     if [ -f "/opt/S9011sMesh" ]; then
       #start Mesh service
       echo "starting 11s mesh service"
@@ -160,10 +161,10 @@ provisioning()
          ifconfig br-lan down
          brctl delbr br-lan
    fi
-   ifconfig $ifname_ap down
-   ifconfig $mesh_if down
-   ifconfig $ifname_ap up
-   ifconfig $mesh_if up
+   ifconfig "$ifname_ap" down
+   ifconfig "$mesh_if" down
+   ifconfig "$ifname_ap" up
+   ifconfig "$mesh_if" up
    if [ -z "$1" ]; then
     exit 1
   fi
@@ -171,10 +172,10 @@ provisioning()
 
 clean_up()
 {
-  cd $SC_MESH_FOLDER
+  cd "$SC_MESH_FOLDER" || exit
   if [ -d "auth/" ]
   then
-    rm *.der; rm -r auth/; rm -r pubKeys/
+    rm ./*.der; rm -r auth/; rm -r pubKeys/
   fi
 }
 
@@ -191,8 +192,8 @@ EOF
 
 bug_initializing()
 {
-  iface=$(ifconfig -a | grep wlan* | awk -F':' '{ print $1 }')
-  if [ $iface == 'wlan0' ]; then
+  iface=$(ifconfig -a | grep "wlan*" | awk -F':' '{ print $1 }')
+  if [ "$iface" == 'wlan0' ]; then
     /sbin/ip link set wlan0 down
     /sbin/ip link set wlan0 name wlan1
     /sbin/ip link set wlan1 up
@@ -206,7 +207,7 @@ generate_random_mesh_ip() {
   # Loop until we generate a valid IP address
   while true; do
     # Generate a random number between 2 and 254
-    rand_num=$((2 + $RANDOM % 253))
+    rand_num=$((2 + RANDOM % 253))
 
     # Use the random number as the last octet of the IP address
     if [ "$rand_num" -ne "$last_oct" ]; then
@@ -237,14 +238,14 @@ get_available_networks() {
 
 
 start_mesh_1_5() {
-  cd "$SC_MESH_FOLDER"
+  cd "$SC_MESH_FOLDER" || exit
   python3 -u main.py
 }
 
 
 get_unused_network() {
   local used_networks="$1"
-  local available_networks=($(seq 15 50 | grep -Fxv -e{10,"used_networks[@]"} | shuf))
+  mapfile -t  available_networks < <(seq 15 50 | grep -Fxv -e{10,"used_networks[@]"} | shuf)
   local unused_network="1${available_networks[0]}.0.0"
   echo "$unused_network"
 }
@@ -298,7 +299,8 @@ if [ "$meshVersion" == "1.5" ]; then
   update_mesh_com_conf "$random_ip"
 
   # Check if the network is available and generate a new one if necessary
-  used_networks=($(get_available_networks))
+  #used_networks=($(get_available_networks))
+  mapfile -t used_networks < <(get_available_networks)
   if [[ "${#used_networks[@]}" -gt 0 ]]; then
     unused_network="$(get_unused_network "${used_networks[@]}")"
     auth_ap="$unused_network.1"
@@ -310,7 +312,7 @@ if [ "$meshVersion" == "1.5" ]; then
   # Update authentication AP configuration file with the new IP
   update_auth_ap_conf "$auth_ap"
 
-  prov=$(cat $SC_MESH_FOLDER/features.yaml |grep provisioning | awk '{ print $2}')
+  prov=$(grep provisioning  $SC_MESH_FOLDER/features.yaml | awk '{ print $2}')
 
   if ! $prov ; #no provisioning
   then
@@ -324,9 +326,9 @@ if [ "$meshVersion" == "1.5" ]; then
 
   cp $COMMON_FOLDER/test/root_cert.der /etc/ssl/certs/ # this is for testing only, must be provided
 
-  uid=$(echo -n $mesh_if_mac | b2sum -l 32)
+  uid=$(echo -n "$mesh_if_mac" | b2sum -l 32)
   uid=${uid::-1}
-  /bin/bash $MESH_FOLDER/common/scripts/generate_keys.sh $uid
+  /bin/bash "$MESH_FOLDER"/common/scripts/generate_keys.sh "$uid"
   start_mesh_1_5
 else
     provisioning true
@@ -343,9 +345,9 @@ if [ "$mode" = "sta+mesh" ]; then
   mesh_service
   create_ap_config
   #Connect to default GW AP
-  wpa_supplicant -Dnl80211 -i $ifname_ap-c ap.conf -B
+  wpa_supplicant -Dnl80211 -i "$ifname_ap" -c ap.conf -B
   sleep 3
-  udhcpc -i $ifname_ap
+  udhcpc -i "$ifname_ap"
 elif [ "$mode" = "ap+mesh_mcc" ]; then
   # Create bridge br-lan
   mesh_service
@@ -354,7 +356,7 @@ elif [ "$mode" = "ap+mesh_mcc" ]; then
   ssid="comms_sleeve#$(echo "$ap_if_mac" | cut -b 13-14,16-17)"
   # Set frequency band and channel from given frequency
   calculate_wifi_channel "$ch"
-  ifconfig $ifname_ap up
+  ifconfig "$ifname_ap" up
 
    # AP hostapd config
     cat <<EOF >/var/run/hostapd.conf
@@ -378,7 +380,7 @@ EOF
   # Bridge AP and Mesh
   if [ "$algo" = "olsr" ]; then
         brctl addif br-lan "$mesh_if" "$ifname_ap"
-        iptables -A FORWARD --in-interface $mesh_if -j ACCEPT
+        iptables -A FORWARD --in-interface "$mesh_if" -j ACCEPT
         killall olsrd 2>/dev/null
         (olsrd -i br-lan -d 0)&
   else
@@ -386,22 +388,22 @@ EOF
         brctl addif br-lan bat0 "$ifname_ap"
         iptables -A FORWARD --in-interface bat0 -j ACCEPT
   fi
-  ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
+  ifconfig br-lan "$br_lan_ip" netmask "255.255.255.0"
   ifconfig br-lan up
   echo
   ifconfig br-lan
   # Add forwarding rules from AP to $mesh_if interface
   iptables -P FORWARD ACCEPT
   route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
-  route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
-  iptables --table nat -A POSTROUTING --out-interface $ifname_ap -j MASQUERADE
+  route add -net 192.168.1.0 gw "$br_lan_ip" netmask 255.255.255.0 dev br-lan
+  iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
 
   #setup minimalistic Mumble server configuration
   rm /etc/umurmur.conf
   cp /opt/mesh_com/modules/utils/docker/umurmur.conf /etc/umurmur.conf
   #Get GW IP
   if [ "$mode" = "sta+mesh" ]; then
-    gw_ip=$(ifconfig $iface | grep "inet " | awk '{ print $2 }')
+    gw_ip=$(ifconfig "$ifname_ap" | grep "inet " | awk '{ print $2 }')
   elif [ "$mode" = "ap+mesh" ]; then
     gw_ip=$(ifconfig br-lan | grep "inet " | awk '{ print $2 }')
   fi
@@ -426,7 +428,7 @@ EOF
     #Create static mac addr for Batman if
     eth0_mac="$(ip -brief link | grep eth0 | awk '{print $3; exit}')"
     batif_mac="00:00:$(echo "$eth0_mac" | cut -b 7-17)"
-    ifconfig $mesh_if hw ether "$batif_mac"
+    ifconfig "$mesh_if" hw ether "$batif_mac"
 
     brctl addbr br-lan
     # AP setup
@@ -438,7 +440,7 @@ EOF
     iw dev "$mesh_if" interface add "$ifname_ap" type managed addr "00:01:$(echo "$pcie_radio_mac" | cut -b 7-17)"
 
     # Set frequency band and channel from given frequency
-     calculate_wifi_channel $ch
+     calculate_wifi_channel "$ch"
 
   # AP hostapd config
   cat <<EOF >/var/run/hostapd.conf
@@ -474,13 +476,13 @@ EOF
     /usr/sbin/hostapd -B /var/run/hostapd.conf -dd -f /tmp/hostapd_"$ifname_ap".log
 
     # Bridge AP and Mesh
-    brctl addif br-lan $mesh_if "$ifname_ap"
+    brctl addif br-lan bat0 "$ifname_ap"
     ifconfig br-lan "$ipaddr" netmask "$nmask"
     ifconfig br-lan up
     echo
     ifconfig br-lan
     iptables -P FORWARD ACCEPT
-    ip addr flush dev $mesh_if
+    ip addr flush dev bat0
     echo "Mesh Point + AP done."
   else
     bridge_settings
@@ -489,4 +491,4 @@ fi
 
 #start comms sleeve web server for companion phone
 #nohup python -u /opt/mesh_com/modules/utils/docker/comms_sleeve_server.py -ip $br_lan_ip -ap_if $ifname_ap  -mesh_if $mesh_if
-nohup python -u $MESH_FOLDER/modules/sc-mesh-secure-deployment/src/gw/main.py
+nohup python -u "$MESH_FOLDER"/modules/sc-mesh-secure-deployment/src/gw/main.py

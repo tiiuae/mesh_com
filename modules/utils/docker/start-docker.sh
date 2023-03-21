@@ -55,13 +55,14 @@ elif [ "$OS" == "Buildroot" ]; then
         # change rootfs location once its mounted in dedicated partition
         if [ -f "/root/rootfs.tgz" ]; then
             echo "import rootfs.tgz commms vm"
+            # shellcheck disable=SC2002
             cat /root/rootfs.tgz | docker import - comms_vm
             docker build -t comms_vm .
         else
             docker import - comms_vm < /rootfs.tar
         fi
         meshcom_path="/opt/container-data/mesh/mesh_com/"
-        echo $meshcom_path
+        echo "$meshcom_path"
         if [ ! -f "/opt/container-data/mesh/mesh.conf" ]; then
 		cp /opt/mesh_default.conf /opt/container-data/mesh/mesh.conf
 		cp $meshcom_path/common/scripts/mesh-ibss.sh  /opt/container-data/mesh/.

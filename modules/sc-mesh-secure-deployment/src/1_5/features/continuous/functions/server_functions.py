@@ -50,7 +50,7 @@ def authenticator(secret, crc_key, received_shares, msg_received, time_margin, s
     print("Message to MAC = ", msg_to_mac)
     # calc_mac = hmac.new(bytes(str(secret),'utf-8'), bytes(r_client_id + ',' + r_server_id + ',' + r_message + ',
     # ' + r_u + ',' + ',' + r_time_flag, 'utf-8'), hashlib.sha256).digest()
-    calc_mac = hmac.new(bytes(str(secret), 'utf-8'), msg_to_mac.encode('utf-8'), hashlib.sha256).digest()
+    calc_mac = hmac.new(bytes(str(secret), 'utf-8'), msg_to_mac.encode('utf-8'), hashlib.sha3_256).digest()
     print("Calculated MAC = ", calc_mac)
     if str(calc_mac) == r_mac:
         print("MACs match")
@@ -61,7 +61,7 @@ def authenticator(secret, crc_key, received_shares, msg_received, time_margin, s
 
     # Compute new share authenticator
     # print("u - secret - time flag= ", str(r_u - secret - r_time_flag))
-    calc_sa = hashlib.sha256(bytes(str(r_u - secret - r_time_flag), 'utf-8')).digest()
+    calc_sa = hashlib.sha3_256(bytes(str(r_u - secret - r_time_flag), 'utf-8')).digest()
     print("Calculated share authenticator = ", calc_sa)
     if str(calc_sa) == r_sa:
         print("Share authenticated")
@@ -71,35 +71,3 @@ def authenticator(secret, crc_key, received_shares, msg_received, time_margin, s
         print("Share not authenticated")
         # return "fail"
         return 0
-
-
-def authentication_result(auth_result):
-    # Sends authentication result to client and implements exponential backoff in case of failure
-    # Set backoff period according to auth result and consecutive num of failures
-    # if auth_result == "pass":
-    if auth_result == 1:
-        num_of_fails = 0  # reset no of failures to 0
-        backoff_period = 0  # reset backoff time to 0
-        result_dict = {
-            "auth_result": auth_result,
-            "backoff_period": backoff_period
-        }
-        result = json.dumps(result_dict)
-        print("Result Sent = ", result)
-        c.send(bytes(result, 'utf-8'))
-    else:
-        num_of_fails = num_of_fails + 1
-        backoff_period = period ** num_of_fails  # exponential backoff = auth period ^ num of failures
-        result_dict = {
-            "auth_result": auth_result,
-            "backoff_period": backoff_period
-        }
-        result = json.dumps(result_dict)
-        print("Result Sent = ", result)
-        c.send(bytes(result, 'utf-8'))
-        backoff_start = time.time()
-        # Do not receive data for backoff period
-        while time.time() - backoff_start <= backoff_period:
-            pass
-    print('*********************************************************************')
-    print(' ')

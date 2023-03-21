@@ -1,3 +1,3 @@
 #!/bin/bash
 
-ip route add default via $1
+ip route add default via "$1"

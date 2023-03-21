@@ -1,6 +1,5 @@
 from pyke import knowledge_engine, krb_traceback
 import sys
-import pickle
 import os
 import json
 import time
@@ -175,7 +174,7 @@ class NESS:
 
     def read_file(self):
         with open(self.dataset, 'rb') as f:  # b for binary
-            obj = pickle.load(f)
+            obj = json.load(f)
         return obj, len(obj)
 
     def test(self):

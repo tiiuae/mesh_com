@@ -1,10 +1,3 @@
-import multiprocessing
-import pandas as pd
-from time import time, sleep
-import random
-import numpy as np
-import sys
-
 from .ca_main import *
 from ..mutual.mutual import *
 
@@ -26,7 +19,7 @@ async def launchCA(sectable):
     ID = random.randint(1000, 64000)
     with contextlib.suppress(OSError):
         ca = CA(ID)
-    myip = co.get_ip_address(MESHINT)
+    myip =  mesh_utils.get_mesh_ip_address(MESHINT)
     max_count = 3
     flag_ctr = 0
 
@@ -143,21 +136,7 @@ def update_table_ca(df, result, myID):
                 info = {'ID': cliID, 'MAC': mac, 'IP': ip, 'PubKey_fpr': client_fpr, 'MA_level': 1, 'CA_Result': CA_Result,
                         'CA_Server': myID} # Check if MA_level should be 1 or something else
                 df = df.append(info, ignore_index=True)
-    """
-    for index, row in df.iterrows():
-        for res in result:
-            for ip in res.keys():
-                if row['IP'] == ip:
-                    IP = row['IP']
-                    if res[ip] in ['pass', 1]:
-                        df.loc[index, 'CA_Result'] = 1
-                    elif res[ip] == 'fail' or res[ip] == 0:
-                        df.loc[df['IP'] == IP, 'CA_Result'] = 2
-                    else:
-                        df.loc[df['IP'] == IP, 'CA_Result'] = 3
-                    # df.loc[df['IP'] == IP, 'CA_ts'] = time()
-                    df.loc[df['IP'] == IP, 'CA_Server'] = myID
-    """
+
     df.drop_duplicates(inplace=True)
     print('result: ', result)
     print('df: ', df)

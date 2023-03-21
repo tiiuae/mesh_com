@@ -10,7 +10,6 @@ try:
     import queue
 except ImportError:
     import Queue as queue
-import re
 
 
 def get_macs_neighbors():
@@ -19,7 +18,8 @@ def get_macs_neighbors():
     return a list of macs
     """
     macs = []
-    proc = subprocess.run(['batctl', 'n'], capture_output=True)
+    cmd = ['batctl', 'n']
+    proc = subprocess.run(cmd, capture_output=True, shell=False)
     splitout = proc.stdout.decode().split('\n')
     if len(splitout) > 3:
         macs.extend(aux.split('\t')[1].split(' ')[2] for aux in splitout[2:-1])
@@ -28,7 +28,6 @@ def get_macs_neighbors():
 
 def get_mac_mesh(pattern):
     for interf in netifaces.interfaces():
-        # TODO: what it if doesn't start with wlan???
         if interf.startswith(pattern):
             interface = interf
             mac = netifaces.ifaddresses(interface)[netifaces.AF_LINK]
@@ -84,15 +83,16 @@ def get_neighbors_ip():
     def thread_pinger(ip):
         #args = ['/bin/ping', '-c', '1', '-W', '1', str(ip)]
         args = ['/bin/ping', '-c', '1', str(ip)]
-        p_ping = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE)
-        # save ping stdout
-        p_ping_out = str(p_ping.communicate()[0])
+        with subprocess.Popen(args, shell=False, stdout=subprocess.PIPE) as p_ping:
 
-        if (p_ping.wait() == 0):
-            # rtt min/avg/max/mdev = 22.293/22.293/22.293/0.000 ms
-            # search = re.search(r'rtt min/avg/max/mdev = (.*)/(.*)/(.*)/(.*) ms',p_ping_out, re.M | re.I)
-            # out_q.put(str(ip))
-            final.append(ip)
+        # save ping stdout
+        #p_ping_out = str(p_ping.communicate()[0])
+
+            if p_ping.wait() == 0:
+                # rtt min/avg/max/mdev = 22.293/22.293/22.293/0.000 ms
+                # search = re.search(r'rtt min/avg/max/mdev = (.*)/(.*)/(.*)/(.*) ms',p_ping_out, re.M | re.I)
+                # out_q.put(str(ip))
+                final.append(ip)
 
     for ip in ips:
         worker = Thread(target=thread_pinger, args=(ip,), daemon=True)
@@ -121,3 +121,5 @@ def get_arp():
             mac = string[-2]
             neig[ip] = mac
     return neig
+
+

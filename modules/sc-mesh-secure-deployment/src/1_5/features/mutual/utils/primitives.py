@@ -13,7 +13,6 @@ from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA256
 from Crypto.Util.Padding import unpad
 from Crypto.Cipher import AES
-from common import utils
 
 BUF_SIZE = 65536  # let's read stuff in 64kb chunks!
 LIB = "/usr/lib/softhsm/libsofthsm2.so"
@@ -204,6 +203,7 @@ def import_cert(client_key, node_name):
 
 
 def verify_hsm(msg, sig, name):
+    pubKey = None
     session = get_session()
     keys = session.findObjects()
     for key in range(len(keys)):
@@ -318,11 +318,15 @@ def get_labels():
             labels.append(aux['CKA_LABEL'])
     return list(set(labels))[0]
     """
-    ut = utils.Utils()
-    mesh_if_mac = ut.get_mac_by_interface('wlp1s0')
-    command = [f'echo -n {mesh_if_mac} | b2sum -l 32']
-    output = subprocess.run(command, shell=True, capture_output=True, text=True)
-    return output.stdout[:-4]
+    mesh_if_mac = util.get_mac_by_interface('wlp1s0')
+    cmd = ["echo", "-n", mesh_if_mac]
+    cmd2 = ["b2sum", "-l", "32"]
+
+    with subprocess.Popen(cmd, stdout=subprocess.PIPE) as ps_proc:
+        with subprocess.Popen(cmd2, stdin=ps_proc.stdout, stdout=subprocess.PIPE) as grep_ipython_proc:
+            pid, _ = grep_ipython_proc.communicate()
+
+    return pid.decode().split('\n',maxsplit=1)[0].split('  -',maxsplit=1)[0]
 
 def main():
     clean_all()
@@ -330,3 +334,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

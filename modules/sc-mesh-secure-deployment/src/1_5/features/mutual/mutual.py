@@ -1,31 +1,30 @@
 #!/bin/python3
 
+import base64
+import hashlib
+import hmac
+import json
 import os
 import random
-from os import path
-from .utils import wifi_ssrc as wf
-from .utils import funsocket as fs
-import time
-import pandas as pd
-from .utils import primitives as pri
-from termcolor import colored
-import sys
 import shutil
-import json
-import base64
-import hmac
-import hashlib
-from datetime import datetime
-import pickle
-from common import utils
-import traceback
 import subprocess
+import sys
+import time
+import traceback
+from datetime import datetime
+from os import path
+
+import pandas as pd
+
+from termcolor import colored
+
+from .utils import funsocket as fs
+from .utils import primitives as pri
+from .utils import wifi_ssrc as wf
 
 sys.path.insert(0, '../../')
-'''
-only for testing 
-'''
-from common import ConnectionMgr
+
+from common import ConnectionMgr, mesh_utils, utils
 
 co = ConnectionMgr.ConnectionMgr()
 
@@ -131,8 +130,8 @@ class Mutual:
         Function to create an structure for the message, it is created a dictionary.
         The output is a json of a dictionary with the HMAC of the structure
         '''
-        with open(self.local_cert, 'rb') as file:
-            client_cert_data = file.read()
+        with open(self.local_cert, 'rb') as f:
+            client_cert_data = f.read()
         msg_to_mac_dict = {
             "root_sig": base64.b64encode(self.signature()).decode(),
             "client_cert": base64.b64encode(client_cert_data).decode(),
@@ -156,18 +155,18 @@ class Mutual:
         '''
         function to exchange info as a client
         '''
-        with open(root_cert, 'rb') as file:
-            root_cert_data = file.read()
+        with open(root_cert, 'rb') as f:
+            root_cert_data = f.read()
         message = self.message_generator(root_cert_data)
         try:
             fs.client_auth(candidate, serverIP, json.dumps(message).encode(), self.interface)
             if logger:
                 logger.info("Client socket created")
-        except Exception as e:
-            print("Client connection failed with exception ", e)
+        except ConnectionRefusedError as exc:
+            print("Client connection failed with exception ", exc)
             traceback.print_exc()
             if logger:
-                logger.error("Client connection failed with exception %s", e)
+                logger.error("Client connection failed with exception %s", exc)
             sys.exit()
 
     def client(self, candidate, logger=None):
@@ -182,14 +181,14 @@ class Mutual:
                 command = ['iw', 'dev', self.interface, 'link']
                 iw = subprocess.run(command, shell=False, capture_output=True, text=True)
                 logger.debug("iw output:\n%s", iw.stdout)
-        except Exception as e:
-            print("Connection to AP failed with exception ", e)
+        except ConnectionRefusedError as exc:
+            print("Connection to AP failed with exception ", exc)
             traceback.print_exc()
             if logger:
-                logger.error("Connection to AP failed with exception %s", e)
+                logger.error("Connection to AP failed with exception %s", exc)
             sys.exit()
         print('2) sending signature of root certificate')
-        serverIP = (".".join(co.get_ip_address(self.interface).split(".")[:3]) + ".1")
+        serverIP = (".".join(mesh_utils.get_mesh_ip_address(self.interface).split(".")[:3]) + ".1")
         self.exchange(candidate, serverIP, logger)
         print('3) getting node certificate')
         server_sig, addr = fs.server_auth(self.myID, self.interface)
@@ -209,23 +208,25 @@ class Mutual:
                 command = ['iw', 'dev', self.interface, 'info']
                 iw = subprocess.run(command, shell=False, capture_output=True, text=True)
                 logger.debug("iw output:\n%s", iw.stdout)
-        except Exception as e:
+        except ConnectionRefusedError as exc:
             self.server_exception(
                 "AP creation failed with exception ",
-                e,
+                exc,
                 logger,
                 "AP creation failed with exception %s",
             )
         time.sleep(2)
         print('1) server default')
+        client_cert = None
+        addr = None
         try:
             client_cert, addr = fs.server_auth(self.myID, self.interface)
             if logger:
                 logger.info("Server socket created")
-        except Exception as e:
+        except ConnectionRefusedError as exc:
             self.server_exception(
                 "Server socket creation failed with exception ",
-                e,
+                exc,
                 logger,
                 "Server socket creation failed with exception %s",
             )
@@ -264,8 +265,8 @@ class Mutual:
         }
         # convert dict to json
         msg_to_mac = json.dumps(msg_to_mac_dict)
-        with open(root_cert, 'rb') as file:
-            root_cert_data = file.read()
+        with open(root_cert, 'rb') as f:
+            root_cert_data = f.read()
         my_mac =  hmac.new(
                 root_cert_data,
                 msg_to_mac.encode('utf-8'),
@@ -287,7 +288,7 @@ class Mutual:
         if os.path.isfile('auth/nonces.bin'):
             # Load the list back into memory
             with open('auth/nonces.bin', 'rb') as f:
-                received_shares = pickle.loads(f.read())
+                received_shares = json.loads(f.read())
         else:
             received_shares = []
         if received_shares.count(nonce) == 0:
@@ -295,7 +296,7 @@ class Mutual:
             received_shares.append(nonce.to_bytes(2, byteorder='big'))
             # Open a file and map it into memory
             with open('auth/nonces.bin', 'wb') as f:
-                pickle.dump(received_shares, f)
+                json.dump(received_shares, f)
         else:
             print(colored('> Share has been used previously', 'red'))
             # return "fail"
@@ -349,7 +350,7 @@ class Mutual:
             fs.client_auth(cliID, addr[0], encrypt_pass, self.interface)
         try:
             client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
-        except Exception as e:
+        except ConnectionRefusedError:
             time.sleep(10)
             client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)
         if self.debug:
@@ -362,7 +363,7 @@ class Mutual:
             fs.client_auth(cliID, addr[0], my_mac_mesh.encode(), self.interface)
         try:
             client_mac, _ = fs.server_auth(self.myID, self.interface)
-        except Exception as e:
+        except ConnectionRefusedError:
             time.sleep(10)
             client_mac, _ = fs.server_auth(self.myID, self.interface)
         if self.debug:
@@ -382,8 +383,7 @@ class Mutual:
         try:
             self.my_ip_mesh, self.my_mac_mesh = co.create_mesh_config
             co.starting_mesh()
-        except Exception:
-            TypeError
+        except TypeError:
             print("No password provided for the mesh. Please get the password via provisioning server")
             sys.exit()
 
@@ -422,6 +422,8 @@ class Mutual:
             print('Authenticated, now send my pubkey')
             client_fpr, _ = pri.hashSig(node_name + '.der')
             #pri.derive_ecdh_secret(node_name, cliID, self.local_cert, self.salt)
+            client_mac = None
+            client_mesh_ip = None
             if cli:  # client
                 print('5) get password')
                 enc_pass, _ = fs.server_auth(self.myID, self.interface)
@@ -432,11 +434,11 @@ class Mutual:
                 self.start_mesh()
                 try:
                     fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode(), self.interface)  # send my mesh ip
-                except Exception as e:
+                except ConnectionRefusedError:
                     time.sleep(2)
                     try:
                         fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode(), self.interface)
-                    except Exception as e:
+                    except ConnectionRefusedError:
                         time.sleep(10)
                         fs.client_auth(cliID, addr[0], self.my_ip_mesh.encode(), self.interface)  # send my mesh ip
                 client_mac, _ = fs.server_auth(self.myID, self.interface)
@@ -444,11 +446,11 @@ class Mutual:
                 try:
                     time.sleep(2)
                     fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode(), self.interface)  # send my mac
-                except Exception as e:
+                except ConnectionRefusedError:
                     time.sleep(2)
                     try:
                         fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode(), self.interface)
-                    except Exception as e:
+                    except ConnectionRefusedError:
                         time.sleep(10)
                         fs.client_auth(cliID, addr[0], self.my_mac_mesh.encode(), self.interface)
                 client_mesh_ip, _ = fs.server_auth(self.myID, self.interface)

@@ -36,15 +36,14 @@ myID = mut.myID
 
 def print_menu():
     banner()
-    for key in menu_options.keys():
-        print(key, '--', menu_options[key])
-
+    for key, value in menu_options.items():
+        print(f"{key} -- {value}")
 
 def aux_auth(semasphore):
     while True:
         with semasphore:
             command = ["ps | grep 'wpa_supplicant -B -i wlan1 -c conf/ap.conf' -m 1 | awk '{print $1}'"]
-            output = subprocess.run(command, shell=True, capture_output=True, text=True)
+            output = subprocess.run(command, shell=True, capture_output=True, text=True) # TODO remove the shell=True
             pid = (output.stdout).replace('\n','')
             command = ['kill', pid]
             subprocess.run(command, shell=False)
