@@ -57,6 +57,7 @@ if [ $hw_platform == "Compute" ]; then
     #start Mesh service
     echo "starting 11s mesh service"
     /opt/S9011sMesh start
+    /opt/S90nats_server start
     sleep 2
   fi
 else

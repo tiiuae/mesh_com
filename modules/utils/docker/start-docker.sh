@@ -70,6 +70,8 @@ elif [ "$OS" == "Buildroot" ]; then
 		chmod 755 /opt/container-data/mesh/mesh-11s.sh
 		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S9011sMesh /opt/container-data/mesh/.
 		chmod 755 /opt/container-data/mesh/S9011sMesh
+		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90nats_server /opt/container-data/mesh/.
+		chmod 755 /opt/container-data/mesh/S90nats_server
         fi
         cp /etc/umurmur.conf $meshcom_path/modules/utils/docker/umurmur.conf
         docker rm -f mesh_comms_vm
