@@ -1,6 +1,6 @@
 #! /bin/bash -x
 
-
+COMMS_PCB_VERSION_FILE="/opt/hardware/comms_pcb_version"
 
 calculate_wifi_channel()
 {
@@ -21,8 +21,6 @@ calculate_wifi_channel()
   fi
 }
 
-
-
 create_ap_config()
 {
   cat > ap.conf <<- EOF
@@ -32,8 +30,7 @@ create_ap_config()
     }
   EOF
 }
-
-
+#configurate the dhcpd file 
 create_dhcpd_config()
 {
   SUBNET="$1"
@@ -51,9 +48,7 @@ create_dhcpd_config()
   EOF
   cp /dev/null /var/lib/dhcp/dhcpd.leases
 }
-
-
-
+#create a confiuration file for OlSRD whereas we add Hna4 and Hna6
 create_olsrd_config()
 {
   wifidev="$1"
@@ -70,15 +65,11 @@ create_olsrd_config()
 
   }
 
- 
-
   IpVersion               4
 
   LinkQualityFishEye      0
 
   LinkQualityAlgorithm "etx_ffeth_nl80211"
-
- 
 
   # This is only here to be able to generate a
 
@@ -115,9 +106,7 @@ create_olsrd_config()
   }
   EOF
 }
-
-
-
+#configuration of the radvd.conf to use a random ipv6
 create_radvd_config()
 {
   IPV6_PREFIX="$1"
@@ -131,8 +120,6 @@ create_radvd_config()
     };
   EOF
 }
-
-
 
 if [ -f "/opt/mesh.conf" ]; then
   source /opt/mesh.conf
@@ -201,8 +188,7 @@ elif [ "$mode" = "ap+mesh_mcc" ]; then
   # Set frequency band and channel from given frequency
   calculate_wifi_channel "$ch"
   ifconfig $ifname_ap up
-  
-  
+  #generate a random IPV6
   IPV6_PREFIX=$( echo fd`dd if=/dev/urandom bs=7 count=1 status=none | xxd -p` | sed 's/\(....\)/\1:/g' )
   ip addr add $SUBNET.1/24 dev br-lan && ip addr add $IPV6_PREFIX:1/64 dev br-lan
 
@@ -359,9 +345,26 @@ elif [ "$mode" == "ap+mesh_scc" ]; then
   echo 'Mesh Point + AP extra done'
 
 else
-  brctl addbr br-lan
-  # Bridge eth1 and Mesh
-  brctl addif br-lan bat0 eth1
+   brctl addbr br-lan
+  # Bridge ethernet and Mesh
+  
+  eth_port="eth1"
+  if [ -f "$COMMS_PCB_VERSION_FILE" ]; then
+    source "$COMMS_PCB_VERSION_FILE"
+    # Sleeve 1.x has PCB version 0
+    if (( $(echo "$COMMS_PCB_VERSION == 0" |bc -l) )); then
+      eth_port="eth1"
+    # CM1.5 PCB version is 0.5
+    elif (( $(echo "$COMMS_PCB_VERSION == 0.5" |bc -l) )); then
+      eth_port="eth0"
+    # CM2.x PCB version starts from 1
+    elif (( $(echo "$COMMS_PCB_VERSION >= 1" |bc -l) )); then
+      eth_port="lan1"
+    fi
+  fi
+  echo $eth_port
+
+  brctl addif br-lan bat0 $eth_port
   echo $br_lan_ip
   ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
   ifconfig br-lan up
@@ -374,8 +377,6 @@ else
   iptables -A FORWARD --in-interface bat0 -j ACCEPT
   iptables --table nat -A POSTROUTING --out-interface $br_lan_ip -j MASQUERADE
 fi
-
-
 
 #start gw manager
 nohup python -u /opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw/main.py
