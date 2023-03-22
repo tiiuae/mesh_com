@@ -121,7 +121,7 @@ class RIDLocSubscriber(Node):
         elif self.rid_type == "nats":
              jmsg = self.encoder.init_data_fields(msg.timestamp, "AirBone", msg.lat, msg.lon, msg.alt, msg.eph, msg.epv, "Unkown", "Unkown", "Unkown", "Unkown", msg.vel_m_s, msg.timestamp_time_relative, msg.vel_e_m_s, msg.vel_d_m_s)
              jmsg = self.encoder.encode_data_fields()
-             await self.client.publish_async("rid", jmsg)
+             self.client.loop.run_until_complete(self.client.publish_async("rid", jmsg))
         else:
             print("rid transport not supported")
 
