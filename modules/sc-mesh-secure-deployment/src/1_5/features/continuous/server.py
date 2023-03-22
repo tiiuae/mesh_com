@@ -200,7 +200,6 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
             if auth_result == "pass" or auth_result == 1:
                 r_bin_data = msg_received[:-(len(crc_key) - 1)]
                 msg_received_jsn = ''.join(chr(int(r_bin_data[i:i + 8], 2)) for i in range(0, len(r_bin_data), 8))
-
                 msg_received = json.loads(msg_received_jsn)
                 print('Message received = ', msg_received)
 

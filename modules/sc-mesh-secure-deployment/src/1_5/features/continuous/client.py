@@ -82,8 +82,8 @@ def initiate_client(server_ip, ID, logger=None):
                 cli_sock.send(message)
 
             elif message == 'Connected to server, need to exchange ID':
-                #received_message = cli_sock.recv(1024)
-                #servID = received_message.decode('utf-8')
+                received_message = cli_sock.recv(1024)
+                servID = received_message.decode('utf-8')
 
                 print('Sending my ID')
                 my_ID = pri.get_labels()
@@ -145,7 +145,7 @@ def initiate_client(server_ip, ID, logger=None):
                     msg = f"Continuous Authentication {str(time_flag)}"
 
                     # Generate message with authentication tokens
-                    msg_to_send = client_functions.message_generator(secret, server_id, client_id, msg, rand_num, time_flag, shared_sec)
+                    msg_to_send = client_functions.message_generator(secret, server_id, client_id, msg, shared_sec, time_flag, share_aut)
                     # Add CRC
                     msg_with_crc = client_functions.crc_generator(msg_to_send, crc_key)
 

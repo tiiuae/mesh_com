@@ -155,7 +155,7 @@ def sbeat():
     count = 1
     sbeatcount(count)
     #sec_beat(myID)
-    while time() < original_time + END_TIME_SEC_BEAT:
+    while time() < original_time + END_TIME_SEC_BEAT: # to add more time increase this parameter in header, or add an infinite loop
         if mesh_utils.verify_mesh_status() and time() - sec_beat_start_time >= SEC_BEAT_TIME:  # verifying that mesh is running
             #sleep(sec_beat_time - time() % sec_beat_time)  # sec beat time
             sec_beat_start_time = time()

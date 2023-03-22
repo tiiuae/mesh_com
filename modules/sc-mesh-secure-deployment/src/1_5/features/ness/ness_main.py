@@ -64,9 +64,8 @@ class NESS:
         mappids = self.mapping(set(df["ID"].tolist()))
         df2 = df.replace({"CA_Server": mappids})
         # df2 = df2.replace({"ID": mapp})
-        df2["CA_Server"] = df2["CA_Server"].astype('Int64')
+        df2["CA_Server"] = df2["CA_Server"]#.astype('Int64')
         new_list = []
-        last_status = []
         for i in df2["ID"]:
             df2.loc[(df2['CA_Server'].isnull()) & (df2["ID"] == i), "CA_Server"] = int(list(pd.Series(i).map(mappids))[0])
             table = [list(pd.Series(i).map(mappids))[0]]
@@ -94,8 +93,8 @@ class NESS:
             flags_list = []
             servers_list = []
         else:
-            f = open('last_result.json')
-            json_object = json.load(f)
+            with open('last_result.json') as f:
+                json_object = json.load(f)
             latest_status_list = json_object['latest_status_list']
             good_server_status_list = json_object['good_server_status_list']
             flags_list = json_object['flags_list']
@@ -112,7 +111,7 @@ class NESS:
             if result[node] == 194:
                 latest_status_list.append(3)
                 flags_list.append(3)
-        n = len(servers_list)
+        #n = len(servers_list)
         self.save_file_status(latest_status_list=latest_status_list, good_server_status_list=good_server_status_list,
                               flags_list=flags_list, servers_list=servers_list, mapp=mapp)
 
@@ -149,7 +148,7 @@ class NESS:
         else:
             res1 = 0
             print("\nCan't conclude inference. More checks needed for node ", i[0])
-            mnode = ''
+            #mnode = ''
             try:
                 with self.engine.prove_goal('ness_check.consistency_analysis($eval1)') as gen:
                     for vars, plan in gen:

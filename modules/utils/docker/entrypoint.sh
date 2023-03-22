@@ -330,6 +330,7 @@ if [ "$meshVersion" == "1.5" ]; then
   uid=${uid::-1}
   /bin/bash "$MESH_FOLDER"/common/scripts/generate_keys.sh "$uid"
   start_mesh_1_5
+  nohup python -u "$MESH_FOLDER"/modules/sc-mesh-secure-deployment/src/gw/main.py
 else
     provisioning true
     mesh_service
