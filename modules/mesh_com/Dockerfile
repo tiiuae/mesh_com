@@ -47,8 +47,10 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     rfkill \
     iproute2 \
     python3-pip \
+    vim \
+    ros-galactic-rosbag2 \
+    libyaml-cpp0.6 \
     && rm -rf /var/lib/apt/lists/*
-
 RUN pip3 install nats-py
 RUN apt-get remove -y python3-pip
 
