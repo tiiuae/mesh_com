@@ -33,6 +33,7 @@ setup(
         'mesh_publisher = mesh_com.mesh_publisher:main',
         'mesh_executor = mesh_com.mesh_executor:main',
         'rid_ussp_service = mesh_com.utm_ussp_service.rid_location_subscriber:main',
+        'rid_queue_test = mesh_com.utm_ussp_service.rid_queue_test:main'
         ],
     },
 )

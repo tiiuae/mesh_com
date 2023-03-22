@@ -1,5 +1,5 @@
 rid_type: nats
-rid_sampling_rate: 1000
+rid_frequency: 3
 rid_server: "demo.nats.io"
 rid_port: 4222
 rid_certfile:

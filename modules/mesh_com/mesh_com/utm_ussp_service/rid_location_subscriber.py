@@ -9,6 +9,7 @@ from rclpy.qos import QoSReliabilityPolicy
 from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSHistoryPolicy
 from px4_msgs.msg import VehicleGpsPosition
+import time
 
 from .transport.rid_nats import ridNatsClient
 from .transport.dri_broadcast import dri_broadcast
@@ -105,7 +106,7 @@ class RIDLocSubscriber(Node):
         self.backup_data = ""
         self.yaml_file = "/opt/ros/galactic/share/mesh_com/ussp.yaml"
         self.rid_type = None
-        self.rid_sampling_rate = None
+        self.rid_frequency = None
         self.rid_certfile = None
         self.rid_keyfile = None
         self.client = None
@@ -122,6 +123,7 @@ class RIDLocSubscriber(Node):
              jmsg = self.encoder.init_data_fields(msg.timestamp, "AirBone", msg.lat, msg.lon, msg.alt, msg.eph, msg.epv, "Unkown", "Unkown", "Unkown", "Unkown", msg.vel_m_s, msg.timestamp_time_relative, msg.vel_e_m_s, msg.vel_d_m_s)
              jmsg = self.encoder.encode_data_fields()
              self.client.loop.run_until_complete(self.client.publish_async("rid", jmsg))
+             time.sleep(1/self.rid_frequency)
         else:
             print("rid transport not supported")
 
@@ -133,8 +135,8 @@ class RIDLocSubscriber(Node):
             if "rid_type" in parsed_yaml:
                 self.rid_type = parsed_yaml["rid_type"]
 
-            if "rid_sampling_rate" in parsed_yaml:
-                self.rid_sampling_rate = parsed_yaml["rid_sampling_rate"]
+            if "rid_frequency" in parsed_yaml:
+                self.rid_frequency = parsed_yaml["rid_frequency"]
 
             if "rid_certfile" in parsed_yaml:
                 self.rid_certfile = parsed_yaml["rid_certfile"]
