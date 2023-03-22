@@ -154,6 +154,7 @@ class RIDLocSubscriber(Node):
         elif self.rid_type == "nats":
             self.encoder = rid_astm_f3411()
             self.client = ridNatsClient(server=self.rid_server, port=self.rid_port, certfile=self.rid_certfile, keyfile=self.rid_keyfile)
+            print("NATS Server", self.rid_server, "port:", self.rid_port)
             # Connect to NATS server
             self.client.loop.run_until_complete(self.client.connect())
         else:
