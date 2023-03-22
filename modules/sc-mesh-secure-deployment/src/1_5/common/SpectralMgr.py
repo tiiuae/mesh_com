@@ -95,8 +95,10 @@ class Spectral:
                     sigval = noise + rssi + 20 * math.log10(sample) - sum_square_sample
                     self.VALUES[count] = (tsf, subcarrier_freq, noise, rssi, sigval)
 
-                    print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (tsf, subcarrier_freq, noise, rssi, sigval))
+                    if(self.debug):
+                       print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (tsf, subcarrier_freq, noise, rssi, sigval))
                     count = count + 1
+                    
             # 40 MHz
             elif stype == 2:
                 if pos >= len(data) - self.header_size - self.type2_packet_size + 1:
@@ -151,7 +153,8 @@ class Spectral:
                     subcarrier_freq = first_sc + i * self.sc_wide
                     self.VALUES[count] = (subcarrier_freq, (noise_l + noise_u) / 2, (rssi_l + rssi_u) / 2, sigval, (max_mag_l + max_mag_u)/2)
 
-                    print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f Max Magnitude %d" % (tsf, subcarrier_freq, (noise_l+noise_u)/2, (rssi_l + rssi_u) / 2, sigval, (max_mag_l + max_mag_u)/2))
+                    if(self.debug):
+                       print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f Max Magnitude %d" % (tsf, subcarrier_freq, (noise_l+noise_u)/2, (rssi_l + rssi_u) / 2, sigval, (max_mag_l + max_mag_u)/2))
                     count = count + 1
 
             # ath10k
@@ -170,7 +173,8 @@ class Spectral:
 
                 self.VALUES[count] = (freq1, noise, max_mag, gain_db, base_pwr_db, rssi, relpwr_db, avgpwr_db)
 
-                print(f"Channel Width: {chanwidth} Freq1: {freq1} Freq2: {freq2} Noise: {noise} Max Magnitude: {max_mag} Gain_db: {gain_db} Base Power_db: {base_pwr_db} TSF: {tsf} Max Index: {max_index} Rssi: {rssi} Rel Power_db: {relpwr_db} Avg Power_db: {avgpwr_db} Max_exp: {max_exp}")
+                if(self.debug):
+                   print(f"Channel Width: {chanwidth} Freq1: {freq1} Freq2: {freq2} Noise: {noise} Max Magnitude: {max_mag} Gain_db: {gain_db} Base Power_db: {base_pwr_db} TSF: {tsf} Max Index: {max_index} Rssi: {rssi} Rel Power_db: {relpwr_db} Avg Power_db: {avgpwr_db} Max_exp: {max_exp}")
                 count = count + 1
 
 
@@ -178,7 +182,6 @@ class Spectral:
             vals_list = []
             for key, value in self.VALUES.items():
                 vals_list.append(list(value))
-          
 
             if(self.driver == "ath9k"): 
                 spectral_capture_df = pd.DataFrame(vals_list, columns = ["freq1", "noise", "rssi", "signal", "max magnitude"])
@@ -188,13 +191,13 @@ class Spectral:
                 spectral_capture_df = pd.DataFrame(vals_list, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
 
 
-            if(spectral_capture_df['freq1'].nunique() != len(channels.split())):
+            if(spectral_capture_df['freq1'].nunique() != len(channels.split())): # scan is missing channels
                 if(self.missing_scan_count == 0):       # first instance of missing scan
                     present_channels = list(map(str, spectral_capture_df['freq1'].unique()))
                     self.missing_scan_count += 1
                     vals_list_scanning = vals_list
 
-                elif(self.missing_scan_count > 0):      # add remaining missing channels from subsequent scans
+                elif(self.missing_scan_count > 0): # add remaining missing channels from subsequent scans
                     scanned_channels = list(map(str, spectral_capture_df['freq1'].unique()))
                     present_channels += scanned_channels
                     vals_list_scanning += vals_list
@@ -204,18 +207,18 @@ class Spectral:
                 channels_missing_set = set(channels.split()) ^ set(present_channels)
                 sorted_channels = list(map(int,list(channels_missing_set)))
                 sorted_channels.sort()
-                channels = ' '.join(list(map(str, sorted_channels)))       # converting into string format to pass to do_scan_cmd
+                channels = ' '.join(list(map(str, sorted_channels)))       # converting to string to pass to do_scan_cmd
                 return channels
 
-            if(channels == ''):
-                present_channels = []
-                print(f"cont_saved csv {self.outfile}_{csv_count}.csv")
-                spectral_capture_df = pd.DataFrame(vals_list_scanning, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
-                spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
-                self.missing_scan_count = 0
-                return all_channels
+                if(channels == ''): # if all missing channels have been retreived in the scans
+                    present_channels = []
+                    print(f"cont_saved csv {self.outfile}_{csv_count}.csv")
+                    spectral_capture_df = pd.DataFrame(vals_list_scanning, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
+                    spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
+                    self.missing_scan_count = 0
+                    return all_channels
 
-            elif(spectral_capture_df['freq1'].nunique() == len(channels.split())):
+            elif(spectral_capture_df['freq1'].nunique() == len(channels.split())): # if scan has all channels
                 print(f"all_saved csv {self.outfile}_{csv_count}.csv")
                 spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
                 return all_channels
@@ -238,7 +241,6 @@ class Spectral:
 
         elif(self.driver == "ath10k"):
            cmd_background = "echo background > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
-           #cmd_count = "echo 25 > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_count"
            cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
 
            subprocess.call(cmd_background, shell=True)
