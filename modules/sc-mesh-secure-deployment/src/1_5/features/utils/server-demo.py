@@ -1,4 +1,4 @@
-from flask import Flask, request, json
+from flask import Flask
 import pandas as pd
 app = Flask(__name__)
 
@@ -44,4 +44,4 @@ def debug():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=True)
+    app.run(host='0.0.0.0', debug=False)

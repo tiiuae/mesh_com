@@ -43,15 +43,38 @@ elif [ "$OS" == "Buildroot" ]; then
             mkdir -p /opt/container-data/mesh
             mv /opt/mesh_com* /opt/container-data/mesh/
         fi
+        # Copy hardware identification file into container-data
+        if [ ! -d "/opt/container-data/mesh/hardware" ]; then
+            if [ -f "/etc/comms_pcb_version" ]; then
+                mkdir -p /opt/container-data/mesh/hardware
+                cp /etc/comms_pcb_version /opt/container-data/mesh/hardware/comms_pcb_version
+            fi
+        fi
+        # change rootfs location once its mounted in dedicated partation
         cp mesh.conf /opt/container-data/mesh/ #only for MS1.5
         # change rootfs location once its mounted in dedicated partition
         if [ -f "/root/rootfs.tgz" ]; then
             echo "import rootfs.tgz commms vm"
+            # shellcheck disable=SC2002
             cat /root/rootfs.tgz | docker import - comms_vm
             docker build -t comms_vm .
         else
             docker import - comms_vm < /rootfs.tar
         fi
+        meshcom_path="/opt/container-data/mesh/mesh_com/"
+        echo "$meshcom_path"
+        if [ ! -f "/opt/container-data/mesh/mesh.conf" ]; then
+		cp /opt/mesh_default.conf /opt/container-data/mesh/mesh.conf
+		cp $meshcom_path/common/scripts/mesh-ibss.sh  /opt/container-data/mesh/.
+		chmod 755 /opt/container-data/mesh/mesh-ibss.sh
+		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90mesh /opt/container-data/mesh/.
+		chmod 755 /opt/container-data/mesh/S90mesh
+		cp $meshcom_path/common/scripts/mesh-11s.sh  /opt/container-data/mesh/.
+		chmod 755 /opt/container-data/mesh/mesh-11s.sh
+		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S9011sMesh /opt/container-data/mesh/.
+		chmod 755 /opt/container-data/mesh/S9011sMesh
+        fi
+        cp /etc/umurmur.conf $meshcom_path/modules/utils/docker/umurmur.conf
         docker rm -f mesh_comms_vm
         docker run --name mesh_comms_vm -d --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm
         #Add restart policy of the container if it stops or device rebooted

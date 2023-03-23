@@ -1,28 +1,29 @@
-#!/usr/bin/python
 import contextlib
-import subprocess
-from . import server
-from . import client
 import multiprocessing
-from common import ConnectionMgr, mesh_utils, utils
-import pandas as pd
-import numpy as np
+import random
+import sys
 from queue import Queue
 from time import sleep
-import asyncio
-import logging
-import random
+
+import numpy as np
+import pandas as pd
+
+sys.path.insert(0, '../../')
+from features.utils import utils as ut
+from common import ConnectionMgr, mesh_utils, utils
+from . import server
+from . import client
+
+
+
 
 co = ConnectionMgr.ConnectionMgr()
 MUTUALINT = 'wlan1'
 MESHINT = 'bat0'
 
-import sys
-import os
 
-sys.path.insert(0, '../../')
-from features.mutual.utils import primitives as pri
-from features.utils import utils as ut
+
+
 
 class CA:
 
@@ -77,9 +78,8 @@ class CA:
 
         sectable = pd.read_csv('auth/dev.csv')
 
-        myip = co.get_ip_address(MESHINT)
-        max_count = 3
-        flag_ctr = 0
+        #myip = co.get_ip_address(MESHINT)
+        myip = mesh_utils.get_mesh_ip_address(MESHINT)
 
         manager = multiprocessing.Manager()
         return_dict = manager.dict()
@@ -98,7 +98,6 @@ class CA:
                 client_proc = multiprocessing.Process(target=self.as_client, args=(IP, logger), daemon=True)
                 client_proc.start()
                 client_jobs.append(client_proc)
-                #client_proc.join()
 
         for client_proc in client_jobs:
             client_proc.join()
@@ -180,8 +179,8 @@ class CA:
         try:
             exchange_table.to_csv('logs/global_table.csv', mode='w', header=True, index=False)
             logger.info("Global table created")
-        except Exception as e:
-            logger.error("Global table creation failed with exception %s", e)
+        except Exception as exp:
+            logger.error("Global table creation failed with exception %s", exp)
         print('Global security table:')
         print(exchange_table)
         logger.debug("Global table:\n%s", exchange_table)
@@ -207,7 +206,3 @@ class CA:
         except FileNotFoundError:
             print("SecTable not available. Need to be requested during provisioning")
         common_ut.close_logger(logger)
-
-
-
-

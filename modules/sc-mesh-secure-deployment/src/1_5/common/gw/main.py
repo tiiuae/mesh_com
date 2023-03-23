@@ -155,15 +155,14 @@ class AutoGateway:
     def find_mesh_ipv4_subnet(self):
 
         interfaces = ["br-lan", "bat0"]
-
+        value = ''
         for interface in interfaces:
             ret, value = run_shell_command(f"ip -o -f inet addr show | grep -e {interface} " + "| awk '{print $4}'")
 
             if ret != 0:
                 self.logger.error("Error ip inet addr show failed")
-            else:
-                if value != '':
-                    break
+            elif value != '':
+                break
 
         interface = ipaddress.IPv4Interface(value.strip())
         return str(interface.network)
@@ -222,9 +221,8 @@ class AutoGateway:
                 self.gateway_client_activity()
             elif self.gw_mode == "server":
                 self.gateway_server_activity()
-            else:
-                if self.wifi_name == "no_device":
-                    self.clean_and_start()
+            elif self.wifi_name == "no_device":
+                self.clean_and_start()
 
             self.logger.debug("------------------------------------------------------------------------")
             # self.logger.debug(self.run_shell_command("ip route show")[1])

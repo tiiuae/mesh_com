@@ -1,15 +1,11 @@
 import socket
 import sys
-import random
 
 sys.path.insert(0, '../../')
 
-'''
-only for testing 
-'''
-from common import ConnectionMgr
+from common import mesh_utils
 
-co = ConnectionMgr.ConnectionMgr()
+
 
 
 def client_auth(ID, ser_ip, message, interface='wlan0'):
@@ -20,15 +16,12 @@ def client_auth(ID, ser_ip, message, interface='wlan0'):
     #PORT = int(ID.split('AuthAP_')[1]) if 'AuthAP_' in ID else int(ID)
     PORT = 7777
     print(f'Starting client Auth with {str(HOST)}:{PORT}')
-    ipaddr = co.get_ip_address(interface)  # assuming that wlan0 will be (or connected to) the 'AP'
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    #ipaddr = co.get_ip_address(interface)  # assuming that wlan0 will be (or connected to) the 'AP'
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         #s.bind((ipaddr, random.randint(1000, 64000)))
-        s.connect((HOST, PORT))
-
-        #command = [f'netstat -an | grep {ipaddr}']
-        #subprocess.call(command, shell=True)
-        s.sendall(message)
-        data = s.recv(2048)
+        sock.connect((HOST, PORT))
+        sock.sendall(message)
+        data = sock.recv(2048)
     print('Sent: ', repr(data))
 
 
@@ -36,19 +29,17 @@ def server_auth(ID, interface='wlan0'):
     '''
     Create a socket server and get the key information to import it.
     '''
-    ip = co.get_ip_address(interface)  # assuming that wlan0 will be (or connected to) the 'AP'
+    ip =  mesh_utils.get_mesh_ip_address(interface)  # assuming that wlan0 will be (or connected to) the 'AP'
     HOST = ip
     #PORT = int(ID.split('AuthAP_')[1]) if 'AuthAP_' in ID else int(ID)
     PORT = 7777
     print(f'Starting server Auth on {str(HOST)}:{PORT}')
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind((HOST, PORT))
-        s.listen()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind((HOST, PORT))
+        sock.listen()
 
-        #command = [f'netstat -an | grep {ip}']
-        #subprocess.call(command, shell=True)
-        conn, addr = s.accept()
+        conn, addr = sock.accept()
         with conn:
             print("Connected by", addr)
             while True:
@@ -56,6 +47,6 @@ def server_auth(ID, interface='wlan0'):
                 if not data:
                     break
                 conn.sendall(data)
-                s.close()
+                sock.close()
                 print('Received: ', repr(data))
                 return data, addr

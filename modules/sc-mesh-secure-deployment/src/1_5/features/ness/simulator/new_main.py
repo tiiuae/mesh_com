@@ -1,9 +1,7 @@
-import argparse
 import pickle
 import random
 import sys
 from random import choices
-import itertools
 import PySimpleGUI as sg
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -11,7 +9,6 @@ import numpy as np
 from pyke import knowledge_engine, krb_traceback
 from pyvis.network import Network
 import streamlit as st
-import pandas as pd
 import glob
 import streamlit.components.v1 as components
 
@@ -256,7 +253,7 @@ def run_decision(latest_status_list, good_server_status_list, flags_list, server
                             act = "Signaling Not Checked Status"
                             res = 1
                             action_code = 3 + 128
-    except Exception1:
+    except Exception:
         krb_traceback.print_exc()
         sys.exit(1)
 
@@ -273,7 +270,7 @@ def run_decision(latest_status_list, good_server_status_list, flags_list, server
                     else:
                         if vars['eval1'] == "NotChecked":
                             res1 = 2
-        except Exception2:
+        except Exception:
             krb_traceback.print_exc()
             sys.exit(1)
 
@@ -560,6 +557,7 @@ def step_simulation(initial_n, ui_report_list, new_topo):
 
 def get_matrix(n):  # get matrix for any input (to print values)
     aux = 0
+    size = n
     for i in range(2, 10):
         if n % i == 0:
             aux = i

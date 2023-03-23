@@ -2,7 +2,6 @@ import subprocess
 import threading
 from os import path
 import os as osh
-import pandas as pd
 import netifaces
 import yaml
 import pathlib
@@ -31,17 +30,17 @@ class Utils:
                 print(exc)
                 return None
 
-    def init_state(self):
-        """
-        Function to create table of authenticated devices.
-        TODO: Currently this function is inside mutual. Consider to export it here
-        """
-        columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'MA_level']
-        if not path.isfile(self.state_csv_file):
-            table = pd.DataFrame(columns=columns)
-            table.to_csv(self.state_csv_file, header=columns, index=False)
-            table = pd.read_csv(self.state_csv_file)
-        return table
+    # def init_state(self):
+    #     """
+    #     Function to create table of authenticated devices.
+    #     TODO: Currently this function is inside mutual. Consider to export it here
+    #     """
+    #     columns = ['ID', 'MAC', 'IP', 'PubKey_fpr', 'MA_level']
+    #     if not path.isfile(self.state_csv_file):
+    #         table = pd.DataFrame(columns=columns)
+    #         table.to_csv(self.state_csv_file, header=columns, index=False)
+    #         table = pd.read_csv(self.state_csv_file)
+    #     return table
 
     def update_mesh_conf(self, ip):
         """
@@ -79,37 +78,36 @@ class Utils:
         with open(self.mesh_config_file, 'w') as fp:
             yaml.dump(config, fp)
 
-    def generate_ip(self):
-        return self.random.sample(range(2, 254), 2)
+    # def generate_ip(self):
+    #     return self.random.sample(range(2, 254), 2)
 
-    def update_state(self, info):
-        """
-        this function update the table with the node's info.
-        Then, it updates mesh_conf_file with ip address.
-        Finally, it calls the transfer function.
-        TODO: Currently this function is inside mutual. Consider to export it here
-        """
-        table = self.init_state(self)
-        print(table)
-        if len(table) == 1:  # first node to be added, then it will be server. == 1 means that provserver is there
-            self.set_auth_role(self)
-        if info['ID'] not in set(table['ID']):
-            while info['IP'] in set(table['IP']):
-                info['IP'] = f'10.0.0.{str(self.generate_ip().pop())}'
-            self.update_cont(table, info)
-        elif table.loc[table['ID'] == info['ID']]['PubKey_fpr'].all() != info['PubKey_fpr']:
-            self.update_cont(table, info)
-        self.update_mesh_conf(info['IP'])
-        if info['ID'] != 'provServer':
-            return 'auth/node' + info['ID'] + '.asc'
-        return None
-
-    def update_cont(self, table, info):
-        table = table.append(info, ignore_index=True)
-        table.drop_duplicates(inplace=True)
-        self.lock.acquire()
-        table.to_csv(self.state_csv_file, index=False)
-        self.lock.release()
+    # def update_state(self, info):
+    #     """
+    #     this function update the table with the node's info.
+    #     Then, it updates mesh_conf_file with ip address.
+    #     Finally, it calls the transfer function.
+    #     """
+    #     table = self.init_state(self)
+    #     print(table)
+    #     if len(table) == 1:  # first node to be added, then it will be server. == 1 means that provserver is there
+    #         self.set_auth_role(self)
+    #     if info['ID'] not in set(table['ID']):
+    #         while info['IP'] in set(table['IP']):
+    #             info['IP'] = f'10.0.0.{str(self.generate_ip().pop())}'
+    #         self.update_cont(table, info)
+    #     elif table.loc[table['ID'] == info['ID']]['PubKey_fpr'].all() != info['PubKey_fpr']:
+    #         self.update_cont(table, info)
+    #     self.update_mesh_conf(info['IP'])
+    #     if info['ID'] != 'provServer':
+    #         return 'auth/node' + info['ID'] + '.asc'
+    #     return None
+    #
+    # def update_cont(self, table, info):
+    #     table = table.append(info, ignore_index=True)
+    #     table.drop_duplicates(inplace=True)
+    #     self.lock.acquire()
+    #     table.to_csv(self.state_csv_file, index=False)
+    #     self.lock.release()
 
     @staticmethod
     def get_os():  # this is not being used
@@ -158,7 +156,7 @@ class Utils:
         logger = logging.getLogger()
         logger.setLevel(logging.DEBUG)
         # create a file handler
-        file_handler = logging.FileHandler('logs/'+name+'-log.txt', mode='w')
+        file_handler = logging.FileHandler(f'logs/{name}-log.txt', mode='w')
         file_handler.setLevel(logging.DEBUG)
         # create a formatter
         formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s',

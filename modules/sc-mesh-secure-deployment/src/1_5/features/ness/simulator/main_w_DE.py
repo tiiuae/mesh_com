@@ -1,4 +1,3 @@
-import contextlib
 import sys
 from pyke import knowledge_engine, krb_traceback
 import networkx as nx
@@ -164,7 +163,7 @@ def run_decision(latest_status_list, good_server_status_list, flags_list, server
                             act = "Signaling Not Checked Status"
                             res = 1
                             action_code = 4 + 128
-    except Exception1:
+    except Exception:
         krb_traceback.print_exc()
         sys.exit(1)
 
@@ -181,7 +180,7 @@ def run_decision(latest_status_list, good_server_status_list, flags_list, server
                     else:
                         if vars['eval1'] == "NotChecked":
                             res1 = 2
-        except Exception2:
+        except Exception:
             krb_traceback.print_exc()
             sys.exit(1)
 

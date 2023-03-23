@@ -3,21 +3,15 @@ import logging
 import time
 
 def is_batman_if_ready():
-    return_code, bat_if = run_shell_command("ifconfig | grep bat0 | awk '{print $1}'")
-    if bat_if.strip()  == 'bat0:':
-        return True
-    else:
-        return False
+    _, bat_if = run_shell_command("ifconfig | grep bat0 | awk '{print $1}'")
+    return bat_if.strip() == 'bat0:'
 
 def find_batman_wifi_iface():
-    while is_batman_if_ready() == False:
+    while is_batman_if_ready() is False:
         time.sleep(5)
     ret, value = run_shell_command("batctl if")
 
-    if value != "" and ret == 0:
-        return value.strip().split(":")[0]
-
-    return "no_device"
+    return value.strip().split(":")[0] if value != "" and ret == 0 else "no_device"
 
 
 def check_interface_connectivity(interface):

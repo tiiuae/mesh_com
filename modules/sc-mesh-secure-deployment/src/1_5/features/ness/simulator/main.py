@@ -1,4 +1,3 @@
-import sys
 
 import networkx as nx
 import numpy as np
@@ -40,12 +39,12 @@ class Simulator:
         return nx.read_gml(file)
 
 
-    def plot(self, G):
-        pos = nx.spring_layout(G)
-        nx.draw_networkx_nodes(G, pos, cmap=plt.get_cmap('jet'), node_size=500)
-        nx.draw_networkx_labels(G, pos)
-        nx.draw_networkx_edges(G, pos, arrows=False)
-        plt.show(block=False)
+    # def plot(self, G):
+    #     pos = nx.spring_layout(G)
+    #     nx.draw_networkx_nodes(G, pos, cmap=plt.get_cmap('jet'), node_size=500)
+    #     nx.draw_networkx_labels(G, pos)
+    #     nx.draw_networkx_edges(G, pos, arrows=False)
+    #     plt.show(block=False)
 
 
     def get_neighbors(self, G):
@@ -143,6 +142,7 @@ class Simulator:
 if __name__ == '__main__':
     sim = Simulator()
     sim.run()
+
 
 
 

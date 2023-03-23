@@ -45,12 +45,11 @@ class Quarantine:
         """
         common_ut = utils.Utils()
         logger = common_ut.setup_logger('quarantine')
+        blocking_time = 20 #in seconds
 
         ip = '127.0.0.1'
-        print('***********************************************************************')
-        print('Blocking ', ip)
-        print('')
-        self.block(ip)
+        self.printing('Blocking ', ip)
+        self.block(ip, blocking_time)
         logger.info("Blocked %s", ip)
         command = ['ping', '-w', '4', ip]
         ping = subprocess.run(command, shell=False, capture_output=True, text=True)
@@ -62,9 +61,7 @@ class Quarantine:
         iptable = subprocess.run(command, shell=False, capture_output=True, text=True)
         print(iptable.stdout)
         logger.debug("IP Table after blocking:\n%s", iptable.stdout)
-        print('***********************************************************************')
-        print('Unblocking ', ip)
-        print('')
+        self.printing('Unblocking ', ip)
         self.unblock(ip)
         logger.info("Unblocked %s", ip)
         command = ['ping', '-w', '4', ip]
@@ -78,3 +75,8 @@ class Quarantine:
         print(iptable.stdout)
         logger.debug("IP Table after unblocking:\n%s", iptable.stdout)
         common_ut.close_logger(logger)
+
+    def printing(self, arg0, ip):
+        print('***********************************************************************')
+        print(arg0, ip)
+        print('')

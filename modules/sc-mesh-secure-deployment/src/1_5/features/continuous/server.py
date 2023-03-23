@@ -1,17 +1,14 @@
 import json
 import socket
 import time
-from _thread import *
 from threading import Thread, Lock
 
 from .functions import crc_functions
 from .functions import server_functions
-import asyncio
 import pandas as pd
 import sys
 import os
 import traceback
-import random
 
 sys.path.insert(0, '../../')
 
@@ -27,12 +24,6 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
     print('Connected with ', addr, name)
     print('====================================================================')
 
-
-    # Exchange public keys and derive secret for client if it does not already exist
-    filetable = pd.read_csv('auth/dev.csv')
-    #cliID = filetable[filetable['IP'] == addr[0]]['ID'].iloc[0]  # Get the client ID
-    #print("cliID: ", cliID)
-    #secret_filename = f'secrets/secret_{cliID}.der'
 
     client_mesh_ip = addr[0]
     print("client_mesh_ip = ", client_mesh_ip)
@@ -50,22 +41,22 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
         print('Sending my public key and ID')
         with open(local_cert, 'rb') as file:
             cert = file.read()
-        myID = pri.get_labels()
-        message = cert + myID.encode('utf-8')
+        my_ID = pri.get_labels()
+        message = cert + my_ID.encode('utf-8')
         #message = cert
         c.send(message)
 
         received_cert = c.recv(1024)
         client_cert = received_cert[:-8]
-        cliID = received_cert[-8:].decode('utf-8')
+        cli_ID = received_cert[-8:].decode('utf-8')
         #client_cert = received_cert
-        id_dict[addr[0]] = cliID # Used to insert row in auth table
+        id_dict[addr[0]] = cli_ID # Used to insert row in auth table
 
         # Create directory pubKeys to store neighbor node's public key certificates to use for secret derivation
         if not os.path.exists('pubKeys/'):
             os.mkdir('pubKeys/')
 
-        # Save client public key certificate to pubKeys/{cliID}.der
+        # Save client public key certificate to pubKeys/{cli_ID}.der
         with open(f'pubKeys/{client_mesh_name}.der', 'wb') as writer:
             writer.write(client_cert)
 
@@ -86,7 +77,7 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
         if not os.path.exists('pubKeys/'):
             os.mkdir('pubKeys/')
 
-        # Save client public key certificate to pubKeys/{cliID}.der
+        # Save client public key certificate to pubKeys/{cli_ID}.der
         with open(f'pubKeys/{client_mesh_name}.der', 'wb') as writer:
             writer.write(client_cert)
 
@@ -95,24 +86,25 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
         c.send(bytes('Connected to server, need to exchange ID', 'utf-8'))
 
         print('Sending my ID')
-        myID = pri.get_labels()
-        message = myID.encode('utf-8')
+        my_ID = pri.get_labels()
+        message = my_ID.encode('utf-8')
         c.send(message)
 
         received_message = c.recv(1024)
-        cliID = received_message.decode('utf-8')
-        id_dict[addr[0]] = cliID  # Used to insert row in auth table
+        cli_ID = received_message.decode('utf-8')
+        id_dict[addr[0]] = cli_ID  # Used to insert row in auth table
     else:
         c.send(bytes('Connected to server', 'utf-8'))  # Transmit tcp msg as a byte with encoding format str to client
 
-    # Derive secret key and store it to secret_{cliID}.der
+    # Derive secret key and store it to secret_{cli_ID}.der
     #salt = os.urandom(16)  # Random 16 byte salt
     #print('Deriving secret')
-    #pri.derive_ecdh_secret('', cliID, mut.local_cert, salt)
+    #pri.derive_ecdh_secret('', cli_ID, mut.local_cert, salt)
 
     # Session Initializations Parameters
     #secret_byte = open(secret_filename, 'rb').read()
     #secret_byte = pri.decrypt_file(secret_filename, mut.local_cert, salt)
+    secret_byte = None
     try:
         secret_byte = pri.derive_ecdh_secret('', client_mesh_name)
         if logger:
@@ -127,9 +119,6 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
 
     secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
     print("Secret = ", secret)
-    #secret = 1234  # this should be stored on HSM
-    #secret=int(open("secret.txt",'r').read())
-    total_period = 20  # Total period for the session
     period = 2  # Period for continuous authentication
     time_margin = 0.4 * period  # Time margin for freshness = 40 % of period
     crc_key = '1001'  # CRC key
@@ -141,7 +130,6 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
     received_shares = []  # Store old shares received during the session to check freshness of new share
 
     num_of_fails = 0  # Number of times authentication has failed
-    backoff_period = 0  # back off period initialized to 0
 
     # Setting socket timeout = time margin to raise exception when client does not respond to authentication request
     # within time margin
@@ -190,8 +178,6 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
                         start_timestamp = time.time()  # restart timer
                     else:
                         num_of_fails = num_of_fails + 1
-                        # exponential backoff = auth period ^ num of failures
-                        # max(period, 2) to avoid diminishing exponential when period < 1
                         backoff_period = max(period, 2) ** num_of_fails
                         result_dict = {
                             "auth_result": "fail",
@@ -213,11 +199,7 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
             # Avoid following block of code when auth failed in earlier steps
             if auth_result == "pass" or auth_result == 1:
                 r_bin_data = msg_received[:-(len(crc_key) - 1)]
-                # print('Received binary data = ', r_bin_data)
-
-                # Convert binary to string
                 msg_received_jsn = ''.join(chr(int(r_bin_data[i:i + 8], 2)) for i in range(0, len(r_bin_data), 8))
-
                 msg_received = json.loads(msg_received_jsn)
                 print('Message received = ', msg_received)
 

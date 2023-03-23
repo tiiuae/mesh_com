@@ -21,7 +21,7 @@ def mod2div(divident, divisor):
 
     # Slicing the divident to appropriate
     # length for particular step
-    tmp = divident[0: pick]
+    tmp = divident[:pick]
 
     while pick < len(divident):
 
@@ -45,13 +45,8 @@ def mod2div(divident, divisor):
     # For the last n bits, we have to carry it out
     # normally as increased value of pick will cause
     # Index Out of Bounds.
-    if tmp[0] == '1':
-        tmp = xor(divisor, tmp)
-    else:
-        tmp = xor('0' * pick, tmp)
-
-    checkword = tmp
-    return checkword
+    tmp = xor(divisor, tmp) if tmp[0] == '1' else xor('0' * pick, tmp)
+    return tmp
 
 
 # Function used at the sender side to encode
@@ -64,9 +59,7 @@ def encodeData(data, key):
     appended_data = data + '0' * (l_key - 1)
     remainder = mod2div(appended_data, key)
 
-    # Append remainder in the original data
-    codeword = data + remainder
-    return codeword
+    return data + remainder
 
 
 # Function used at the receiver side to decode
@@ -76,5 +69,4 @@ def decodeData(data, key):
 
     # Appends n-1 zeroes at end of data
     appended_data = data + '0' * (l_key - 1)
-    remainder = mod2div(appended_data, key)
-    return remainder
+    return mod2div(appended_data, key)
