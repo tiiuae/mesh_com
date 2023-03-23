@@ -16,29 +16,29 @@ def main():
 
     # asks for user name
     name = input("\33[34m\33[1m CREATING NEW ID:\n Enter username: \33[0m")
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(2)
+    soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    soc.settimeout(2)
 
     # connecting host
     try:
-        s.connect((host, port))
-    except:
+        soc.connect((host, port))
+    except ConnectionRefusedError:
         print("\33[31m\33[1m Can't connect to the server \33[0m")
         sys.exit()
 
     # if connected
     output = name.encode('utf-8')
-    s.send(output)
+    soc.send(output)
     display()
     while 1:
-        socket_list = [sys.stdin, s]
+        socket_list = [sys.stdin, soc]
 
         # Get the list of sockets which are readable
-        rList, wList, error_list = select.select(socket_list, [], [])
+        red_list, _, _ = select.select(socket_list, [], [])
 
-        for sock in rList:
+        for sock in red_list:
             # incoming message from server
-            if sock == s:
+            if sock == soc:
                 data = sock.recv(4096)
                 data = data.decode("utf-8")
                 if not data:
@@ -51,7 +51,7 @@ def main():
             # user entered a message
             else:
                 msg = sys.stdin.readline()
-                s.send(msg.encode('utf-8'))
+                soc.send(msg.encode('utf-8'))
                 display()
 
 
