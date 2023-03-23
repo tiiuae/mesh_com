@@ -1,22 +1,22 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          S90nats_server
-# Short-Description: start nats during boot time
+# Provides:          S90meshs_settings
+# Short-Description: mesh_settings subscriber
 # Description:       NATS server starter
 ### END INIT INFO
 
-DAEMON="nats-server"
-DIR="/usr/bin/"
+DAEMON="mesh_settings.py"
+DIR="/opt/"
 PIDFILE="/var/run/$DAEMON.pid"
-LOG_FILE=/opt/nats-server.log
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-NATS_SERVER_ARGS="-l $LOG_FILE -a $2 -p 4222"
+LOG_FILE=/opt/mesh_settings.log
+ARGS="-s $2 -p 4222"
 start() {
     echo "$NATS_SERVER_ARGS"
     printf 'Starting %s: ' "$DAEMON"
-    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON \
-          $NATS_SERVER_ARGS > $LOG_FILE 2>&1"
+    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec python $DIR$DAEMON \
+          $ARGS > $LOG_FILE 2>&1"
     status=$?
     if [ "$status" -eq 0 ]; then
         echo "OK"

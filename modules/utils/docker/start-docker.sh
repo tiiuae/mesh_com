@@ -62,16 +62,16 @@ elif [ "$OS" == "Buildroot" ]; then
         echo $meshcom_path
         if [ ! -f "/opt/container-data/mesh/mesh.conf" ]; then
 		cp /opt/mesh_default.conf /opt/container-data/mesh/mesh.conf
-		cp $meshcom_path/common/scripts/mesh-ibss.sh  /opt/container-data/mesh/.
-		chmod 755 /opt/container-data/mesh/mesh-ibss.sh
-		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90mesh /opt/container-data/mesh/.
-		chmod 755 /opt/container-data/mesh/S90mesh
 		cp $meshcom_path/common/scripts/mesh-11s.sh  /opt/container-data/mesh/.
 		chmod 755 /opt/container-data/mesh/mesh-11s.sh
 		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S9011sMesh /opt/container-data/mesh/.
 		chmod 755 /opt/container-data/mesh/S9011sMesh
 		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90nats_server /opt/container-data/mesh/.
 		chmod 755 /opt/container-data/mesh/S90nats_server
+		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90mesh_settings /opt/container-data/mesh/.
+		chmod 755 /opt/container-data/mesh/S90mesh_settings
+		cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/mesh_settings.py /opt/container-data/mesh/.
+		chmod 755 /opt/container-data/mesh/mesh_settings.py
         fi
         cp /etc/umurmur.conf $meshcom_path/modules/utils/docker/umurmur.conf
         docker rm -f mesh_comms_vm

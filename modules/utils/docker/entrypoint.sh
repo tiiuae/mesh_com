@@ -57,7 +57,6 @@ if [ $hw_platform == "Compute" ]; then
     #start Mesh service
     echo "starting 11s mesh service"
     /opt/S9011sMesh start
-    /opt/S90nats_server start
     sleep 2
   fi
 else
@@ -258,6 +257,9 @@ else
   route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
   iptables -A FORWARD --in-interface bat0 -j ACCEPT
   iptables --table nat -A POSTROUTING --out-interface $br_lan_ip -j MASQUERADE
+
+  /opt/S90nats_server start $br_lan_ip
+  /opt/S90mesh_settings start $br_lan_ip
 fi
 
 #start gw manager
