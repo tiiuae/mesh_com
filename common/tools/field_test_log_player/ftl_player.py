@@ -80,7 +80,8 @@ class Node:
                          "altitude", "PDOP",
                          "cpu temp [mC]", "wifi temp [mC]", "tmp100 [mC]",
                          "battery voltage [uV]", "battery current [uA]", "nRF voltage [mV]",
-                         "nRF current [mA]", "3v3 voltage [mV]", "3v3 current [mA]"], inplace=True)
+                         "nRF current [mA]", "3v3 voltage [mV]", "3v3 current [mA]",
+                         "DCin (XT30) voltage [mV]", "DCin (XT30) current [mA]" ], inplace=True, errors='ignore')
 
         # Drop corrupted DF lines i.e. the ones where the
         # last expected csv file column is empty.
@@ -336,7 +337,7 @@ class NodeNetwork:
                     font_size=1)
 
             # data path visualization
-            nx.draw(self.nx_data_path, pos=nx.circular_layout(self.nx_graph), with_labels=True,
+            nx.draw(self.nx_data_path, nx.get_node_attributes(self.nx_graph, 'pos'), with_labels=True,
                     edge_color=path_colors,
                     edgecolors='b',
                     node_size=4,
@@ -526,7 +527,7 @@ class NodeNetwork:
         self.nx_data_path.clear()
         self.edge_labels = {}
 
-        text_legend = f"{'mac':<18}{'rx(kbit/s)':<10} {'tx(kbit/s)':<10}\n"
+        text_legend = f"{'mac':<18}{'tx(kbit/s)':<10} {'rx(kbit/s)':<10}\n"
 
         # static node positions
         for node in self.network_nodes:
