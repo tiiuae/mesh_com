@@ -38,16 +38,15 @@ class Spectral:
           sys.exit("Config file error.")
 
 
-    # DEBUG MODE PARAMS    
+    # DEBUG CSV FILE
     if(debug):
-       missing_scan_count = 0
        outfile = "spectral_scan"
 
 
     def __init__(self):
         self.VALUES = dict()
 
-    def read(self, spectral_bin, size, all_channels, channels, csv_count):
+    def read(self, spectral_bin, size, all_channels, channels, csv_count, missing_scan_count):
         self.VALUES = dict()
 
         data = spectral_bin.read(size)  # just read 2048 bytes
@@ -178,50 +177,49 @@ class Spectral:
                 count = count + 1
 
 
-        if(self.debug):
-            vals_list = []
-            for key, value in self.VALUES.items():
-                vals_list.append(list(value))
+        vals_list = []
+        for key, value in self.VALUES.items():
+            vals_list.append(list(value))
 
-            if(self.driver == "ath9k"): 
-                spectral_capture_df = pd.DataFrame(vals_list, columns = ["freq1", "noise", "rssi", "signal", "max magnitude"])
-                spectral_capture_df = spectral_capture_df.reindex(columns = ["freq1", "noise","signal", "max_magnitude","total_gain_db", "base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
+        if(self.driver == "ath9k"): 
+            spectral_capture_df = pd.DataFrame(vals_list, columns = ["freq1", "noise", "rssi", "signal", "max magnitude"])
+            spectral_capture_df = spectral_capture_df.reindex(columns = ["freq1", "noise","signal", "max_magnitude","total_gain_db", "base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
 
-            elif(self.driver == "ath10k"):
-                spectral_capture_df = pd.DataFrame(vals_list, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
-
-
-            if(spectral_capture_df['freq1'].nunique() != len(channels.split())): # scan is missing channels
-                if(self.missing_scan_count == 0):       # first instance of missing scan
-                    present_channels = list(map(str, spectral_capture_df['freq1'].unique()))
-                    self.missing_scan_count += 1
-                    vals_list_scanning = vals_list
-
-                elif(self.missing_scan_count > 0): # add remaining missing channels from subsequent scans
-                    scanned_channels = list(map(str, spectral_capture_df['freq1'].unique()))
-                    present_channels += scanned_channels
-                    vals_list_scanning += vals_list
-                    self.missing_scan_count += 1
+        elif(self.driver == "ath10k"):
+            spectral_capture_df = pd.DataFrame(vals_list, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
 
 
-                channels_missing_set = set(channels.split()) ^ set(present_channels)
-                sorted_channels = list(map(int,list(channels_missing_set)))
-                sorted_channels.sort()
-                channels = ' '.join(list(map(str, sorted_channels)))       # converting to string to pass to do_scan_cmd
-                return channels
+        if(spectral_capture_df['freq1'].nunique() != len(channels.split())): # scan is missing channels
+            if(missing_scan_count == 0):       # first instance of missing scan
+                present_channels = list(map(str, spectral_capture_df['freq1'].unique()))
+                missing_scan_count += 1
+                vals_list_scanning = vals_list
 
-                if(channels == ''): # if all missing channels have been retreived in the scans
-                    present_channels = []
-                    print(f"cont_saved csv {self.outfile}_{csv_count}.csv")
-                    spectral_capture_df = pd.DataFrame(vals_list_scanning, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
-                    spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
-                    self.missing_scan_count = 0
-                    return all_channels
+            elif(missing_scan_count > 0): # add remaining missing channels from subsequent scans
+                scanned_channels = list(map(str, spectral_capture_df['freq1'].unique()))
+                present_channels += scanned_channels
+                vals_list_scanning += vals_list
+                missing_scan_count += 1
 
-            elif(spectral_capture_df['freq1'].nunique() == len(channels.split())): # if scan has all channels
-                print(f"all_saved csv {self.outfile}_{csv_count}.csv")
-                spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
-                return all_channels
+         
+            channels_missing_set = set(channels.split()) ^ set(present_channels)
+            sorted_channels = list(map(int,list(channels_missing_set)))
+            sorted_channels.sort()
+            channels = ' '.join(list(map(str, sorted_channels)))       # converting to string to pass to do_scan_cmd
+            return [channels, missing_scan_count]
+        
+        if(channels == ''): # if all missing channels have been retreived in the scans
+             present_channels = []
+             print(f"cont_saved csv {self.outfile}_{csv_count}.csv")
+             spectral_capture_df = pd.DataFrame(vals_list_scanning, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
+             spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
+             missing_scan_count = 0
+             return [all_channels, missing_scan_count]
+
+        elif(spectral_capture_df['freq1'].nunique() == len(channels.split())): # if scan has all channels
+            print(f"all_saved csv {self.outfile}_{csv_count}.csv")
+            spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
+            return [all_channels, missing_scan_count]
 
 
     def get_values(self):
