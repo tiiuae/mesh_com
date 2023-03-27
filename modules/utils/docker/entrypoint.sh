@@ -124,7 +124,7 @@ EOF
   if [ "$algo" = "olsr" ]; then
         brctl addif br-lan "$mesh_if" "$ifname_ap"
         iptables -A FORWARD --in-interface $mesh_if -j ACCEPT
-        killall olsrd 2>/dev/null
+        killall olsrd 2>/dev/null   
         (olsrd -i br-lan -d 0)&
   else
         ##batman-adv###
@@ -231,7 +231,7 @@ EOF
 else
   brctl addbr br-lan
   # Bridge ethernet and Mesh
-
+  
   eth_port="eth1"
   if [ -f "$COMMS_PCB_VERSION_FILE" ]; then
     source "$COMMS_PCB_VERSION_FILE"
