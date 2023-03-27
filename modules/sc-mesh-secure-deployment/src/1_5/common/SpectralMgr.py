@@ -28,7 +28,7 @@ class Spectral:
         sys.exit("No driver detected.")
 
     # CONFIG FILE
-    with open('spectral_scan_config.yaml') as file:
+    with open('config_spectralscan.yaml') as file:
         try:
            config = yaml.safe_load(file)
            debug = config['debug']
@@ -184,44 +184,50 @@ class Spectral:
         if(self.driver == "ath9k"): 
             spectral_capture_df = pd.DataFrame(vals_list, columns = ["freq1", "noise", "rssi", "signal", "max magnitude"])
             spectral_capture_df = spectral_capture_df.reindex(columns = ["freq1", "noise","signal", "max_magnitude","total_gain_db", "base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
+            if(self.debug):
+                print(f"all_saved csv {self.outfile}_{csv_count}.csv")
+                spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
+            return [all_channels, 0]
 
         elif(self.driver == "ath10k"):
             spectral_capture_df = pd.DataFrame(vals_list, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
 
 
-        if(spectral_capture_df['freq1'].nunique() != len(channels.split())): # scan is missing channels
-            if(missing_scan_count == 0):       # first instance of missing scan
-                present_channels = list(map(str, spectral_capture_df['freq1'].unique()))
+            if(spectral_capture_df['freq1'].nunique() != len(channels.split())): # scan is missing channels
                 missing_scan_count += 1
-                vals_list_scanning = vals_list
+                
+                # first instance of missing scan
+                if(missing_scan_count == 0):       
+                    present_channels = list(map(str, spectral_capture_df['freq1'].unique()))
+                    vals_list_scanning = vals_list
 
-            elif(missing_scan_count > 0): # add remaining missing channels from subsequent scans
-                scanned_channels = list(map(str, spectral_capture_df['freq1'].unique()))
-                present_channels += scanned_channels
-                vals_list_scanning += vals_list
-                missing_scan_count += 1
+                # add remaining missing channels from subsequent scans
+                elif(missing_scan_count > 0): 
+                    scanned_channels = list(map(str, spectral_capture_df['freq1'].unique()))
+                    present_channels += scanned_channels
+                    vals_list_scanning += vals_list
 
-         
-            channels_missing_set = set(channels.split()) ^ set(present_channels)
-            sorted_channels = list(map(int,list(channels_missing_set)))
-            sorted_channels.sort()
-            channels = ' '.join(list(map(str, sorted_channels)))       # converting to string to pass to do_scan_cmd
-            return [channels, missing_scan_count]
-        
-            if(channels == ''): # if all missing channels have been retreived in the scans
-                present_channels = []
-                missing_scan_count = 0
+            
+                channels_missing_set = set(channels.split()) ^ set(present_channels)
+                sorted_channels = list(map(int,list(channels_missing_set)))
+                sorted_channels.sort()
+                channels = ' '.join(list(map(str, sorted_channels)))       # converting to string to pass to do_scan_cmd
+                return [channels, missing_scan_count]
+            
+                if(channels == ''): # if all missing channels have been retreived in the scans
+                    present_channels = []
+                    missing_scan_count = 0
+                    if(self.debug):
+                        print(f"cont_saved csv {self.outfile}_{csv_count}.csv")
+                        spectral_capture_df = pd.DataFrame(vals_list_scanning, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
+                        spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
+                    return [all_channels, missing_scan_count]
+
+            elif(spectral_capture_df['freq1'].nunique() == len(channels.split())): # if scan has all channels
                 if(self.debug):
-                    print(f"cont_saved csv {self.outfile}_{csv_count}.csv")
-                    spectral_capture_df = pd.DataFrame(vals_list_scanning, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
+                    print(f"all_saved csv {self.outfile}_{csv_count}.csv")
                     spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
                 return [all_channels, missing_scan_count]
-
-        elif(spectral_capture_df['freq1'].nunique() == len(channels.split())): # if scan has all channels
-            if(self.debug):
-                print(f"all_saved csv {self.outfile}_{csv_count}.csv")
-                spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
-            return [all_channels, missing_scan_count]
 
 
     def get_values(self):
@@ -232,11 +238,11 @@ class Spectral:
         if(self.driver == "ath9k"):
            # cmd_function =  "echo background > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
            cmd_function = "echo manual > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
-           cmd_count = "echo 25 > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_count"
+           #cmd_count = "echo 25 > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_count"
            cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
 
            subprocess.call(cmd_function, shell=True)
-           subprocess.call(cmd_count, shell=True)
+           #subprocess.call(cmd_count, shell=True)
            subprocess.call(cmd_trigger, shell=True)
 
         elif(self.driver == "ath10k"):
@@ -249,22 +255,21 @@ class Spectral:
 
     def execute_scan(self, channels):
         scan = False
+        do_scan_cmd = f"iw dev {self.interface} scan freq {channels}"
+        print(do_scan_cmd)
 
-        if (self.driver == "ath10k"):
-            do_scan_cmd = f"iw dev {self.interface} scan freq {channels}"
+        while(scan == False):
+            try:
+                proc = subprocess.run(do_scan_cmd, shell=True, stdout=subprocess.DEVNULL, check=True)
+                #proc = subprocess.run(do_scan_cmd, shell=True, stdout=subprocess.DEVNULL)
+                scan = True
+            except:
+                time.sleep(0.1)
+                scan = False
 
-            while(scan == False):
-               try:
-                  proc = subprocess.run(do_scan_cmd, shell=True, stdout=subprocess.DEVNULL, check=True)
-                  #proc = subprocess.run(do_scan_cmd, shell=True, stdout=subprocess.DEVNULL)
-                  scan = True
-               except:
-                  time.sleep(0.1)
-                  scan = False
-
-               if(scan == True):
-                  print(f"Scan time {datetime.now()}")
-                  break
+            if(scan == True):
+                print(f"Scan time {datetime.now()}")
+                break
 
 
         cmd_scan = f"echo trigger > /sys/kernel/debug/ieee80211/phy0/{self.driver}/spectral_scan_ctl"
