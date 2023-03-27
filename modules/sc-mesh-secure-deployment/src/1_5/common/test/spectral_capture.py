@@ -30,7 +30,7 @@ if __name__ == "__main__":
         
 
     # CONFIG
-    with open('spectral_scan_config.yaml') as file:
+    with open('config_spectralscan.yaml') as file:
       try: 
         config = yaml.safe_load(file)
         
