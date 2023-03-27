@@ -1,13 +1,14 @@
 import sys
 import os
 import yaml
-import subprocess
 import pandas as pd
+import subprocess
 sys.path.append('../')
 from SpectralMgr import Spectral
 
 if __name__ == "__main__":
-    count = 0
+    scan_count = 0
+    missing_scan_count = 0
     subprocess.call("rm /tmp/data*", shell=True)
 
     # SCAN MODE: Check if scan mode arg passed, if not set to default
@@ -52,6 +53,8 @@ if __name__ == "__main__":
        spec.execute_scan(scan_channels)
        f = spec.file_open(f"/tmp/data")
        file_stats = os.stat(f"/tmp/data")
-       scan_channels = spec.read(f, file_stats.st_size, all_channels, scan_channels, count)
+       channels_scanstatus = spec.read(f, file_stats.st_size, all_channels, scan_channels, scan_count, missing_scan_count)
+       scan_channels = channels_scanstatus[0]
+       missing_scan_count = channels_scanstatus[1]
        spec.file_close(f)
-       count += 1
+       scan_count += 1
