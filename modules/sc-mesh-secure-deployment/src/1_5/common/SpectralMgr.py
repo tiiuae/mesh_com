@@ -208,17 +208,19 @@ class Spectral:
             channels = ' '.join(list(map(str, sorted_channels)))       # converting to string to pass to do_scan_cmd
             return [channels, missing_scan_count]
         
-        if(channels == ''): # if all missing channels have been retreived in the scans
-             present_channels = []
-             print(f"cont_saved csv {self.outfile}_{csv_count}.csv")
-             spectral_capture_df = pd.DataFrame(vals_list_scanning, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
-             spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
-             missing_scan_count = 0
-             return [all_channels, missing_scan_count]
+            if(channels == ''): # if all missing channels have been retreived in the scans
+                present_channels = []
+                missing_scan_count = 0
+                if(self.debug):
+                    print(f"cont_saved csv {self.outfile}_{csv_count}.csv")
+                    spectral_capture_df = pd.DataFrame(vals_list_scanning, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
+                    spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
+                return [all_channels, missing_scan_count]
 
         elif(spectral_capture_df['freq1'].nunique() == len(channels.split())): # if scan has all channels
-            print(f"all_saved csv {self.outfile}_{csv_count}.csv")
-            spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
+            if(self.debug):
+                print(f"all_saved csv {self.outfile}_{csv_count}.csv")
+                spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
             return [all_channels, missing_scan_count]
 
 
