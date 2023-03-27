@@ -256,7 +256,6 @@ class Spectral:
     def execute_scan(self, channels):
         scan = False
         do_scan_cmd = f"iw dev {self.interface} scan freq {channels}"
-        print(do_scan_cmd)
 
         while(scan == False):
             try:
