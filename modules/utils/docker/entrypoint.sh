@@ -90,6 +90,9 @@ if [ "$mode" = "sta+mesh" ]; then
   sleep 3
   udhcpc -i $iface
 elif [ "$mode" = "ap+mesh_mcc" ]; then
+  # WAR to stop AP disappearing when device connects. No idea why this fixes it, but it does.
+  # Hopefully will not occur in MS v1.5
+  sleep 5
   # Create bridge br-lan
   brctl addbr br-lan
   ifname_ap="$(ifconfig -a | grep wlan* | awk -F':' '{ print $1 }')"
