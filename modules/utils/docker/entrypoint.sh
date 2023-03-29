@@ -166,7 +166,7 @@ create_radvd_config()
             prefix $IPV6_PREFIX:0/64 {
             };
     };
-  EOF
+EOF
 }
 
 
@@ -370,3 +370,4 @@ nohup python -u /opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw/main.py
 
 #start comms sleeve web server for companion phone
 #nohup python -u /opt/mesh_com/modules/utils/docker/comms_sleeve_server.py -ip $br_lan_ip -ap_if $ifname_ap  -mesh_if bat0
+
