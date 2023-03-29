@@ -92,7 +92,7 @@ create_dhcpd_config()
             range $SUBNET.100 $SUBNET.199;
             option routers $SUBNET.1;
     }
-  EOF
+EOF
   cp /dev/null /var/lib/dhcp/dhcpd.leases
 }
 create_olsrd_config()
@@ -150,7 +150,7 @@ create_olsrd_config()
   {
           $IPV6_PREFIX:0 64
   }
-  EOF
+EOF
 }
 
 
