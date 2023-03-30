@@ -1,0 +1,10 @@
+paramiko==2.7.2
+wifi==0.3.8
+pandas==1.1.5
+netifaces==0.10.9
+<<<<<<<< HEAD:modules/sc-mesh-secure-deployment/src/1_5/features/mutual/requirements.txt
+numpy==1.22.0
+========
+numpy==1.19.5
+>>>>>>>> 8fa3bdc9 (first commit.):modules/sc-mesh-secure-deployment/src/1.5/features/mutual/requirements.txt
+ruamel.yaml

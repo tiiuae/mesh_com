@@ -1,24 +1,24 @@
-from pathlib import Path
-from os import getenv
-import subprocess
-import os as osh
-import yaml
-import socket
 import fcntl
-import struct
-from .gw import main
+import os as osh
 import random
+import socket
 import string
-from threading import Thread
-import pathlib
+import struct
+import subprocess
 import sys
+from os import getenv
+from pathlib import Path
+from threading import Thread
 
+import yaml
+
+from .gw import main
 from .utils import Utils
 
 ut = Utils()
 
-script_path = pathlib.Path(__file__).parent.resolve()
-src_path = str(script_path).split('common')[0].split('1_5')[0]
+script_path = Path(__file__).parent.resolve()
+src_path = str(script_path).split('common', maxsplit=1)[0].split('1_5')[0]
 
 
 class ConnectionMgr:
@@ -47,9 +47,8 @@ class ConnectionMgr:
         """
         start mesh service(11s/ibss)
         """
-        if self.mesh_mode == '11s':
-            com = [self.config_11s_mesh_path, self.mesh_if]
-        elif self.mesh_mode == 'ibss':
+        com = [self.config_11s_mesh_path, self.mesh_if]
+        if self.mesh_mode == 'ibss':
             com = [self.config_mesh_path, self.mesh_if]
         subprocess.call(com, shell=False)
         if self.gw:
@@ -74,11 +73,15 @@ class ConnectionMgr:
         config = confs['secos']
         if config['key'] == '':
             return TypeError
+        mesh_vif = 'wlp1s0'
         if confc['mesh_service']:
             mesh_vif = self.util.get_interface_by_pattern(confc['mesh_inf'])
-            cmd = f"iw dev {mesh_vif}" + " info | awk '/wiphy/ {printf \"phy\" $2}'"
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)  # check how to transform it Shell=False
-            phy_name = proc.communicate()[0].decode('utf-8').strip()
+        command1 = ['iw', 'dev', mesh_vif, 'info']
+        with subprocess.Popen(command1, stdout=subprocess.PIPE, shell=False) as proc1:
+            command = ['awk', '/wiphy/ { printf $2 }']
+            with subprocess.Popen(command, stdin=proc1.stdout, stdout=subprocess.PIPE, shell=False) as proc2:
+                output, _ = proc2.communicate()
+        phy_name = f"phy{output.decode().strip()}"
         mesh_ip = config['ip']
         mesh_mac = self.util.get_mac_by_interface(mesh_vif)
         # Create mesh service config
@@ -106,30 +109,14 @@ class ConnectionMgr:
         self.mesh_mac = mesh_mac
         return self.mesh_ip, self.mesh_mac
 
-    @staticmethod
-    def set_provisioned_state(config):
-        # TBD
-        cmd = None
-        # subprocess.call(cmd, shell=False)
-
-    @staticmethod
-    def create_dhcpd_conf(self, start, end):
-        config_lines = [
-            '\n',
-            f'\tstart="{start}"',
-            f'\tend="{end}"',
-            f'\tinterface="{self.auth_ap_if}"',
-            '\toption subnet 255.255.255.0',
-            '\toption domain local',
-        ]
-        config = '\n'.join(config_lines)
-        print(config)
-
-        with open("/etc/udhcpd.conf", "a+") as wifi:
-            wifi.write(config)
+    # @staticmethod
+    # def set_provisioned_state(config):
+    #     # TBD
+    #     cmd = None
+    #     # subprocess.call(cmd, shell=False)
 
     # @staticmethod
-    def start_ap(self, config):
+    def start_ap(self):
         cmd = ["hostapd", "-B", "/etc/ap.conf", "-f", "/tmp/hostapd.log"]
         subprocess.call(cmd, shell=False)
         cmd2 = ["ifconfig", self.auth_ap_if, self.auth_ap_ip]
@@ -138,48 +125,64 @@ class ConnectionMgr:
         cmd3 = ["udhcpd", "/etc/udhcpd.conf"]
         subprocess.call(cmd3, shell=False)
 
-    def create_ap_conf(self, ssid, psk):
-        config_lines = [
-            '\n',
-            'network={',
-            f'\tinterface="{self.auth_ap_if}"',
-            f'\tssid="{ssid}"',
-            f'\tpsk="{psk}"',
-            '\tkey_mgmt=WPA-PSK',
-            '\tmode=2',
-            '}',
-        ]
+    # to be used in the future
+    # @staticmethod
+    # def create_dhcpd_conf(self, start, end):
+    #     config_lines = [
+    #         '\n',
+    #         f'\tstart="{start}"',
+    #         f'\tend="{end}"',
+    #         f'\tinterface="{self.auth_ap_if}"',
+    #         '\toption subnet 255.255.255.0',
+    #         '\toption domain local',
+    #     ]
+    #     config = '\n'.join(config_lines)
+    #     print(config)
+    #     with open("/etc/udhcpd.conf", "a+", encoding="UTF-8") as wifi:
+    #         wifi.write(config)
 
-        config = '\n'.join(config_lines)
-        print(config)
-
-        with open("/etc/ap.conf", "a+") as wifi:
-            wifi.write(config)
-
-    def connect_to_ap(self, config):
-        cmd = f"wpa_supplicant - B - i {self.sta_if}- c /etc/wpa_supplicant/wpa_supplicant_sta.conf"
-        subprocess.call(cmd, shell=False)
-        cmd = f"udhcpc -i {self.sta_if}"
-        subprocess.call(cmd, shell=False)
-
-    @staticmethod
-    def create_sta_conf(ssid, psk):
-        config_lines = ['\n', 'network={', f'\tssid="{ssid}"', f'\tpsk="{psk}"', '}']
-
-        config = '\n'.join(config_lines)
-        print(config)
-
-        with open("/etc/wpa_supplicant/wpa_supplicant_sta.conf", "a+") as wifi:
-            wifi.write(config)
-
-    @staticmethod
-    def get_ip_address(ifname):
-        with  socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            return socket.inet_ntoa(fcntl.ioctl(
-                s.fileno(),
-                0x8915,  # SIOCGIFADDR
-                struct.pack('256s', ifname[:15].encode())
-            )[20:24])
+    # def create_ap_conf(self, ssid, psk):
+    #     config_lines = [
+    #         '\n',
+    #         'network={',
+    #         f'\tinterface="{self.auth_ap_if}"',
+    #         f'\tssid="{ssid}"',
+    #         f'\tpsk="{psk}"',
+    #         '\tkey_mgmt=WPA-PSK',
+    #         '\tmode=2',
+    #         '}',
+    #     ]
+    #
+    #     config = '\n'.join(config_lines)
+    #     print(config)
+    #
+    #     with open("/etc/ap.conf", "a+") as wifi:
+    #         wifi.write(config)
+    #
+    # def connect_to_ap(self, config):
+    #     cmd = f"wpa_supplicant - B - i {self.sta_if}- c /etc/wpa_supplicant/wpa_supplicant_sta.conf"
+    #     subprocess.call(cmd, shell=False)
+    #     cmd = f"udhcpc -i {self.sta_if}"
+    #     subprocess.call(cmd, shell=False)
+    #
+    # @staticmethod
+    # def create_sta_conf(ssid, psk):
+    #     config_lines = ['\n', 'network={', f'\tssid="{ssid}"', f'\tpsk="{psk}"', '}']
+    #
+    #     config = '\n'.join(config_lines)
+    #     print(config)
+    #
+    #     with open("/etc/wpa_supplicant/wpa_supplicant_sta.conf", "a+") as wifi:
+    #         wifi.write(config)
+    #
+    # @staticmethod
+    # def get_ip_address(ifname):
+    #     with  socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+    #         return socket.inet_ntoa(fcntl.ioctl(
+    #             sock.fileno(),
+    #             0x8915,  # SIOCGIFADDR
+    #             struct.pack('256s', ifname[:15].encode())
+    #         )[20:24])
 
     def get_password(self):
         yaml_conf = self.util.read_yaml()
@@ -187,12 +190,12 @@ class ConnectionMgr:
         return instances['key'] or ''
 
     @staticmethod
-    def create_password(WPA=False):
+    def create_password(wpa=False):
         '''
         get random password pf length 8 with letters, digits
         '''
         characters: str = (
-            string.ascii_letters + string.digits if WPA else string.digits
+            string.ascii_letters + string.digits if wpa else string.digits
         )
 
         return ''.join(random.choice(characters) for _ in range(10))

@@ -1,11 +1,8 @@
 import contextlib
-import queue
 import socket
 import sys
 import threading
 import glob
-import json
-import time
 from queue import Queue
 
 import subprocess
@@ -17,23 +14,6 @@ sys.path.append('../../')
 from common import mesh_utils
 
 received_table_q = Queue() # Create empty queue to store received tables from other nodes
-#received_tables = []
-"""
-def exchage_table(df):
-    '''
-    this function exchange the table (json) with the neighbors
-    '''
-    message = df.to_json()
-    threading.Thread(target=exchange_server, args=(), daemon=True).start()
-    time.sleep(0.5)
-    neigh = mesh_utils.get_arp()
-    ip2_send = list(set(df['IP'].tolist() + list(neigh.keys())))
-    for IP in ip2_send:
-        if IP != mesh_utils.get_mesh_ip_address():
-            threading.Thread(target=exchange_client, args=(IP, message,),
-                             daemon=True).start()  # lock variable add later
-            time.sleep(1)
-"""
 
 def start_server():
     thread = threading.Thread(target=exchange_server, args=(), daemon=True)
@@ -108,8 +88,8 @@ def exchage_table(sectable, start_server_thread, logger=None, debug=True):
         logger.debug("Global table:\n%s", exchange_table)
 
 def exchange_server(debug=False):
-    table = 'auth/dev.csv'
-    sectable = pd.read_csv((table))
+    #table = 'auth/dev.csv'
+    #sectable = pd.read_csv(table)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         with contextlib.suppress(OSError):
             sock.bind(("0.0.0.0", 5005))

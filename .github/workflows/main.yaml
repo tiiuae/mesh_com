@@ -33,11 +33,11 @@ jobs:
 
       - uses: jfrog/setup-jfrog-cli@v2
         env:
-          JF_ARTIFACTORY_1: ${{ secrets.ARTIFACTORY_TOKEN }}
+          JF_ARTIFACTORY_1: ${{ secrets.ARTIFACTORY_CLOUD_TOKEN }}
 
       - name: Upload to Artifactory
         env:
-          ARTIFACTORY_REPO: debian-public-local
+          ARTIFACTORY_REPO: ssrc-deb-public-local
           DISTRIBUTION: focal
           COMPONENT: fog-sw
           ARCHITECTURE: amd64

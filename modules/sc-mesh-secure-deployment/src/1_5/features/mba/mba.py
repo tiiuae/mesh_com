@@ -5,8 +5,7 @@ import queue
 
 from common import utils
 
-import os
-import sys
+
 
 
 class MBA:
@@ -77,4 +76,3 @@ class MBA:
 
         sever_thread.join()
         common_ut.close_logger(logger)
-

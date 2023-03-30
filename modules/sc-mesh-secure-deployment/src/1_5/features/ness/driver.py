@@ -1,10 +1,8 @@
-# driver.py
-
-import contextlib
+import json
 import sys
+
 import matplotlib.pyplot as plt
 from pyke import knowledge_engine, krb_traceback
-import pickle
 
 engine = knowledge_engine.engine(__file__)
 
@@ -90,7 +88,7 @@ def run_decision(latest_status_list, good_server_status_list, flags_list, server
 
 def read_file(file):
     with open(file, 'rb') as f:  # b for binary
-        obj = pickle.load(f)
+        obj = json.load(f)
     return obj, len(obj)
     #
 

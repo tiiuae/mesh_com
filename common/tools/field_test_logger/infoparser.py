@@ -16,7 +16,7 @@ def read_value(file: str) -> str:
 def get_hwmon_path_from_options(paths: [str]) -> str:
     for path in paths:
         p = get_hwmon_path(path)
-        if p is not "NaN":
+        if p != "NaN":
             return p
     return "NaN"
 
@@ -42,6 +42,9 @@ class InfoParser:
         self.__longitude = -999999
         self.__gps_time = "NaN"
         self.__pdop = 0
+        self.__speed = 0
+        self.__climb = 0
+        self.__track = 0
         #
         self.__cpu_temp = "NaN"
         self.__wifi_temp = "NaN"
@@ -73,6 +76,15 @@ class InfoParser:
 
     def get_pdop(self) -> str:
         return str(self.__pdop)
+
+    def get_speed(self) -> str:
+        return str(self.__speed)
+
+    def get_climb(self) -> str:
+        return str(self.__climb)
+
+    def get_track(self) -> str:
+        return str(self.__track)
 
     def get_cpu_temp(self):
         return self.__cpu_temp
@@ -167,18 +179,24 @@ class InfoParser:
             self.__altitude = gps_response.alt
             self.__gps_time = gps_response.time
             self.__pdop = gps_response.pdop
+            self.__speed = gps_response.hspeed
+            self.__climb = gps_response.climb
+            self.__track = gps_response.track
         except:
             self.__latitude = -999999
             self.__longitude = -999999
             self.__altitude = 0
             self.__gps_time = "NaN"
             self.__pdop = 0
+            self.__speed = 0
+            self.__climb = 0
+            self.__track = 0
 
     # ----------------------------------------
 
     def update(self):
         """
-        Update variables with latest info
+        Update variables with the latest info
         """
         self.__update_gpsd_data()
         self.__update_temperatures()
