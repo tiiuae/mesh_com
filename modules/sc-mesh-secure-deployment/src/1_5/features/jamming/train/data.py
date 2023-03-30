@@ -1,14 +1,14 @@
-import pandas
 import random
+import sys
 
+import pandas
 import pandas as pd
 import torch.nn.functional
+import tqdm
+from scipy.signal import butter, filtfilt
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 from torch.utils.data import WeightedRandomSampler
-from scipy.signal import butter, filtfilt
-
-import sys
 
 from util import *
 
@@ -119,7 +119,7 @@ def impute_series(serie_type_1: pd.DataFrame, serie_type_2: pd.DataFrame, bounds
     return new_serie
 
 
-def generate_data_imputation(df, amount=2000, label='simulated', plot=False):
+def generate_data_imputation(df, amount=100, label='simulated', plot=False):
     print('generate_data_imputation')
     num_series = df['series_id'].nunique()
 
@@ -133,8 +133,7 @@ def generate_data_imputation(df, amount=2000, label='simulated', plot=False):
     normal5 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) > 3000) & (df['label'].str.contains('floor'))]
     jamming5 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) > 3000) & (df['label'].str.contains('_10dBm'))]
 
-    # Ignore jam 5 60cm 0dbm
-    for i in range(amount):
+    for i in tqdm.tqdm(range(amount)):
         r = np.random.rand()
         normal = normal2 if r < 0.5 else normal5
         jamming = jamming2 if r < 0.5 else jamming5

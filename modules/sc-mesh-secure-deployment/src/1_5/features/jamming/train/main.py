@@ -242,7 +242,7 @@ def main():
     util.model_summary(model)
 
     # Train
-    # train(model, loaders, len_train_data)
+    train(model, loaders, len_train_data)
 
     # Test
     test(model, loaders, load_best=True)

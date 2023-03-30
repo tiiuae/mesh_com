@@ -13,6 +13,7 @@ __pycache__/
 
 /data
 /preprocessing/raw_dataset
+/preprocessing/raw_dataset (copy)
 /preprocessing/preprocessed
 /preprocessing/train_test_split
 /save

@@ -1,10 +1,12 @@
 import glob
 import os
+import time
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import tqdm
 import tsaug
 from scipy.signal import butter, filtfilt
 from sklearn.model_selection import train_test_split
@@ -12,7 +14,7 @@ from sklearn.model_selection import train_test_split
 from util import SEED, NUM_MEASUREMENT, ORDERED_COLS, CHANNELS
 
 normal_folders = ['floor', 'inter_mid', 'inter_high']
-# normal_folders = ['inter_mid']
+max_files = 1500
 
 
 def plot_timeserie(original: np.ndarray, filtered: np.ndarray, resized: np.ndarray):
@@ -74,10 +76,15 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
         os.mkdir(storing_folder)
 
     # Loop through noise floor and normal files and extract features
-    for folder in normal_folders:
+    for folder_name in normal_folders:
         all_series = []
-        for file_name in glob.glob(f'{dataset_path}/{folder}/*.csv'):
-            print(file_name)
+        files = glob.glob(f'{dataset_path}/{folder_name}/*.csv')
+        if len(files) > max_files:
+            print(f'Dropping {len(files) - max_files} files')
+            time.sleep(0.01)  # sleep so print() and tqdm dont overlap
+            files = files[:max_files]
+
+        for file_name in tqdm.tqdm(files, desc=f'Processing {folder_name} folder'):
             df = pd.read_csv(file_name)
             # Ignore sometimes corrupted first row
             df = df.iloc[1:-1]
@@ -96,7 +103,7 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
                 # Set serie id
                 df_serie['series_id'] = series_id
                 df_serie['bin_label'] = 0
-                df_serie['label'] = folder
+                df_serie['label'] = folder_name
 
                 # Concatenate
                 all_series.append(df_serie)
@@ -104,13 +111,13 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
 
         all_series = pd.concat(all_series, ignore_index=True)
         all_series = all_series[ORDERED_COLS]
-        all_series.to_csv(f'{storing_folder}/{folder}.csv', index=False)
+        all_series.to_csv(f'{storing_folder}/{folder_name}.csv', index=False)
 
     all_series = []
     # Loop through jammed files and extract features
     for folder in ['jamming/2.4', 'jamming/5.0']:
-        for file_name in glob.glob(f'{dataset_path}/{folder}/*.csv'):
-            print(f'Processing file {file_name}')
+        files = glob.glob(f'{dataset_path}/{folder}/*.csv')
+        for file_name in tqdm.tqdm(files, desc=f'Processing {folder} folder'):
             df = pd.read_csv(file_name)
 
             # Ignore sometimes corrupted first row
