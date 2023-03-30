@@ -330,13 +330,9 @@ if [ "$meshVersion" == "1.5" ]; then
   uid=${uid::-1}
   /bin/bash "$MESH_FOLDER"/common/scripts/generate_keys.sh "$uid"
   start_mesh_1_5
-  nohup python -u "$MESH_FOLDER"/modules/sc-mesh-secure-deployment/src/gw/main.py
-else
-    provisioning true
-    mesh_service
-    bridge_settings
-fi
 
+else #this means 1.0
+    mesh_service
 
 if [ "$mode" == "provisioning" ]; then
   provisioning
@@ -488,7 +484,7 @@ EOF
   else
     bridge_settings
 fi
-
+fi
 
 #start comms sleeve web server for companion phone
 #nohup python -u /opt/mesh_com/modules/utils/docker/comms_sleeve_server.py -ip $br_lan_ip -ap_if $ifname_ap  -mesh_if $mesh_if
