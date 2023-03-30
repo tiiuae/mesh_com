@@ -38,7 +38,8 @@ mid = hashlib.blake2b(util.get_mac_by_interface('wlp1s0').encode(), digest_size=
 
 def recover_pin():
     try:
-        pin_aux = open('/opt/output.txt').readlines() #need to make it absolute
+        with open('/opt/output.txt') as file:
+            pin_aux = file.readlines() #need to make it absolute
         # Determine salt and ciphertext
         encryptedDataB64 = pin_aux[0].split('\n')[0]
         encryptedData = base64.b64decode(encryptedDataB64)
@@ -270,7 +271,8 @@ def encrypt_file(file_name, key_name, salt):
     '''
     Encrpyt file_name using key derived from key_name + salt
     '''
-    password = open(key_name, 'rb').read()
+    with open(key_name, 'rb') as file:
+        password = file.read()
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
@@ -279,8 +281,8 @@ def encrypt_file(file_name, key_name, salt):
     )
     key = base64.urlsafe_b64encode(kdf.derive(password))
     f = Fernet(key)
-    message = open(file_name, 'rb').read()
-
+    with open(file_name, 'rb') as file:
+        message = file.read()
     encrypted = f.encrypt(message)
     with open(file_name, 'wb') as writer:
         writer.write(encrypted)
@@ -289,7 +291,8 @@ def decrypt_file(file_name, key_name, salt):
     '''
     Decrypt file_name
     '''
-    password = open(key_name, 'rb').read()
+    with open(key_name, 'rb') as file:
+        password = file.read()
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
@@ -298,7 +301,8 @@ def decrypt_file(file_name, key_name, salt):
     )
     key = base64.urlsafe_b64encode(kdf.derive(password))
     f = Fernet(key)
-    encrypted = open(file_name, 'rb').read()
+    with open(file_name, 'rb') as file:
+        encrypted = file.read()
     return f.decrypt(encrypted)
 
 
@@ -318,8 +322,7 @@ def get_labels():
     mesh_if_mac = ut.get_mac_by_interface('wlp1s0')
     command = [f'echo -n {mesh_if_mac} | b2sum -l 32']
     output = subprocess.run(command, shell=True, capture_output=True, text=True)
-    label = output.stdout[:-4]
-    return label
+    return output.stdout[:-4]
 
 def main():
     clean_all()

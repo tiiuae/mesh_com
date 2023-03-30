@@ -1,5 +1,6 @@
 from header import *
 from main_with_menu import *
+import yaml
 
 def continuous_authentication(sectable, myID):
     print("Starting Continuous Authentication")
@@ -29,23 +30,19 @@ def only_ca(myID):
         table = 'auth/dev.csv'
         filetable = pd.read_csv(table)
         filetable.drop_duplicates(inplace=True)
-        if not filetable.empty:
-            if "Ness_Result" in filetable.columns:
-                filetable.drop(["Ness_Result"], axis=1, inplace=True)
-            sectable = continuous_authentication(filetable, myID)
+        if "Ness_Result" in filetable.columns:
+            filetable.drop(["Ness_Result"], axis=1, inplace=True)
+        sectable = continuous_authentication(filetable, myID)
+        sleep(2)
+        if sectable is not None:
+            # ut.exchage_table(sectable)
             sleep(2)
-            if sectable is not None:
-                # ut.exchage_table(sectable)
-                sleep(2)
-                if 'CA_Result' in set(sectable):
-                    sectable.to_csv(table, index=False)
-                else:
-                    sectable.to_csv(table, mode='a', header=False, index=False)
-                return sectable
-            print("End of Continuous Authentication")
-        else:
-            print("Empty Security Table")
-            exit()
+            if 'CA_Result' in set(sectable):
+                sectable.to_csv(table, index=False)
+            else:
+                sectable.to_csv(table, mode='a', header=False, index=False)
+            return sectable
+        print("End of Continuous Authentication")
     except FileNotFoundError:
         print("SecTable not available. Need to be requested during provisioning")
 
@@ -123,38 +120,31 @@ def mutual_authentication():
     return mut.myID
 
 
-def start_servers():
-    process = []
-    q = queue.Queue()
-    ca_s = ca_utils.ca_server(mesh_utils.get_mesh_ip_address())  # port 9999
-    process.append(ca_s)
-    #ex_s = multiprocessing.Process(target=ut.exchange_server, args=(q,), daemon=True)  # port 5005
-    #process.append(ex_s)
-    return process
-
 MA_thread = None
+sbeat_thread = None
 def readfile():
     with open("features.yaml", "r") as stream:
         try:
             return yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
+            return None
 
 
 def initialize(feature):
-    global MA_thread
+    global MA_thread, sbeat_thread
     if feature == 'mutual':
-            MA_thread = MA()
+        MA_thread = MA()
     if feature == 'continuous':
-            CA()
+        CA()
     if feature == 'NESS':
-            DE()
+        DE()
     if feature == 'secbeat':
-            sbeat_client()
+        sbeat_thread = sbeat_client()
     if feature == 'quarantine':
-            Quarantine()
+        Quarantine()
     if feature == 'only_mesh':
-            only_mesh()
+        only_mesh()
 
 if __name__ == "__main__":
     threadList = []
@@ -165,3 +155,5 @@ if __name__ == "__main__":
     # wait for Auth_AP to start in background for future nodes
     if MA_thread:
         MA_thread.join()
+    if sbeat_thread:
+        sbeat_thread.join()

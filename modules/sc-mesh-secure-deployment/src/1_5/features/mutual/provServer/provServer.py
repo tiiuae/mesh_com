@@ -13,6 +13,7 @@ import paramiko
 import glob
 import argparse
 import random
+import sys
 import ruamel.yaml
 
 
@@ -157,7 +158,7 @@ def clean_all():
         os.remove('auth/dev.csv')
     except FileNotFoundError:
         print('Nothing to clean')
-    exit()
+    sys.exit()
 
 
 def exist(ID, verbose=True):

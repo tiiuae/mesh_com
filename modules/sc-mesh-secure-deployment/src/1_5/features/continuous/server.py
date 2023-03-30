@@ -48,7 +48,8 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
         c.send(bytes('Connected to server, need to exchange public keys and ID', 'utf-8'))
 
         print('Sending my public key and ID')
-        cert = open(local_cert, 'rb').read()
+        with open(local_cert, 'rb') as file:
+            cert = file.read()
         myID = pri.get_labels()
         message = cert + myID.encode('utf-8')
         #message = cert
@@ -73,7 +74,8 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
         c.send(bytes('Connected to server, need to exchange public keys', 'utf-8'))
 
         print('Sending my public key')
-        cert = open(local_cert, 'rb').read()
+        with open(local_cert, 'rb') as file:
+            cert = file.read()
         message = cert
         c.send(message)
 
@@ -279,45 +281,45 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
 
 def initiate_server(ip, return_dict, id_dict, num_neighbors, ips_sectable, logger=None):
 
-    try:
-        s = socket.socket()  # create server socket s with default param ipv4, TCP
-        s.settimeout(20)  # Setting timeout to prevent infinite blocking at s.accept() when the client node is not on
-        # to accept connections from clients, bind IP of server, a port number to the server socket
-        s.bind((ip, 9999))
-        print('Socket Created')
+    with socket.socket() as s:  # create server socket s with default param ipv4, TCP
+        try:
+            s.settimeout(30)  # Setting timeout to prevent infinite blocking at s.accept() when the client node is not on
+            # to accept connections from clients, bind IP of server, a port number to the server socket
+            s.bind((ip, 9999))
+            print('Socket Created')
 
-        # wait for clients to connect (tcp listener)
-        s.listen(3)  # buffer for only 3 connections
-        print('Waiting for connections')
+            # wait for clients to connect (tcp listener)
+            s.listen(3)  # buffer for only 3 connections
+            print('Waiting for connections')
 
-        if logger:
-            logger.info("Server socket created at (%s, 9999)", ip)
-    except socket.error:
-        print("Server socket creation failed")
-        if logger:
-            logger.error("Server socket creation failed")
-        return
+            if logger:
+                logger.info("Server socket created at (%s, 9999)", ip)
+        except socket.error:
+            print("Server socket creation failed")
+            if logger:
+                logger.error("Server socket creation failed")
+            return
 
-    threads = []
+        threads = []
 
-    #while True:
-    for i in range(0, num_neighbors):
-        print("Server inside for loop, i = ", i)
-        lock = Lock()
-        # accept connection from client
-        c, addr = s.accept()
-        print('Connected to client', c)
-        print('Client address:', addr)
-        print(' ')
-        return_dict[addr[0]] = []
-        # start thread to handle client
-        thread = Thread(target=multi_threaded_client, args=(c, addr, lock, return_dict, id_dict, ips_sectable, logger), daemon=True)
-        threads.append(thread)
-        thread.start()
+        #while True:
+        for i in range(0, num_neighbors):
+            print("Server inside for loop, i = ", i)
+            lock = Lock()
+            # accept connection from client
+            c, addr = s.accept()
+            print('Connected to client', c)
+            print('Client address:', addr)
+            print(' ')
+            return_dict[addr[0]] = []
+            # start thread to handle client
+            thread = Thread(target=multi_threaded_client, args=(c, addr, lock, return_dict, id_dict, ips_sectable, logger), daemon=True)
+            threads.append(thread)
+            thread.start()
 
-    for thread in threads:
-        thread.join()
-    #c.send(bytes('Closing connection', 'utf-8'))
-    #c.close()  # close client socket
-    print('Connection closed')
+        for thread in threads:
+            thread.join()
+        #c.send(bytes('Closing connection', 'utf-8'))
+        #c.close()  # close client socket
+        print('Connection closed')
 

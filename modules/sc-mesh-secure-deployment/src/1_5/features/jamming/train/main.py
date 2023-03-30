@@ -7,7 +7,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 from sklearn.metrics import confusion_matrix
 from timm.data.mixup import Mixup
 from torch import nn
-from tsai.models.all import ResCNN
+from tsai.models.all import ResCNN, InceptionTimePlus, xresnet1d18
 
 import data
 import util
@@ -34,13 +34,15 @@ def plot_confusion_matrix(model, loader, label_encoder):
     fig, ax = plt.subplots(figsize=(12, 10))
     im = ax.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
     ax.figure.colorbar(im, ax=ax)
-    ax.set(xticks=np.arange(cm.shape[1]), yticks=np.arange(cm.shape[0]), xticklabels=classes, yticklabels=classes, ylabel='True label', xlabel='Predicted label')
+    ax.set(xticks=np.arange(cm.shape[1]), yticks=np.arange(cm.shape[0]), xticklabels=classes, yticklabels=classes,
+           ylabel='True label', xlabel='Predicted label')
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
     fmt = 'd'
     thresh = cm.max() / 2.
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
-            ax.text(j, i, format(cm[i, j], fmt), ha="center", va="center", color="white" if cm[i, j] > thresh else "black")
+            ax.text(j, i, format(cm[i, j], fmt), ha="center", va="center",
+                    color="white" if cm[i, j] > thresh else "black")
 
     fig.tight_layout()
     # plt.show()
@@ -64,7 +66,7 @@ def test(model, loaders, load_best=False):
         correct += (preds == y_batch).sum().item()
 
         # Compute normal vs. all
-        bin_preds = torch.where(preds > 3, 1, 0)
+        bin_preds = torch.where(preds > 2, 1, 0)
         bin_correct += (bin_preds == y_bin_batch).sum().item()
 
         total += y_batch.size(0)
@@ -168,7 +170,7 @@ def train(model, loaders, len_train_data):
             correct += (preds == targets).sum().item()
 
             # Compute normal vs. all
-            bin_preds = torch.where(preds > 3, 1, 0)
+            bin_preds = torch.where(preds > 2, 1, 0)
             bin_correct += (bin_preds == y_bin_batch).sum().item()
 
             total += targets.size(0)
@@ -212,8 +214,9 @@ def train(model, loaders, len_train_data):
 
         if epoch % 1 == 0:
             epoch_time = time.time() - epoch_time
-            print(f'Epoch: {epoch:3d}. Loss: {epoch_loss:.4f}. Val. Acc.: {acc:2.2%}. Val. Bin. Acc.: {bin_acc:2.2%} - Test Acc.: {best_test_acc:2.2%}. '
-                  f'Test Bin Acc.: {best_test_bin_acc:2.2%}. Last lr {last_lr:2.8}, Time: {epoch_time:2.2}')
+            print(
+                f'Epoch: {epoch:3d}. Loss: {epoch_loss:.4f}. Val. Acc.: {acc:2.2%}. Val. Bin. Acc.: {bin_acc:2.2%} - Test Acc.: {best_test_acc:2.2%}. '
+                f'Test Bin Acc.: {best_test_bin_acc:2.2%}. Last lr {last_lr:2.8}, Time: {epoch_time:2.2}')
 
     print('Done!')
 
@@ -226,20 +229,20 @@ def main():
     torch.manual_seed(util.SEED)
 
     loaders, len_train_data, label_encoder = data.get_classification_data()
+    n_classes = len(label_encoder.classes_)
 
     # Simple MLP with a symmetric decoder for pretraining
     # model = Classifier(raw_ni=15, fft_ni=15, no=21, drop=0.25).to(device)
     # model = InceptionTime(15, 21).to(device)  # Test accuracy multiclass: 0.9849498327759197, bin accuracy: 1.0
     # model = InceptionTimePlus(15, 21).to(device)  # Test accuracy multiclass: 0.9832775919732442, bin accuracy: 1.0
     # model = XCMPlus(15, 21, 128).to(device) # Test accuracy multiclass: 0.9765886287625418, bin accuracy: 0.9966
-    # model = ResCNN(15, 21).to(device) # Test accuracy multiclass: 0.9866220735785953, bin accuracy: 1.0
-    model = ResCNN(15, 23, separable=True, dropout=0.0).to(device)  # Test accuracy multiclass: 0.991638795986, bin accuracy: 1.0
+    model = ResCNN(15, n_classes, separable=True).to(device)  # Test accuracy multiclass: 0.991638795986, bin accuracy: 1.0
     # model = TCN(15, 21).to(device) # problems
-    # model = xresnet1d18(15, 21).to(device)  # Test accuracy multiclass: 0.9866220735785953, bin accuracy: 1.0
+    # model = xresnet1d18(15, n_classes).to(device)  # Test accuracy multiclass: 0.9866220735785953, bin accuracy: 1.0
     util.model_summary(model)
 
     # Train
-    train(model, loaders, len_train_data)
+    # train(model, loaders, len_train_data)
 
     # Test
     test(model, loaders, load_best=True)

@@ -6,4 +6,8 @@
 *.pyc
 .idea/
 *.enc
+<<<<<<< HEAD
 
+=======
+/modules/sc-mesh-secure-deployment/src/1_5/.VSCodeCounter/
+>>>>>>> 2574641eaf53726d4229027ae8541abf2f85584f

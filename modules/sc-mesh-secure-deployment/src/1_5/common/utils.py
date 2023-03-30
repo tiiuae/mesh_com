@@ -1,4 +1,3 @@
-import os
 import subprocess
 import threading
 from os import path
@@ -30,6 +29,7 @@ class Utils:
                 return yaml.safe_load(stream)
             except yaml.YAMLError as exc:
                 print(exc)
+                return None
 
     def init_state(self):
         """
@@ -96,24 +96,20 @@ class Utils:
         if info['ID'] not in set(table['ID']):
             while info['IP'] in set(table['IP']):
                 info['IP'] = f'10.0.0.{str(self.generate_ip().pop())}'
-            table = table.append(info, ignore_index=True)
-            table.drop_duplicates(inplace=True)
-            self.lock.acquire()
-            table.to_csv(self.state_csv_file, index=False)
-            self.lock.release()
+            self.update_cont(table, info)
         elif table.loc[table['ID'] == info['ID']]['PubKey_fpr'].all() != info['PubKey_fpr']:
-            table = table.append(info, ignore_index=True)
-            table.drop_duplicates(inplace=True)
-            self.lock.acquire()
-            table.to_csv(self.state_csv_file, index=False)
-            self.lock.release()
+            self.update_cont(table, info)
         self.update_mesh_conf(info['IP'])
-        # Fix Me: remove hardcoded path
-        file_keys = 'auth/' + info['ID'] + '.asc'
         if info['ID'] != 'provServer':
-            file_keys = 'auth/node' + info['ID'] + '.asc'
-            return file_keys
+            return 'auth/node' + info['ID'] + '.asc'
         return None
+
+    def update_cont(self, table, info):
+        table = table.append(info, ignore_index=True)
+        table.drop_duplicates(inplace=True)
+        self.lock.acquire()
+        table.to_csv(self.state_csv_file, index=False)
+        self.lock.release()
 
     @staticmethod
     def get_os():  # this is not being used
@@ -129,16 +125,15 @@ class Utils:
     def is_sec_os(self):  # this is not being used
         execution_ctx = osh.environ.get('EXECUTION_CTX')
         if execution_ctx == "docker":
-            return "secos" if osh.environ.get('HOSTNAME') == "br_hardened" else self.get_os(self)
+            return "secos" if osh.environ.get('HOSTNAME') == "br_hardened" else self.get_os()
         return ""
 
     @staticmethod
     def get_interface_by_pattern(pattern):
         interface_list = netifaces.interfaces()
-        interface = filter(lambda x: pattern in x, interface_list)
-        if pre := list(interface):
+        interface = [x for x in interface_list if pattern in x]
+        if pre := interface:
             return str(pre[0])
-
         print(f'> ERROR: Interface {pattern} not found!')
         return False
 
@@ -158,7 +153,7 @@ class Utils:
     @staticmethod
     def setup_logger(name):
         if not path.isdir('logs'):
-            os.mkdir('logs')
+            osh.mkdir('logs')
         # create a logger object
         logger = logging.getLogger()
         logger.setLevel(logging.DEBUG)

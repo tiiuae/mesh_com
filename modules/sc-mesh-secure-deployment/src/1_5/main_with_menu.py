@@ -33,7 +33,6 @@ def banner():
 AUTHSERVER = False
 mut = mutual.Mutual(MUTUALINT)
 myID = mut.myID
-sec_beat_time = 100  # Security beat period in seconds
 
 def print_menu():
     banner()
@@ -49,11 +48,9 @@ def aux_auth(semasphore):
             pid = (output.stdout).replace('\n','')
             command = ['kill', pid]
             subprocess.run(command, shell=False)
-            #print('Checkpoint wpa_supplicant for ap connect killed')
-
             mut = mutual.Mutual(MUTUALINT)
             client, addr = mut.server()
-            client_cert, sig, cliID, cli = mut.send_my_key(client, addr)
+            client_cert, sig, cliID, _ = mut.send_my_key(client, addr)
             #sig, client_cert, cliID = mut.decode_cert(client)
             node_name = addr[0].replace('.', '_')
             pri.import_cert(client_cert, node_name)
@@ -77,12 +74,15 @@ def only_mesh():
     print('\'Run Only Mesh\'')
     mut = mutual.Mutual(MUTUALINT)
     try:
+        if not readfile()['provisioning']:
+            password = blake2b(mut.digest().encode(), digest_size=24).hexdigest()
+            co.util.update_mesh_password(password)  # update password in config file
         mut.start_mesh()
         mut.create_table()
         sleep(2)
         if mesh_utils.verify_mesh_status():  # verifying that mesh is running
             print("Mesh Running")
-            mesh_utils.get_neighbors_ip()
+            #mesh_utils.get_neighbors_ip()
             neigh = mesh_utils.get_arp()
             for ne in neigh:
                 info = {'ID': ne, 'MAC': neigh[ne], 'IP': ne,
@@ -91,7 +91,7 @@ def only_mesh():
                 mut.update_table(info)
     except TypeError:
         print("No password provided for the mesh. Please get the password via provisioning server")
-        exit()
+        sys.exit()
 
 
 def CA():
@@ -119,6 +119,7 @@ def DE():
         return ness_result, mapp
     except FileNotFoundError:
         print("SecTable not available. Need to be requested during provisioning")
+        return None, None
 
 
 def show_table():
@@ -148,31 +149,27 @@ def show_neighbors():
 def sbeat():
     #os.system('clear')
     original_time = time()
-    end_time = 1000 # Total time to run security beat in seconds
     #os.system('clear')
     print('\'SecBeat\'')
-    print(f'Running SecBeat every {sec_beat_time} seconds, during {end_time} seconds')
+    print(f'Running SecBeat every {SEC_BEAT_TIME} seconds, during {END_TIME_SEC_BEAT} seconds')
     sec_beat_start_time = original_time
     count = 1
-    print("====================================================================")
-    print('Security beat no. ', count)
-    print("====================================================================")
-    # Start server socket to broadcast SecBeat
-    threading.Thread(target=sbeat_server, daemon=True, args=()).start()
-    threading.Thread(target=sec_beat, daemon=True, args=(myID,)).start()
-
-
+    sbeatcount(count)
     #sec_beat(myID)
-    while time() < original_time + end_time:
-        if mesh_utils.verify_mesh_status() and time() - sec_beat_start_time >= sec_beat_time:  # verifying that mesh is running
+    while time() < original_time + END_TIME_SEC_BEAT:
+        if mesh_utils.verify_mesh_status() and time() - sec_beat_start_time >= SEC_BEAT_TIME:  # verifying that mesh is running
             #sleep(sec_beat_time - time() % sec_beat_time)  # sec beat time
             sec_beat_start_time = time()
             count = count + 1
-            print("====================================================================")
-            print('Security beat no. ', count)
-            print("====================================================================")
-            threading.Thread(target=sbeat_server, daemon=True, args=()).start()
-            threading.Thread(target=sec_beat, daemon=True, args=(myID,)).start()
+            sbeatcount(count)
+
+
+def sbeatcount(count):
+    print("====================================================================")
+    print('Security beat no. ', count)
+    print("====================================================================")
+    threading.Thread(target=sbeat_server, daemon=True, args=()).start()
+    threading.Thread(target=sec_beat, daemon=True, args=(myID,)).start()
             #sec_beat(myID)
 
 def sbeat_client():
@@ -181,7 +178,7 @@ def sbeat_client():
     sbeat_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sbeat_sock.bind(("0.0.0.0", 6007))
     # Wait for a security beat period -> If a security beat is received, break while loop and start security beat. If it is not received, breadcast security beat and start it.
-    sbeat_sock.settimeout(sec_beat_time + 15) # 15 seconds buffer time as socket takes some time to start receiving udp packets here
+    sbeat_sock.settimeout(SEC_BEAT_TIME + 15) # 15 seconds buffer time as socket takes some time to start receiving udp packets here
     print("====================================================================")
     print("Waiting for security beat")
     print("====================================================================")
@@ -197,21 +194,25 @@ def sbeat_client():
             break
     print("Starting security beat")
     # sbeat()
-    threading.Thread(target=sbeat, daemon=True, args=()).start()
+    sbeat_thread = threading.Thread(target=sbeat, daemon=True, args=())
+    sbeat_thread.start()
+    return sbeat_thread
 
 def sbeat_server():
+    my_ip = mesh_utils.get_mesh_ip_address()
+    broadcast_ip = '.'.join(my_ip.split('.')[:3]) + '.255'
     sbeat_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)  # UDP
     sbeat_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sbeat_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sbeat_sock.setblocking(False)
     print("Broadcasting security beat")
-    sbeat_sock.sendto(bytes('SecBeat', "utf-8"),('10.10.10.255', 6007))  # mesh_utils.get_mesh_ip_address() # bat0 broadcast ip
+    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), (broadcast_ip, 6007))  # mesh_utils.get_mesh_ip_address() # bat0 broadcast ip
     sleep(0.1)
-    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), ('10.10.10.255', 6007))
+    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), (broadcast_ip, 6007))
     sleep(0.1)
-    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), ('10.10.10.255', 6007))
+    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), (broadcast_ip, 6007))
     sleep(0.1)
-    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), ('10.10.10.255', 6007))
+    sbeat_sock.sendto(bytes('SecBeat', "utf-8"), (broadcast_ip, 6007))
     sbeat_sock.close()
 
 def extable():
@@ -219,15 +220,6 @@ def extable():
     print('\'Exchange Security Table\'')
     table = 'auth/dev.csv'
     try:
-        mesh_utils.get_neighbors_ip()
-        """
-        try:
-            sectable = pd.read_csv(table)
-            sectable.drop_duplicates(inplace=True)
-            ut.exchage_table(sectable)
-        except Exception:
-            pass
-        """
         sectable = pd.read_csv(table)
         sectable.drop_duplicates(inplace=True)
         start_server_thread = ut.start_server()

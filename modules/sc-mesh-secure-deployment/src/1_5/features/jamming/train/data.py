@@ -1,7 +1,8 @@
 import pandas
+import random
+
 import pandas as pd
 import torch.nn.functional
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 from torch.utils.data import WeightedRandomSampler
@@ -118,14 +119,19 @@ def impute_series(serie_type_1: pd.DataFrame, serie_type_2: pd.DataFrame, bounds
     return new_serie
 
 
-def generate_data_imputation(df, amount=2000, label='simulated', plot=True):
+def generate_data_imputation(df, amount=2000, label='simulated', plot=False):
     print('generate_data_imputation')
     num_series = df['series_id'].nunique()
 
-    normal2 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) < 3000) & (~df['label'].str.contains('crypto'))]  # inter_high
-    jamming2 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) < 3000) & (~df['label'].str.contains('_10dBm'))]  # _0dBm
-    normal5 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) > 3000) & (~df['label'].str.contains('crypto'))]  # inter_high
-    jamming5 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) > 3000) & (~df['label'].str.contains('_10dBm'))]  # 0_dBm
+    # normal2 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) < 3000) & (~df['label'].str.contains('inter_high'))]
+    # jamming2 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) < 3000) & (~df['label'].str.contains('_0dBm'))]
+    # normal5 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) > 3000) & (~df['label'].str.contains('inter_high'))]
+    # jamming5 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) > 3000) & (~df['label'].str.contains('0_dBm'))]
+
+    normal2 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) < 3000) & (df['label'].str.contains('floor'))]
+    jamming2 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) < 3000) & (df['label'].str.contains('_10dBm'))]
+    normal5 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) > 3000) & (df['label'].str.contains('floor'))]
+    jamming5 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) > 3000) & (df['label'].str.contains('_10dBm'))]
 
     # Ignore jam 5 60cm 0dbm
     for i in range(amount):
@@ -266,39 +272,88 @@ def create_datasets(data, valid_pct=0.1, test_pct=0.2):
     raw, fft, bin_target, target = data
     assert len(raw) == len(fft), 'raw not same length as fft arrays'
 
-    idx = np.arange(raw.shape[0])
-    train_idx, test_idx = train_test_split(idx, test_size=test_pct, random_state=SEED)
-    train_ds = TensorDataset(
-        torch.tensor(raw[:][train_idx]).float(),
-        torch.tensor(fft[:][train_idx]).float(),
-        torch.tensor(bin_target[:][train_idx]).long(),
-        torch.tensor(target[:][train_idx]).long()
-    )
-    test_ds = TensorDataset(
-        torch.tensor(raw[:][test_idx]).float(),
-        torch.tensor(fft[:][test_idx]).float(),
-        torch.tensor(bin_target[:][test_idx]).long(),
-        torch.tensor(target[:][test_idx]).long()
-    )
+    target_indices = {}
+    for i, t in enumerate(target):
+        if t not in target_indices:
+            target_indices[t] = []
+        target_indices[t].append(i)
 
-    idx = np.arange(len(train_ds))
-    train_idx, valid_idx = train_test_split(idx, test_size=valid_pct, random_state=SEED)
+    train_indices = []
+    val_indices = []
+    test_indices = []
+    for t in target_indices:
+        indices = target_indices[t]
+        num_t = len(indices)
+        num_train_t = int(num_t * (1 - valid_pct - test_pct))
+        num_val_t = int(num_t * valid_pct)
+        num_test_t = int(num_t * test_pct)
+
+        # Set the random seed for reproducibility
+        random.seed(SEED)
+
+        # Shuffle the indices for this class
+        random.shuffle(indices)
+
+        # Add the indices to the subsets
+        train_indices += indices[:num_train_t]
+        val_indices += indices[num_train_t:num_train_t + num_val_t]
+        test_indices += indices[num_train_t + num_val_t:num_train_t + num_val_t + num_test_t]
+
     train_ds = CustomDataset(
-        torch.tensor(raw[:][train_idx]).float(),
-        torch.tensor(fft[:][train_idx]).float(),
-        torch.tensor(bin_target[:][train_idx]).long(),
-        torch.tensor(target[:][train_idx]).long()
-    )
-    val_ds = TensorDataset(
-        torch.tensor(raw[:][valid_idx]).float(),
-        torch.tensor(fft[:][valid_idx]).float(),
-        torch.tensor(bin_target[:][valid_idx]).long(),
-        torch.tensor(target[:][valid_idx]).long()
+        torch.tensor(raw[train_indices]).float(),
+        torch.tensor(fft[train_indices]).float(),
+        torch.tensor(bin_target[train_indices]).long(),
+        torch.tensor(target[train_indices]).long()
     )
 
-    print(f'Train dataset length: {len(train_ds)}')
-    print(f'Val. dataset length: {len(val_ds)}')
-    print(f'Test dataset length: {len(test_ds)}')
+    val_ds = TensorDataset(
+        torch.tensor(raw[val_indices]).float(),
+        torch.tensor(fft[val_indices]).float(),
+        torch.tensor(bin_target[val_indices]).long(),
+        torch.tensor(target[val_indices]).long()
+    )
+
+    test_ds = TensorDataset(
+        torch.tensor(raw[test_indices]).float(),
+        torch.tensor(fft[test_indices]).float(),
+        torch.tensor(bin_target[test_indices]).long(),
+        torch.tensor(target[test_indices]).long()
+    )
+
+    #
+    # idx = np.arange(raw.shape[0])
+    # train_idx, test_idx = train_test_split(idx, test_size=test_pct, random_state=SEED, stratify=target)
+    # train_ds = TensorDataset(
+    #     torch.tensor(raw[:][train_idx]).float(),
+    #     torch.tensor(fft[:][train_idx]).float(),
+    #     torch.tensor(bin_target[:][train_idx]).long(),
+    #     torch.tensor(target[:][train_idx]).long()
+    # )
+    # test_ds = TensorDataset(
+    #     torch.tensor(raw[:][test_idx]).float(),
+    #     torch.tensor(fft[:][test_idx]).float(),
+    #     torch.tensor(bin_target[:][test_idx]).long(),
+    #     torch.tensor(target[:][test_idx]).long()
+    # )
+    #
+    # idx = np.arange(len(train_ds))
+    # train_idx, valid_idx = train_test_split(idx, test_size=valid_pct, random_state=SEED, stratify=train_ds.tensors[3].numpy())
+    # train_ds = CustomDataset(
+    #     torch.tensor(raw[:][train_idx]).float(),
+    #     torch.tensor(fft[:][train_idx]).float(),
+    #     torch.tensor(bin_target[:][train_idx]).long(),
+    #     torch.tensor(target[:][train_idx]).long()
+    # )
+    # val_ds = TensorDataset(
+    #     torch.tensor(raw[:][valid_idx]).float(),
+    #     torch.tensor(fft[:][valid_idx]).float(),
+    #     torch.tensor(bin_target[:][valid_idx]).long(),
+    #     torch.tensor(target[:][valid_idx]).long()
+    # )
+    #
+    # print(f'Train dataset length: {len(train_ds)}')
+    # print(f'Val. dataset length: {len(val_ds)}')
+    # print(f'Test dataset length: {len(test_ds)}')
 
     return train_ds, val_ds, test_ds
 
@@ -317,12 +372,13 @@ def create_resampler(label_encoder, train_ds):
     return sampler
 
 
-def create_loaders(data, label_encoder, batch_size, jobs=2):
+def create_loaders(data, label_encoder, batch_size, jobs=0):
     train_ds, val_ds, test_ds = data
 
-    sampler = create_resampler(label_encoder, train_ds)
-    train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=jobs, drop_last=True)
+    # sampler = create_resampler(label_encoder, train_ds)
     # train_dl = DataLoader(train_ds, batch_size=batch_size, num_workers=jobs, drop_last=True, sampler=sampler)
+
+    train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=jobs, drop_last=True)
     val_dl = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0)
     test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=0)
     return train_dl, val_dl, test_dl

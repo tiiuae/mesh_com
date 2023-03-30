@@ -16,44 +16,44 @@ class MBA:
         self.add = '.'.join(aux)
 
     def client(self, q, debug=False, logger=None):
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            sock.bind(("0.0.0.0", 6006))
-            if logger:
-                logger.info("Client socket created")
-        except socket.error:
-            print("Client socket creation failed")
-            if logger:
-                logger.error("Client socket creation failed")
-            return
-        while True:
-            data, addr = sock.recvfrom(1024)
-            print("mba: message received")
-            if debug:
-                print(data, addr)
-            q.put(data)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            try:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                sock.bind(("0.0.0.0", 6006))
+                if logger:
+                    logger.info("Client socket created")
+            except socket.error:
+                print("Client socket creation failed")
+                if logger:
+                    logger.error("Client socket creation failed")
+                return
+            while True:
+                data, addr = sock.recvfrom(1024)
+                print("mba: message received")
+                if debug:
+                    print(data, addr)
+                q.put(data)
 
     def server(self, message, debug=False, logger=None):
         num_message = 5
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)  # UDP
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            sock.setblocking(False)
-            if logger:
-                logger.info("Server socket created")
-        except socket.error:
-            print("Server socket creation failed")
-            if logger:
-                logger.error("Server socket creation failed")
-            return
-        while num_message:
-            if debug:
-                print(f"this is server and it will send message {num_message} more times")
-            sock.sendto(bytes(message, "utf-8"), (self.add, 6006))
-            num_message -= 1
-            sleep(1)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock: # UDP
+            try:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                sock.setblocking(False)
+                if logger:
+                    logger.info("Server socket created")
+            except socket.error:
+                print("Server socket creation failed")
+                if logger:
+                    logger.error("Server socket creation failed")
+                return
+            while num_message:
+                if debug:
+                    print(f"this is server and it will send message {num_message} more times")
+                sock.sendto(bytes(message, "utf-8"), (self.add, 6006))
+                num_message -= 1
+                sleep(1)
 
     def terminate(self):
         del self

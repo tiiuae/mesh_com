@@ -1,18 +1,18 @@
 import glob
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import tsaug
-from sklearn.model_selection import train_test_split
-from scipy.signal import savgol_filter
 import plotly.express as px
-import matplotlib.pyplot as plt
+import tsaug
 from scipy.signal import butter, filtfilt
+from sklearn.model_selection import train_test_split
 
 from util import SEED, NUM_MEASUREMENT, ORDERED_COLS, CHANNELS
 
-folders = ['floor', 'inter_mid', 'inter_high', 'jamming', 'crypto']
+normal_folders = ['floor', 'inter_mid', 'inter_high']
+# normal_folders = ['inter_mid']
 
 
 def plot_timeserie(original: np.ndarray, filtered: np.ndarray, resized: np.ndarray):
@@ -60,15 +60,6 @@ def resize_to_length(df: pd.DataFrame, filter=False):
             else:
                 df_down[col] = tsaug.Resize(size=NUM_MEASUREMENT).augment(df[col].to_numpy())
 
-            # plotting
-            # if col == 'rssi':
-            #     plot_timeserie(df[col].to_numpy(), df[col].to_numpy(), df_down[col].to_numpy())
-            #     quit()
-
-            # from tslearn.preprocessing import TimeSeriesResampler
-            # col_data = TimeSeriesResampler(sz=NUM_MEASUREMENT).fit_transform(np_col)
-            # df_down[col] = np.squeeze(col_data)
-
     df_down['freq1'] = freq1
     assert len(df_down) == NUM_MEASUREMENT, 'wrong length'
     return df_down
@@ -83,8 +74,8 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
         os.mkdir(storing_folder)
 
     # Loop through noise floor and normal files and extract features
-    for folder in folders:
-        all_series = None
+    for folder in normal_folders:
+        all_series = []
         for file_name in glob.glob(f'{dataset_path}/{folder}/*.csv'):
             print(file_name)
             df = pd.read_csv(file_name)
@@ -104,30 +95,18 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
 
                 # Set serie id
                 df_serie['series_id'] = series_id
-                series_id += 1
-
                 df_serie['bin_label'] = 0
                 df_serie['label'] = folder
 
                 # Concatenate
-                all_series = df_serie if all_series is None else pd.concat([all_series, df_serie])
+                all_series.append(df_serie)
+                series_id += 1
 
+        all_series = pd.concat(all_series, ignore_index=True)
         all_series = all_series[ORDERED_COLS]
         all_series.to_csv(f'{storing_folder}/{folder}.csv', index=False)
 
-    # label = 3
-    # labels = {}
-    # for freq in ['2', '5']:
-    #     freq_dict = {}
-    #     for dist in ['20', '40', '60']:
-    #         dist_dict = {}
-    #         for pwr in ['0', '5', '10']:
-    #             dist_dict[pwr] = label
-    #             label += 1
-    #         freq_dict[dist] = dist_dict
-    #     labels[freq] = freq_dict
-
-    all_series = None
+    all_series = []
     # Loop through jammed files and extract features
     for folder in ['jamming/2.4', 'jamming/5.0']:
         for file_name in glob.glob(f'{dataset_path}/{folder}/*.csv'):
@@ -165,15 +144,16 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
             df_serie['label'] = f'jam_{frequency}GHz_{distance}cm_{power_level}dBm'
 
             # Concatenate
-            all_series = df_serie if all_series is None else pd.concat([all_series, df_serie])
+            all_series.append(df_serie)
 
-        all_series = all_series[ORDERED_COLS]
-        all_series.to_csv(f'{storing_folder}/jamming.csv', index=False)
+    all_series = pd.concat(all_series, ignore_index=True)
+    all_series = all_series[ORDERED_COLS]
+    all_series.to_csv(f'{storing_folder}/jamming.csv', index=False)
 
 
 def store_all_data(storing_folder='preprocessed'):
     all_data = None
-    for file_name in folders:
+    for file_name in normal_folders + ['jamming']:
         print(f'Loading {storing_folder}/{file_name}.csv')
         df = pd.read_csv(f'{storing_folder}/{file_name}.csv')
         all_data = df if all_data is None else pd.concat([all_data, df])
@@ -187,7 +167,7 @@ def split_data(storing_folder='preprocessed'):
 
     # Split data into train and test
     dataset = None
-    for file_name in folders:
+    for file_name in normal_folders + ['jamming']:
         print(f'Loading {storing_folder}/{file_name}.csv')
         df = pd.read_csv(f'{storing_folder}/{file_name}.csv')
         dataset = df if dataset is None else pd.concat([dataset, df])
@@ -206,9 +186,9 @@ def split_data(storing_folder='preprocessed'):
 
 def main():
     np.random.seed(0)
-    # preprocess_raw_files()
+    preprocess_raw_files()
     store_all_data()
-    split_data()
+    # split_data()
 
 
 if __name__ == '__main__':
