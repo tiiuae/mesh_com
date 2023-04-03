@@ -14,19 +14,20 @@ if __name__ == "__main__":
     # SCAN MODE: Check if scan mode arg passed, if not set to default
     try:        
         scan_mode = sys.argv[1].strip()
-        if(scan_mode != 'high_latency' and scan_mode != 'low_latency'):
+        if((scan_mode != 'high_latency') and (scan_mode != 'low_latency')):
             scan_mode = 'default'      
     except:
         scan_mode = 'default'
     
         
     # FREQUENCY BAND: Check if band arg passed, if not set to all bands   
-    try:
-        band = sys.argv[2].strip()
-        if(scan_mode == 'high_latency' and (band != 'band_2_4' and band != 'band_5')): # if param passed but invalid input
-            scan_mode = 'default'    
-    except:     
-        scan_mode = 'default'
+    if(scan_mode == 'high_latency'):
+        try:
+            band = sys.argv[2].strip()
+            if((band != 'band_2_4') and (band != 'band_5')): # if param passed but invalid input
+                scan_mode = 'default'    
+        except:     
+            scan_mode = 'default'
         
 
     # CONFIG
@@ -35,8 +36,8 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
         
         if(scan_mode == 'low_latency'):
-            scan_channels = config[scan_mode]['channels'][0]
-            all_channels = config[scan_mode]['channels'][0]
+            scan_channels = config[scan_mode]['channels']
+            all_channels = config[scan_mode]['channels']
         elif(scan_mode == 'high_latency'):
             scan_channels = config[scan_mode][band]['channels']
             all_channels = config[scan_mode][band]['channels']             
