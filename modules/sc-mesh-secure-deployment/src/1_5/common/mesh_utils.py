@@ -3,6 +3,7 @@ import fcntl
 import struct
 import socket
 import netifaces
+import yaml
 
 from threading import Thread
 
@@ -11,6 +12,20 @@ try:
 except ImportError:
     import Queue as queue
 
+def get_mesh_int():
+    '''
+    get the mesh interface (br-lan in case of bridge, bat0 if no bridge) from common/mesh_com_11s.conf
+    '''
+    with open('common/mesh_com_11s.conf', 'r') as stream:
+        try:
+            yaml_conf = yaml.safe_load(stream)
+            confs = yaml_conf['server']
+            config = confs['secos']
+            MESHINT = config['meshint']
+            return MESHINT
+        except yaml.YAMLError as exc:
+            print(exc)
+            return None
 
 def get_macs_neighbors():
     """
@@ -26,7 +41,7 @@ def get_macs_neighbors():
     return macs
 
 
-def get_mac_mesh(pattern):
+def get_mac_mesh(pattern=get_mesh_int()):
     for interf in netifaces.interfaces():
         if interf.startswith(pattern):
             interface = interf
@@ -43,7 +58,7 @@ def verify_mesh_status():
     return len(macs) >= 1
 
 
-def get_mesh_ip_address(ifname='bat0'):
+def get_mesh_ip_address(ifname=get_mesh_int()):
     """
     function to get the ip address.
     Another option can be to get the ip from the conf file, but in this case it will need to be loaded here.
@@ -56,7 +71,7 @@ def get_mesh_ip_address(ifname='bat0'):
             struct.pack('256s', bytes(ifname[:15], 'utf-8')))[20:24])
 
 
-def get_mesh_interface(pattern):
+def get_mesh_interface(pattern=get_mesh_int()):
     '''
     Using this function from previous script, to obtain the mesh_interface.
     Maybe it's redundant if secure OS will have 'wlan1' as default
@@ -109,7 +124,7 @@ def get_arp():
     neig = {}
     # get_neighbors_ip()
     # time.sleep(2)
-    args = ['ip', 'neigh', 'show', 'dev', 'bat0', 'nud', 'stale']
+    args = ['ip', 'neigh', 'show', 'dev', get_mesh_int(), 'nud', 'stale']
     output = subprocess.check_output(args, shell=False)
 
     aux = output.decode().split('\n')
