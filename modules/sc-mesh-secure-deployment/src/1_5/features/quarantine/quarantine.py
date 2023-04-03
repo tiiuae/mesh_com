@@ -9,7 +9,7 @@ from common import mesh_utils, utils
 
 class Quarantine:
     def __init__(self):
-        self.interface = mesh_utils.get_mesh_interface('bat0')
+        self.interface = mesh_utils.get_mesh_interface(mesh_utils.get_mesh_int())
 
     def block(self, ip, quarantineTime):
         #command = [str(script_path) + '/traffic_block.sh', mac, self.interface]

@@ -6,7 +6,7 @@ from common import ConnectionMgr, mesh_utils
 
 co = ConnectionMgr.ConnectionMgr()
 MUTUALINT = 'wlan1'
-MESHINT = 'bat0'
+MESHINT = mesh_utils.get_mesh_int()
 
 client_q = {}
 

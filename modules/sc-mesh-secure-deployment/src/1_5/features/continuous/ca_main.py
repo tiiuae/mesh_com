@@ -13,13 +13,13 @@ from features.utils import utils as ut
 from common import ConnectionMgr, mesh_utils, utils
 from . import server
 from . import client
-
+#from header import MESHINT, MUTUALINT
 
 
 
 co = ConnectionMgr.ConnectionMgr()
 MUTUALINT = 'wlan1'
-MESHINT = 'bat0'
+MESHINT = mesh_utils.get_mesh_int()
 
 
 

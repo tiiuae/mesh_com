@@ -10,6 +10,7 @@ ROOT_CERT="$COMMON_FOLDER/test/root_cert.der"
 MESH_COM_CONF="$COMMON_FOLDER/mesh_com_11s.conf"
 AUTH_AP_CONF="$FEATURES_FOLDER/auth_ap.yaml"
 DHCPD_LEASES="/var/lib/dhcp/dhcpd.leases"
+MESH_CONF="$MESH_FOLDER/modules/utils/docker/mesh.conf"
 
 COMMS_PCB_VERSION_FILE="/opt/hardware/comms_pcb_version"
 
@@ -329,7 +330,16 @@ if [ "$meshVersion" == "1.5" ]; then
   uid=$(echo -n "$mesh_if_mac" | b2sum -l 32)
   uid=${uid::-1}
   /bin/bash "$MESH_FOLDER"/common/scripts/generate_keys.sh "$uid"
-  start_mesh_1_5
+
+  bridge=$(grep -oP '^BRIDGE=\K.*' $MESH_CONF)
+  if [ "$bridge" == "true" ]; then #write bridge: True, meshint: br-lan
+    sed -i "s/bridge: .*/bridge: True/" "$MESH_COM_CONF"
+    sed -i "s/meshint: .*/meshint: br-lan/" "$MESH_COM_CONF"
+  else #write bridge: False, meshint: bat0
+    sed -i "s/bridge: .*/bridge: False/" "$MESH_COM_CONF"
+    sed -i "s/meshint: .*/meshint: bat0/" "$MESH_COM_CONF"
+  fi
+  start_mesh_1_5 # bridge_settings is called inside start_mesh_1_5
 
 else #this means 1.0
     mesh_service

@@ -19,6 +19,7 @@ ut = Utils()
 
 script_path = Path(__file__).parent.resolve()
 src_path = str(script_path).split('common', maxsplit=1)[0].split('1_5')[0]
+docker_path = str(script_path).split('common')[0].split('1_5')[0].split('src')[0].split('sc-mesh-secure-deployment')[0] + 'utils/docker'
 
 
 class ConnectionMgr:
@@ -42,6 +43,7 @@ class ConnectionMgr:
         # 11s :default mesh mode
         self.mesh_mode = "11s"
         self.gw = False
+        self.bridge = False
 
     def starting_mesh(self):  # Get the mesh_com config
         """
@@ -55,6 +57,8 @@ class ConnectionMgr:
             print("============================================")
             gw_service = main.AutoGateway()
             Thread(target=gw_service.run, daemon=True).start()
+        if self.bridge:
+            subprocess.Popen(['bash', '-c', docker_path + '/entrypoint.sh', 'bridge_settings'])
 
     @property
     def create_mesh_config(self):
@@ -107,6 +111,7 @@ class ConnectionMgr:
         self.mesh_if = self.util.get_interface_by_pattern(confc['mesh_inf'])
         self.mesh_ip = mesh_ip
         self.mesh_mac = mesh_mac
+        self.bridge = config['bridge']
         return self.mesh_ip, self.mesh_mac
 
     # @staticmethod
