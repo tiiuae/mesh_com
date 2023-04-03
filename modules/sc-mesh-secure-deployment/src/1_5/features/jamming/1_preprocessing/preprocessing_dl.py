@@ -1,5 +1,6 @@
 import glob
 import os
+import random
 import time
 
 import matplotlib.pyplot as plt
@@ -13,8 +14,8 @@ from sklearn.model_selection import train_test_split
 
 from util import SEED, NUM_MEASUREMENT, ORDERED_COLS, CHANNELS
 
-normal_folders = ['floor', 'inter_mid', 'inter_high']
-max_files = 1500
+normal_folders = ['communication', 'floor', 'inter_mid', 'inter_high']
+max_files = 1000
 
 
 def plot_timeserie(original: np.ndarray, filtered: np.ndarray, resized: np.ndarray):
@@ -79,7 +80,9 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
     for folder_name in normal_folders:
         all_series = []
         files = glob.glob(f'{dataset_path}/{folder_name}/*.csv')
-        if len(files) > max_files:
+        random.shuffle(files)
+
+        if len(files) > max_files and folder_name != 'communication':
             print(f'Dropping {len(files) - max_files} files')
             time.sleep(0.01)  # sleep so print() and tqdm dont overlap
             files = files[:max_files]
@@ -89,7 +92,8 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
             # Ignore sometimes corrupted first row
             df = df.iloc[1:-1]
             # Loop through each channel
-            for channel in CHANNELS:
+            channel_list = [5180] if 'meshfreq' in file_name else CHANNELS
+            for channel in channel_list:
                 # Filter measurements for a particular channel within file
                 df_channel = df.loc[df['freq1'] == channel]
 
@@ -147,8 +151,11 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
             frequency = '2' if frequency < 3000 else '5'
             distance = split_filename[4].split("cm")[0]
             power_level = split_filename[5].split("dBm")[0]
-            # df_serie['label'] = labels[frequency][distance][power_level]
-            df_serie['label'] = f'jam_{frequency}GHz_{distance}cm_{power_level}dBm'
+            if int(distance) == 0:
+                jam_type = split_filename[6]
+                df_serie['label'] = f'jam_{frequency}GHz_{distance}cm_{power_level}dBm_{jam_type}'
+            else:
+                df_serie['label'] = f'jam_{frequency}GHz_{distance}cm_{power_level}dBm'
 
             # Concatenate
             all_series.append(df_serie)

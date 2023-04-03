@@ -209,6 +209,8 @@ def load_data(plot=False):
 
     # Load enhanced data with simulated data
     df = pd.read_csv('../data/preprocessed/enhanced.csv')
+    # df = df[df['label'] != 'communication']
+
     # df = apply_filter(df)
 
     # Expand amount of features by engineering some
