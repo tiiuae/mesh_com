@@ -1,126 +1,69 @@
-import random
+import time
+
+import numpy as np
 
 from options import parse_option
-
-normal_folders = ['communication', 'floor', 'inter_mid', 'inter_high']
-max_files = 1000
-
-from enum import Enum
-from typing import List
-
-
-class Band(Enum):
-    BAND_2_4GHZ = "2.4GHz"
-    BAND_5GHZ = "5GHz"
-
-
-class WirelessScanner:
-    def __init__(self, interface: str):
-        self.interface = interface
-        self.current_band = self.get_current_band()
-        self.current_channel = self.get_current_channel()
-
-    def get_available_channels(self, band: Band) -> List[int]:
-        """
-        Get the available channels in the specified band.
-
-        :param band: The band to retrieve channels for.
-        :return: A list of available channels in the specified band.
-        """
-        # Replace this function with actual code to get the available channels in the specified band
-        return [1, 6, 11] if band == Band.BAND_2_4GHZ else [36, 40, 44, 48]
-
-    def low_latency_spectral_scan(self, channel: int) -> None:
-        """
-        Run a low-latency spectral scan on the given channel.
-
-        :param channel: The channel to perform the low-latency spectral scan on.
-        """
-        # Replace this function with actual code to run a low-latency spectral scan on the given channel
-        pass
-
-    def spectral_scan(self, channel: int) -> None:
-        """
-        Run a spectral scan on the given channel.
-
-        :param channel: The channel to perform the spectral scan on.
-        """
-        # Replace this function with actual code to run a spectral scan on the given channel
-        pass
-
-    def set_channel(self, channel: int) -> None:
-        """
-        Set the wireless interface to the given channel.
-
-        :param channel: The channel to set the wireless interface to.
-        """
-        # Replace this function with actual code to set the wireless interface to the given channel
-        self.current_channel = channel
-        self.current_band = Band.BAND_2_4GHZ if 1 <= channel <= 14 else Band.BAND_5GHZ
-
-    def get_current_band(self) -> Band:
-        """
-        Get the current band of the wireless scanner.
-
-        :return: The current band.
-        """
-        return Band.BAND_5GHZ
-
-    def get_current_channel(self) -> int:
-        """
-        Get the current channel of the wireless scanner.
-
-        :return: The current channel.
-        """
-        return 5180
-
-
-class ChannelQualityEstimator:
-    @staticmethod
-    def get_current_channel_quality(channel):
-        # Replace this function with actual code to get the quality of the current channel
-        return random.random()
-
-    @staticmethod
-    def get_channel_quality(channel):
-        # Replace this function with actual code to get the quality of a specific channel
-        return random.random()
+from util import print_channel_quality, map_freq_to_channel
+from channel_quality_estimator import ChannelQualityEstimator
+from wireless_scanner import WirelessScanner
+from preprocessor import Preprocessor
 
 
 def main():
-    # Parse arguments
     args = parse_option()
 
-    scanner = WirelessScanner(interface=args.interface)
+    # Initialize scanner, preprocessor, and estimator objects
+    scanner = WirelessScanner(args)
+    prep = Preprocessor()
     estimator = ChannelQualityEstimator()
 
-    # Loop through each channel
-    channel_list = [5180] if 'meshfreq' in file_name else CHANNELS
-    for channel in channel_list:
-        # Filter measurements for a particular channel within file
-        df_channel = df.loc[df['freq1'] == channel]
+    while True:
+        # Perform a low latency spectral scan
+        channel, scan = scanner.low_latency_spectral_scan()
+        # Preprocess the scan
+        feat_array, frequencies = prep.preprocess(scan)
+        # Estimate the channel quality
+        channel_quality = estimator.estimate(feat_array)
+        # Print channel quality and frequencies
+        print_channel_quality(channel_quality, frequencies)
 
-        # Ignore timeseries with low number of measurements
-        if len(df_channel) < 64:
-            continue
+        # If channel quality is below the threshold
+        if channel_quality < args.threshold:
+            # Perform a full scan of the current frequency band
+            channel, scan = scanner.scan_current_band()
+            # Preprocess the scan
+            feat_array, frequencies = prep.preprocess(scan)
+            # Estimate the channel quality
+            channels_quality = estimator.estimate(feat_array)
+            # Print channel quality and frequencies
+            print_channel_quality(channels_quality, frequencies)
 
-        # Down sample by interpolating mean
-        df_serie = resize_to_length(df_channel)
+            # Check if there is at least one channel under the threshold
+            if any(quality > args.threshold for quality in channels_quality):
+                # Pick the channel with the highest quality
+                best_freq = frequencies[np.argmax(channels_quality)]
+                # Map the frequency to the corresponding channel
+                best_channel = map_freq_to_channel(best_freq)
+                # Set the device to use the best channel
+                scanner.set_channel(best_channel)
+            else:
+                # Scan the other frequency band
+                channel, scan = scanner.scan_other_band()
+                # Preprocess the scan
+                feat_array, frequencies_other = prep.preprocess(scan)
+                # Estimate channel quality for the other band
+                channels_quality_other = estimator.estimate(feat_array)
+                # Print channel quality and frequencies
+                print_channel_quality(channels_quality_other, frequencies_other)
 
-        # Set serie id
-        df_serie['series_id'] = series_id
-        df_serie['bin_label'] = 0
-        df_serie['label'] = folder_name
+                # Find the best channel between the current and other bands
+                best_quality_both = max(max(channels_quality), max(channels_quality_other))
+                best_freq_both = frequencies[np.argmax(channels_quality)] if best_quality_both in channels_quality else frequencies_other[np.argmax(channels_quality_other)]
+                best_channel_both = map_freq_to_channel(best_freq_both)
+                # Set the device to use the best channel from both bands
+                scanner.set_channel(best_channel_both)
 
-        # Concatenate
-        all_series.append(df_serie)
-        series_id += 1
-
-    print(df)
-    quit()
-    preprocess_raw_files()
-    store_all_data()
-    # split_data()
+        time.sleep(args.waiting_time)
 
 
 if __name__ == '__main__':

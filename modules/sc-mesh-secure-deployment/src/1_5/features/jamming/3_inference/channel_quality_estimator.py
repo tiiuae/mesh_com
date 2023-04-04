@@ -1,0 +1,90 @@
+"""
+ChannelQualityEstimator.py
+Description: 
+
+Author: Willian T. Lunardi
+Contact: wtlunar@gmail.com
+License: MIT License (https://opensource.org/licenses/MIT)
+
+Repository: https://github.com/Willtl/voice-fingerprinting.git
+"""
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+from tsai.models.all import ResCNN
+
+
+class ChannelQualityEstimator:
+    """
+    A class for estimating the quality of communication channels using a pre-trained ResCNN model.
+
+    This class utilizes a pre-trained ResCNN model to estimate the channel quality based on input features.
+    The channel quality is computed as a score that combines the probabilities of good and jamming states,
+    providing a relative measure of quality for each channel.
+
+    Positive channel quality values indicate a better channel quality, while negative values suggest
+    potential jamming or lower channel quality.
+
+    Attributes:
+        device: A PyTorch device ('cuda' or 'cpu') to run the model on.
+        model: The pre-trained ResCNN model for channel quality estimation.
+    """
+
+    def __init__(self):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = ResCNN(15, 26, separable=True).to(self.device)
+        self.model.load_state_dict(torch.load('pretrained_model/best.pth'))
+        self.model.eval()
+
+    def _forward(self, feat_array: np.ndarray):
+        with torch.no_grad():
+            # Create tensors
+            inputs = torch.from_numpy(feat_array).float()
+            inputs = inputs.to(self.device, non_blocking=True)
+            # Feed inputs and compute jamming probability for each frequency
+            out = self.model(inputs)
+            # Compute the probabilities
+            preds = F.softmax(out, dim=1)
+        return preds.cpu().numpy()
+
+    def _compute_channel_quality(self, preds: np.ndarray):
+        """
+        Compute the channel quality based on the model's predictions.
+
+        The channel quality is calculated as the difference between the weighted sum of good state probabilities
+        and the average probability of jamming states. Positive channel quality values indicate a better channel
+        quality, while negative values suggest potential jamming or lower channel quality.
+
+        :param preds: A 2D NumPy array of shape (n_channels, n_classes) containing the model's class probabilities.
+        :return: A 1D NumPy array of shape (n_channels,) representing the channel quality scores for each channel.
+        """
+        # Weights for good states (communication, floor, inter_mid, inter_high)
+        good_weights = np.array([0.75, 1, 0.5, 0.25])
+
+        # Compute good state probabilities
+        good_probs = preds[:, :4]  # Get the probabilities for the first 4 states
+
+        # Compute a score based on the good state probabilities and their weights
+        good_scores = np.dot(good_probs, good_weights)
+
+        # Compute jamming state probabilities
+        jamming_probs = preds[:, 4:]  # Get the probabilities for the remaining jamming states
+
+        # Compute a jamming score based on the average probability of jamming states
+        jamming_scores = np.mean(jamming_probs, axis=1)
+
+        # Compute channel quality as the difference between good scores and jamming scores
+        channel_quality = good_scores - jamming_scores
+
+        return channel_quality
+
+    def estimate(self, feat_array: np.ndarray):
+        # Compute class probabilities for the given features
+        preds = self._forward(feat_array)
+
+        # Compute the channel quality
+        channel_quality = self._compute_channel_quality(preds)
+
+        # Return the channel quality
+        return channel_quality

@@ -1,3 +1,4 @@
+import json
 import random
 import sys
 
@@ -64,6 +65,11 @@ def normalize_df(df: pandas.DataFrame):
         cols_mean_std[col]['std'] = df_norm[col].std()
         df_norm[col] = (df_norm[col] - cols_mean_std[col]['mean']) / cols_mean_std[col]['std']
     print('Normalization variables', cols_mean_std)
+
+    # Open the file in write mode and dump the dictionary as JSON
+    with open('../3_inference/cols_mean_std.json', 'w') as file:
+        json.dump(cols_mean_std, file)
+
     return df_norm
 
 
@@ -199,16 +205,16 @@ def apply_filter(df):
 
 
 def load_data(plot=False):
-    if not os.path.exists('../data/preprocessed/enhanced.csv'):
+    if not os.path.exists('../1_preprocessing/preprocessed/enhanced.csv'):
         # Load data and compute number of series within it
-        df = pd.read_csv(f'../data/preprocessed/all_series.csv')
+        df = pd.read_csv(f'../1_preprocessing/preprocessed/all_series.csv')
 
         # Generate additional jamming samples by imputation of normal and jamming time series
         df = generate_data_imputation(df)
-        df.to_csv('../data/preprocessed/enhanced.csv')
+        df.to_csv('../1_preprocessing/preprocessed/enhanced.csv')
 
     # Load enhanced data with simulated data
-    df = pd.read_csv('../data/preprocessed/enhanced.csv')
+    df = pd.read_csv('../1_preprocessing/preprocessed/enhanced.csv')
     # df = df[df['label'] != 'communication']
 
     # df = apply_filter(df)
@@ -217,8 +223,8 @@ def load_data(plot=False):
     df = feature_engineer(df)
 
     # Reorder columns
-    reorder_cols = ['series_id', 'freq1', 'max_magnitude', 'total_gain_db', 'base_pwr_db', 'rssi', 'relpwr_db', 'avgpwr_db',
-                    'snr', 'cnr', 'pn', 'ssi', 'pd', 'sinr', 'sir', 'mr', 'pr', 'bin_label', 'label']
+    reorder_cols = ['series_id', 'freq1', 'max_magnitude', 'total_gain_db', 'base_pwr_db', 'rssi', 'relpwr_db', 'avgpwr_db', 'snr', 'cnr', 'pn', 'ssi', 'pd', 'sinr', 'sir', 'mr',
+                    'pr', 'bin_label', 'label']
     df = df[reorder_cols]
 
     # Encode labels
