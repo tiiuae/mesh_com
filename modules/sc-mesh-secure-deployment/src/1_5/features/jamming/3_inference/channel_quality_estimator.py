@@ -27,17 +27,28 @@ class ChannelQualityEstimator:
     potential jamming or lower channel quality.
 
     Attributes:
-        device: A PyTorch device ('cuda' or 'cpu') to run the model on.
-        model: The pre-trained ResCNN model for channel quality estimation.
+        device (str): A PyTorch device ('cuda' or 'cpu') to run the model on.
+        model (ResCNN): The pre-trained ResCNN model for channel quality estimation.
     """
 
     def __init__(self):
+        """
+        Initializes the ChannelQualityEstimator object.
+
+        Loads the pre-trained ResCNN model and sets the device to 'cuda' if available, 'cpu' otherwise.
+        """
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = ResCNN(15, 26, separable=True).to(self.device)
         self.model.load_state_dict(torch.load('pretrained_model/best.pth'))
         self.model.eval()
 
-    def _forward(self, feat_array: np.ndarray):
+    def _forward(self, feat_array: np.ndarray) -> np.ndarray:
+        """
+        Computes the class probabilities for a given feature array.
+
+        :param feat_array: A 2D NumPy array of shape (n_samples, n_features) containing the input features.
+        :return: A 2D NumPy array of shape (n_samples, n_classes) containing the model's class probabilities.
+        """
         with torch.no_grad():
             # Create tensors
             inputs = torch.from_numpy(feat_array).float()
@@ -48,9 +59,9 @@ class ChannelQualityEstimator:
             preds = F.softmax(out, dim=1)
         return preds.cpu().numpy()
 
-    def _compute_channel_quality(self, preds: np.ndarray):
+    def _compute_channel_quality(self, preds: np.ndarray) -> np.ndarray:
         """
-        Compute the channel quality based on the model's predictions.
+        Computes the channel quality scores based on the model's predictions.
 
         The channel quality is calculated as the difference between the weighted sum of good state probabilities
         and the average probability of jamming states. Positive channel quality values indicate a better channel
@@ -79,7 +90,13 @@ class ChannelQualityEstimator:
 
         return channel_quality
 
-    def estimate(self, feat_array: np.ndarray):
+    def estimate(self, feat_array: np.ndarray) -> np.ndarray:
+        """
+        Estimates the channel quality for a given feature array.
+
+        :param feat_array: A 2D NumPy array of shape (n_samples, n_features) containing the input features.
+        :return: A 1D NumPy array of shape (n_channels,) representing the channel quality scores for each channel.
+        """
         # Compute class probabilities for the given features
         preds = self._forward(feat_array)
 

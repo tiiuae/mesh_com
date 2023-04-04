@@ -91,13 +91,13 @@ class Preprocessor:
         assert len(df_down) == self.input_length, 'wrong length'
         return df_down
 
-    def normalize(self, df: pd.DataFrame) -> np.ndarray:
+    def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Normalizes the given spectral scan data to have a mean of 0 and a standard deviation of 1 using the
-        mean and standard deviation information from the col_mean_std.json file.
+        Applies zero-mean unit variance normalization to the given spectral scan data using the mean and standard deviation
+        information from the col_mean_std.json file.
 
         :param df: The spectral scan data to normalize.
-        :return: The normalized spectral scan data as a NumPy array.
+        :return: The normalized spectral scan data as a pandas DataFrame.
         """
         for col in df.columns:
             if col in ['freq1']:
@@ -111,7 +111,7 @@ class Preprocessor:
         Preprocesses the given spectral scan data by computing features, resizing, and normalizing it.
 
         :param df: The spectral scan data to preprocess.
-        :return: The preprocessed spectral scan data as a NumPy array.
+        :return: A tuple containing the preprocessed spectral scan data as a NumPy array and the unique frequencies.
         """
         # Ignore first and last rows, sometimes corrupted
         df = df.iloc[1:-1].copy()

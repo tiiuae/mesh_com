@@ -8,14 +8,22 @@ License:
 
 Repository:
 """
+
 from argparse import Namespace
-from typing import List, Any
+from typing import List
+
+import pandas as pd
 
 from util import Band, map_channel_to_freq, load_sample_data, map_channel_to_band
 
 
 class WirelessScanner:
     def __init__(self, args: Namespace):
+        """
+        Initializes the WirelessScanner object.
+
+        :param args: A Namespace object containing command line arguments.
+        """
         self.args = args
         self.channel = args.channels5[0]  # TODO: Implement function that loads interface's channel
         self.band = map_channel_to_band(self.channel)
@@ -24,16 +32,18 @@ class WirelessScanner:
         """
         Get the available channels in the specified band.
 
+        :param band: A Band enum specifying the frequency band to get available channels for.
         :return: A list of available channels in the specified band.
         """
         # Replace this function with actual code to get the available channels in the specified band
         return self.args.channels2 if band == Band.BAND_24GHZ else self.args.channels5
 
-    def low_latency_spectral_scan(self) -> tuple[Any, Any]:
+    def low_latency_spectral_scan(self) -> tuple[int, pd.DataFrame]:
         """
         Runs a low-latency spectral scan on the current channel.
 
-        :return: A pandas DataFrame containing the spectral scan data for the chosen CSV file.
+        :return: A tuple containing the current channel as an integer and a pandas DataFrame containing the spectral
+        scan data for the chosen CSV file.
         """
         # Sample a csv
         message, scan = load_sample_data()
@@ -44,7 +54,13 @@ class WirelessScanner:
 
         return self.channel, scan
 
-    def scan_current_band(self):
+    def scan_current_band(self) -> tuple[int, pd.DataFrame]:
+        """
+        Runs a high-latency spectral scan on the available channels in the current band.
+
+        :return: A tuple containing the current channel as an integer and a pandas DataFrame containing the spectral
+        scan data for the chosen CSV file.
+        """
         channels = self.get_available_channels(self.band)
         freqs = [map_channel_to_freq(channel) for channel in channels]
 
@@ -56,7 +72,13 @@ class WirelessScanner:
 
         return self.channel, scan
 
-    def scan_other_band(self):
+    def scan_other_band(self) -> tuple[int, pd.DataFrame]:
+        """
+        Runs a high-latency spectral scan on the available channels in the other band.
+
+        :return: A tuple containing the current channel as an integer and a pandas DataFrame containing the spectral
+        scan data for the chosen CSV file.
+        """
         other_band = Band.BAND_50GHZ if self.band == Band.BAND_24GHZ else Band.BAND_24GHZ
         channels = self.get_available_channels(other_band)
         freqs = [map_channel_to_freq(channel) for channel in channels]
@@ -71,9 +93,10 @@ class WirelessScanner:
 
     def set_channel(self, channel: int) -> None:
         """
-        Set the wireless interface to the given channel.
+        Sets the wireless interface to the given channel.
 
-        :param channel: The channel to set the wireless interface to.
+        :param channel: An integer specifying the channel to set the wireless interface to.
+        :return: None
         """
         print('moving to', channel, map_channel_to_freq(channel))
         # Replace this function with actual code to set the wireless interface to the given channel
