@@ -26,3 +26,4 @@ The model is trained using the AdamW optimizer with a learning rate of 0.001 and
 ## Evaluation
 The performance of the model is evaluated using the test set. The accuracy of the model is calculated for both the multiclass classification and the binary classification (normal vs. all).
 
+# 
