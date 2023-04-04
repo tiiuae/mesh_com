@@ -1,3 +1,14 @@
+"""
+main.py
+Description: 
+
+Author: Willian T. Lunardi
+Contact: wtlunar@gmail.com
+License:
+
+Repository:
+"""
+
 import time
 
 import numpy as np

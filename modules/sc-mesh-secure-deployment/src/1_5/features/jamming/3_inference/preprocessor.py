@@ -4,10 +4,11 @@ Description:
 
 Author: Willian T. Lunardi
 Contact: wtlunar@gmail.com
-License: MIT License (https://opensource.org/licenses/MIT)
+License: 
 
-Repository: https://github.com/Willtl/voice-fingerprinting.git
+Repository:  
 """
+
 import json
 import sys
 from typing import Optional, Tuple

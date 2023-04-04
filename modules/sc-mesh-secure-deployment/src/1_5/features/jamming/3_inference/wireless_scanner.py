@@ -1,12 +1,12 @@
 """
-WirelessScanner.py
+wireless_scanner.py
 Description: 
 
 Author: Willian T. Lunardi
 Contact: wtlunar@gmail.com
-License: MIT License (https://opensource.org/licenses/MIT)
+License:
 
-Repository: https://github.com/Willtl/voice-fingerprinting.git
+Repository:
 """
 from argparse import Namespace
 from typing import List, Any

@@ -1,3 +1,14 @@
+"""
+transforms.py
+Description: 
+
+Author: Willian T. Lunardi
+Contact: wtlunar@gmail.com
+License:
+
+Repository:
+"""
+
 import numpy as np
 
 
