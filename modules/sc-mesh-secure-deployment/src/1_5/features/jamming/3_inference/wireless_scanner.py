@@ -14,7 +14,7 @@ from typing import List
 
 import pandas as pd
 
-from util import Band, map_channel_to_freq, load_sample_data, map_channel_to_band
+from util import Band, map_channel_to_freq, map_channel_to_band
 
 
 class WirelessScanner:
@@ -45,12 +45,16 @@ class WirelessScanner:
         :return: A tuple containing the current channel as an integer and a pandas DataFrame containing the spectral
         scan data for the chosen CSV file.
         """
-        # Sample a csv
-        message, scan = load_sample_data()
-        print(f'Low latency - sampled {message}')
+        freq = map_channel_to_freq(self.channel)
 
-        # Filter the data to only include the current channel's frequency
-        scan = scan[scan['freq1'] == map_channel_to_freq(self.channel)]  # TODO: change for low latency scan
+        # Perform spectral scan on given the current frequency
+        scan = self.scan([freq])
+
+        # # Sample a csv
+        # message, scan = load_sample_data()
+        # print(f'Low latency - sampled {message}')
+        # # Filter the data to only include the current channel's frequency
+        # scan = scan[scan['freq1'] == map_channel_to_freq(self.channel)]
 
         return self.channel, scan
 
@@ -64,11 +68,13 @@ class WirelessScanner:
         channels = self.get_available_channels(self.band)
         freqs = [map_channel_to_freq(channel) for channel in channels]
 
-        message, scan = load_sample_data()
-        print(f'High latency current band - sampled {message}')
+        # Perform spectral scan on the given frequencies of the current band
+        scan = self.scan(freqs)
 
-        # Filter the data to only include the available channel's frequency
-        scan = scan[scan['freq1'].isin(freqs)]  # TODO: change for scan on the available channels on the current band
+        # message, scan = load_sample_data()
+        # print(f'High latency current band - sampled {message}')
+        # # Filter the data to only include the available channel's frequency
+        # scan = scan[scan['freq1'].isin(freqs)]
 
         return self.channel, scan
 
@@ -83,11 +89,13 @@ class WirelessScanner:
         channels = self.get_available_channels(other_band)
         freqs = [map_channel_to_freq(channel) for channel in channels]
 
-        message, scan = load_sample_data('floor')
-        print(f'High latency other band - sampled {message}')
+        # Perform spectral scan on the given frequencies of the other band
+        scan = self.scan(freqs)
 
-        # Filter the data to only include the available channel's frequency
-        scan = scan[scan['freq1'].isin(freqs)]  # TODO: change for scan on the available channels on the current band
+        # message, scan = load_sample_data('floor')
+        # print(f'High latency other band - sampled {message}')
+        # # Filter the data to only include the available channel's frequency
+        # scan = scan[scan['freq1'].isin(freqs)]
 
         return self.channel, scan
 
@@ -102,3 +110,12 @@ class WirelessScanner:
         # Replace this function with actual code to set the wireless interface to the given channel
         self.channel = channel
         self.band = Band.BAND_24GHZ if 1 <= channel <= 14 else Band.BAND_50GHZ
+
+    def scan(self, freqs: List[int]) -> pd.DataFrame:
+        """
+        Scan a list of frequencies and return a pandas DataFrame with the time series of each frequency.
+
+        :param freqs: A list of integers denoting the frequencies to be scanned.
+        :return: A pandas DataFrame containing the time series of each frequency.
+        """
+        pass
