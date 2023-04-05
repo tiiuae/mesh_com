@@ -16,6 +16,7 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import torch
 
 CH_TO_FREQ = {1: 2412, 2: 2417, 3: 2422, 4: 2427, 5: 2432, 6: 2437, 7: 2442, 8: 2447, 9: 2452, 10: 2457, 11: 2462,
               36: 5180, 40: 5200, 44: 5220, 48: 5240, 52: 5260, 56: 5280, 60: 5300, 64: 5320, 100: 5500, 104: 5520,
@@ -124,3 +125,9 @@ def print_channel_quality(channels_quality: np.ndarray, frequencies: np.ndarray)
             print(freq, channels_quality[i], 'BAD')
         else:
             print(freq, channels_quality[i], 'GOOD')
+
+
+def trace_model(model):
+    example_input = torch.rand(1, 15, 128)
+    traced_model = torch.jit.trace(model, example_input)
+    torch.jit.save(traced_model, "my_traced_model.pt")

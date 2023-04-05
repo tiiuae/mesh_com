@@ -12,7 +12,9 @@ Repository:
 import numpy as np
 import torch
 import torch.nn.functional as F
-from tsai.models.all import ResCNN
+
+
+# from tsai.models.all import ResCNN
 
 
 class ChannelQualityEstimator:
@@ -38,8 +40,12 @@ class ChannelQualityEstimator:
         Loads the pre-trained ResCNN model and sets the device to 'cuda' if available, 'cpu' otherwise.
         """
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = ResCNN(15, 26, separable=True).to(self.device)
-        self.model.load_state_dict(torch.load('pretrained_model/best.pth'))
+        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # self.model = ResCNN(15, 26, separable=True).to(self.device)
+        # self.model.load_state_dict(torch.load('pretrained_model/best.pth'))
+        # self.model.eval()
+        self.model = torch.jit.load("my_traced_model.pt")
+        self.model = self.model.to(self.device)
         self.model.eval()
 
     def _forward(self, feat_array: np.ndarray) -> np.ndarray:
