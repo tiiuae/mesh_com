@@ -27,18 +27,33 @@ fi
 LIB='/usr/lib/softhsm/libsofthsm2.so'
 
 
-softhsm2_output=$(softhsm2-util --show-slot)
-if [ ${#softhsm2_output} -ne 616 ]
- then
+# list the available slots and check if the token label exists
+token_label="secccoms"
+if pkcs11-tool --module="$LIB" --list-slots | grep -q "Label: $token_label"; then
   echo "Token exists"
-  token_label=$(echo "$softhsm2_output" | grep 'Label:' | sed 's/^.*: //')
-  softhsm2-util --slot 1 --delete-token --token "$token_label"
+  # delete the existing token
+  pkcs11-tool --module="$LIB" --login --pin "$pin" --delete-token --label "$token_label" #we need the pin from previous execution
 else
   echo "No Token exists"
 fi
 
 #random pin 
-pin=$((1 + RANDOM % 99999999999))
+pin=$(tr -dc '0-9' </dev/random | head -c 6)
+
+#softhsm2_output=$(softhsm2-util --show-slot)
+#if [ ${#softhsm2_output} -ne 616 ]
+# then
+#  echo "Token exists"
+#  token_label=$(echo "$softhsm2_output" | grep 'Label:' | sed 's/^.*: //')
+#  softhsm2-util --slot 1 --delete-token --token "$token_label"
+#else
+#  echo "No Token exists"
+#fi
+
+#intialize token
+pkcs11-tool --module="$LIB" --init-token --label secccoms --so-pin "$pin" # --pin "$pin"
+#init the pin
+pkcs11-tool --init-pin --login --pin "$pin" --so-pin "$pin" --module "$LIB"
 
 #delete keys
 keys=$(pkcs11-tool --module="$LIB" -O --login --pin "$pin")
@@ -50,8 +65,7 @@ then
   pkcs11-tool --module="$LIB" --login --pin "$pin" --delete-object --type pubkey --id 01
 fi
 
-#intialize token
-softhsm2-util --init-token --slot 0 --label secccoms --pin "$pin" --so-pin "$pin" ## this should be done before?
+
 
 
 if [ -z "$1" ] # label or ID
@@ -82,9 +96,18 @@ fi
 
 echo "$pin" | openssl enc -aes-256-cbc -md sha256 -a -pbkdf2 -iter 100000 -salt -pass pass:$LABEL > "$output_path"/output.txt
 
-
-
+#to decrypt
 #openssl aes-256-cbc -md sha256 -salt -a -pbkdf2 -iter 100000  -d  -k "$LABEL" -in "$output_path"/output.txt
+
+
+#create the CSR
+#key_label=$(pkcs11-tool --module $LIB --list-objects --login --pin $pin | awk '/Private Key/{getline; print $2}' | cut -d "\"" -f 2)
+
+export OPENSSL_PIN="$pin"
+openssl req -new -engine pkcs11 -keyform engine -key 01 -passin env:OPENSSL_PIN  -out /opt/my.csr -subj "/C=AE/ST=Abu Dhabi/L=Abu Dhabi/O=TII/OU=SSRC/CN=*.tii.ae"
+echo "Certificate Signing Request (CSR)"
+openssl req -in /opt/my.csr -noout -text
+
 
 
 
