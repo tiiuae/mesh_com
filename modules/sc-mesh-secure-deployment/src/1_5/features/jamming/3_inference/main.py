@@ -31,23 +31,25 @@ def main():
     while True:
         # Perform a low latency spectral scan
         channel, scan = scanner.low_latency_spectral_scan()
+        if(scan.empty): continue
         # Preprocess the scan
         feat_array, frequencies = prep.preprocess(scan)
         # Estimate the channel quality
         channel_quality = estimator.estimate(feat_array)
         # Print channel quality and frequencies
-        print_channel_quality(channel_quality, frequencies)
+        print_channel_quality(args, channel_quality, frequencies)
 
         # If channel quality is below the threshold
         if channel_quality < args.threshold:
             # Perform a full scan of the current frequency band
             channel, scan = scanner.scan_current_band()
+            if(scan.empty): continue
             # Preprocess the scan
             feat_array, frequencies = prep.preprocess(scan)
             # Estimate the channel quality
             channels_quality = estimator.estimate(feat_array)
             # Print channel quality and frequencies
-            print_channel_quality(channels_quality, frequencies)
+            print_channel_quality(args, channels_quality, frequencies)
 
             # Check if there is at least one channel under the threshold
             if any(quality > args.threshold for quality in channels_quality):
@@ -65,7 +67,7 @@ def main():
                 # Estimate channel quality for the other band
                 channels_quality_other = estimator.estimate(feat_array)
                 # Print channel quality and frequencies
-                print_channel_quality(channels_quality_other, frequencies_other)
+                print_channel_quality(args, channels_quality_other, frequencies_other)
 
                 # Find the best channel between the current and other bands
                 best_quality_both = max(max(channels_quality), max(channels_quality_other))
