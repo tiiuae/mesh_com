@@ -10,11 +10,13 @@ Repository:
 """
 
 from argparse import Namespace
+from SpectralMgr import Spectral
 from typing import List
 
 import pandas as pd
+import os
 
-from util import Band, map_channel_to_freq, map_channel_to_band
+from util import Band, map_freq_to_channel, map_channel_to_freq, map_channel_to_band, get_current_channel
 
 
 class WirelessScanner:
@@ -25,8 +27,11 @@ class WirelessScanner:
         :param args: A Namespace object containing command line arguments.
         """
         self.args = args
-        self.channel = args.channels5[0]  # TODO: Implement function that loads interface's channel
+        #self.freq = get_current_channel()
+        #self.channel = map_freq_to_channel(self.freq)
+        self.channel = args.channels5[0] #TODO: get current frequency from mesh interface upon resolving low latency scan
         self.band = map_channel_to_band(self.channel)
+
 
     def get_available_channels(self, band: Band) -> List[int]:
         """
@@ -46,9 +51,11 @@ class WirelessScanner:
         scan data for the chosen CSV file.
         """
         freq = map_channel_to_freq(self.channel)
+        #print(freq)
+        freq = str(freq)
 
         # Perform spectral scan on given the current frequency
-        scan = self.scan([freq])
+        scan = self.scan(freq)
 
         # # Sample a csv
         # message, scan = load_sample_data()
@@ -67,6 +74,7 @@ class WirelessScanner:
         """
         channels = self.get_available_channels(self.band)
         freqs = [map_channel_to_freq(channel) for channel in channels]
+        freqs = ' '.join(str(value) for value  in freqs)
 
         # Perform spectral scan on the given frequencies of the current band
         scan = self.scan(freqs)
@@ -111,11 +119,18 @@ class WirelessScanner:
         self.channel = channel
         self.band = Band.BAND_24GHZ if 1 <= channel <= 14 else Band.BAND_50GHZ
 
-    def scan(self, freqs: List[int]) -> pd.DataFrame:
+    def scan(self, freqs: str) -> pd.DataFrame:
         """
         Scan a list of frequencies and return a pandas DataFrame with the time series of each frequency.
 
-        :param freqs: A list of integers denoting the frequencies to be scanned.
+        :param freqs: A string of frequencies to scan.
         :return: A pandas DataFrame containing the time series of each frequency.
         """
-        pass
+        spec = Spectral()
+        spec.initialize_scan()
+        spec.execute_scan(freqs)
+        f = spec.file_open("/tmp/data")
+        file_stats = os.stat("/tmp/data")
+        scan = spec.read(f, file_stats.st_size, freqs)
+        spec.file_close(f)
+        return scan
