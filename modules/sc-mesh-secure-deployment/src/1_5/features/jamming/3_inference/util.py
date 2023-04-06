@@ -17,6 +17,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+import sys
+import os
+import re
 
 CH_TO_FREQ = {1: 2412, 2: 2417, 3: 2422, 4: 2427, 5: 2432, 6: 2437, 7: 2442, 8: 2447, 9: 2452, 10: 2457, 11: 2462,
               36: 5180, 40: 5200, 44: 5220, 48: 5240, 52: 5260, 56: 5280, 60: 5300, 64: 5320, 100: 5500, 104: 5520,
@@ -69,6 +72,39 @@ def map_channel_to_band(channel: int) -> Band:
         raise ValueError(f"Invalid channel number: {channel}.")
 
 
+def get_current_channel() -> int:
+    """
+    Get mesh interface information to parse interface name and current channel.
+
+    :return: current channel of mesh interface.
+    """
+    no_mesh = False
+    iw_output = os.popen('iw dev').read()
+    iw_output = re.sub('\s+', ' ', iw_output).split(' ')
+    size = len(iw_output)
+    idx_list = [idx - 1 for idx, val in enumerate(iw_output) if val == "Interface"]
+    if (len(idx_list) > 1):  idx_list.pop(0)
+    iw_interfaces = [iw_output[i: j] for i, j in
+                     zip([0] + idx_list, idx_list + ([size] if idx_list[-1] != size else []))]
+
+    for interface_list in iw_interfaces:
+        try:
+            mesh_index = interface_list.index("mesh")
+            mesh_list = interface_list
+            no_mesh = False
+            break
+        except:
+            no_mesh = True
+    if (no_mesh):
+        sys.exit("No mesh interface to scan/No mesh set up")
+
+    mesh_interface_index = mesh_list.index("Interface") + 1
+    mesh_interface = mesh_list[mesh_interface_index].split()[0]
+    channel_index = mesh_list.index("channel") + 2
+    channel_freq = int(re.sub("[^0-9]", "", mesh_list[channel_index]).split()[0])
+
+    return channel_freq
+
 def load_sample_data(sample_type: Optional[str] = None):
     """
     Load sample data from a CSV file based on a randomly chosen sample type.
@@ -119,9 +155,9 @@ def plot_timeseries(X: np.ndarray, X_resized: np.ndarray) -> None:
     plt.show()
 
 
-def print_channel_quality(channels_quality: np.ndarray, frequencies: np.ndarray) -> None:
+def print_channel_quality(args, channels_quality: np.ndarray, frequencies: np.ndarray) -> None:
     for i, freq in enumerate(frequencies):
-        if channels_quality[i] < 0.25:
+        if channels_quality[i] < args.threshold:
             print(freq, channels_quality[i], 'BAD')
         else:
             print(freq, channels_quality[i], 'GOOD')
