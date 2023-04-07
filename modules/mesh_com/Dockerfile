@@ -1,7 +1,7 @@
-FROM ghcr.io/tiiuae/fog-ros-baseimage:builder-ae21266 AS builder
+FROM ghcr.io/tiiuae/fog-ros-baseimage-builder:v2.1.0 AS builder
 
 # Install build dependencies
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
+RUN apt update -y && apt install -y --no-install-recommends \
     curl \
     python3-bloom \
     fakeroot \
@@ -23,19 +23,36 @@ RUN /packaging/build.sh
 #  ▲               runtime ──┐
 #  └── build                 ▼
 
-FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-ae21266
+FROM ghcr.io/tiiuae/fog-ros-baseimage:v2.1.0
 
-# wpasupplicant pinned as to receive SSRC version (and not Ubuntu) of it which has some mesh-related customizations:
-# https://github.com/tiiuae/wpa
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    wpasupplicant=2.9.0-20-6~git20210701.43d8971 \
-    wifi-firmware \
+RUN apt update -y && apt install -y --no-install-recommends \
     iw \
     batctl \
     alfred \
     rfkill \
-    iproute2 \
-    && rm -rf /var/lib/apt/lists/*
+    iproute2 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Ubuntu 22.04 has upgraded libssl to 3 and does not propose libssl1.1.
+# We can force the installation of libssl1.1 by adding the ubuntu 20.04 source.
+RUN echo "deb http://security.ubuntu.com/ubuntu focal-security main" | tee /etc/apt/sources.list.d/focal-security.list && \
+    apt update -y && \
+    apt install -y --no-install-recommends \
+        wget \
+        libdbus-1-3 \
+        libnl-genl-3-200 \
+        libnl-route-3-200 \
+        libpcsclite1 \
+        libssl1.1 \
+        # ifconfig not installed by default anymore
+        net-tools && \
+    rm -rf /var/lib/apt/lists/* && \
+    wget \
+        https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local/wpasupplicant_2.9.0-20-6~git20210701.43d8971_amd64.deb \
+        https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local/wifi-firmware_1.0.0-5~git20210816.fecb07b_amd64.deb && \
+    dpkg -i wpasupplicant_*.deb && \
+    rm -rf wpasupplicant_*.deb && \
+    rm -rf /etc/apt/sources.list.d/focal-security.list
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 
