@@ -1,0 +1,17 @@
+table {
+    table-layout: responsive-sm;
+}
+
+thead th {
+    background-color: #5b42e6;
+    color: white;
+}
+
+td {
+    white-space: normal !important;
+    word-wrap: break-word;
+}
+
+.fixed-button-size {
+    width: 100px !important
+}
