@@ -1,143 +1,148 @@
 """
-wireless_scanner.py
+preprocessor.py
 Description: 
 
 Author: Willian T. Lunardi
 Contact: wtlunar@gmail.com
-License:
+License: 
 
-Repository:
+Repository:  
 """
 
-from argparse import Namespace
-from SpectralMgr import Spectral
-from typing import List
-
-import pandas as pd
-import yaml
+import json
 import sys
-import os
+from typing import Optional, Tuple
 
-from util import Band, map_freq_to_channel, map_channel_to_freq, map_channel_to_band, load_sample_data, get_current_channel
+import numpy as np
+import pandas as pd
+
+from transforms import resize
+from util import FEATS_ATH10K
 
 
-class WirelessScanner:
-    def __init__(self, args: Namespace):
+class Preprocessor:
+    def __init__(self, input_length: int = 128, col_mean_std_path: Optional[str] = 'normalization_data/cols_mean_std.json') -> None:
         """
-        Initializes the WirelessScanner object.
+        Initializes the Preprocessor object.
 
-        :param args: A Namespace object containing command line arguments.
+        :param input_length: The desired length of the spectral scan data after resizing.
+        :param col_mean_std_path: The path to the JSON file containing the mean and standard deviation information for
+                                  the columns to be normalized. Defaults to 'cols_mean_std.json'.
         """
-        self.args = args
-        #self.freq = get_current_channel()
-        #self.channel = map_freq_to_channel(self.freq)
-        self.channel = args.channels5[0] #TODO: get current frequency from mesh interface
-        self.band = map_channel_to_band(self.channel)
+        self.input_length = input_length
 
+        # Load the mean and standard deviation information from the JSON file
+        with open(col_mean_std_path, 'r') as file:
+            json_data = json.load(file)
+        self.cols_mean_std = json_data
 
-    def get_available_channels(self, band: Band) -> List[int]:
+    def feature_engineer(self, df: pd.DataFrame, eps: float = sys.float_info.epsilon) -> pd.DataFrame:
         """
-        Get the available channels in the specified band.
+        Computes additional features based on the given spectral scan data.
 
-        :param band: A Band enum specifying the frequency band to get available channels for.
-        :return: A list of available channels in the specified band.
+        :param df: The spectral scan data to compute features for.
+        :param eps: A small value added to the denominator of some computations to avoid division by zero.
+        :return: The spectral scan data with additional computed features.
         """
-        # Replace this function with actual code to get the available channels in the specified band
-        return self.args.channels2 if band == Band.BAND_24GHZ else self.args.channels5
+        # Compute SNR
+        df['snr'] = 10 * np.log10(np.maximum((df['max_magnitude'] ** 2 - df['noise']) / (df['rssi'] + eps), eps))
 
-    def low_latency_spectral_scan(self) -> tuple[int, pd.DataFrame]:
+        # Carrier-to-noise ratio (CNR)
+        df['cnr'] = df['rssi'] - df['noise']
+
+        # Phase noise (PN)
+        df['pn'] = 10 * np.log10(np.maximum(df['max_magnitude'] ** 2 / (2 * df['freq1'] * df['snr'] + eps), eps))
+
+        # Signal strength indicator (SSI)
+        df['ssi'] = df['rssi'] - df['relpwr_db']
+
+        # Power Difference (PD)
+        df['pd'] = df['base_pwr_db'] - df['avgpwr_db']
+
+        # Signal-to-interference-plus-noise ratio (SINR):
+        df['sinr'] = df['rssi'] - df['relpwr_db']
+
+        # Signal-to-interference ratio (SIR):
+        df['sir'] = df['rssi'] - (df['total_gain_db'] - df['relpwr_db'])
+
+        # Magnitude ratio (MR) between maximum magnitude and average power:
+        df['mr'] = df['max_magnitude'] / (df['avgpwr_db'] + eps)
+
+        # Power ratio (PR) between average power and base power:
+        df['pr'] = df['avgpwr_db'] / (df['base_pwr_db'] + eps)
+
+        return df
+
+    def resize(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Runs a low-latency spectral scan on the current channel.
+        Resizes the given spectral scan data to a fixed input length.
 
-        :return: A tuple containing the current channel as an integer and a pandas DataFrame containing the spectral
-        scan data for the chosen CSV file.
+        :param df: The spectral scan data to resize.
+        :return: The resized spectral scan data.
         """
-        freq = map_channel_to_freq(self.channel)
-        #print(freq)
-        freq = str(freq)
+        df = df.copy()
+        df_down = pd.DataFrame()
+        freq1 = df['freq1'].iloc[0]
+        for col in df.columns:
+            if col not in ['freq1', 'freq2', 'tsf']:
+                df_down[col] = resize(df[col].to_numpy(), self.input_length)
 
-        # Perform spectral scan on given the current frequency
-        scan = self.scan(freq)
+        df_down['freq1'] = freq1
+        assert len(df_down) == self.input_length, 'wrong length'
+        return df_down
 
-        # # Sample a csv
-        #message, scan = load_sample_data()
-        #print(f'Low latency - sampled {message}')
-        # # Filter the data to only include the current channel's frequency
-        #scan = scan[scan['freq1'] == map_channel_to_freq(self.channel)]
-
-        return self.channel, scan
-
-    def scan_current_band(self) -> tuple[int, pd.DataFrame]:
+    def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Runs a high-latency spectral scan on the available channels in the current band.
+        Applies zero-mean unit variance normalization to the given spectral scan data using the mean and standard deviation
+        information from the col_mean_std.json file.
 
-        :return: A tuple containing the current channel as an integer and a pandas DataFrame containing the spectral
-        scan data for the chosen CSV file.
+        :param df: The spectral scan data to normalize.
+        :return: The normalized spectral scan data as a pandas DataFrame.
         """
-        channels = self.get_available_channels(self.band)
-        freqs = [map_channel_to_freq(channel) for channel in channels]
-        #print(freqs)
-        freqs = ' '.join(str(value) for value  in freqs)
-        #print(freqs)
+        for col in df.columns:
+            if col in ['freq1']:
+                continue
+            df[col] = (df[col] - self.cols_mean_std[col]['mean']) / self.cols_mean_std[col]['std']
 
-        # Perform spectral scan on the given frequencies of the current band
-        scan = self.scan(freqs)
+        return df
 
-        #message, scan = load_sample_data()
-        #print(f'High latency current band - sampled {message}')
-        # # Filter the data to only include the available channel's frequency
-        #scan = scan[scan['freq1'].isin(freqs)]
-
-        return self.channel, scan
-
-    def scan_other_band(self) -> tuple[int, pd.DataFrame]:
+    def preprocess(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Runs a high-latency spectral scan on the available channels in the other band.
+        Preprocesses the given spectral scan data by computing features, resizing, and normalizing it.
 
-        :return: A tuple containing the current channel as an integer and a pandas DataFrame containing the spectral
-        scan data for the chosen CSV file.
+        :param df: The spectral scan data to preprocess.
+        :return: A tuple containing the preprocessed spectral scan data as a NumPy array and the unique frequencies.
         """
-        other_band = Band.BAND_50GHZ if self.band == Band.BAND_24GHZ else Band.BAND_24GHZ
-        channels = self.get_available_channels(other_band)
-        freqs = [map_channel_to_freq(channel) for channel in channels]
+        # Ignore first and last rows, sometimes corrupted
+        df = df.iloc[1:-1].copy()
 
-        # Perform spectral scan on the given frequencies of the other band
-        scan = self.scan(freqs)
+        all_series = []
+        # Get unique frequencies
+        unique_freqs = df['freq1'].unique()
 
-        #message, scan = load_sample_data('floor')
-        #print(f'High latency other band - sampled {message}')
-        # # Filter the data to only include the available channel's frequency
-        #scan = scan[scan['freq1'].isin(freqs)]
+        # Resize time series to fixed length
+        for freq in unique_freqs:
+            df_channel = df.loc[df['freq1'] == freq]
+            resized_channel = self.resize(df_channel)
+            all_series.append(resized_channel)
+        df = pd.concat(all_series, ignore_index=True)
 
-        return self.channel, scan
+        # Compute additional features
+        df = self.feature_engineer(df)
 
-    def set_channel(self, channel: int) -> None:
-        """
-        Sets the wireless interface to the given channel.
+        # Drop irrelevant columns
+        cols = ['freq1', 'max_magnitude', 'total_gain_db', 'base_pwr_db', 'rssi', 'relpwr_db', 'avgpwr_db', 'snr', 'cnr', 'pn', 'ssi', 'pd', 'sinr', 'sir', 'mr', 'pr']
+        df = df[cols]
 
-        :param channel: An integer specifying the channel to set the wireless interface to.
-        :return: None
-        """
-        print('moving to', channel, map_channel_to_freq(channel))
-        # Replace this function with actual code to set the wireless interface to the given channel
-        self.channel = channel
-        self.band = Band.BAND_24GHZ if 1 <= channel <= 14 else Band.BAND_50GHZ
+        # Normalize so cols have mean 0 and std 1
+        df_norm = self.normalize(df)
 
-    def scan(self, freqs: str) -> pd.DataFrame:
-        """
-        Scan a list of frequencies and return a pandas DataFrame with the time series of each frequency.
+        # Transform df into np.array
+        num_series = len(df_norm['freq1'].unique())
+        feat_array = np.array(df_norm[FEATS_ATH10K])
+        feat_array = np.reshape(feat_array, [num_series, self.input_length, len(FEATS_ATH10K)])
 
-        :param freqs: A list of integers denoting the frequencies to be scanned.
-        :return: A pandas DataFrame containing the time series of each frequency.
-        """
-        print('start scan')
-        spec = Spectral()
-        spec.initialize_scan()
-        #print(freqs)
-        spec.execute_scan(freqs)
-        f = spec.file_open("/tmp/data")
-        file_stats = os.stat("/tmp/data")
-        scan = spec.read(f, file_stats.st_size, freqs)
-        spec.file_close(f)
-        print('end scan')
-        return scan
+        # Finally, transpose the data to we get [samples, features, time] array
+        feat_array = feat_array.transpose(0, 2, 1)
+
+        return feat_array, unique_freqs
