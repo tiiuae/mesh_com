@@ -9,7 +9,11 @@ License:
 Repository:
 """
 
+import glob
+import os
 import random
+import re
+import sys
 from enum import Enum
 from typing import Optional
 
@@ -17,9 +21,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import sys
-import os
-import re
+
+from options import Options
 
 CH_TO_FREQ = {1: 2412, 2: 2417, 3: 2422, 4: 2427, 5: 2432, 6: 2437, 7: 2442, 8: 2447, 9: 2452, 10: 2457, 11: 2462,
               36: 5180, 40: 5200, 44: 5220, 48: 5240, 52: 5260, 56: 5280, 60: 5300, 64: 5320, 100: 5500, 104: 5520,
@@ -105,29 +108,34 @@ def get_current_channel() -> int:
 
     return channel_freq
 
+
 def load_sample_data(sample_type: Optional[str] = None):
     """
     Load sample data from a CSV file based on a randomly chosen sample type.
 
     :return: A tuple containing the message describing the sample data and a pandas DataFrame with the loaded data.
     """
-    sample_types = ['floor', 'video', 'jamming']
+    # sample_types = ['floor', 'interference', 'video', 'jamming']
+    sample_types = ['floor']
     sample_type = random.choice(sample_types) if sample_type is None else sample_type
 
     if sample_type == 'floor':
-        message = "Floor data"
-        file_name = 'spectral_scan_floor_141.csv'
+        csv_files = glob.glob('sample/floor/' + '*.csv')
+        path = random.choice(csv_files)
+        message = f'Floor data {path}'
     elif sample_type == 'video':
-        message = "Video data"
-        file_name = 'spectral_scan_video_meshfreq5180_80mhz_718.csv'
+        csv_files = glob.glob('sample/video/' + '*.csv')
+        path = random.choice(csv_files)
+        message = f'Video data {path}'
     elif sample_type == 'jamming':
-        message = "Jamming data"
-        file_name = 'samples_chamber_5180MHz_0cm_13dBm_gaussiannoise_7.csv'
+        csv_files = glob.glob('sample/jamming/' + '*.csv')
+        path = random.choice(csv_files)
+        message = f'Jamming data {path}'
     else:
         raise ValueError("Invalid sample_type provided. Choose from 'floor', 'video', 'interference', or 'jamming'.")
 
     # load the data into a pandas DataFrame
-    data = pd.read_csv('sample/' + file_name)
+    data = pd.read_csv(path)
 
     return message, data
 
@@ -155,12 +163,24 @@ def plot_timeseries(X: np.ndarray, X_resized: np.ndarray) -> None:
     plt.show()
 
 
-def print_channel_quality(args, channels_quality: np.ndarray, frequencies: np.ndarray) -> None:
+def print_channel_quality(args: Options, channels_quality: np.ndarray, probs: np.ndarray, frequencies: np.ndarray) -> None:
     for i, freq in enumerate(frequencies):
-        if channels_quality[i] < args.threshold:
-            print(freq, channels_quality[i], 'BAD')
+        index = np.argmax(probs[i])
+        if index == 0:
+            pred = 'video like interference'
+        elif index == 1:
+            pred = 'floor like interference'
+        elif index == 2:
+            pred = 'wireless lab. like interference'
+        elif index == 3:
+            pred = 'crypto/finance like interference'
         else:
-            print(freq, channels_quality[i], 'GOOD')
+            pred = 'jamming'
+
+        if channels_quality[i] < args.threshold:
+            print(freq, channels_quality[i], np.argmax(probs[i]), pred)
+        else:
+            print(freq, channels_quality[i], np.argmax(probs[i]), pred)
 
 
 def trace_model(model):

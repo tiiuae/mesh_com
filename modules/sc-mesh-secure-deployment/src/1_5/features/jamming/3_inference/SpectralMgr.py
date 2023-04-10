@@ -1,13 +1,12 @@
-#!/usr/bin/python
-from datetime import datetime
-import pandas as pd
-import subprocess
-import struct
 import math
-import time
-import yaml
-import sys
 import os
+import struct
+import subprocess
+import sys
+import time
+from datetime import datetime
+
+import pandas as pd
 
 HEADER_SIZE = 3
 TYPE1_PACKET_SIZE = 17 + 56
@@ -19,7 +18,8 @@ SC_WIDE = 0.3125  # in MHz
 
 DRIVERS = ["ath9k", "ath10k"]
 DRIVER = os.popen('ls /sys/kernel/debug/ieee80211/phy* | grep ath').read().strip()
-if (DRIVER not in DRIVERS): sys.exit("No driver detected.")
+if DRIVER not in DRIVERS: sys.exit("No driver detected.")
+
 
 class Spectral:
 
@@ -76,7 +76,7 @@ class Spectral:
 
                     if (self.debug):
                         print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (
-                        tsf, subcarrier_freq, noise, rssi, sigval))
+                            tsf, subcarrier_freq, noise, rssi, sigval))
                     count = count + 1
 
             # 40 MHz

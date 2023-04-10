@@ -9,30 +9,31 @@ License:
 Repository:
 """
 
-from argparse import Namespace
-from SpectralMgr import Spectral
+import os
 from typing import List
 
 import pandas as pd
-import os
 
-from util import Band, map_freq_to_channel, map_channel_to_freq, map_channel_to_band, get_current_channel
+from options import Options
+from util import Band, map_channel_to_freq, map_channel_to_band, load_sample_data
 
 
 class WirelessScanner:
-    def __init__(self, args: Namespace):
+    def __init__(self, args: Options):
         """
         Initializes the WirelessScanner object.
 
         :param args: A Namespace object containing command line arguments.
         """
         self.args = args
-        #self.freq = get_current_channel()
-        #self.channel = map_freq_to_channel(self.freq)
-        self.channel = args.channels5[0] #TODO: get current frequency from mesh interface upon resolving low latency scan
-        self.band = map_channel_to_band(self.channel)
+        if not args.debug:
+            from SpectralMgr import Spectral
+            self.spec = Spectral()
 
-        self.spec = Spectral()
+        # self.freq = get_current_channel()
+        # self.channel = map_freq_to_channel(self.freq)
+        self.channel = args.channels5[0]  # TODO: get current frequency from mesh interface upon resolving low latency scan
+        self.band = map_channel_to_band(self.channel)
 
     def get_available_channels(self, band: Band) -> List[int]:
         """
@@ -52,17 +53,17 @@ class WirelessScanner:
         scan data for the chosen CSV file.
         """
         freq = map_channel_to_freq(self.channel)
-        #print(freq)
-        freq = str(freq)
 
-        # Perform spectral scan on given the current frequency
-        scan = self.scan(freq)
-
-        # # Sample a csv
-        # message, scan = load_sample_data()
-        # print(f'Low latency - sampled {message}')
-        # # Filter the data to only include the current channel's frequency
-        # scan = scan[scan['freq1'] == map_channel_to_freq(self.channel)]
+        if not self.args.debug:
+            # Perform spectral scan on given the current frequency
+            freq = str(freq)
+            scan = self.scan(freq)
+        else:
+            # Sample locally a .csv
+            message, scan = load_sample_data()
+            print(f'Low latency - sampled {message}')
+            # Filter the data to only include the current channel's frequency
+            scan = scan[scan['freq1'] == map_channel_to_freq(self.channel)]
 
         return self.channel, scan
 
@@ -75,15 +76,17 @@ class WirelessScanner:
         """
         channels = self.get_available_channels(self.band)
         freqs = [map_channel_to_freq(channel) for channel in channels]
-        freqs = ' '.join(str(value) for value  in freqs)
 
-        # Perform spectral scan on the given frequencies of the current band
-        scan = self.scan(freqs)
-
-        # message, scan = load_sample_data()
-        # print(f'High latency current band - sampled {message}')
-        # # Filter the data to only include the available channel's frequency
-        # scan = scan[scan['freq1'].isin(freqs)]
+        if not self.args.debug:
+            # Perform spectral scan on the given frequencies of the current band
+            freqs = ' '.join(str(value) for value in freqs)
+            scan = self.scan(freqs)
+        else:
+            # Sample locally a .csv
+            message, scan = load_sample_data()
+            print(f'High latency current band - sampled {message}')
+            # Filter the data to only include the available channel's frequency
+            scan = scan[scan['freq1'].isin(freqs)]
 
         return self.channel, scan
 
@@ -98,13 +101,16 @@ class WirelessScanner:
         channels = self.get_available_channels(other_band)
         freqs = [map_channel_to_freq(channel) for channel in channels]
 
-        # Perform spectral scan on the given frequencies of the other band
-        scan = self.scan(freqs)
-
-        # message, scan = load_sample_data('floor')
-        # print(f'High latency other band - sampled {message}')
-        # # Filter the data to only include the available channel's frequency
-        # scan = scan[scan['freq1'].isin(freqs)]
+        if not self.args.debug:
+            # Perform spectral scan on the given frequencies of the other band
+            freqs = ' '.join(str(value) for value in freqs)
+            scan = self.scan(freqs)
+        else:
+            # Sample locally a .csv
+            message, scan = load_sample_data('floor')
+            print(f'High latency other band - sampled {message}')
+            # Filter the data to only include the available channel's frequency
+            scan = scan[scan['freq1'].isin(freqs)]
 
         return self.channel, scan
 
@@ -127,10 +133,28 @@ class WirelessScanner:
         :param freqs: A string of frequencies to scan.
         :return: A pandas DataFrame containing the time series of each frequency.
         """
-        self.spec.initialize_scan()
-        self.spec.execute_scan(freqs)
-        f = self.spec.file_open("/tmp/data")
-        file_stats = os.stat("/tmp/data")
-        scan = self.spec.read(f, file_stats.st_size, freqs)
-        self.spec.file_close(f)
-        return scan
+        while True:
+            self.spec.initialize_scan()
+            self.spec.execute_scan(freqs)
+            f = self.spec.file_open("/tmp/data")
+            file_stats = os.stat("/tmp/data")
+            scan = self.spec.read(f, file_stats.st_size, freqs)
+            self.spec.file_close(f)
+            # Check if the scan is valid, if it is, then return it
+            if self.is_valid_scan(freqs, scan):
+                return scan
+
+    def is_valid_scan(self, freqs: str, scan: pd.DataFrame) -> bool:
+        """
+        Check if the given scan is valid based on the minimum number of rows per frequency.
+
+        :param freqs: A string of space-separated frequencies to validate (e.g., '5180 5200 5220').
+        :param scan: A pandas DataFrame containing the time series of each frequency.
+        :return: A boolean indicating whether the scan is valid or not.
+        """
+        freq_list = [int(freq) for freq in freqs.split()]
+        for freq in freq_list:
+            freq_scan = scan[scan['freq1'] == freq]
+            if len(freq_scan) < self.args.min_rows:
+                return False
+        return True
