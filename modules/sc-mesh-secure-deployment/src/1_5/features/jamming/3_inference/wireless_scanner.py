@@ -75,6 +75,29 @@ class WirelessScanner:
 
         return self.channel, scan
 
+    def scan_all_channels(self) -> tuple[int, pd.DataFrame]:
+        """
+        Runs a high-latency spectral scan on both bands (all channels).
+
+        :return: A tuple containing the current channel as an integer and a pandas DataFrame containing the spectral
+        scan data for the chosen CSV file.
+        """
+        channels = self.get_all_channels()
+        freqs = [map_channel_to_freq(channel) for channel in channels]
+
+        if not self.args.debug:
+            # Perform spectral scan on the given frequencies of the current band
+            freqs = ' '.join(str(value) for value in freqs)
+            scan = self.scan(freqs)
+        else:
+            # Sample locally a .csv
+            message, scan = load_sample_data()
+            print(f'High latency current band - sampled {message}')
+            # Filter the data to only include the available channel's frequency
+            scan = scan[scan['freq1'].isin(freqs)]
+
+        return self.channel, scan
+
     def scan_current_band(self) -> tuple[int, pd.DataFrame]:
         """
         Runs a high-latency spectral scan on the available channels in the current band.
@@ -82,8 +105,7 @@ class WirelessScanner:
         :return: A tuple containing the current channel as an integer and a pandas DataFrame containing the spectral
         scan data for the chosen CSV file.
         """
-        # channels = self.get_available_channels(self.band) # TODO: solve this after demo
-        channels = self.get_all_channels()
+        channels = self.get_available_channels(self.band)
         freqs = [map_channel_to_freq(channel) for channel in channels]
 
         if not self.args.debug:

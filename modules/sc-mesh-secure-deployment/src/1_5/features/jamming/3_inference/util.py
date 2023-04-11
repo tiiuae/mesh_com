@@ -116,7 +116,7 @@ def load_sample_data(sample_type: Optional[str] = None):
     :return: A tuple containing the message describing the sample data and a pandas DataFrame with the loaded data.
     """
     # sample_types = ['floor', 'interference', 'video', 'jamming']
-    sample_types = ['floor', 'video', 'jamming']
+    sample_types = ['floor']  # , 'video', 'jamming']
     sample_type = random.choice(sample_types) if sample_type is None else sample_type
 
     if sample_type == 'floor':
