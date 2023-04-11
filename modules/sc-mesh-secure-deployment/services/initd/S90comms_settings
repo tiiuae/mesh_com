@@ -1,11 +1,11 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          S90meshs_settings
-# Short-Description: mesh_settings subscriber
-# Description:       NATS server starter
+# Provides:          S90comms_settings
+# Short-Description: comms.settings subscriber
+# Description:       Starts comms settings NATS node
 ### END INIT INFO
 
-DAEMON="mesh_settings.py"
+DAEMON="comms_settings.py"
 DIR="/opt/"
 PIDFILE="/var/run/$DAEMON.pid"
 # shellcheck source=/dev/null
@@ -13,7 +13,7 @@ PIDFILE="/var/run/$DAEMON.pid"
 LOG_FILE=/opt/mesh_settings.log
 ARGS="-s $2 -p 4222"
 start() {
-    echo "$NATS_SERVER_ARGS"
+    echo "$ARGS"
     printf 'Starting %s: ' "$DAEMON"
     start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec python $DIR$DAEMON \
           $ARGS > $LOG_FILE 2>&1"
