@@ -35,6 +35,14 @@ class WirelessScanner:
         self.channel = args.channels5[0]  # TODO: get current frequency from mesh interface upon resolving low latency scan
         self.band = map_channel_to_band(self.channel)
 
+    def get_all_channels(self) -> List[int]:
+        """
+        Get all available channels for the device.
+
+        :return: A list of all available channels for the device.
+        """
+        return self.args.all_channels
+
     def get_available_channels(self, band: Band) -> List[int]:
         """
         Get the available channels in the specified band.
@@ -74,7 +82,8 @@ class WirelessScanner:
         :return: A tuple containing the current channel as an integer and a pandas DataFrame containing the spectral
         scan data for the chosen CSV file.
         """
-        channels = self.get_available_channels(self.band)
+        # channels = self.get_available_channels(self.band) # TODO: solve this after demo
+        channels = self.get_all_channels()
         freqs = [map_channel_to_freq(channel) for channel in channels]
 
         if not self.args.debug:

@@ -7,6 +7,7 @@ class Options:
         self.waiting_time: int = 1
         self.channels2: List[int] = [1, 6, 11]
         self.channels5: List[int] = [36, 40, 44, 48, 149, 153, 157, 161, 165]
+        self.all_channels: List[int] = []
         self.threshold: float = 0.25
         self.interface: str = 'wlp1s0'
         self.debug: bool = True
@@ -33,6 +34,7 @@ class Options:
         self.waiting_time = args.waiting_time
         self.channels2 = args.channels2
         self.channels5 = args.channels5
+        self.all_channels = self.channels2 + self.channels5
         self.threshold = args.threshold
         self.interface = args.interface
         self.debug = args.debug
