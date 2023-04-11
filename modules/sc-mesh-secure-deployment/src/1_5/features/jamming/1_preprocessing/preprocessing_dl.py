@@ -104,7 +104,7 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
                 # Down sample by interpolating mean
                 df_serie = resize_to_length(df_channel)
 
-                # Set serie id
+                # Set series id
                 df_serie['series_id'] = series_id
                 df_serie['bin_label'] = 0
                 df_serie['label'] = folder_name

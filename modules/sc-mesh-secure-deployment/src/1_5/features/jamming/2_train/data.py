@@ -215,16 +215,13 @@ def load_data(plot=False):
 
     # Load enhanced data with simulated data
     df = pd.read_csv('../1_preprocessing/preprocessed/enhanced.csv')
-    # df = df[df['label'] != 'communication']
-
-    # df = apply_filter(df)
 
     # Expand amount of features by engineering some
     df = feature_engineer(df)
 
     # Reorder columns
-    reorder_cols = ['series_id', 'freq1', 'max_magnitude', 'total_gain_db', 'base_pwr_db', 'rssi', 'relpwr_db', 'avgpwr_db', 'snr', 'cnr', 'pn', 'ssi', 'pd', 'sinr', 'sir', 'mr',
-                    'pr', 'bin_label', 'label']
+    reorder_cols = ['series_id', 'freq1', 'max_magnitude', 'total_gain_db', 'base_pwr_db', 'rssi', 'relpwr_db', 'avgpwr_db', 'snr', 'cnr', 'pn', 'ssi', 'pd', 'sinr', 'sir',
+                    'mr', 'pr', 'bin_label', 'label']
     df = df[reorder_cols]
 
     # Encode labels

@@ -7,11 +7,10 @@ import torch.optim.lr_scheduler as lr_scheduler
 from sklearn.metrics import confusion_matrix
 from timm.data.mixup import Mixup
 from torch import nn
-from tsai.models.all import ResCNN, InceptionTimePlus, xresnet1d18
+from tsai.models.all import ResCNN
 
 import data
 import util
-from network import MLP
 from transforms import *
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -54,6 +53,7 @@ def test(model, loaders, load_best=False):
 
     if load_best:
         model.load_state_dict(torch.load('best.pth'))
+        # model.load_state_dict(torch.load('best_bin.pth'))  # Test accuracy multiclass: 0.9930551602436386, bin accuracy: 1.0
 
     model.eval()
     correct, bin_correct, total = 0, 0, 0
@@ -223,6 +223,13 @@ def train(model, loaders, len_train_data):
     util.plot_loss_acc(val_loss_history, val_acc_history, lr_history)
 
 
+def trace_model(model):
+    model = model.cpu()
+    example_input = torch.rand(1, 15, 128).cpu()
+    traced_model = torch.jit.trace(model, example_input)
+    torch.jit.save(traced_model, "my_traced_model.pt")
+
+
 def main():
     random.seed(util.SEED)
     np.random.seed(util.SEED)
@@ -248,6 +255,8 @@ def main():
     test(model, loaders, load_best=True)
 
     plot_confusion_matrix(model, loaders, label_encoder)
+
+    trace_model(model)
 
 
 if __name__ == '__main__':
