@@ -1,16 +1,16 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          S90comms_settings
-# Short-Description: comms.settings subscriber
-# Description:       Starts comms settings NATS node
+# Provides:          S90comms_command
+# Short-Description: comms.command subscriber
+# Description:       Starts comms command NATS node
 ### END INIT INFO
 
-DAEMON="comms_settings.py"
+DAEMON="comms_command.py"
 DIR="/opt/nats/"
 PIDFILE="/var/run/$DAEMON.pid"
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-LOG_FILE=/opt/comms_settings.log
+LOG_FILE=/opt/comms_command.log
 ARGS="-s $2 -p 4222"
 start() {
     echo "$ARGS"

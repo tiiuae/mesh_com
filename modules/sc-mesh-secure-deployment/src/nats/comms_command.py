@@ -1,5 +1,5 @@
 """
-mesh setting nats node
+Comms command control NATS node
 """
 import json
 import subprocess
@@ -12,97 +12,88 @@ from nats.aio.client import Client as NATS
 
 import comms_common as comms
 
-class MeshNetwork:
+
+class CommandControl:
     """
-    Mesh network
+    Command  control class
     """
 
-    class MeshSettings:  # pylint: disable=too-few-public-methods
+    class Command:  # pylint: disable=too-few-public-methods
         """
-        Settings class
+        Command class
         """
 
         def __init__(self):
             self.api_version = 1
-            self.ssid = ""
-            self.key = ""
-            self.ap_mac = ""
-            self.country = ""
-            self.frequency = ""
-            self.ip_address = ""
-            self.subnet = ""
-            self.tx_power = ""
-            self.mode = ""
+            self.command = ""
 
     def __init__(self):
-        self.settings = self.MeshSettings()
-        self.mesh_params = ""
+        self.cmd = self.Command()
         self.status = comms.STATUS.no_status
 
-    def handle_mesh_settings(self, msg: str) -> (str, str):
+    def handle_command(self, msg: str) -> (str, str):
         try:
             parameters = json.loads(msg)
             print(parameters)
-            self.settings.api_version = int(parameters["api_version"])
-            self.settings.ssid = quote(str(parameters["ssid"]))
-            self.settings.key = quote(str(parameters["key"]))
-            self.settings.ap_mac = quote(str(parameters["ap_mac"]))
-            self.settings.country = quote(str(parameters["country"]).lower())
-            self.settings.frequency = quote(str(parameters["frequency"]))
-            self.settings.ip_address = quote(str(parameters["ip"]))
-            self.settings.subnet = quote(str(parameters["subnet"]))
-            self.settings.tx_power = quote(str(parameters["tx_power"]))
-            self.settings.mode = quote(str(parameters["mode"]))
-            ret, info = self.__save_settings()
-
+            self.cmd.api_version = int(parameters["api_version"])
+            self.cmd.command = quote(str(parameters["cmd"]))
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
             ret, self.status = "FAIL", comms.STATUS.mesh_fail
             info = "JSON format not correct" + str(error)
+            return ret, info
 
+        if self.cmd.api_version != 1:
+            ret, info = "FAIL", "API version not supported"
+        elif self.cmd.command == comms.COMMAND.revoke:
+            ret, info = self.__activate_default_mesh()
+        elif self.cmd.command == comms.COMMAND.apply:
+            ret, info = self.__apply_mission_config()
+        elif self.cmd.command == comms.COMMAND.wifi_down:
+            ret, info = "FAIL", "Command not implemented"
+        elif self.cmd.command == comms.COMMAND.wifi_up:
+            ret, info = "FAIL", "Command not implemented"
+        elif self.cmd.command == comms.COMMAND.reboot:
+            ret, info = "FAIL", "Command not implemented"
+        elif self.cmd.command == comms.COMMAND.get_logs:
+            ret, info = "FAIL", "Command not implemented"
+        else:
+            ret, info = "FAIL", "Command not supported"
         return ret, info
 
-    def __save_settings(self) -> (str, str):
-        return_code = subprocess.call(["cp", "/opt/mesh.conf",
-                                       "/opt/mesh.conf_backup"],
-                                      shell=False)
-        if return_code != 0:
-            print("mesh.conf backup copy failed " + str(return_code))
+    def __activate_default_mesh(self) -> (str, str):
+        ret = subprocess.run(["/opt/S9011sMesh", "restart", "default"],
+                             shell=False, check=True, capture_output=True)
+        if ret.returncode != 0:
+            # todo: Default mesh configuration failed. What to do next?
             self.status = comms.STATUS.mesh_fail
-            return "FAIL", "mesh.conf backup copy failed " + str(return_code)
+            return "FAIL", "default mesh starting failed " \
+                           + str(ret.returncode) \
+                           + str(ret.stdout) \
+                           + str(ret.stderr)
 
-        # todo parameters check
+        self.status = comms.STATUS.mesh_default
+        return "OK", "Default mesh command applied"
 
-        try:
-            with open("/opt/mesh.conf", "w", encoding="utf-8") as mesh_conf:
-                mesh_conf.write(f"MODE={quote(self.settings.mode)}\n")
-                mesh_conf.write("IP=10.20.15.3\n")
-                mesh_conf.write("MASK=255.255.255.0\n")
-                mesh_conf.write(f"MAC={quote(self.settings.ap_mac)}\n")
-                mesh_conf.write(f"KEY={quote(self.settings.key)}\n")
-                mesh_conf.write(f"ESSID={quote(self.settings.ssid)}\n")
-                mesh_conf.write(f"FREQ={quote(self.settings.frequency)}\n")
-                mesh_conf.write(f"TXPOWER={quote(self.settings.tx_power)}\n")
-                mesh_conf.write(f"COUNTRY={quote(self.settings.country).upper()}\n")
-                mesh_conf.write("MESH_VIF=wlp1s0\n")
-                mesh_conf.write("PHY=phy0\n")
-                mesh_conf.write("# CONCURRENCY configuration\n")
-                mesh_conf.write("# CONCURRENCY=ap+mesh\n")
-                mesh_conf.write("# MCC_CHANNEL=2412\n")
-        except:
+    def __apply_mission_config(self) -> (str, str):
+        ret = subprocess.run(["/opt/S9011sMesh", "restart", "mission"],
+                             shell=False, check=True, capture_output=True)
+        if ret.returncode != 0:
             self.status = comms.STATUS.mesh_fail
-            return "FAIL", "not able to write new mesh.conf"
+            return "FAIL", "mesh starting failed " \
+                           + str(ret.returncode) \
+                           + str(ret.stdout) \
+                           + str(ret.stderr)
 
-        self.status = comms.STATUS.mesh_configuration_stored
-        print('Setting Done')
-        return "OK", "Mesh configuration stored"
-
+        print('Mission configurations applied')
+        self.status = comms.STATUS.mesh_mission_not_connected
+        return "OK", "Mission configurations applied"
 
 async def main(server, port, keyfile=None, certfile=None):
     """
     main
     """
-    mesh_network = MeshNetwork()
+    cmd_controller = CommandControl()
 
     nats_client = NATS()
 
@@ -150,14 +141,17 @@ async def main(server, port, keyfile=None, certfile=None):
         # subject = msg.subject
         # reply = msg.reply
         data = msg.data.decode()
-        ret, info = mesh_network.handle_mesh_settings(data)
+        ret, info = cmd_controller.handle_command(data)
+
         status = f"""{{"status":"{ret}",
-                       "mesh_status":"{mesh_network.status}",
+                       "mesh_status":"{cmd_controller.status}",
                        "info":"{info}"}}"""
 
         await msg.respond(status.encode("utf-8"))
 
-    await nats_client.subscribe("comms.settings", cb=message_handler)
+    # Subscribe messages
+    await nats_client.subscribe("comms.command", cb=message_handler)
+
 
     print("Mesh Settings Listening for requests")
 

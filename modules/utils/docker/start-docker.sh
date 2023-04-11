@@ -1,6 +1,5 @@
 #! /bin/bash
-function help
-{
+function help {
     echo
     echo "Usage: sudo ./start-docker.sh <docker_env"
     echo "Parameters:"
@@ -11,10 +10,10 @@ function help
 }
 
 echo "sudo  start-docker.sh $1"
-    if [[ -z "$1" ]]; then
-        echo "check arguments..."
-        help
-    fi
+if [[ -z "$1" ]]; then
+    echo "check arguments..."
+    help
+fi
 
 docker_exec_env=$1
 
@@ -33,8 +32,8 @@ if [ "$OS" == "Ubuntu" ]; then
 elif [ "$OS" == "Buildroot" ]; then
     if [ "$docker_exec_env" == "sec_os" ]; then
         if [ ! -d "/opt/container-data/mesh" ]; then
-            echo "create persist mesh container data partation"
-            # create persist mesh container data partation
+            echo "create persist mesh container data partition"
+            # create persist mesh container data partition
             # data/container-data/mesh
             # ├── state.json
             # └── wpa_supplicant_11s.conf
@@ -44,34 +43,41 @@ elif [ "$OS" == "Buildroot" ]; then
             mv /opt/mesh_com* /opt/container-data/mesh/
         fi
         # Copy hardware identification file into container-data
-        if [ ! -d "/opt/container-data/mesh/hardware" ]; then 
+        if [ ! -d "/opt/container-data/mesh/hardware" ]; then
             if [ -f "/etc/comms_pcb_version" ]; then
                 mkdir -p /opt/container-data/mesh/hardware
                 cp /etc/comms_pcb_version /opt/container-data/mesh/hardware/comms_pcb_version
             fi
         fi
-        # change rootfs location once its mounted in dedicated partation
+        # change rootfs location once its mounted in dedicated partition
         if [ -f "/root/rootfs.tgz" ]; then
             echo "import rootfs.tgz commms vm"
             cat /root/rootfs.tgz | docker import - comms_vm
             docker build -t comms_vm .
         else
-            docker import - comms_vm < /rootfs.tar
+            docker import - comms_vm </rootfs.tar
         fi
         meshcom_path="/opt/container-data/mesh/mesh_com/"
         echo $meshcom_path
+        if [ ! -f "/opt/container-data/mesh/mesh_default.conf" ]; then
+            cp /opt/mesh_default.conf /opt/container-data/mesh/
+        fi
         if [ ! -f "/opt/container-data/mesh/mesh.conf" ]; then
-		cp /opt/mesh_default.conf /opt/container-data/mesh/mesh.conf
-		cp $meshcom_path/common/scripts/mesh-11s.sh  /opt/container-data/mesh/.
-		chmod 755 /opt/container-data/mesh/mesh-11s.sh
-		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S9011sMesh /opt/container-data/mesh/.
-		chmod 755 /opt/container-data/mesh/S9011sMesh
-		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90nats_server /opt/container-data/mesh/.
-		chmod 755 /opt/container-data/mesh/S90nats_server
-		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90mesh_settings /opt/container-data/mesh/.
-		chmod 755 /opt/container-data/mesh/S90mesh_settings
-		cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/mesh_settings.py /opt/container-data/mesh/.
-		chmod 755 /opt/container-data/mesh/mesh_settings.py
+            cp /opt/mesh_default.conf /opt/container-data/mesh/mesh.conf
+            cp $meshcom_path/common/scripts/mesh-11s.sh /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/mesh-11s.sh
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S9011sMesh /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S9011sMesh
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90nats_server /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S90nats_server
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90comms_settings /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S90comms_settings
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90comms_visual /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S90comms_visual
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90comms_command /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S90comms_command
+            cp -R $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/ /opt/container-data/mesh/
+            chmod -R 755 /opt/container-data/mesh/nats/*.py
         fi
         cp /etc/umurmur.conf $meshcom_path/modules/utils/docker/umurmur.conf
         docker rm -f mesh_comms_vm

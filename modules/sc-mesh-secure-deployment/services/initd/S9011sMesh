@@ -14,7 +14,16 @@ DAEMON="mesh-11s.sh"
 DIR="/opt/"
 PIDFILE="/var/run/$DAEMON.pid"
 LOG_FILE=/opt/mesh_11s.log
-source /opt/mesh.conf
+
+case "$2" in
+    mission)
+        source /opt/mesh.conf;;
+    default)
+        source /opt/mesh_default.conf;;
+    *)
+        source /opt/mesh_default.conf;;
+esac
+
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
 MYMESH_ARGS="${MODE} ${IP} ${MASK} ${MAC} ${KEY} ${ESSID} ${FREQ} ${TXPOWER} ${COUNTRY} ${MESH_VIF} ${PHY} ${ROUTING}"
@@ -34,11 +43,11 @@ start() {
 stop() {
 #/etc/init.d/S9011sMesh stop <interface>
     printf 'Stopping %s: ' "$DAEMON"
-    NEW_PID=$(ps ax|grep wpa_supplicant |grep adhoc | awk {'print $1'})
+    NEW_PID=$(ps ax | grep -E 'wpa_supplicant\-11s.conf' | awk {'print $1'})
     kill -9 $NEW_PID
     ifconfig $MESH_VIF down
     ifconfig $MESH_VIF up
-    start-stop-daemon -K -q -p "$PIDFILE"
+    start-stop-daemon -K -o -q -p "$PIDFILE"
     status=$?
     if [ "$status" -eq 0 ]; then
         rm -f "$PIDFILE"

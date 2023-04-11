@@ -251,15 +251,18 @@ else
   ifconfig br-lan up
   echo
   ifconfig br-lan
-  # Add forwading rules from AP to bat0 interface
+  # Add forwarding rules from AP to bat0 interface
   iptables -P FORWARD ACCEPT
   route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
   route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
   iptables -A FORWARD --in-interface bat0 -j ACCEPT
   iptables --table nat -A POSTROUTING --out-interface $br_lan_ip -j MASQUERADE
 
+  # Start nats server and client nodes
   /opt/S90nats_server start $br_lan_ip
-  /opt/S90mesh_settings start $br_lan_ip
+  /opt/S90comms_settings start $br_lan_ip
+  /opt/S90comms_visual start $br_lan_ip
+  /opt/S90comms_command start $br_lan_ip
 fi
 
 #start gw manager
