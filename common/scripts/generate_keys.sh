@@ -155,12 +155,20 @@ create_csr(){
 #create the CSR
 #key_label=$(pkcs11-tool --module $LIB --list-objects --login --pin $pin | awk '/Private Key/{getline; print $2}' | cut -d "\"" -f 2)
 
+SUBJ="/C=AE/ST=Abu Dhabi/L=Abu Dhabi/O=TII/OU=SSRC/CN=*.tii.ae"
+
+
 export OPENSSL_PIN="$pin"
-openssl req -new -engine pkcs11 -keyform engine -key 01 -passin env:OPENSSL_PIN  -out /opt/mycsr.csr -subj "/C=AE/ST=Abu Dhabi/L=Abu Dhabi/O=TII/OU=SSRC/CN=*.tii.ae"
+openssl req -new -x509 -days 365 -subj "$SUBJ" -sha256 -engine pkcs11 -keyform engine -key 01 -passin env:OPENSSL_PIN  -out cert.pem
 echo "Certificate Signing Request (CSR)"
-openssl req -in /opt/mycsr.csr -noout -text -passin env:OPENSSL_PIN
+openssl req -new -engine pkcs11 -keyform engine -key 01 -passin env:OPENSSL_PIN  -out /opt/mycsr.csr -subj "$SUBJ"
+openssl x509 -req -CAkeyform engine -engine pkcs11 -in /opt/mycsr.csr -CA cert.pem -CAkey 01 -set_serial 1 -sha256  -passin env:OPENSSL_PIN  -out /opt/mycert.pem # self-signed cerificate
+echo "self-signed certificate"
+openssl x509 -in /opt/mycert.pem -noout -text -passin env:OPENSSL_PIN
+
 
 }
+
 
 initialize_hsm
 initialize_all
