@@ -32,7 +32,7 @@ if [ ${#softhsm2_output} -ne 616 ]
  then
   echo "Token exists"
   token_label=$(echo "$softhsm2_output" | grep 'Label:' | sed 's/^.*: //')
-  softhsm2-util --slot 1 --delete-token --token "$token_label"
+  softhsm2-util --slot 1 --delete-token --token $token_label
 else
   echo "No Token exists"
 fi

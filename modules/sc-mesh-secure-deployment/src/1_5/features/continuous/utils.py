@@ -115,10 +115,11 @@ def update_table_ca(df, result, myID):
                     df.loc[df['IP'] == ip, 'CA_Result'] = 3
                 df.loc[df['IP'] == ip, 'CA_Server'] = myID
             else:
-                neigh = mesh_utils.get_arp()
                 try:
-                    mac = neigh[ip]
-                except KeyError:
+                    command = ['batctl', 't', ip] # Get mac of given ip
+                    output = subprocess.run(command, shell=False, capture_output=True, text=True)
+                    mac = output.stdout.replace('\n', '')
+                except Exception as e:
                     mac = '----'
                 client_mesh_name = ip.replace('.', '_')
                 client_fpr, _ = pri.hashSig(f'pubKeys/{client_mesh_name}.der')

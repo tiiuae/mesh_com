@@ -39,7 +39,7 @@ def exchage_table(sectable, start_server_thread, logger=None, debug=True):
         print(exchange_table)
 
     count = 1  # Number of exchanges
-    send_flag = 1 # send_flag = 0 if 'To_Send' is empty for all exchange_table entries
+    send_flag = 0 if (exchange_table['To_Send'] == '').all() else 1 # send_flag = 0 if 'To_Send' is empty for all exchange_table entries
 
     # Run while sending table rows is not completed for all nodes
     #while send_flag > 0:
@@ -94,6 +94,7 @@ def exchange_server(debug=False):
         with contextlib.suppress(OSError):
             sock.bind(("0.0.0.0", 5005))
             sock.listen()
+        sock.settimeout(90) # Initial timeout to wait for cont auth to be done or exit infinite loop if nothing is received
         while 1:
             try:
                 data, addr = sock.recvfrom(4096)
@@ -110,7 +111,7 @@ def exchange_server(debug=False):
             except socket.timeout:
                 print('Socket timeout')
                 break # If timeout, break while loop
-            sock.settimeout(25)  # Setting timeout to exit infinite loop if nothing is received for 15 seconds
+            sock.settimeout(30)  # Setting timeout to exit infinite loop if nothing is received for 30 seconds
 
 def exchange_client(IP, message, debug=False):
     print('Checkpoint inside exchange_client')

@@ -1,12 +1,13 @@
 from header import *
 from main_with_menu import *
 import yaml
+from termcolor import colored
 
 def continuous_authentication(sectable, myID):
     print("Starting Continuous Authentication")
     aux = sectable.iloc[:, :5]
-    sectable = aux.drop_duplicates()
-    sectable.drop(sectable.loc[sectable['MAC'] == '----'].index, inplace=True) # To avoid duplicates after exchange table for mesh neighbors not originally mutually authenticated
+    sectable = aux.drop_duplicates(subset=['IP'])
+    #sectable.drop(sectable.loc[sectable['MAC'] == '----'].index, inplace=True) # To avoid duplicates after exchange table for mesh neighbors not originally mutually authenticated
     loop_ca = None
     try:
         loop_ca = asyncio.get_event_loop()
@@ -105,9 +106,13 @@ def sec_beat(myID):
     sectable.drop_duplicates(inplace=True)
     ut.exchage_table(sectable, start_server_thread)
     global_table = pd.read_csv('auth/global_table.csv')
-    ness_result, mapp = decision_engine(global_table, ma, q)
-    #quaran(ness_result, q, sectable, ma, mapp)
-    quaran(ness_result, q, global_table, ma, mapp)
+    if global_table.empty:
+        print("Empty Global security table")
+        print("Nothing to do")
+    else:
+        ness_result, mapp = decision_engine(global_table, ma, q)
+        #quaran(ness_result, q, sectable, ma, mapp)
+        quaran(ness_result, q, global_table, ma, mapp)
 
 def mutual_authentication():
     print("Starting Mutual Authentication")
@@ -131,6 +136,19 @@ def readfile():
             print(exc)
             return None
 
+def demo_rogue():
+    main_dir = os.path.dirname(__file__)
+    print("\n")
+    print(colored("===================================================", 'red'))
+    print(colored("Replacing fake certificates to create rogue node", 'red'))
+    pin = pri.recover_pin()
+    command = ['chmod +x ' + main_dir + '/test_inputs/demo/rogue_key_gen.sh']
+    subprocess.run(command, shell=True)
+    # Generating fake keys and replacing root cert with fake mesh cert
+    command = [main_dir + '/test_inputs/demo/rogue_key_gen.sh', pin]
+    subprocess.run(command, shell=False)
+    print(colored("===================================================", 'red'))
+    print("\n")
 
 def initialize(feature):
     global MA_thread, sbeat_thread
@@ -146,6 +164,10 @@ def initialize(feature):
         Quarantine()
     if feature == 'only_mesh':
         only_mesh()
+    if feature == 'demo_rogue':
+        timer_thread = threading.Timer(1.75*SEC_BEAT_TIME, demo_rogue) # Call demo_rogue() towards the end of second sec beat
+        timer_thread.start()
+
 
 if __name__ == "__main__":
     threadList = []
