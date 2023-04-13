@@ -1,7 +1,8 @@
-only_mesh: false
+only_mesh: true
 NESS: false
 continuous: false
-mutual: true
+mutual: false
+demo_ui: true
 demo_rogue: false
 secbeat: true
 quarantine: false

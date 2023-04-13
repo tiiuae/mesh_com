@@ -150,6 +150,12 @@ def demo_rogue():
     print(colored("===================================================", 'red'))
     print("\n")
 
+def demo_ui():
+    # Call demo ui
+    main_dir = os.path.dirname(__file__)
+    print("Running Demo UI")
+    os.system('python3 ' + main_dir + '/demo/demo_ui.py')
+
 def initialize(feature):
     global MA_thread, sbeat_thread
     if feature == 'mutual':
@@ -164,6 +170,8 @@ def initialize(feature):
         Quarantine()
     if feature == 'only_mesh':
         only_mesh()
+    if feature == 'demo_ui':
+        threading.Thread(target=demo_ui, daemon=True, args=()).start()
     if feature == 'demo_rogue':
         timer_thread = threading.Timer(1.75*SEC_BEAT_TIME, demo_rogue) # Call demo_rogue() towards the end of second sec beat
         timer_thread.start()
