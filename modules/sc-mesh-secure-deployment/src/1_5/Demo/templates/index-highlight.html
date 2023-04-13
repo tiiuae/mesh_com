@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="utf-8" />
+    <title>Mesh Shield 1.5 Demo</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"></script>
+    <script src="{{ url_for('static', filename='js/ajax_table_example.js') }}"></script>
+
+    <style>
+        .highlighted {
+            background-color: yellow;
+        }
+    </style>
+
+    <script>
+        $(document).ready(function() {
+            var tableRows = $("table tbody tr");
+            var currentRow = 0;
+
+            setInterval(function() {
+                tableRows.removeClass("highlighted"); // Remove highlight from all rows
+                tableRows.eq(currentRow).addClass("highlighted"); // Add highlight to current row
+                currentRow = (currentRow + 1) % tableRows.length; // Increment current row index, wrap around if necessary
+            }, 5000); // Repeat every 5 seconds
+        });
+    </script>
+
+</head>
+<body>
+
+
+<h2> Security Table </h2>
+
+
+<div class="container">
+
+    <table id="jds-example" class="table">
+        <thead>
+            <tr>
+                {% for col in data.columns %}
+                <th scope="col"> {{ col }}</th>
+                    {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+                {% for key, value in data.iterrows() %}
+            <tr>
+                    {% for k in value %}
+                <td scope="row">{{ k }}</td>
+                    {% endfor %}
+            </tr>
+                {% endfor %}
+        </tbody>
+    </table>
+    
+    </div>
+    
+    
+    </body>
+    </html>

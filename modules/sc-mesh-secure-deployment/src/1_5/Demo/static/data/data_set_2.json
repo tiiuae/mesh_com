@@ -1,0 +1,17 @@
+[{
+  "name": "Joe Doe",
+  "position": "Technology",
+  "salary": "$100,000",
+  "start_date": "2015",
+  "office": "Miami",
+  "extn": "4512"
+},
+{
+  "name": "Ashley Doe",
+  "position": "Fashion",
+  "salary": "$100,000",
+  "start_date": "2015",
+  "office": "Alaska",
+  "extn": "1245"
+}
+]

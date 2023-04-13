@@ -1,0 +1,17 @@
+[{
+  "name": "John Doe",
+  "position": "Sales",
+  "salary": "$100,000",
+  "start_date": "2015",
+  "office": "New York",
+  "extn": "5421"
+},
+{
+  "name": "Larry Doe",
+  "position": "Trader",
+  "salary": "$100,000",
+  "start_date": "2018",
+  "office": "Tokyo",
+  "extn": "2154"
+}
+]

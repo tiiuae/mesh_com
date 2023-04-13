@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="utf-8" />
+    <head>
+    <meta http-equiv="refresh" content="10">
+    </head>
+    <title>Mesh Shield 1.5 Demo</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"></script>
+    <script src="{{ url_for('static', filename='js/ajax_table_example.js') }}"></script>
+
+    <style>
+        .highlighted {
+            background-color: #F08080;
+        }
+    </style>
+
+    <script>
+        $(document).ready(function() {
+            var tableRows = $("table tbody tr");
+            var currentRow = {{ highlighted_row_index }};
+
+            if (currentRow !== 999) { // Add check for non-zero value
+                tableRows.eq(currentRow).addClass("highlighted");
+            }
+        });
+    </script>
+
+   <p style="margin-bottom: 5cm;"> <h1>
+      <span>Mesh Shield 1.5</span>
+      <span>Mesh Shield 1.5</span>
+    </h1></p>
+</head>
+<body>
+
+
+
+<div class="container">
+    <div class="eight">
+    <p style="margin-bottom: 7cm;"><h1><center>Security Table</center></h1></p>
+</div>
+
+
+<table id="jds-example" class="table">
+    <thead>
+        <tr>
+            {% for col in data.columns %}
+            <th scope="col"> {{ col }}</th>
+                {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+            {% for key, value in data.iterrows() %}
+        <tr>
+                {% for k in value %}
+            <td scope="row">{{ k }}</td>
+                {% endfor %}
+        </tr>
+            {% endfor %}
+    </tbody>
+</table>
+
+</div>
+
+
+    <div class="container">
+            <div class="eight">
+                <h1>Topology Viewer</h1>
+            </div>
+        <div id="topology"></div>
+    </div>
+
+    <script type="text/javascript" src="{{ url_for('static', filename='js/vis.min.js') }}"></script>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/vis.min.css') }}">
+    <script type="text/javascript">
+        var topology = new vis.Network(
+          document.getElementById('topology'),
+          {
+            nodes: new vis.DataSet({{ nodes|tojson }}),
+            edges: new vis.DataSet({{ edges|tojson }}),
+          },
+          {
+            height: "1000px",
+            layout: {
+              randomSeed: 1,
+              hierarchical: {
+                enabled: false,
+                treeSpacing: 2000,
+                levelSeparation: 200,
+                nodeSpacing: 1500
+              }
+            },
+            physics: {
+              enabled: false
+            }
+            }
+        );
+    </script>
+
+</body>
+
+</html>
