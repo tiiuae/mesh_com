@@ -2,9 +2,10 @@
 Commonly used comms settings/command definitions
 """
 
+
 class STATUS:  # pylint: disable=too-few-public-methods
     """
-    Status values
+    Comms status values
     """
     no_status = "MESH_NO_STATUS"  # no stat available
     mesh_default = "MESH_DEFAULT"  # mesh default settings
@@ -17,12 +18,13 @@ class STATUS:  # pylint: disable=too-few-public-methods
 
 class COMMAND:  # pylint: disable=too-few-public-methods
     """
-    Command values
+    Comms control commands
     """
-    revoke = "REVOKE"  # Activate default mesh and revoke/delete mission keys
-    apply = "APPLY"  # Take mission config into use
+    revoke = "REVOKE"   # Activate default mesh and revoke/delete mission keys
+    apply = "APPLY"     # Take mission config into use
     wifi_down = "DOWN"  # Deactivate Wi-Fi transmitter
-    wifi_up = "UP" # Deactivate Wi-Fi transmitter
-    reboot = "REBOOT"  # Reboot comms module
-    get_logs = "LOGS"  # Command to send basic logs as response
-
+    wifi_up = "UP"      # Deactivate Wi-Fi transmitter
+    reboot = "REBOOT"   # Reboot comms module
+    get_logs = "LOGS"   # Command to send basic logs as response
+    enable_visualisation = "ENABLE_VISUALISATION"
+    disable_visualisation = "DISABLE_VISUALISATION"

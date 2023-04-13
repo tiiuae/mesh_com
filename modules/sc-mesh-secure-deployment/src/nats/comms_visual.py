@@ -86,13 +86,13 @@ async def main(server, port, keyfile=None, certfile=None, interval=1):
 
     # Connect to NATS server with TLS enabled if ssl_context is provided
     if ssl_context:
-        await nc.connect(f"tls://"+str(server)+":"+str(port),
+        await nc.connect(f"tls://{server}:{port}",
                          tls=ssl_context,
                          reconnected_cb=reconnected_cb,
                          disconnected_cb=disconnected_cb,
                          max_reconnect_attempts=-1)
     else:
-        await nc.connect(f"nats://"+str(server)+":"+str(port),
+        await nc.connect(f"nats://{server}:{port}",
                          reconnected_cb=reconnected_cb,
                          disconnected_cb=disconnected_cb,
                          max_reconnect_attempts=-1)
@@ -113,12 +113,14 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port', help='Server port', required=True)
     parser.add_argument('-k', '--keyfile', help='TLS keyfile', required=False)
     parser.add_argument('-c', '--certfile', help='TLS certfile', required=False)
+    parser.add_argument('-i', '--interval', help='Publish interval', required=False)
     args = parser.parse_args()
 
     loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(main(args.server, args.port,
-                                     args.keyfile, args.certfile))
+        loop.run_until_complete(main(server=args.server, port=args.port,
+                                     keyfile=args.keyfile, certfile=args.certfile,
+                                     interval=args.interval))
         loop.run_forever()
         loop.close()
     except:

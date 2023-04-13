@@ -1,23 +1,17 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          S90comms_visual
-# Short-Description: Mesh visualization data broker
-# Description:       Starts comms visualization broker NATS node
+# Provides:          S90comms_controller
+# Short-Description: Comms nats client
+# Description:       Starts comms controller NATS node
 ### END INIT INFO
 
-DAEMON="comms_visual.py"
+DAEMON="comms_nats_controller.py"
 DIR="/opt/nats/"
 PIDFILE="/var/run/$DAEMON.pid"
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-LOG_FILE=/opt/comms_visual.log
-
-if [ -z "$3" ]; then
-    ARGS="-s $2 -p 4222"
-else
-    ARGS="-s $2 -p 4222 -i $3"
-fi
-
+LOG_FILE=/opt/comms_settings.log
+ARGS="-s $2 -p 4222"
 start() {
     echo "$ARGS"
     printf 'Starting %s: ' "$DAEMON"

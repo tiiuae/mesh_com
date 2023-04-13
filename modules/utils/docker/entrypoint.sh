@@ -260,9 +260,7 @@ else
 
   # Start nats server and client nodes
   /opt/S90nats_server start $br_lan_ip
-  /opt/S90comms_settings start $br_lan_ip
-  /opt/S90comms_visual start $br_lan_ip
-  /opt/S90comms_command start $br_lan_ip
+  /opt/S90comms_controller start $br_lan_ip
 fi
 
 #start gw manager
