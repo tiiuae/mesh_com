@@ -41,7 +41,8 @@ def main():
         # Check quality of current channel
         index = args.all_channels.index(channel)
         current_channel_quality = channels_quality[index]
-        if current_channel_quality > args.threshold:
+        # if current_channel_quality > args.threshold:
+        if False:
             print(f'Current channel {channel}, estimated quality: {current_channel_quality}')
         else:
             # Pick the channel with the highest quality

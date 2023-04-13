@@ -9,7 +9,9 @@ License:
 Repository:
 """
 
+import json
 import os
+import socket
 from typing import List
 
 import pandas as pd
@@ -19,12 +21,17 @@ from util import Band, map_channel_to_freq, map_channel_to_band, load_sample_dat
 
 
 class WirelessScanner:
-    def __init__(self, args: Options):
+    def __init__(self, args: Options, host: str = 'localhost', port: int = 8000) -> None:
         """
         Initializes the WirelessScanner object.
 
         :param args: A Namespace object containing command line arguments.
         """
+        self.host = host
+        self.port = port
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect((self.host, self.port))
+
         self.args = args
         if not args.debug:
             from SpectralMgr import Spectral
@@ -156,6 +163,7 @@ class WirelessScanner:
         # Replace this function with actual code to set the wireless interface to the given channel
         self.channel = channel
         self.band = Band.BAND_24GHZ if 1 <= channel <= 14 else Band.BAND_50GHZ
+        self.broadcast(channel)
 
     def scan(self, freqs: str) -> pd.DataFrame:
         """
@@ -189,3 +197,23 @@ class WirelessScanner:
             if len(freq_scan) < self.args.min_rows:
                 return False
         return True
+
+    def broadcast(self, channel: int) -> None:
+        """
+        Broadcast the new channel.
+
+        :param channel: A integer that denotes the new channel.
+        """
+
+        if not self.socket:
+            print("Error: Socket is not initialized.")
+            return
+
+        try:
+            data = {'action': 'broadcast', 'channel': channel}
+            json_str = json.dumps(data)
+            self.socket.send(json_str.encode())
+        except ConnectionRefusedError:
+            print("Error: Connection refused by the server. Check if the server is running and reachable.")
+        except socket.error as e:
+            print(f"Error: Socket error occurred: {e}")

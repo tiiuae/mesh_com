@@ -44,16 +44,14 @@ class ChannelQualityEstimator:
         """
         self.host = host
         self.port = port
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect((self.host, self.port))
 
         # Model related attributes
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = torch.jit.load("my_traced_model.pt")
         self.model = self.model.to(self.device)
         self.model.eval()
-
-        # Socket object for sending data
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.connect((self.host, self.port))
 
     def _forward(self, feat_array: np.ndarray) -> np.ndarray:
         """
