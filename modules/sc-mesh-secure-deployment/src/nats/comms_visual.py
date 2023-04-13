@@ -120,7 +120,7 @@ if __name__ == '__main__':
     try:
         loop.run_until_complete(main(server=args.server, port=args.port,
                                      keyfile=args.keyfile, certfile=args.certfile,
-                                     interval=args.interval))
+                                     interval=int(args.interval)))
         loop.run_forever()
         loop.close()
     except:
