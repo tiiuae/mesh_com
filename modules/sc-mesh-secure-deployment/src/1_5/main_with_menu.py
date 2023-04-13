@@ -79,6 +79,8 @@ def only_mesh():
         mut.start_mesh()
         mut.create_table()
         sleep(2)
+        """
+        # This results in inconsistent table entries
         if mesh_utils.verify_mesh_status():  # verifying that mesh is running
             print("Mesh Running")
             #mesh_utils.get_neighbors_ip()
@@ -88,6 +90,7 @@ def only_mesh():
                         'PubKey_fpr': "----", 'MA_level': 1}
                 print(info)
                 mut.update_table(info)
+        """
     except TypeError:
         print("No password provided for the mesh. Please get the password via provisioning server")
         sys.exit()

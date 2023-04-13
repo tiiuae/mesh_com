@@ -35,11 +35,10 @@ def get_topology_info(df_decision):
     points = []
     edges = []
 
-    for index in range(len(df)):
-        node = {"id": df['MAC'].loc[index], "label": df['MAC'].loc[index],
-                "color": 'green' if df['Ness_Result'].loc[index] == 65 else 'red'}
+    for index, row in df.iterrows():
+        node = {"id": row['MAC'], "label": row['MAC'], "color": 'green' if row['Ness_Result'] == 65 else 'red'}
         nodes.append(node)
-        points.append(df['MAC'].loc[index])
+        points.append(row['MAC'])
 
     # Get combinations of pair of 2 points from list of all nodes
     point_combinations = list(itertools.combinations(points, 2))
