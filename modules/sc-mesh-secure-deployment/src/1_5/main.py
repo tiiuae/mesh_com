@@ -173,7 +173,8 @@ def initialize(feature):
     if feature == 'demo_ui':
         threading.Thread(target=demo_ui, daemon=True, args=()).start()
     if feature == 'demo_rogue':
-        timer_thread = threading.Timer(1.75*SEC_BEAT_TIME, demo_rogue) # Call demo_rogue() towards the end of second sec beat
+        #timer_thread = threading.Timer(1.9*SEC_BEAT_TIME, demo_rogue) # Call demo_rogue() towards the end of second sec beat
+        timer_thread = threading.Timer(45 + 110, demo_rogue)
         timer_thread.start()
 
 

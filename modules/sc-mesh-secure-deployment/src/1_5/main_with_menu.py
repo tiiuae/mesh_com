@@ -180,7 +180,8 @@ def sbeat_client():
     sbeat_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sbeat_sock.bind(("0.0.0.0", 6007))
     # Wait for a security beat period -> If a security beat is received, break while loop and start security beat. If it is not received, breadcast security beat and start it.
-    sbeat_sock.settimeout(SEC_BEAT_TIME + 15) # 15 seconds buffer time as socket takes some time to start receiving udp packets here
+    #sbeat_sock.settimeout(SEC_BEAT_TIME + 15) # 15 seconds buffer time as socket takes some time to start receiving udp packets here
+    sbeat_sock.settimeout(45)
     print("====================================================================")
     print("Waiting for security beat")
     print("====================================================================")
