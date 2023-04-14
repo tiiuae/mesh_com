@@ -8,13 +8,13 @@ import ssl
 import argparse
 from nats.aio.client import Client as NATS
 
-from visualisation.batstat import Batman
-from visualisation.batadvvis import BatAdvVis
+from src.visual.batstat import Batman
+from src.visual.batadvvis import BatAdvVis
 
 
 class MeshTelemetry:
     """
-    Mesh network executor
+    Mesh network telemetry collector
     """
 
     def __init__(self):

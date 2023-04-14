@@ -5,7 +5,7 @@ import json
 import subprocess
 from shlex import quote
 
-import comms_common as comms
+from .comms_common import STATUS, COMMAND
 
 
 class Command:  # pylint: disable=too-few-public-methods
@@ -21,7 +21,7 @@ class Command:  # pylint: disable=too-few-public-methods
         self.interval = 1
 
     def handle_command(self, msg: str) -> (str, str):
-        mesh_status = comms.STATUS.no_status
+        mesh_status = STATUS.no_status
         try:
             parameters = json.loads(msg)
             print(parameters)
@@ -36,21 +36,21 @@ class Command:  # pylint: disable=too-few-public-methods
 
         if self.api_version != 1:
             ret, info = "FAIL", "API version not supported"
-        elif self.command == comms.COMMAND.revoke:
+        elif self.command == COMMAND.revoke:
             ret, info, mesh_status = self.__activate_default_mesh()
-        elif self.command == comms.COMMAND.apply:
+        elif self.command == COMMAND.apply:
             ret, info, mesh_status = self.__apply_mission_config()
-        elif self.command == comms.COMMAND.wifi_down:
+        elif self.command == COMMAND.wifi_down:
             ret, info = "FAIL", "Command not implemented"
-        elif self.command == comms.COMMAND.wifi_up:
+        elif self.command == COMMAND.wifi_up:
             ret, info = "FAIL", "Command not implemented"
-        elif self.command == comms.COMMAND.reboot:
+        elif self.command == COMMAND.reboot:
             ret, info = "FAIL", "Command not implemented"
-        elif self.command == comms.COMMAND.get_logs:
+        elif self.command == COMMAND.get_logs:
             ret, info = "FAIL", "Command not implemented"
-        elif self.command == comms.COMMAND.enable_visualisation:
+        elif self.command == COMMAND.enable_visualisation:
             ret, info = self.__enable_visualisation()
-        elif self.command == comms.COMMAND.disable_visualisation:
+        elif self.command == COMMAND.disable_visualisation:
             ret, info = self.__disable_visualisation()
         else:
             ret, info = "FAIL", "Command not supported"
@@ -64,9 +64,9 @@ class Command:  # pylint: disable=too-few-public-methods
             return "FAIL", "default mesh starting failed " \
                            + str(ret.returncode) \
                            + str(ret.stdout) \
-                           + str(ret.stderr), comms.STATUS.mesh_fail
+                           + str(ret.stderr), STATUS.mesh_fail
 
-        return "OK", "Default mesh command applied", comms.STATUS.mesh_default
+        return "OK", "Default mesh command applied", STATUS.mesh_default
 
     def __apply_mission_config(self) -> (str, str, str):
         ret = subprocess.run(["/opt/S9011sMesh", "restart", "mission"],
@@ -75,11 +75,11 @@ class Command:  # pylint: disable=too-few-public-methods
             return "FAIL", "mesh starting failed " \
                            + str(ret.returncode) \
                            + str(ret.stdout) \
-                           + str(ret.stderr), comms.STATUS.mesh_fail
+                           + str(ret.stderr), STATUS.mesh_fail
 
         print('Mission configurations applied')
         return "OK", "Mission configurations applied", \
-            comms.STATUS.mesh_mission_not_connected
+            STATUS.mesh_mission_not_connected
 
     def __radio_down(self) -> (str, str, str):
         ret = subprocess.run(["/opt/S9011sMesh", "stop"],
@@ -88,11 +88,11 @@ class Command:  # pylint: disable=too-few-public-methods
               return "FAIL", "Radio deactivation failed " \
                            + str(ret.returncode) \
                            + str(ret.stdout) \
-                           + str(ret.stderr), comms.STATUS.mesh_fail
+                           + str(ret.stderr), STATUS.mesh_fail
 
         print('Radio deactivated')
         # Fixme: What is correct mesh status to report in this case?
-        return "OK", "Radio deactivated", comms.STATUS.no_status
+        return "OK", "Radio deactivated", STATUS.no_status
 
     def __radio_up(self) -> (str, str):
         # Todo: Should we enable default mesh if it was previously in use?
@@ -102,10 +102,10 @@ class Command:  # pylint: disable=too-few-public-methods
             return "FAIL", "Radio activation failed " \
                            + str(ret.returncode) \
                            + str(ret.stdout) \
-                           + str(ret.stderr), comms.STATUS.mesh_fail
+                           + str(ret.stderr), STATUS.mesh_fail
         print('Radio activated')
         # Fixme: What is correct mesh status to report in this case?
-        return "OK", "Radio activated", comms.STATUS.mesh_mission_not_connected
+        return "OK", "Radio activated", STATUS.mesh_mission_not_connected
 
     def __enable_visualisation(self) -> (str, str):
         ret = subprocess.run(["/opt/S90comms_visual", "start",

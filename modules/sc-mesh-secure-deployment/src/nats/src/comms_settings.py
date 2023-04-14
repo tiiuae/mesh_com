@@ -5,7 +5,10 @@ import json
 import subprocess
 from shlex import quote
 
-import comms_common as comms
+try:
+    import comms_common as comms
+except ImportError:
+    import src.comms_common as comms
 
 
 class CommsSettings:  # pylint: disable=too-few-public-methods
@@ -25,7 +28,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods
         self.tx_power = ""
         self.mode = ""
 
-    def handle_mesh_settings(self, msg: str) -> (str, str):
+    def handle_mesh_settings(self, msg: str, path="/opt", file="mesh.conf") -> (str, str):
         try:
             parameters = json.loads(msg)
             print(parameters)
@@ -40,7 +43,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods
             self.tx_power = quote(str(parameters["tx_power"]))
             self.mode = quote(str(parameters["mode"]))
             # Todo: Validate parameters before saving
-            ret, info, mesh_status = self.__save_settings()
+            ret, info, mesh_status = self.__save_settings(path, file)
 
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
@@ -49,9 +52,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods
 
         return ret, info, mesh_status
 
-    def __save_settings(self) -> (str, str, str):
-        return_code = subprocess.call(["cp", "/opt/mesh.conf",
-                                       "/opt/mesh.conf_backup"],
+    def __save_settings(self, path: str, file: str) -> (str, str, str):
+        return_code = subprocess.call(["cp", f"{path}/{file}",
+                                       f"{path}/{file}_backup"],
                                       shell=False)
         if return_code != 0:
             print("mesh.conf backup failed " + str(return_code))
@@ -59,7 +62,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods
                 comms.STATUS.no_status
 
         try:
-            with open("/opt/mesh.conf", "w", encoding="utf-8") as mesh_conf:
+            with open(f"{path}/{file}", "w", encoding="utf-8") as mesh_conf:
                 mesh_conf.write(f"MODE={quote(self.mode)}\n")
                 mesh_conf.write("IP=10.20.15.3\n")
                 mesh_conf.write("MASK=255.255.255.0\n")

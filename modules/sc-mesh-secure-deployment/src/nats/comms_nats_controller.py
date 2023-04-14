@@ -7,9 +7,9 @@ import ssl
 import argparse
 from nats.aio.client import Client as NATS
 
-import comms_common as comms
-import comms_settings
-import comms_command
+from src import comms_common as comms
+from src import comms_settings
+from src import comms_command
 
 class CommsController:  # pylint: disable=too-few-public-methods
     """

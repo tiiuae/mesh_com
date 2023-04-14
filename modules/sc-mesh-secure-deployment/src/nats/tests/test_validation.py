@@ -27,7 +27,7 @@ class TestValidation(unittest.TestCase):
         ssid = [chr(char) for char in range(32, 126)]
         self.assertTrue(validation.validate_ssid("".join(ssid)[0:32]))
         self.assertTrue(validation.validate_ssid("".join(ssid)[33:64]))
-        self.assertTrue(validation.validate_ssid("".join(ssid)[65:96]))
+        self.assertTrue(validation.validate_ssid("".join(ssid)[65:94]))
 
     def test_validate_wpa3_psk(self):
         """
