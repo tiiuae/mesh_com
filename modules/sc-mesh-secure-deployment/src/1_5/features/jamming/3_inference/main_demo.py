@@ -16,8 +16,20 @@ import numpy as np
 from channel_quality_estimator import ChannelQualityEstimator
 from options import Options
 from preprocessor import Preprocessor
-from util import print_channel_quality, map_freq_to_channel
+from util import print_channel_quality, map_freq_to_channel, map_channel_to_freq
 from wireless_scanner import WirelessScanner
+
+WORKING_FREQS = [5180, 5200, 5220, 5240, 5745, 5765, 5785, 5805, 5825]
+
+
+def filter_working_freqs(frequencies: np.ndarray, channels_quality: np.ndarray):
+    new_freqs, new_quality = [], []
+    for freq, quality in zip(frequencies, channels_quality):
+        if freq in WORKING_FREQS:
+            new_freqs.append(freq)
+            new_quality.append(quality)
+    frequencies, channels_quality = np.array(new_freqs), np.array(new_quality)
+    return frequencies, channels_quality
 
 
 def main():
@@ -38,8 +50,12 @@ def main():
         # Print channel quality and frequencies
         print_channel_quality(args, channels_quality, probs, frequencies)
 
+        # Filter working frequencies
+        frequencies, channels_quality = filter_working_freqs(frequencies, channels_quality)
+
         # Check quality of current channel
-        index = args.all_channels.index(channel)
+        # index = args.all_channels.index(channel)
+        index = frequencies.tolist().index(map_channel_to_freq(channel))
         current_channel_quality = channels_quality[index]
         # if current_channel_quality > args.threshold:
         if False:

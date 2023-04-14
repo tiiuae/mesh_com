@@ -12,7 +12,7 @@ class Options:
         self.interface: str = 'wlp1s0'
         self.debug: bool = True
         self.low_latency: bool = True
-        self.min_rows: int = 64
+        self.min_rows: int = 16
         self.parse_options()
 
     def parse_options(self) -> 'Options':

@@ -210,7 +210,8 @@ class WirelessScanner:
             return
 
         try:
-            data = {'action': 'broadcast', 'channel': channel}
+            freq = map_channel_to_freq(channel)
+            data = {'action': 'broadcast', 'channel': freq}
             json_str = json.dumps(data)
             self.socket.send(json_str.encode())
         except ConnectionRefusedError:
