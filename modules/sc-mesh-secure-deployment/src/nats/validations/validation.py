@@ -8,11 +8,14 @@ def validate_ssid(ssid: str) -> bool:
     Validates a given SSID according to the 802.11 specification.
     Returns True if the SSID is valid, False otherwise.
     """
-    if len(ssid) > 32:
+    try:
+        if len(ssid) > 32:
+            return False
+        if re.search(r'[^\x20-\x7E]', ssid):
+            return False
+        return True
+    except (ValueError, TypeError, AttributeError):
         return False
-    if re.search(r'[^\x20-\x7E]', ssid):
-        return False
-    return True
 
 
 def validate_wpa3_psk(psk: str) -> bool:
@@ -20,11 +23,14 @@ def validate_wpa3_psk(psk: str) -> bool:
     Validates a given PSK for WPA3.
     Returns True if the PSK is valid, False otherwise.
     """
-    if len(psk) < 8 or len(psk) > 63:
+    try:
+        if len(psk) < 8 or len(psk) > 63:
+            return False
+        if not re.match(r'^[!-~]*$', psk):
+            return False
+        return True
+    except (ValueError, TypeError, AttributeError):
         return False
-    if not re.match(r'^[!-~]*$', psk):
-        return False
-    return True
 
 
 def validate_ip_address(ip: str) -> bool:
@@ -35,7 +41,7 @@ def validate_ip_address(ip: str) -> bool:
     try:
         socket.inet_pton(socket.AF_INET, ip)
         return True
-    except socket.error:
+    except (socket.error, TypeError, AttributeError):
         return False
 
 

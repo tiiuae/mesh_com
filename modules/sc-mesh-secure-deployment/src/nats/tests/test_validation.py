@@ -21,6 +21,8 @@ class TestValidation(unittest.TestCase):
         self.assertTrue(validation.validate_ssid('mesh'))
         # ssid is invalid
         self.assertFalse(validation.validate_ssid('meshmeshmessshmeshmessshmeshmesss'))
+        # ssid is invalid
+        self.assertFalse(validation.validate_ssid(1))
         # print ascii chars in the range of ascii code 32 to 126 (decimal)
         ssid = [chr(char) for char in range(32, 126)]
         self.assertTrue(validation.validate_ssid("".join(ssid)[0:32]))
@@ -31,6 +33,8 @@ class TestValidation(unittest.TestCase):
         """
         Test cases for validate_wpa3_psk(psk)
         """
+        # psk is invalid
+        self.assertFalse(validation.validate_wpa3_psk(1))
         # psk is valid
         self.assertTrue(validation.validate_wpa3_psk('12345678'))
         # psk is invalid (short)
@@ -48,6 +52,8 @@ class TestValidation(unittest.TestCase):
         # ip is invalid
         self.assertFalse(validation.validate_ip_address('1000.0.0.0'))
         # ip is invalid
+        self.assertFalse(validation.validate_ip_address(1))
+        # ip is invalid
         self.assertFalse(validation.validate_ip_address('0.0.0'))
         # ip is invalid
         self.assertFalse(validation.validate_ip_address('0.0.256.0'))
@@ -62,6 +68,8 @@ class TestValidation(unittest.TestCase):
         self.assertFalse(validation.validate_netmask('0.0.0.255'))
         # netmask is invalid
         self.assertFalse(validation.validate_netmask('a.b.c.d'))
+        # netmask is invalid
+        self.assertFalse(validation.validate_netmask(1))
 
     def test_validate_tx_power(self):
         """
@@ -75,6 +83,8 @@ class TestValidation(unittest.TestCase):
         self.assertFalse(validation.validate_tx_power(101))
         # power is invalid
         self.assertFalse(validation.validate_tx_power(-1))
+        # power is Valid
+        self.assertTrue(validation.validate_tx_power("10"))
 
     def test_validate_country_code(self):
         """
@@ -96,12 +106,15 @@ class TestValidation(unittest.TestCase):
         self.assertFalse(validation.validate_country_code('  '))
         # country code is invalid
         self.assertFalse(validation.validate_country_code('   '))
+        # country code is invalid
+        self.assertFalse(validation.validate_country_code(1))
 
     def test_validate_wifi_mode(self):
         """
        Test cases for validate_wifi_mode(mode)
        """
         self.assertFalse(validation.validate_mode('ap'))
+        self.assertFalse(validation.validate_mode(1))
         self.assertFalse(validation.validate_mode('sta'))
         self.assertTrue(validation.validate_mode('mesh'))
 
@@ -125,6 +138,8 @@ class TestValidation(unittest.TestCase):
         self.assertFalse(validation.validate_frequency(5179))
         # frequency is invalid
         self.assertFalse(validation.validate_frequency(5826))
+        # frequency is invalid
+        self.assertFalse(validation.validate_frequency("2412"))
 
 
 if __name__ == '__main__':
