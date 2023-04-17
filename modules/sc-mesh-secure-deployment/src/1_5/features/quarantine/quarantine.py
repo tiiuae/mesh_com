@@ -16,6 +16,8 @@ class Quarantine:
         #command = ['iptables', '-A', 'INPUT', '-p', 'ALL', '-m', 'mac', '--mac-source', mac, '-j', 'DROP']
         command = ['iptables', '-I', 'INPUT', '-p', 'ALL', '-s', ip, '-j', 'DROP']
         subprocess.call(command, shell=False)
+        command = ['iptables', '-I', 'FORWARD', '-p', 'ALL', '-s', ip, '-j', 'DROP']
+        subprocess.call(command, shell=False)
         print(f'blocking IP: {str(ip)} on interface {str(self.interface)}')
         self.iptablesSave()
         for i in range(quarantineTime, 0, -1):
@@ -28,6 +30,8 @@ class Quarantine:
         #command = [str(script_path) + '/traffic_block.sh', mac, self.interface]
         #command = ['iptables', '-D', 'INPUT', '-p', 'ALL', '-m', 'mac', '--mac-source', mac, '-j',  'DROP']
         command = ['iptables', '-D', 'INPUT', '-p', 'ALL', '-s', ip, '-j', 'DROP']
+        subprocess.call(command, shell=False)
+        command = ['iptables', '-D', 'FORWARD', '-p', 'ALL', '-s', ip, '-j', 'DROP']
         subprocess.call(command, shell=False)
         print(f'unblocking IP: {str(ip)} on interface {str(self.interface)}')
         self.iptablesSave()
