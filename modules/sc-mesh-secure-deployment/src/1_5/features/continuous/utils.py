@@ -6,7 +6,7 @@ from common import ConnectionMgr, mesh_utils
 
 co = ConnectionMgr.ConnectionMgr()
 MUTUALINT = 'wlan1'
-MESHINT = mesh_utils.get_mesh_int()
+MESHINT = mesh_utils.get_mesh_interface()
 
 client_q = {}
 
@@ -94,13 +94,13 @@ def ca_client(IP, flag_ctr, max_count, ca):
 
 
 def update_table_ca(df, result, myID):
-    print(result)
-    """
+    '''
     function to update the mutual authentication table with the CA result.
     Note: this function should be called after the CA result is received.
     Note2: the new table is not being saved only converted to json and sent to the neighbors.
-    """
+    '''
     #myID = int(list(set(df.loc[df['IP'] == co.get_ip_address(MESHINT), "ID"]))[0])
+    print(result)
     df = df.assign(CA_Result=0)
 
     for res_tuple in result:

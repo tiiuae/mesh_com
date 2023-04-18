@@ -19,7 +19,7 @@ from . import client
 
 co = ConnectionMgr.ConnectionMgr()
 MUTUALINT = 'wlan1'
-MESHINT = mesh_utils.get_mesh_int()
+MESHINT = mesh_utils.get_mesh_interface()
 
 
 
