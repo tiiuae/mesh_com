@@ -1,5 +1,6 @@
 import asyncio
 import signal
+import json
 from nats.aio.client import Client as NATS
 import config
 
@@ -11,8 +12,8 @@ async def run(loop):
 
     async def closed_cb():
         print("Connection to NATS is closed.")
-        await asyncio.sleep(0.1, loop=loop)
-        loop.stop()
+        #await asyncio.sleep(0.1, loop=loop)
+        nc.close()
 
     async def reconnected_cb():
         print(f"Connected to NATS ...")
@@ -20,7 +21,7 @@ async def run(loop):
     async def subscribe_handler(msg):
         subject = msg.subject
         reply = msg.reply
-        data = msg.data.decode()
+        data = json.loads(msg.data.decode())
         print("Received a message on '{subject} {reply}': {data}".format(
           subject=subject, reply=reply, data=data))
 

@@ -5,6 +5,7 @@ import asyncio
 import signal
 import ssl
 import argparse
+import json
 from nats.aio.client import Client as NATS
 
 from src import comms_common as comms
@@ -81,12 +82,13 @@ async def main(server, port, keyfile=None, certfile=None):
         if subject == "comms.settings":
             ret, info, mesh_status = cc.settings.handle_mesh_settings(data)
         elif subject == "comms.command":
-            ret, info, mesh_status = cc.command.handle_command(data)
+            ret, info, mesh_status, data = cc.command.handle_command(data)
         # elif subject == "comms.status":
 
-        status = f"""{{"status":"{ret}",
-                       "mesh_status":"{mesh_status}",
-                       "info":"{info}"}}"""
+        if data is None:
+            status = f"""{{"status":"{ret}","mesh_status":"{mesh_status}","info":"{info}"}}"""
+        else:
+            status = f"""{{"status":"{ret}","mesh_status":"{mesh_status}","info":"{info}","data":"{data}"}}"""
 
         await msg.respond(status.encode("utf-8"))
 

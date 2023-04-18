@@ -1,7 +1,6 @@
 import asyncio
 import nats
 import json
-import time
 import config
 
 async def main():
@@ -15,18 +14,7 @@ async def main():
     parameters = json.loads(rep.data)
     print(parameters)
 
-    rep = await nc.request("comms.command",
-                           b"""{"api_version": 1,"cmd": "APPLY"}""", timeout=2)
-    parameters = json.loads(rep.data)
-    print(parameters)
-
-    # rep = await nc.request("comms.command",
-    #                        b"""{"api_version": 1,"cmd": "REVOKE"}""",
-    #                        timeout=2)
-    # parameters = json.loads(rep.data)
-    # print(parameters)
-    #
-    # await nc.close()
+    await nc.close()
     exit(0)
 
 if __name__ == '__main__':
