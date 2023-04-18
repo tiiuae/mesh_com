@@ -45,4 +45,4 @@ pkcs11-tool --keypairgen --key-type="EC:prime256v1"  --login --pin="$pin" --modu
 pkcs11-tool --read-object --id 01 --type pubkey --module="$LIB" --output-file /etc/ssl/certs/mesh_cert.der
 
 # Replacing root cert with fake mesh cert
-cp /etc/ssl/certs/mesh_cert.der /etc/ssl/certs/root_cert.der
+#cp /etc/ssl/certs/mesh_cert.der /etc/ssl/certs/root_cert.der

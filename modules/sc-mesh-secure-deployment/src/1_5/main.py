@@ -154,7 +154,7 @@ def demo_ui():
     # Call demo ui
     main_dir = os.path.dirname(__file__)
     print("Running Demo UI")
-    os.system('python3 ' + main_dir + '/Demo/demo_ui.py')
+    os.system('streamlit run ' + main_dir + '/Demo/new-ui.py')
 
 def initialize(feature):
     global MA_thread, sbeat_thread
