@@ -28,7 +28,7 @@ class Batman:
     Batman mesh class
     """
 
-    def __init__(self):
+    def __init__(self, loop_interval: float = 1.0):
         self.topology = {}
         self.device_template = {}
         self.device_rssi_list = []
@@ -44,6 +44,7 @@ class Batman:
         self.hw_name = self.mesh_status.not_avail
         self.thread_running = True
         self.latest_stat = ""
+        self.interval = loop_interval
 
     def _update_interface_name(self):
         """
@@ -313,7 +314,7 @@ class Batman:
         while self.thread_running:
             self.update_stat_data()
             self.latest_stat = self.get_stat()
-            sleep(1.0)
+            sleep(self.interval)
 
 
 # Real user is mesh_executor

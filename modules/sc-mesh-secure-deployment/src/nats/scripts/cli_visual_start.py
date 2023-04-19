@@ -7,7 +7,7 @@ async def main():
     # Connect to NATS!
     nc = await nats.connect(f"{config.MODULE_IP}:{config.MODULE_PORT}")
     rep = await nc.request("comms.command",
-                            b"""{"api_version": 1,"cmd": "ENABLE_VISUALISATION", "interval": "1"}""",
+                            b"""{"api_version": 1,"cmd": "ENABLE_VISUALISATION", "interval": "1000"}""",
                             timeout=4)
     parameters = json.loads(rep.data.decode())
     print(parameters)

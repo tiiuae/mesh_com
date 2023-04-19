@@ -7,9 +7,8 @@ import signal
 import ssl
 import argparse
 from nats.aio.client import Client as NATS
-
-from src.visual.batstat import Batman
-from src.visual.batadvvis import BatAdvVis
+from src import batadvvis
+from src import batstat
 
 
 class MeshTelemetry:
@@ -17,11 +16,13 @@ class MeshTelemetry:
     Mesh network telemetry collector
     """
 
-    def __init__(self):
+    def __init__(self, loop_interval: int = 1000):
         self.t1 = None
         self.t2 = None
-        self.batman_visual = BatAdvVis()
-        self.batman = Batman()
+        # milliseconds to seconds
+        self.interval = float(loop_interval / 1000.0)
+        self.batman_visual = batadvvis.BatAdvVis(self.interval*0.2)
+        self.batman = batstat.Batman(self.interval*0.2)
         self.runner = True
 
     def mesh_visual(self):
@@ -48,11 +49,13 @@ class MeshTelemetry:
         self.t2.join()
 
 
-async def main(server, port, keyfile=None, certfile=None, interval=1):
+async def main(server, port, keyfile=None, certfile=None, interval=1000):
     """
     main
     """
-    mesh_telemetry = MeshTelemetry()
+    # milliseconds to seconds
+    publish_interval = float(interval/1000)
+    mesh_telemetry = MeshTelemetry(interval) # milliseconds
     await mesh_telemetry.run()
 
     nc = NATS()
@@ -99,7 +102,7 @@ async def main(server, port, keyfile=None, certfile=None, interval=1):
 
     print("Publisher loop...")
     while True:
-        await asyncio.sleep(interval)
+        await asyncio.sleep(publish_interval)
         try:
             await nc.publish("comms.visual",
                              mesh_telemetry.mesh_visual().encode())
@@ -113,7 +116,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port', help='Server port', required=True)
     parser.add_argument('-k', '--keyfile', help='TLS keyfile', required=False)
     parser.add_argument('-c', '--certfile', help='TLS certfile', required=False)
-    parser.add_argument('-i', '--interval', help='Publish interval', required=False)
+    parser.add_argument('-i', '--interval', help='Publish interval (milliseconds)', required=False)
     args = parser.parse_args()
 
     loop = asyncio.get_event_loop()

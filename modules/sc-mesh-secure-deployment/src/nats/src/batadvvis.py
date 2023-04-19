@@ -12,9 +12,10 @@ class BatAdvVis:
     """
     command = 'batadv-vis'
 
-    def __init__(self):
+    def __init__(self, loop_interval:float = 1.0):
         self.latest_topology = "{}"
         self.thread_running = True
+        self.interval = loop_interval
 
     @staticmethod
     def remove_interfaces(visual_lines):
@@ -75,7 +76,7 @@ class BatAdvVis:
         """
         while self.thread_running:
             self.latest_topology = self.get()
-            time.sleep(1.0)
+            time.sleep(self.interval)
 
 
 # Real user is mesh_executor
