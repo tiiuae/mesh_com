@@ -15,7 +15,14 @@ async def main():
                             timeout=2)
 
     print(rep.data)
+    parameters = json.loads(rep.data.decode())
+    b64_data = base64.b64decode(parameters["data"].encode())
+    print(b64_data.decode())
 
+    rep = await nc.request("comms.command",
+                            b"""{"api_version": 1,"cmd": "LOGS", "param": "WPA"}""",
+                            timeout=2)
+    print(rep.data)
     parameters = json.loads(rep.data.decode())
     b64_data = base64.b64decode(parameters["data"].encode())
     print(b64_data.decode())

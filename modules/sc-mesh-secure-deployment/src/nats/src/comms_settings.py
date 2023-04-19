@@ -7,11 +7,13 @@ from shlex import quote
 
 try:
     import comms_common as comms
+    import validation
 except ImportError:
+    import src.validation as validation
     import src.comms_common as comms
 
 
-class CommsSettings:  # pylint: disable=too-few-public-methods
+class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instance-attributes
     """
     Comms settings class
     """
@@ -28,7 +30,40 @@ class CommsSettings:  # pylint: disable=too-few-public-methods
         self.tx_power = ""
         self.mode = ""
 
+    def validate_mesh_settings(self) -> (str, str, str):
+        """
+        Validate mesh settings
+        """
+        if validation.validate_ssid(self.ssid) is False:
+            return "FAIL", comms.STATUS.mesh_fail, "Invalid SSID"
+
+        if validation.validate_wpa3_psk(self.key) is False:
+            return "FAIL", comms.STATUS.mesh_fail, "Invalid WPA3 PSK"
+
+        if validation.validate_ip_address(self.ip_address) is False:
+            return "FAIL", comms.STATUS.mesh_fail, "Invalid IP address"
+
+        if validation.validate_mode(self.mode) is False:
+            return "FAIL", comms.STATUS.mesh_fail, "Invalid mode"
+
+        if validation.validate_frequency(int(self.frequency)) is False:
+            return "FAIL", comms.STATUS.mesh_fail, "Invalid frequency"
+
+        if validation.validate_country_code(self.country) is False:
+            return "FAIL", comms.STATUS.mesh_fail, "Invalid country code"
+
+        if validation.validate_netmask(self.subnet) is False:
+            return "FAIL", comms.STATUS.mesh_fail, "Invalid subnet"
+
+        if validation.validate_tx_power(int(self.tx_power)) is False:
+            return "FAIL", comms.STATUS.mesh_fail, "Invalid tx power"
+
+        return "OK", "", "Mesh settings OK"
+
     def handle_mesh_settings(self, msg: str, path="/opt", file="mesh.conf") -> (str, str):
+        """
+        Handle mesh settings
+        """
         try:
             parameters = json.loads(msg)
             print(parameters)
@@ -42,8 +77,10 @@ class CommsSettings:  # pylint: disable=too-few-public-methods
             self.subnet = quote(str(parameters["subnet"]))
             self.tx_power = quote(str(parameters["tx_power"]))
             self.mode = quote(str(parameters["mode"]))
-            # Todo: Validate parameters before saving
-            ret, info, mesh_status = self.__save_settings(path, file)
+
+            ret, mesh_status, info  = self.validate_mesh_settings()
+            if ret == "OK":
+                ret, info, mesh_status = self.__save_settings(path, file)
 
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
@@ -53,6 +90,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods
         return ret, info, mesh_status
 
     def __save_settings(self, path: str, file: str) -> (str, str, str):
+        """
+        Save mesh settings
+        """
         return_code = subprocess.call(["cp", f"{path}/{file}",
                                        f"{path}/{file}_backup"],
                                       shell=False)

@@ -75,20 +75,19 @@ async def main(server, port, keyfile=None, certfile=None):
         # reply = msg.reply
         subject = msg.subject
         data = msg.data.decode()
-
-        ret, info = "FAIL", "Not supported subject"
+        ret, info, resp = "FAIL", "Not supported subject", ""
         mesh_status = comms.STATUS.no_status
 
         if subject == "comms.settings":
             ret, info, mesh_status = cc.settings.handle_mesh_settings(data)
         elif subject == "comms.command":
-            ret, info, mesh_status, data = cc.command.handle_command(data)
+            ret, info, mesh_status, resp = cc.command.handle_command(data)
         # elif subject == "comms.status":
 
         if data is None:
             status = f"""{{"status":"{ret}","mesh_status":"{mesh_status}","info":"{info}"}}"""
         else:
-            status = f"""{{"status":"{ret}","mesh_status":"{mesh_status}","info":"{info}","data":"{data}"}}"""
+            status = f"""{{"status":"{ret}","mesh_status":"{mesh_status}","info":"{info}","data":"{resp}"}}"""
 
         await msg.respond(status.encode("utf-8"))
 
