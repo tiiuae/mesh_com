@@ -6,9 +6,11 @@ import config
 async def main():
     # Connect to NATS!
     nc = await nats.connect(f"{config.MODULE_IP}:{config.MODULE_PORT}")
+    cmd_dict = {"api_version": 1, "cmd": "ENABLE_VISUALISATION", "interval": "1000"}
+    cmd = json.dumps(cmd_dict)
     rep = await nc.request("comms.command",
-                            b"""{"api_version": 1,"cmd": "ENABLE_VISUALISATION", "interval": "1000"}""",
-                            timeout=4)
+                           cmd.encode(),
+                           timeout=2)
     parameters = json.loads(rep.data.decode())
     print(parameters)
     await nc.close()
