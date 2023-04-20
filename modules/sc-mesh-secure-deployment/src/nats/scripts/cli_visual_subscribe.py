@@ -12,8 +12,9 @@ async def run(loop):
 
     async def closed_cb():
         print("Connection to NATS is closed.")
-        #await asyncio.sleep(0.1, loop=loop)
-        nc.close()
+        if nc.is_closed:
+            return
+        await nc.close()
 
     async def reconnected_cb():
         print(f"Connected to NATS ...")
