@@ -11,6 +11,8 @@ from nats.aio.client import Client as NATS
 from src import comms_common as comms
 from src import comms_settings
 from src import comms_command
+from src import comms_status
+
 
 class CommsController:  # pylint: disable=too-few-public-methods
     """
@@ -19,9 +21,10 @@ class CommsController:  # pylint: disable=too-few-public-methods
     def __init__(self, server, port):
         self.nats_server = server
         self.port = port
-        self.settings = comms_settings.CommsSettings()
-        self.command = comms_command.Command(server, port)
-        self.status = comms.STATUS.no_status
+        self.comms_status = comms_status.CommsStatus()
+        self.settings = comms_settings.CommsSettings(self.comms_status)
+        self.command = comms_command.Command(server, port, self.comms_status)
+
 
 async def main(server, port, keyfile=None, certfile=None):
     """
@@ -76,18 +79,18 @@ async def main(server, port, keyfile=None, certfile=None):
         subject = msg.subject
         data = msg.data.decode()
         ret, info, resp = "FAIL", "Not supported subject", ""
-        mesh_status = comms.STATUS.no_status
+        status = comms.STATUS.no_status
 
         if subject == "comms.settings":
-            ret, info, mesh_status = cc.settings.handle_mesh_settings(data)
+            ret, info, status = cc.settings.handle_mesh_settings(data)
         elif subject == "comms.command":
-            ret, info, mesh_status, resp = cc.command.handle_command(data)
+            ret, info, status, resp = cc.command.handle_command(data)
         # elif subject == "comms.status":
 
         if data is None:
-            status = f"""{{"status":"{ret}","mesh_status":"{mesh_status}","info":"{info}"}}"""
+            status = f"""{{"status":"{ret}","mesh_status":"{status.value}","info":"{info}"}}"""
         else:
-            status = f"""{{"status":"{ret}","mesh_status":"{mesh_status}","info":"{info}","data":"{resp}"}}"""
+            status = f"""{{"status":"{ret}","mesh_status":"{status.value}","info":"{info}","data":"{resp}"}}"""
 
         await msg.respond(status.encode("utf-8"))
 
