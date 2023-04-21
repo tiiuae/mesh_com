@@ -5,6 +5,7 @@ import json
 import subprocess
 import base64
 from shlex import quote
+import logging
 
 from .comms_common import STATUS, COMMAND
 from .comms_status import CommsStatus
@@ -17,8 +18,10 @@ class LogFiles:  # pylint: disable=too-few-public-methods
 
     # Commands
     WPA = "WPA"
+    CONTROLLER = "CONTROLLER"
     DMESG = "DMESG"
     # Log files
+    CONTROLLER_LOG = "/opt/comms_settings.log"
     WPA_LOG = "/var/log/wpa_supplicant_11s.log"
 
 
@@ -27,21 +30,23 @@ class Command:  # pylint: disable=too-few-public-methods
     Command class
     """
 
-    def __init__(self, server, port, comms_status: CommsStatus):
+    def __init__(self, server, port, comms_status: CommsStatus, logger):
         self.nats_server = server
         self.port = port
+        self.logger = logger
         self.api_version = 1
         self.command = ""
         self.param = ""
         self.interval = 1
         self.comms_status = comms_status
 
-    def handle_command(self, msg: str) -> (str, str, STATUS, str):
+    def handle_command(self, msg: str, cc) -> (str, str, STATUS, str):
         """
         handler for commands
 
         Args:
             msg: JSON formatted data from NATS message.
+			cc: CommsController class
 
         Returns:
             str: OK/FAIL
@@ -60,6 +65,7 @@ class Command:  # pylint: disable=too-few-public-methods
                 self.param = quote(str(parameters["param"]))
             if "interval" in parameters:
                 self.interval = int(parameters["interval"])
+            self.logger.debug("Command: %s", self.command)
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
             ret, info = "FAIL", "JSON format not correct" + str(error)
@@ -68,7 +74,7 @@ class Command:  # pylint: disable=too-few-public-methods
         if self.api_version != 1:
             ret, info = "FAIL", "API version not supported"
         elif self.command == COMMAND.revoke:
-            ret, info, status = self.__revoke()
+            ret, info, status = self.__revoke(cc)
         elif self.command == COMMAND.apply:
             ret, info, status = self.__apply_mission_config()
         elif self.command == COMMAND.wifi_down:
@@ -80,14 +86,14 @@ class Command:  # pylint: disable=too-few-public-methods
         elif self.command == COMMAND.get_logs:
             ret, info, status, data = self.__get_logs(self.param)
         elif self.command == COMMAND.enable_visualisation:
-            ret, info, status = self.__enable_visualisation()
+            ret, info, status = self.__enable_visualisation(cc)
         elif self.command == COMMAND.disable_visualisation:
-            ret, info, status = self.__disable_visualisation()
+            ret, info, status = self.__disable_visualisation(cc)
         else:
             ret, info = "FAIL", "Command not supported"
         return ret, info, status, data
 
-    def __revoke(self) -> (str, str, STATUS):
+    def __revoke(self, cc) -> (str, str, STATUS):
         """
         Restores device back to warehouse state without flashing.
         Note! Wi-Fi transmitter gets activates as well even if it
@@ -119,12 +125,12 @@ class Command:  # pylint: disable=too-few-public-methods
                            + str(ret.returncode) \
                            + str(ret.stdout) \
                            + str(ret.stderr), STATUS.mesh_fail
-
+        self.logger.debug('Default mesh command applied')
         self.comms_status.mesh_status = STATUS.mesh_default
         self.comms_status.mesh_cfg_status = STATUS.mesh_default
         self.comms_status.is_mission_cfg = False
 
-        ret, _, _ = self.__disable_visualisation()
+        ret, _, _ = self.__disable_visualisation(cc)
         if ret == "FAIL":
             return "FAIL", "Revoke failed partially. Visualisation is still active", \
                 STATUS.mesh_default
@@ -148,7 +154,7 @@ class Command:  # pylint: disable=too-few-public-methods
                            + str(ret.stdout) \
                            + str(ret.stderr), STATUS.mesh_fail
 
-        print('Mission configurations applied')
+        self.logger.debug('Mission configurations applied')
         self.comms_status.mesh_status = STATUS.mesh_mission_not_connected
         self.comms_status.is_mission_cfg = True
         return "OK", "Mission configurations applied", \
@@ -163,7 +169,7 @@ class Command:  # pylint: disable=too-few-public-methods
                            + str(ret.stdout) \
                            + str(ret.stderr), STATUS.mesh_fail
 
-        print('Radio deactivated')
+        self.logger.debug('Radio deactivated')
         self.comms_status.is_radio_on = False
         if self.comms_status.is_mission_cfg:
             self.comms_status.mesh_status = STATUS.mesh_mission_not_connected
@@ -191,32 +197,30 @@ class Command:  # pylint: disable=too-few-public-methods
             self.comms_status.mesh_status = STATUS.mesh_mission_not_connected
         else:
             self.comms_status.mesh_status = STATUS.mesh_default
-        print("Radio activated")
+        self.logger.debug("Radio activated")
         return "OK", "Radio activated", self.comms_status.mesh_status
 
-    def __enable_visualisation(self) -> (str, str, STATUS):
-        ret = subprocess.run(["/opt/S90comms_visual", "start",
-                              str(self.nats_server), str(self.interval)],
-                             shell=False, check=True,
-                             capture_output=True)
-        if ret.returncode != 0:
-            return "FAIL", "Enabling visualization failed " \
-                           + str(ret.returncode) \
-                           + str(ret.stdout) \
-                           + str(ret.stderr), STATUS.visualisation_disabled
-        print('Visualisation enabled')
+    def __enable_visualisation(self, cc) -> (str, str, STATUS):
+
+        try:
+            cc.telemetry.run()
+        except:
+            self.logger.error('Visualisation enabled failed')
+            return "FAIL", "Enabling visualization failed", \
+                STATUS.visualisation_disabled
+        self.logger.debug('Visualisation enabled')
         self.comms_status.is_visualisation_active = True
         return "OK", "Visualisation enabled", STATUS.visualisation_enabled
 
-    def __disable_visualisation(self) -> (str, str, STATUS):
-        ret = subprocess.run(["/opt/S90comms_visual", "stop"],
-                             shell=False, check=True, capture_output=True)
-        if ret.returncode != 0:
-            return "FAIL", "Disabling visualization failed " \
-                           + str(ret.returncode) \
-                           + str(ret.stdout) \
-                           + str(ret.stderr), STATUS.visualisation_enabled
-        print('Visualisation disabled')
+    def __disable_visualisation(self, cc) -> (str, str, STATUS):
+        try:
+            cc.telemetry.stop()
+            cc.visualisation_enabled = False
+        except:
+            self.logger.error('Visualisation disable failed')
+            return "FAIL", "Disabling visualization failed", \
+                STATUS.visualisation_enabled
+        self.logger.debug('Visualisation disabled')
         self.comms_status.is_visualisation_active = False
         return "OK", "Visualisation disabled", STATUS.visualisation_disabled
 
@@ -230,7 +234,12 @@ class Command:  # pylint: disable=too-few-public-methods
                 with open(file, "rb") as f:
                     file_log = f.read()
                 file_b64 = base64.b64encode(file_log)
-
+            elif param == files.CONTROLLER:
+                file = files.CONTROLLER_LOG
+                # read as bytes as b64encode expects bytes
+                with open(file, "rb") as f:
+                    file_log = f.read()
+                file_b64 = base64.b64encode(file_log)
             elif param == files.DMESG:
                 ret = subprocess.run(["dmesg"],
                                      shell=False, check=True, capture_output=True)
@@ -243,6 +252,6 @@ class Command:  # pylint: disable=too-few-public-methods
         except:
             return "FAIL", f"{file} read failed", STATUS.no_status, None
 
-        print('Log file read')
+        self.logger.debug('__getlogs done')
         # Fixme: What is correct mesh status to report in this case?
         return "OK", "wpa_supplicant log", STATUS.no_status, file_b64.decode()

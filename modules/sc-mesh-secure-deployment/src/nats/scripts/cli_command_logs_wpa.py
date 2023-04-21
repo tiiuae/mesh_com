@@ -9,23 +9,12 @@ async def main():
     # Connect to NATS!
     nc = await nats.connect(f"{config.MODULE_IP}:{config.MODULE_PORT}")
 
-    # DMESG and WPA currently supported
-    cmd_dict = {"api_version": 1, "cmd": "LOGS", "param": "DMESG"}
-    cmd = json.dumps(cmd_dict)
-    rep = await nc.request("comms.command",
-                           cmd.encode(),
-                           timeout=2)
-    print(rep.data)
-    parameters = json.loads(rep.data.decode())
-    b64_data = base64.b64decode(parameters["data"].encode())
-    print(b64_data.decode())
-
     cmd_dict = {"api_version": 1, "cmd": "LOGS", "param": "WPA"}
     cmd = json.dumps(cmd_dict)
     rep = await nc.request("comms.command",
                             cmd.encode(),
                             timeout=2)
-    print(rep.data)
+    #print(rep.data)
     parameters = json.loads(rep.data.decode())
     b64_data = base64.b64decode(parameters["data"].encode())
     print(b64_data.decode())

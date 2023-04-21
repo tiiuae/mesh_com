@@ -19,7 +19,8 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
     Comms settings class
     """
 
-    def __init__(self, comms_status: cs.CommsStatus):
+    def __init__(self, comms_status: cs.CommsStatus, logger):
+        self.logger = logger
         self.api_version = 1
         self.ssid = ""
         self.key = ""
@@ -82,11 +83,14 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             self.mode = quote(str(parameters["mode"]))
 
             ret, status, info = self.validate_mesh_settings()
+            self.logger.debug("Mesh settings validation: %s, %s", ret, info)
             if ret == "FAIL":
                 self.comms_status.mesh_cfg_status = \
                     comms.STATUS.mesh_configuration_not_stored
+                self.logger.error("save settings failed: %s, %s", ret, info)
             else:
                 ret, info, status = self.__save_settings(path, file)
+                self.logger.debug("save settings: %s, %s", ret, info)
 
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
@@ -94,6 +98,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 comms.STATUS.mesh_configuration_not_stored
             ret, status = "FAIL", self.comms_status.mesh_cfg_status
             info = "JSON format not correct" + str(error)
+            self.logger.error("Mesh settings validation: %s, %s", ret, info)
 
         return ret, info, status
 
@@ -120,12 +125,13 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         except:
             self.comms_status.mesh_cfg_status = \
                 comms.STATUS.mesh_configuration_not_stored
+            self.logger.error("not able to write new mesh.conf")
             return "FAIL", "not able to write new mesh.conf", \
                 self.comms_status.mesh_cfg_status
 
         self.comms_status.mesh_cfg_status = \
             comms.STATUS.mesh_configuration_stored
 
-        print('Settings saved')
+        self.logger.debug("mesh.conf written")
         return "OK", "Mesh configuration stored", \
             self.comms_status.mesh_cfg_status

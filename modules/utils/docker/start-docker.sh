@@ -78,6 +78,14 @@ elif [ "$OS" == "Buildroot" ]; then
             chmod -R 755 /opt/container-data/mesh/nats/*.py
         fi
         cp /etc/umurmur.conf $meshcom_path/modules/utils/docker/umurmur.conf
+
+        running=$(docker container inspect -f '{{.State.Running}}' "mesh_comms_vm")
+        if [ "$running" != "true" ]; then
+           docker rm -f mesh_comms_vm
+           docker run --name mesh_comms_vm -d --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm
+           #Add restart policy of the container if it stops or device rebooted
+           docker update --restart unless-stopped mesh_comms_vm
+        fi
         docker rm -f mesh_comms_vm
         docker run --name mesh_comms_vm -d --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm
         #Add restart policy of the container if it stops or device rebooted

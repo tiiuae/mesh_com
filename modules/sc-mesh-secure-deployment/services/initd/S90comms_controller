@@ -10,7 +10,7 @@ DIR="/opt/nats/"
 PIDFILE="/var/run/$DAEMON.pid"
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-LOG_FILE=/opt/comms_settings.log
+LOG_FILE=/opt/comms_controller.log
 ARGS="-s $2 -p 4222"
 start() {
     echo "$ARGS"
