@@ -21,7 +21,7 @@ class LogFiles:  # pylint: disable=too-few-public-methods
     CONTROLLER = "CONTROLLER"
     DMESG = "DMESG"
     # Log files
-    CONTROLLER_LOG = "/opt/comms_settings.log"
+    CONTROLLER_LOG = "/opt/comms_controller.log"
     WPA_LOG = "/var/log/wpa_supplicant_11s.log"
 
 

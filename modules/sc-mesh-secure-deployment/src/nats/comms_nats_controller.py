@@ -176,7 +176,7 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
         try:
             if cc.telemetry.visualisation_enabled:
                 msg = cc.telemetry.mesh_visual()
-                cc.logger.debug("Sending response: %s", msg)
+                cc.logger.debug("Publishing comms.visual: %s", msg)
                 await nats_client.publish("comms.visual",
                              msg.encode())
         except Exception as e:
