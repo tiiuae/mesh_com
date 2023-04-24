@@ -15,22 +15,30 @@ import socket
 from typing import List
 
 import pandas as pd
-
 from options import Options
 from util import Band, map_channel_to_freq, map_channel_to_band, load_sample_data
-
+from osf_server import Client
 
 class WirelessScanner:
-    def __init__(self, args: Options, host: str = 'localhost', port: int = 8000) -> None:
+    def __init__(self, args: Options) -> None:
         """
         Initializes the WirelessScanner object.
 
         :param args: A Namespace object containing command line arguments.
         """
-        self.host = host
-        self.port = port
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.connect((self.host, self.port))
+
+        self.port_lp = 8000
+        self.port_ch = 8080
+        self.host_lp = '40.40.40.5'
+        self.host_ch = 'fd01::1'
+
+        # Open socket with laptop server to share channel quality estimation
+        self.socket_laptop = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket_laptop.connect((self.host_lp, self.port_lp))
+
+        # Open socket with CH to broadcast channel switch via OSF
+        self.socket_osf = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        self.socket_osf.connect((self.host_ch, self.port_ch))
 
         self.args = args
         if not args.debug:
@@ -200,21 +208,30 @@ class WirelessScanner:
 
     def broadcast(self, channel: int) -> None:
         """
-        Broadcast the new channel.
+        Broadcast the new channel to laptop and OSF server.
 
         :param channel: A integer that denotes the new channel.
         """
 
-        if not self.socket:
-            print("Error: Socket is not initialized.")
+        if not self.socket_laptop:
+            print("Error: JAMUI Socket is not initialized.")
+            return
+
+        if not self.socket_osf:
+            print("Error: OSF Socket is not initialized.")
             return
 
         try:
             freq = map_channel_to_freq(channel)
             data = {'action': 'broadcast', 'channel': freq}
             json_str = json.dumps(data)
-            self.socket.send(json_str.encode())
+            self.socket_laptop.send(json_str.encode())
+            self.socket_osf.send(json_str.encode())
+
         except ConnectionRefusedError:
             print("Error: Connection refused by the server. Check if the server is running and reachable.")
         except socket.error as e:
             print(f"Error: Socket error occurred: {e}")
+
+
+

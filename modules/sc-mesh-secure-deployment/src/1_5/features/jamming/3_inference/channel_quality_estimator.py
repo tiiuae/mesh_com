@@ -35,7 +35,7 @@ class ChannelQualityEstimator:
         model (ResCNN): The pre-trained ResCNN model for channel quality estimation.
     """
 
-    def __init__(self, host: str = 'localhost', port: int = 8000) -> None:
+    def __init__(self, host: str = '40.40.40.5', port: int = 8000) -> None:
         """
         Initializes the ChannelQualityEstimator object.
 

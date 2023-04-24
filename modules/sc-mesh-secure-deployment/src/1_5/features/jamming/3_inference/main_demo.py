@@ -57,8 +57,8 @@ def main():
         # index = args.all_channels.index(channel)
         index = frequencies.tolist().index(map_channel_to_freq(channel))
         current_channel_quality = channels_quality[index]
-        # if current_channel_quality > args.threshold:
-        if False:
+        if current_channel_quality > args.threshold:
+            # if False:
             print(f'Current channel {channel}, estimated quality: {current_channel_quality}')
         else:
             # Pick the channel with the highest quality

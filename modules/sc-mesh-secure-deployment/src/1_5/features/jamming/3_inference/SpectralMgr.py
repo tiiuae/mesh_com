@@ -202,7 +202,7 @@ class Spectral:
                 scan = False
 
             if (scan == True):
-                print(f"Scan time {datetime.now()}")
+                #print(f"Scan time {datetime.now()}")
                 break
 
         cmd_scan = f"echo trigger > /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan_ctl"

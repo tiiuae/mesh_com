@@ -1,16 +1,15 @@
 import argparse
 from typing import List
 
-
 class Options:
     def __init__(self):
         self.waiting_time: int = 1
         self.channels2: List[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
         self.channels5: List[int] = [36, 40, 44, 48, 52, 56, 60, 64, 149, 153, 157, 161, 165]
         self.all_channels: List[int] = []
-        self.threshold: float = 0.5
+        self.threshold: float = 0.0
         self.interface: str = 'wlp1s0'
-        self.debug: bool = True
+        self.debug: bool = False
         self.low_latency: bool = True
         self.min_rows: int = 16
         self.parse_options()
