@@ -10,9 +10,7 @@ ROOT_CERT="$COMMON_FOLDER/test/root_cert.der"
 MESH_COM_CONF="$COMMON_FOLDER/mesh_com_11s.conf"
 AUTH_AP_CONF="$FEATURES_FOLDER/auth_ap.yaml"
 DHCPD_LEASES="/var/lib/dhcp/dhcpd.leases"
-
 COMMS_PCB_VERSION_FILE="/opt/hardware/comms_pcb_version"
-
 
 
 configure()
@@ -30,6 +28,7 @@ configure()
       mesh_if=$MESH_VIF
       meshVersion=$MSVERSION
       ML=$ML
+      bridge=$BRIDGE
   else
       mode="mesh"
   fi
@@ -329,14 +328,18 @@ if [ "$meshVersion" == "1.5" ]; then
   uid=$(echo -n "$mesh_if_mac" | b2sum -l 32)
   uid=${uid::-1}
   /bin/bash "$MESH_FOLDER"/common/scripts/generate_keys.sh "$uid"
-  start_mesh_1_5
-  nohup python -u "$MESH_FOLDER"/modules/sc-mesh-secure-deployment/src/gw/main.py
-else
-    provisioning true
-    mesh_service
-    bridge_settings
-fi
 
+  if [ "$bridge" == "true" ]; then #write bridge: True, meshint: br-lan
+    sed -i "s/bridge: .*/bridge: True/" "$MESH_COM_CONF"
+    sed -i "s/meshint: .*/meshint: br-lan/" "$MESH_COM_CONF"
+  else #write bridge: False, meshint: bat0
+    sed -i "s/bridge: .*/bridge: False/" "$MESH_COM_CONF"
+    sed -i "s/meshint: .*/meshint: bat0/" "$MESH_COM_CONF"
+  fi
+  start_mesh_1_5 # bridge_settings is called inside start_mesh_1_5
+
+else #this means 1.0
+    mesh_service
 
 if [ "$mode" == "provisioning" ]; then
   provisioning
@@ -488,7 +491,7 @@ EOF
   else
     bridge_settings
 fi
-
+fi
 
 #start comms sleeve web server for companion phone
 #nohup python -u /opt/mesh_com/modules/utils/docker/comms_sleeve_server.py -ip $br_lan_ip -ap_if $ifname_ap  -mesh_if $mesh_if

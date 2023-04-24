@@ -8,6 +8,7 @@ import pandas as pd
 import sys
 import os
 import traceback
+import subprocess
 sys.path.insert(0, '../../')
 
 from features.mutual.mutual import *
@@ -131,7 +132,10 @@ def initiate_client(server_ip, ID, logger=None):
                     print("Processing authentication request")
                     # Generate share and share authenticator
                     while True:  # Select random x until unique share is generated
-                        rand_num = random.randint(1, 9999)  # Generate random x
+                        #rand_num = random.randint(1, 9999)  # Generate random x
+                        command = ['od', '-An', '-N4', '-i', '/dev/random'] # Read a 4 byte random number from /dev/random
+                        out = subprocess.run(command, shell=False, capture_output=True, text=True)
+                        rand_num = int(out.stdout)
                         shared_sec = secret + time_flag + rand_num  # Share = secret + time flag + random number x
                         if sent_shares.count(shared_sec) == 0:  # Check that new share has not been sent previously
                             sent_shares.append(shared_sec)
