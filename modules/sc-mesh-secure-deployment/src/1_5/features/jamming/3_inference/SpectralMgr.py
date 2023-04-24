@@ -1,5 +1,6 @@
 import math
 import os
+import stat
 import struct
 import subprocess
 import sys
@@ -130,6 +131,7 @@ class Spectral:
                         sigval = noise_l + rssi_l + 20 * math.log10(sample) - sum_square_sample_lower
                     else:
                         sigval = noise_u + rssi_u + 20 * math.log10(sample) - sum_square_sample_upper
+
                     subcarrier_freq = first_sc + i * SC_WIDE
                     self.VALUES[count] = (subcarrier_freq, (noise_l + noise_u) / 2, (rssi_l + rssi_u) / 2, sigval, (max_mag_l + max_mag_u) / 2)
                     count = count + 1
@@ -172,22 +174,29 @@ class Spectral:
 
     def initialize_scan(self):
 
+        write_fix = f"echo -n disable > /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan_ctl"
+
         if (DRIVER == "ath9k"):
             # cmd_function =  "echo background > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
             cmd_function = "echo manual > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
             # cmd_count = "echo 25 > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_count"
             cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
 
-            subprocess.call(cmd_function, shell=True)
+            #subprocess.call(write_fix, shell=True)
+            subprocess.call(cmd_function, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
             # subprocess.call(cmd_count, shell=True)
-            subprocess.call(cmd_trigger, shell=True)
+            subprocess.call(cmd_trigger, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
 
         elif (DRIVER == "ath10k"):
+            file_exists = os.path.exists("/sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl")
+            if (file_exists == False):
+                print("no file spectral_scan_ctl")
             cmd_background = "echo background > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
             cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
 
-            subprocess.call(cmd_background, shell=True)
-            subprocess.call(cmd_trigger, shell=True)
+            #subprocess.call(write_fix, shell=True)
+            subprocess.call(cmd_background, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+            subprocess.call(cmd_trigger, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
 
     def execute_scan(self, channels):
         scan = False
@@ -195,21 +204,25 @@ class Spectral:
 
         while (scan == False):
             try:
-                proc = subprocess.run(do_scan_cmd, shell=True, stdout=subprocess.DEVNULL, check=True)
+                subprocess.run(do_scan_cmd, shell=True, stderr=subprocess.STDOUT,stdout=subprocess.DEVNULL, check=True)
                 scan = True
             except:
                 time.sleep(0.1)
                 scan = False
 
             if (scan == True):
-                #print(f"Scan time {datetime.now()}")
                 break
 
-        cmd_scan = f"echo trigger > /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan_ctl"
+        #cmd_background = f"echo -n background > /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan_ctl"
+        #cmd_scan = f"echo -n trigger > /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan_ctl"
+        cmd_disable = f"echo disable > /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan_ctl"
         cmd_dump = f"cat /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan0 > /tmp/data"
 
-        subprocess.call(cmd_scan, shell=True)
-        subprocess.call(cmd_dump, shell=True)
+
+        #subprocess.call(cmd_background, shell=True)
+        #subprocess.call(cmd_scan, shell=True)
+        subprocess.call(cmd_disable, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+        subprocess.call(cmd_dump, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
 
     @staticmethod
     def file_close(file_pointer):
