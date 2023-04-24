@@ -26,6 +26,7 @@ def initiate_client(server_ip, ID, logger=None):
 
         # connect to server socket
         try:
+            cli_sock.settimeout(10)
             cli_sock.connect((server_ip, 9999))
 
             if logger:
@@ -112,7 +113,7 @@ def initiate_client(server_ip, ID, logger=None):
             #start_time = time.time()
             #timestamp = start_time  # Gives current timestamp in seconds
             time_flag = 1  # Initialization of time flag
-            max_count = 3
+            max_count = 2
             flag_ctr = 0
 
             #period = 2  # Period for each authentication in seconds
@@ -192,7 +193,7 @@ def initiate_client(server_ip, ID, logger=None):
             # Test
             print("Test partial_result: ", partial_result)
             print("Share storage cost: ", sys.getsizeof(sent_shares))
-        except (ConnectionRefusedError, OSError):
+        except (ConnectionRefusedError, OSError, socket.timeout):
             if logger:
                 logger.error("Connection refused from server (%s, 9999)", server_ip)
             #return 3 # Check if this needs to be returned at all

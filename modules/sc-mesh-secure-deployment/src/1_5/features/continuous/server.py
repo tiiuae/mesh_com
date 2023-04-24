@@ -16,7 +16,7 @@ from features.mutual.mutual import *
 from features.mutual.utils import primitives as pri
 
 def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, logger):
-    lock.acquire()
+    #lock.acquire()
     partial_res = []
     # receive client's name
     name = c.recv(1024).decode()
@@ -114,18 +114,18 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
         traceback.print_exc()
         if logger:
             logger.error("Secret key derivation failed in server for client %s with exception %s", client_mesh_ip, e)
-        lock.release()
+        #lock.release()
         #return
 
     secret = int.from_bytes(secret_byte, byteorder=sys.byteorder)
     print("Secret = ", secret)
-    period = 2  # Period for continuous authentication
+    period = 1  # Period for continuous authentication
     time_margin = 0.4 * period  # Time margin for freshness = 40 % of period
     crc_key = '1001'  # CRC key
     start_time = time.time()  # session start time
     start_timestamp = start_time
     time_flag = 0
-    max_count = 3
+    max_count = 2
 
     received_shares = []  # Store old shares received during the session to check freshness of new share
 
@@ -259,7 +259,7 @@ def multi_threaded_client(c, addr, lock, return_dict, id_dict, ips_sectable, log
     #print("Test partial_res server: ", partial_res)
     #print('Checkpoint, server outside while loop time elapsed = ', time.time() - start_time)
     print('================================== Checkpoint, end of server for client', addr[0])
-    lock.release()
+    #ock.release()
 
 def initiate_server(ip, return_dict, id_dict, num_neighbors, ips_sectable, logger=None):
 
@@ -304,4 +304,5 @@ def initiate_server(ip, return_dict, id_dict, num_neighbors, ips_sectable, logge
         #c.send(bytes('Closing connection', 'utf-8'))
         #c.close()  # close client socket
         print('Connection closed')
+
 

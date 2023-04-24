@@ -13,11 +13,15 @@ class Quarantine:
 
     def block(self, ip, quarantineTime):
         #command = [str(script_path) + '/traffic_block.sh', mac, self.interface]
+        ip2 = '192.168.1.12' #command = [str(script_path) + '/traffic_block.sh', mac, self.interface]
         #command = ['iptables', '-A', 'INPUT', '-p', 'ALL', '-m', 'mac', '--mac-source', mac, '-j', 'DROP']
-        command = ['iptables', '-I', 'INPUT', '-p', 'ALL', '-s', ip, '-j', 'DROP']
+        command = ['iptables', '-I', 'INPUT', '-p', 'ALL', '-s', ip2, '-j', 'DROP']
         subprocess.call(command, shell=False)
-        command = ['iptables', '-I', 'FORWARD', '-p', 'ALL', '-s', ip, '-j', 'DROP']
+        command = ['iptables', '-I', 'FORWARD', '-p', 'ALL', '-s', ip2, '-j', 'DROP']
         subprocess.call(command, shell=False)
+#        command = ['iptables', '-I', 'FORWARD', '-p', 'ALL', '-d', ip2, '-j', 'DROP']
+#        subprocess.call(command, shell=False)
+
         print(f'blocking IP: {str(ip)} on interface {str(self.interface)}')
         self.iptablesSave()
         for i in range(quarantineTime, 0, -1):
@@ -29,9 +33,9 @@ class Quarantine:
     def unblock(self, ip):
         #command = [str(script_path) + '/traffic_block.sh', mac, self.interface]
         #command = ['iptables', '-D', 'INPUT', '-p', 'ALL', '-m', 'mac', '--mac-source', mac, '-j',  'DROP']
-        command = ['iptables', '-D', 'INPUT', '-p', 'ALL', '-s', ip, '-j', 'DROP']
-        subprocess.call(command, shell=False)
-        command = ['iptables', '-D', 'FORWARD', '-p', 'ALL', '-s', ip, '-j', 'DROP']
+        #command = ['iptables', '-D', 'INPUT', '-p', 'ALL', '-s', ip, '-j', 'DROP']
+        #subprocess.call(command, shell=False)
+        command = ['iptables', '-F']
         subprocess.call(command, shell=False)
         print(f'unblocking IP: {str(ip)} on interface {str(self.interface)}')
         self.iptablesSave()
@@ -49,7 +53,7 @@ class Quarantine:
         """
         common_ut = utils.Utils()
         logger = common_ut.setup_logger('quarantine')
-        blocking_time = 20 #in seconds
+        blocking_time = 120 #in seconds
 
         ip = '127.0.0.1'
         self.printing('Blocking ', ip)
@@ -84,3 +88,4 @@ class Quarantine:
         print('***********************************************************************')
         print(arg0, ip)
         print('')
+

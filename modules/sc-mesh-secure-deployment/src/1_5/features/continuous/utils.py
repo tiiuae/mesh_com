@@ -20,7 +20,7 @@ async def launchCA(sectable):
     with contextlib.suppress(OSError):
         ca = CA(ID)
     myip =  mesh_utils.get_mesh_ip_address(MESHINT)
-    max_count = 3
+    max_count = 2
     flag_ctr = 0
 
     manager = multiprocessing.Manager()
@@ -40,9 +40,18 @@ async def launchCA(sectable):
     num_neighbors = len(ip2_send) # Number of neighbor nodes that need to be authenticated
     server_proc = ca_server(myip, return_dict, id_dict, num_neighbors, list(set(sectable['IP'].tolist())))
 
+    client_procs = []
     for IP in ip2_send:
         if IP != myip:
-            flag_ctr = ca_client(IP, flag_ctr, max_count, ca)
+            #flag_ctr = ca_client(IP, flag_ctr, max_count, ca)
+            print("neighbor IP:", IP)
+            proc = multiprocessing.Process(target=ca.as_client, args=(IP,), daemon=True)
+            client_procs.append(proc)
+            proc.start()
+
+    for proc in client_procs:
+        proc.join()
+
     #server_proc.terminate()
     server_proc.join()
     print("Checkpoint server proc terminating")
@@ -143,3 +152,4 @@ def update_table_ca(df, result, myID):
     print('df: ', df)
 
     return df
+

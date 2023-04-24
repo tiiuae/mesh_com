@@ -143,7 +143,8 @@ def main():
 
     # Add edges to the graph
     for edge in edges:
-        G.add_edge(edge['from'], edge['to'], label=edge['label'],length=200,font='15px arial black')
+        #G.add_edge(edge['from'], edge['to'], label=edge['label'],length=200,font='15px arial black')
+        G.add_edge(edge['from'], edge['to'], length=200, font='15px arial black')
 
     st.graphviz_chart(
         f"""

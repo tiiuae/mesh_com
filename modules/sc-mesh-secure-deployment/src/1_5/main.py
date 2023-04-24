@@ -1,3 +1,5 @@
+#!/usr/bin/python3 
+
 from header import *
 from main_with_menu import *
 import yaml
@@ -18,8 +20,8 @@ def continuous_authentication(sectable, myID):
             loop_ca = asyncio.get_event_loop()
     if loop_ca is not None:
         ca_task = loop_ca.create_task(ca_utils.launchCA(sectable))
-    with contextlib.suppress(asyncio.CancelledError):
-        result = loop_ca.run_until_complete(asyncio.gather(ca_task))
+#    with contextlib.suppress(asyncio.CancelledError):
+    result = loop_ca.run_until_complete(asyncio.gather(ca_task))
     if result[0] is not None:
         sectable = ca_utils.update_table_ca(sectable, result, myID)
         return sectable
@@ -35,10 +37,10 @@ def only_ca(myID):
         if "Ness_Result" in filetable.columns:
             filetable.drop(["Ness_Result"], axis=1, inplace=True)
         sectable = continuous_authentication(filetable, myID)
-        sleep(2)
+#        sleep(2)
         if sectable is not None:
             # ut.exchage_table(sectable)
-            sleep(2)
+#            sleep(2)
             if 'CA_Result' in set(sectable):
                 sectable.to_csv(table, index=False)
             else:
@@ -85,7 +87,7 @@ def decision_engine(sectable, ma, q):
 
 
 def quaran(ness_result, q, sectable, ma, mapp):
-    quarantineTime = 20  # seconds
+    quarantineTime = 120  # seconds
     for node in ness_result:
         if ness_result[node] == 194 or (not q.empty() and q.get() == 'malicious'):
             print("Malicious Node: ", ness.remapping(mapp, node))
@@ -154,7 +156,7 @@ def demo_ui():
     # Call demo ui
     main_dir = os.path.dirname(__file__)
     print("Running Demo UI")
-    os.system('streamlit run ' + main_dir + '/Demo/new-ui.py')
+    os.system('streamlit run ' + main_dir + '/Demo/new-ui.py', '--showWarningOnDirectExecution = false')
 
 def initialize(feature):
     global MA_thread, sbeat_thread
@@ -189,3 +191,4 @@ if __name__ == "__main__":
         MA_thread.join()
     if sbeat_thread:
         sbeat_thread.join()
+
