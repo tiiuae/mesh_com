@@ -15,9 +15,10 @@ import socket
 from typing import List
 
 import pandas as pd
+
 from options import Options
 from util import Band, map_channel_to_freq, map_channel_to_band, load_sample_data
-from osf_server import Client
+
 
 class WirelessScanner:
     def __init__(self, args: Options) -> None:
@@ -223,15 +224,18 @@ class WirelessScanner:
 
         try:
             freq = map_channel_to_freq(channel)
+
+            # Send broadcast via OSF
             data = {'action': 'broadcast', 'channel': freq}
             json_str = json.dumps(data)
-            self.socket_laptop.send(json_str.encode())
             self.socket_osf.send(json_str.encode())
+
+            # Send new channel to laptop to store in DB
+            data = {'action': 'channel_switch', 'node_id': 1, 'channel': channel}
+            json_str = json.dumps(data)
+            self.socket_laptop.send(json_str.encode())
 
         except ConnectionRefusedError:
             print("Error: Connection refused by the server. Check if the server is running and reachable.")
         except socket.error as e:
             print(f"Error: Socket error occurred: {e}")
-
-
-
