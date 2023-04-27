@@ -383,7 +383,6 @@ class Mutual:
         try:
             self.my_ip_mesh, self.my_mac_mesh = co.create_mesh_config
             co.starting_mesh()
-            time.sleep(5)
             self.my_ip_mesh = mesh_utils.get_mesh_ip_address()
         except TypeError:
             print("No password provided for the mesh. Please get the password via provisioning server")

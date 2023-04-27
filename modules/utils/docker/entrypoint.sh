@@ -9,9 +9,14 @@ FEATURES_FOLDER="$SC_MESH_FOLDER/features/mutual/utils"
 ROOT_CERT="$COMMON_FOLDER/test/root_cert.der"
 MESH_COM_CONF="$COMMON_FOLDER/mesh_com_11s.conf"
 AUTH_AP_CONF="$FEATURES_FOLDER/auth_ap.yaml"
+FEATURES_CONF="$SC_MESH_FOLDER/features.yaml"
 DHCPD_LEASES="/var/lib/dhcp/dhcpd.leases"
 COMMS_PCB_VERSION_FILE="/opt/hardware/comms_pcb_version"
+BRIDGE_SETTINGS="$MESH_FOLDER/modules/utils/docker/bridge_settings.sh" # script to setup bridge
+MCC_SETTINGS="$MESH_FOLDER/modules/utils/docker/mcc_settings.sh" # script to setup mcc mode
 
+chmod +x $BRIDGE_SETTINGS
+chmod +x $MCC_SETTINGS
 
 configure()
 {
@@ -34,7 +39,18 @@ configure()
   fi
 }
 
+bug_initializing()
+{
+  iface=$(ifconfig -a | grep "wlan*" | awk -F':' '{ print $1 }')
+  if [ "$iface" == 'wlan0' ]; then
+    /sbin/ip link set wlan0 down
+    /sbin/ip link set wlan0 name wlan1
+    /sbin/ip link set wlan1 up
+  fi
+}
+
 configure
+bug_initializing
 ###Deciding IP address to be assigned to br-lan from WiFi MAC
 mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
 ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
@@ -189,17 +205,6 @@ EOF
 }
 
 
-bug_initializing()
-{
-  iface=$(ifconfig -a | grep "wlan*" | awk -F':' '{ print $1 }')
-  if [ "$iface" == 'wlan0' ]; then
-    /sbin/ip link set wlan0 down
-    /sbin/ip link set wlan0 name wlan1
-    /sbin/ip link set wlan1 up
-  fi
-}
-
-
 generate_random_mesh_ip() {
   local last_oct=$((16#$1))
 
@@ -250,43 +255,6 @@ get_unused_network() {
 }
 
 
-bridge_settings() {
-    brctl addbr br-lan
-    # Bridge ethernet and Mesh
-
-    eth_port="eth1"
-    if [ -f "$COMMS_PCB_VERSION_FILE" ]; then
-      source "$COMMS_PCB_VERSION_FILE"
-      # Sleeve 1.x has PCB version 0
-      if (( $(echo "$COMMS_PCB_VERSION == 0" |bc -l) )); then
-        eth_port="eth1"
-      # CM1.5 PCB version is 0.5
-      elif (( $(echo "$COMMS_PCB_VERSION == 0.5" |bc -l) )); then
-        eth_port="eth0"
-      # CM2.x PCB version starts from 1
-      elif (( $(echo "$COMMS_PCB_VERSION >= 1" |bc -l) )); then
-        eth_port="lan1"
-      fi
-    fi
-    echo $eth_port
-
-    brctl addif br-lan bat0 $eth_port
-    echo $br_lan_ip
-    ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
-    ifconfig br-lan up
-    echo
-    ifconfig br-lan
-    # Add forwarding rules from AP to $mesh_if interface
-    iptables -P FORWARD ACCEPT
-    route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
-    route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
-    iptables -A FORWARD --in-interface bat0 -j ACCEPT
-    iptables --table nat -A POSTROUTING --out-interface $br_lan_ip -j MASQUERADE
-}
-
-bug_initializing
-
-
 if [ "$meshVersion" == "1.5" ]; then
   clean_up
   install_packages
@@ -329,17 +297,34 @@ if [ "$meshVersion" == "1.5" ]; then
   uid=${uid::-1}
   /bin/bash "$MESH_FOLDER"/common/scripts/generate_keys.sh "$uid"
 
-  if [ "$bridge" == "true" ]; then #write bridge: True, meshint: br-lan
+  sed -i "s/concurrency: .*/concurrency: $mode/" "$MESH_COM_CONF" #copy concurrency set in mesh.conf to mesh_com_11s.conf
+
+  if [ "$mode" = "ap+mesh_mcc" ]; then
+    # Set default eth1 bridge false, set mesh interface to br-lan, concurrency is already set to mcc mode
+    sed -i "s/bridge: .*/bridge: False/" "$MESH_COM_CONF"
+    sed -i "s/meshint: .*/meshint: br-lan/" "$MESH_COM_CONF"
+
+    # Set mcc_channel
+    sed -i "s/mcc_channel: .*/mcc_channel: $ch/" "$MESH_COM_CONF"
+
+    # In features.yaml, set mutual to false and only_mesh to true
+    sed -i "s/only_mesh: .*/only_mesh: true/" "$FEATURES_CONF"
+    sed -i "s/mutual: .*/mutual: false/" "$FEATURES_CONF"
+
+  elif [ "$bridge" == "true" ]; then
+    # Bridge mode: Write bridge: True, meshint: br-lan
     sed -i "s/bridge: .*/bridge: True/" "$MESH_COM_CONF"
     sed -i "s/meshint: .*/meshint: br-lan/" "$MESH_COM_CONF"
-  else #write bridge: False, meshint: bat0
+  else
+    # Write bridge: False, meshint: bat0
     sed -i "s/bridge: .*/bridge: False/" "$MESH_COM_CONF"
     sed -i "s/meshint: .*/meshint: bat0/" "$MESH_COM_CONF"
   fi
-  start_mesh_1_5 # bridge_settings is called inside start_mesh_1_5
+  start_mesh_1_5 # bridge_settings.sh or mcc_settings.sh is called here if bridge mode or mcc mode after connecting to the mesh
 
+#elif [ "$meshVersion" == "1.0" ]; then #this means 1.0
 else #this means 1.0
-    mesh_service
+    #mesh_service
 
 if [ "$mode" == "provisioning" ]; then
   provisioning
@@ -353,58 +338,8 @@ if [ "$mode" = "sta+mesh" ]; then
   sleep 3
   udhcpc -i "$ifname_ap"
 elif [ "$mode" = "ap+mesh_mcc" ]; then
-  # Create bridge br-lan
   mesh_service
-  brctl addbr br-lan
-  ap_if_mac="$(ip -brief link | grep "$ifname_ap" | awk '{print $3; exit}')"
-  ssid="comms_sleeve#$(echo "$ap_if_mac" | cut -b 13-14,16-17)"
-  # Set frequency band and channel from given frequency
-  calculate_wifi_channel "$ch"
-  ifconfig "$ifname_ap" up
-
-   # AP hostapd config
-    cat <<EOF >/var/run/hostapd.conf
-    country_code=AE
-    interface=$ifname_ap
-    ssid=$ssid
-    hw_mode=g
-    channel=7
-    macaddr_acl=0
-    auth_algs=1
-    ignore_broadcast_ssid=0
-    wpa=2
-    wpa_passphrase=ssrcdemo
-    wpa_key_mgmt=WPA-PSK
-    wpa_pairwise=TKIP
-    rsn_pairwise=CCMP
-EOF
-
-  # Start AP
-  /usr/sbin/hostapd -B /var/run/hostapd.conf -f /tmp/hostapd.log
-  # Bridge AP and Mesh
-  if [ "$algo" = "olsr" ]; then
-        brctl addif br-lan "$mesh_if" "$ifname_ap"
-        iptables -A FORWARD --in-interface "$mesh_if" -j ACCEPT
-        killall olsrd 2>/dev/null
-        (olsrd -i br-lan -d 0)&
-  else
-        ##batman-adv###
-        brctl addif br-lan bat0 "$ifname_ap"
-        iptables -A FORWARD --in-interface bat0 -j ACCEPT
-  fi
-  ifconfig br-lan "$br_lan_ip" netmask "255.255.255.0"
-  ifconfig br-lan up
-  echo
-  ifconfig br-lan
-  # Add forwarding rules from AP to $mesh_if interface
-  iptables -P FORWARD ACCEPT
-  route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
-  route add -net 192.168.1.0 gw "$br_lan_ip" netmask 255.255.255.0 dev br-lan
-  iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
-
-  #setup minimalistic Mumble server configuration
-  rm /etc/umurmur.conf
-  cp /opt/mesh_com/modules/utils/docker/umurmur.conf /etc/umurmur.conf
+  /bin/bash "$MCC_SETTINGS"
   #Get GW IP
   if [ "$mode" = "sta+mesh" ]; then
     gw_ip=$(ifconfig "$ifname_ap" | grep "inet " | awk '{ print $2 }')
@@ -489,7 +424,8 @@ EOF
     ip addr flush dev bat0
     echo "Mesh Point + AP done."
   else
-    bridge_settings
+    mesh_service
+    /bin/bash "$BRIDGE_SETTINGS"
 fi
 fi
 
