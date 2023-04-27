@@ -27,16 +27,19 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.ap_mac = ""
         self.country = ""
         self.frequency = ""
+        self.frequency_mcc = ""
         self.ip_address = ""
         self.subnet = ""
         self.tx_power = ""
         self.mode = ""
+        self.routing = ""
         self.comms_status = comms_status
 
     def validate_mesh_settings(self) -> (str, str, str):
         """
         Validate mesh settings
         """
+        # pylint: disable=too-many-return-statements
         if validation.validate_ssid(self.ssid) is False:
             return "FAIL", comms.STATUS.mesh_fail, "Invalid SSID"
 
@@ -52,6 +55,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         if validation.validate_frequency(int(self.frequency)) is False:
             return "FAIL", comms.STATUS.mesh_fail, "Invalid frequency"
 
+        if validation.validate_frequency(int(self.frequency_mcc)) is False:
+            return "FAIL", comms.STATUS.mesh_fail, "Invalid mcc frequency"
+
         if validation.validate_country_code(self.country) is False:
             return "FAIL", comms.STATUS.mesh_fail, "Invalid country code"
 
@@ -60,6 +66,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
 
         if validation.validate_tx_power(int(self.tx_power)) is False:
             return "FAIL", comms.STATUS.mesh_fail, "Invalid tx power"
+
+        if validation.validate_routing(self.routing) is False:
+            return "FAIL", comms.STATUS.mesh_fail, "Invalid routing algo"
 
         return "OK", "", "Mesh settings OK"
 
@@ -77,10 +86,12 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             self.ap_mac = quote(str(parameters["ap_mac"]))
             self.country = quote(str(parameters["country"]).lower())
             self.frequency = quote(str(parameters["frequency"]))
+            self.frequency_mcc = quote(str(parameters["frequency_mcc"]))
             self.ip_address = quote(str(parameters["ip"]))
             self.subnet = quote(str(parameters["subnet"]))
             self.tx_power = quote(str(parameters["tx_power"]))
             self.mode = quote(str(parameters["mode"]))
+            self.routing = quote(str(parameters["routing"]))
 
             ret, status, info = self.validate_mesh_settings()
             self.logger.debug("Mesh settings validation: %s, %s", ret, info)
@@ -115,13 +126,12 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write(f"KEY={quote(self.key)}\n")
                 mesh_conf.write(f"ESSID={quote(self.ssid)}\n")
                 mesh_conf.write(f"FREQ={quote(self.frequency)}\n")
+                mesh_conf.write(f"FREQ_MCC={quote(self.frequency_mcc)}\n")
                 mesh_conf.write(f"TXPOWER={quote(self.tx_power)}\n")
                 mesh_conf.write(f"COUNTRY={quote(self.country).upper()}\n")
+                mesh_conf.write(f"ROUTING={quote(self.routing)}\n")
                 mesh_conf.write("MESH_VIF=wlp1s0\n")
                 mesh_conf.write("PHY=phy0\n")
-                mesh_conf.write("#CONCURRENCY configuration\n")
-                mesh_conf.write("#CONCURRENCY=ap+mesh\n")
-                mesh_conf.write("#MCC_CHANNEL=2412\n")
         except:
             self.comms_status.mesh_cfg_status = \
                 comms.STATUS.mesh_configuration_not_stored

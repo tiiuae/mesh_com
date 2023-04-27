@@ -9,6 +9,7 @@ async def main():
     nc = await nats.connect(f"{config.MODULE_IP}:{config.MODULE_PORT}")
     cmd_dict = {"api_version": 1, "ssid": "test_mesh", "key": "1234567890",
                 "ap_mac": "00:11:22:33:44:55", "country": "FI", "frequency": "5220",
+                "frequency_mcc": "2412", "routing": "batman-adv",
                 "ip": "192.168.1.2", "subnet": "255.255.255.0", "tx_power": "5", "mode": "mesh"}
     cmd = json.dumps(cmd_dict)
     rep = await nc.request("comms.settings",

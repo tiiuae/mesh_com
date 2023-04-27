@@ -21,7 +21,7 @@ class TestSettings(unittest.TestCase):
         logger = logging.getLogger("test")
         cs = comms_status.CommsStatus()
         settings = comms.CommsSettings(cs, logger)
-        ret, info, mesh_status = settings.handle_mesh_settings("""{"api_version": 1,"ssid": "test_mesh", "key": "1234567890","ap_mac": "00:11:22:33:44:55","country": "fi","frequency": "5220","ip": "192.168.1.2","subnet": "255.255.255.0","tx_power": "5","mode": "mesh"}""", "./tests", "test.conf")
+        ret, info, mesh_status = settings.handle_mesh_settings("""{"api_version": 1,"ssid": "test_mesh", "key": "1234567890","ap_mac": "00:11:22:33:44:55","country": "fi","frequency": "5220","frequency_mcc": "2412","ip": "192.168.1.2","subnet": "255.255.255.0","tx_power": "5","mode": "mesh","routing": "batman-adv"}""", "./tests", "test.conf")
         self.assertEqual(ret, "OK", msg=f"ret: {ret}, info: {info}, mesh_status: {mesh_status}")
 
         # settings json is invalid

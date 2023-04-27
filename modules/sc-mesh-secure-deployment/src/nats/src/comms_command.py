@@ -18,11 +18,14 @@ class LogFiles:  # pylint: disable=too-few-public-methods
 
     # Commands
     WPA = "WPA"
+    HOSTAPD = "HOSTAPD"
     CONTROLLER = "CONTROLLER"
     DMESG = "DMESG"
     # Log files
     CONTROLLER_LOG = "/opt/comms_controller.log"
     WPA_LOG = "/var/log/wpa_supplicant_11s.log"
+    HOSTAPD_LOG = "/var/log/hostapd.log"
+    DMESG_CMD = "dmesg"
 
 
 class Command:  # pylint: disable=too-few-public-methods
@@ -116,15 +119,17 @@ class Command:  # pylint: disable=too-few-public-methods
             return "FAIL", "Failed to delete mesh config", \
                 self.comms_status.mesh_cfg_status
 
-        # Restart mesh with default settings
-        ret = subprocess.run(["/opt/S9011sMesh", "restart", "default"],
-                             shell=False, check=True, capture_output=True)
-        if ret.returncode != 0:
-            # todo: Default mesh configuration failed. What to do next?
-            return "FAIL", "default mesh starting failed " \
-                           + str(ret.returncode) \
-                           + str(ret.stdout) \
-                           + str(ret.stderr), STATUS.mesh_fail
+        for process in ["/opt/S9011sMesh", "/opt/S90APoint"]:
+            # Restart mesh with default settings
+            ret = subprocess.run([process, "restart", "default"],
+                                 shell=False, check=True, capture_output=True)
+            if ret.returncode != 0:
+                # todo: Default mesh configuration failed. What to do next?
+                return "FAIL", f"default mesh starting failed {process} " \
+                               + str(ret.returncode) \
+                               + str(ret.stdout) \
+                               + str(ret.stderr), STATUS.mesh_fail
+
         self.logger.debug('Default mesh command applied')
         self.comms_status.mesh_status = STATUS.mesh_default
         self.comms_status.mesh_cfg_status = STATUS.mesh_default
@@ -146,13 +151,14 @@ class Command:  # pylint: disable=too-few-public-methods
         Returns:
             tuple: (str, str, STATUS)
         """
-        ret = subprocess.run(["/opt/S9011sMesh", "restart", "mission"],
-                             shell=False, check=True, capture_output=True)
-        if ret.returncode != 0:
-            return "FAIL", "mesh starting failed " \
-                           + str(ret.returncode) \
-                           + str(ret.stdout) \
-                           + str(ret.stderr), STATUS.mesh_fail
+        for process in ["/opt/S9011sMesh", "/opt/S90APoint"]:
+            ret = subprocess.run([process, "restart", "mission"],
+                                 shell=False, check=True, capture_output=True)
+            if ret.returncode != 0:
+                return "FAIL", f"mesh starting failed {process}" \
+                               + str(ret.returncode) \
+                               + str(ret.stdout) \
+                               + str(ret.stderr), STATUS.mesh_fail
 
         self.logger.debug('Mission configurations applied')
         self.comms_status.mesh_status = STATUS.mesh_mission_not_connected
@@ -161,13 +167,15 @@ class Command:  # pylint: disable=too-few-public-methods
             STATUS.mesh_mission_not_connected
 
     def __radio_down(self) -> (str, str, STATUS):
-        ret = subprocess.run(["/opt/S9011sMesh", "stop"],
-                             shell=False, check=True, capture_output=True)
-        if ret.returncode != 0:
-            return "FAIL", "Radio deactivation failed " \
-                           + str(ret.returncode) \
-                           + str(ret.stdout) \
-                           + str(ret.stderr), STATUS.mesh_fail
+
+        for process in ["/opt/S9011sMesh", "/opt/S90APoint"]:
+            ret = subprocess.run([process, "stop"],
+                                 shell=False, check=True, capture_output=True)
+            if ret.returncode != 0:
+                return "FAIL", f"Radio deactivation failed {process} " \
+                               + str(ret.returncode) \
+                               + str(ret.stdout) \
+                               + str(ret.stderr), STATUS.mesh_fail
 
         self.logger.debug('Radio deactivated')
         self.comms_status.is_radio_on = False
@@ -179,17 +187,19 @@ class Command:  # pylint: disable=too-few-public-methods
         return "OK", "Radio deactivated", STATUS.wifi_off
 
     def __radio_up(self) -> (str, str, STATUS):
-        if self.comms_status.is_mission_cfg:
-            ret = subprocess.run(["/opt/S9011sMesh", "start", "mission"],
-                                 shell=False, check=True, capture_output=True)
-        else:
-            ret = subprocess.run(["/opt/S9011sMesh", "start", "default"],
-                                 shell=False, check=True, capture_output=True)
-        if ret.returncode != 0:
-            return "FAIL", "Radio activation failed " \
-                           + str(ret.returncode) \
-                           + str(ret.stdout) \
-                           + str(ret.stderr), STATUS.mesh_fail
+
+        for process in ["/opt/S9011sMesh", "/opt/S90APoint"]:
+            if self.comms_status.is_mission_cfg:
+                ret = subprocess.run([process, "start", "mission"],
+                                     shell=False, check=True, capture_output=True)
+            else:
+                ret = subprocess.run([process, "start", "default"],
+                                     shell=False, check=True, capture_output=True)
+            if ret.returncode != 0:
+                return "FAIL", f"Radio activation failed {process} " \
+                               + str(ret.returncode) \
+                               + str(ret.stdout) \
+                               + str(ret.stderr), STATUS.mesh_fail
 
         # Update comms_status
         self.comms_status.is_radio_on = True
@@ -224,24 +234,30 @@ class Command:  # pylint: disable=too-few-public-methods
         self.comms_status.is_visualisation_active = False
         return "OK", "Visualisation disabled", STATUS.visualisation_disabled
 
+    def __read_log_file(self, filename) -> bytes:
+        """
+        read file and return the content as bytes and base64 encoded
+
+        param: filename: str
+        return: (int, bytes)
+        """
+        # read as bytes as b64encode expects bytes
+        with open(filename, "rb") as f:
+            file_log = f.read()
+        return base64.b64encode(file_log)
+
     def __get_logs(self, param) -> (str, str, STATUS, str):
         file = ""
         try:
             files = LogFiles()
             if param == files.WPA:
-                file = files.WPA_LOG
-                # read as bytes as b64encode expects bytes
-                with open(file, "rb") as f:
-                    file_log = f.read()
-                file_b64 = base64.b64encode(file_log)
+                file_b64 = self.__read_log_file(files.WPA_LOG)
+            elif param == files.HOSTAPD_LOG:
+                file_b64 = self.__read_log_file(files.HOSTAPD_LOG)
             elif param == files.CONTROLLER:
-                file = files.CONTROLLER_LOG
-                # read as bytes as b64encode expects bytes
-                with open(file, "rb") as f:
-                    file_log = f.read()
-                file_b64 = base64.b64encode(file_log)
+                file_b64 = self.__read_log_file(files.CONTROLLER)
             elif param == files.DMESG:
-                ret = subprocess.run(["dmesg"],
+                ret = subprocess.run([files.DMESG_CMD],
                                      shell=False, check=True, capture_output=True)
                 if ret.returncode != 0:
                     return "FAIL", f"{file} file read failed", STATUS.no_status, None

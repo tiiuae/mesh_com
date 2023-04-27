@@ -1,3 +1,6 @@
+"""
+Helper functions for validating NATS parameters
+"""
 import re
 import socket
 
@@ -167,8 +170,7 @@ def validate_mode(mode: str) -> bool:
     Validates a given wifi mode.
     Returns True if the mode is valid, False otherwise.
     """
-    # todo add correct modes
-    if mode == "mesh":
+    if mode in ("mesh", "ap+mesh_scc", "ap+mesh_mcc"):
         return True
     return False
 
@@ -192,5 +194,14 @@ def validate_frequency(frequency: int) -> bool:
                          5825]
 
     if frequency in list_of_2ghz_freq or frequency in list_of_5ghz_freq:
+        return True
+    return False
+
+def validate_routing(routing: str) -> bool:
+    """
+    Validates a given routing.
+    Returns True if the routing is valid, False otherwise.
+    """
+    if routing in ("olsr", "batman-adv"):
         return True
     return False

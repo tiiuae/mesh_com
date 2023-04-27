@@ -141,6 +141,24 @@ class TestValidation(unittest.TestCase):
         # frequency is invalid
         self.assertFalse(validation.validate_frequency("2412"))
 
+    def test_validate_routing(self):
+        """
+        Test cases for validate_routing(routing)
+        """
+        # routing is invalid
+        self.assertFalse(validation.validate_routing('none'))
+        # routing is valid
+        self.assertTrue(validation.validate_routing('olsr'))
+        # routing is valid
+        self.assertTrue(validation.validate_routing('batman-adv'))
+        # routing is invalid
+        self.assertFalse(validation.validate_routing('nonee'))
+        # routing is invalid
+        self.assertFalse(validation.validate_routing('olsrr'))
+        # routing is invalid
+        self.assertFalse(validation.validate_routing('batmann'))
+        # routing is invalid
+        self.assertFalse(validation.validate_routing(1))
 
 if __name__ == '__main__':
     unittest.main()

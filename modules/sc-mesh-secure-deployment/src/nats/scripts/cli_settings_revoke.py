@@ -11,7 +11,7 @@ async def main():
     cmd = json.dumps(cmd_dict)
     rep = await nc.request("comms.command",
                            cmd.encode(),
-                           timeout=2)
+                           timeout=4)
     parameters = json.loads(rep.data)
     print(parameters)
 
