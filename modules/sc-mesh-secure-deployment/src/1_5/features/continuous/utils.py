@@ -20,8 +20,6 @@ async def launchCA(sectable):
     with contextlib.suppress(OSError):
         ca = CA(ID)
     myip =  mesh_utils.get_mesh_ip_address(MESHINT)
-    max_count = 3
-    flag_ctr = 0
 
     manager = multiprocessing.Manager()
     return_dict = manager.dict()
@@ -40,9 +38,17 @@ async def launchCA(sectable):
     num_neighbors = len(ip2_send) # Number of neighbor nodes that need to be authenticated
     server_proc = ca_server(myip, return_dict, id_dict, num_neighbors, list(set(sectable['IP'].tolist())))
 
+    client_procs = []
     for IP in ip2_send:
         if IP != myip:
-            flag_ctr = ca_client(IP, flag_ctr, max_count, ca)
+            print("neighbor IP:", IP)
+            proc = multiprocessing.Process(target=ca.as_client, args=(IP,), daemon=True)
+            client_procs.append(proc)
+            proc.start()
+
+    for proc in client_procs:
+        proc.join()
+
     #server_proc.terminate()
     server_proc.join()
     print("Checkpoint server proc terminating")
@@ -78,21 +84,6 @@ def ca_server(myip, return_dict, id_dict, num_neighbors, ips_sectable):
     return proc
 
 
-def ca_client(IP, flag_ctr, max_count, ca):
-    print("neighbor IP:", IP)
-    p = multiprocessing.Process(target=ca.as_client, args=(IP,), daemon=True)
-    jobs = [p]
-    p.start()
-    for proc in jobs:
-        proc.join()
-    sleep(5)
-    flag_ctr += 1
-    if flag_ctr == max_count:
-        p.terminate()
-        # break
-    return flag_ctr
-
-
 def update_table_ca(df, result, myID):
     '''
     function to update the mutual authentication table with the CA result.
@@ -115,10 +106,11 @@ def update_table_ca(df, result, myID):
                     df.loc[df['IP'] == ip, 'CA_Result'] = 3
                 df.loc[df['IP'] == ip, 'CA_Server'] = myID
             else:
-                neigh = mesh_utils.get_arp()
                 try:
-                    mac = neigh[ip]
-                except KeyError:
+                    command = ['batctl', 't', ip] # Get mac of given ip
+                    output = subprocess.run(command, shell=False, capture_output=True, text=True)
+                    mac = output.stdout.replace('\n', '')
+                except Exception as e:
                     mac = '----'
                 client_mesh_name = ip.replace('.', '_')
                 client_fpr, _ = pri.hashSig(f'pubKeys/{client_mesh_name}.der')

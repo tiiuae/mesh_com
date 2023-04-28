@@ -297,15 +297,13 @@ if [ "$meshVersion" == "1.5" ]; then
   uid=${uid::-1}
   /bin/bash "$MESH_FOLDER"/common/scripts/generate_keys.sh "$uid"
 
-  sed -i "s/concurrency: .*/concurrency: $mode/" "$MESH_COM_CONF" #copy concurrency set in mesh.conf to mesh_com_11s.conf
+  sed -i "s/concurrency: .*/concurrency: $mode/" "$MESH_COM_CONF" #copy concurrency set in mesh.conf to mesh_com_11s.conf (if not set, null will be written)
+  sed -i "s/mcc_channel: .*/mcc_channel: $ch/" "$MESH_COM_CONF" #copy mcc_channel set in mesh.conf to mesh_com_11s.conf (if not set, null will be written)
 
   if [ "$mode" = "ap+mesh_mcc" ]; then
     # Set default eth1 bridge false, set mesh interface to br-lan, concurrency is already set to mcc mode
     sed -i "s/bridge: .*/bridge: False/" "$MESH_COM_CONF"
     sed -i "s/meshint: .*/meshint: br-lan/" "$MESH_COM_CONF"
-
-    # Set mcc_channel
-    sed -i "s/mcc_channel: .*/mcc_channel: $ch/" "$MESH_COM_CONF"
 
     # In features.yaml, set mutual to false and only_mesh to true
     sed -i "s/only_mesh: .*/only_mesh: true/" "$FEATURES_CONF"

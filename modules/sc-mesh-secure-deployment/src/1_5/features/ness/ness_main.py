@@ -285,8 +285,8 @@ class NESS:
                 continue
             count_malicious = flags.count(NodeType.MALICIOUS)
             if count_malicious == len(num_servers):
-                result[node_id] = NodeType.MALICIOUS
-            elif count_malicious >= len(num_servers) / 2:
+                result[node_id] = NodeType.SUSPICIOUS
+            elif count_malicious > len(num_servers) / 2:
                 result[node_id] = NodeType.SUSPICIOUS
             else:
                 result[node_id] = NodeType.BENIGN
