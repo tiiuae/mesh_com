@@ -56,14 +56,14 @@ for channel in iw_channels:
 all_bands = ' '.join(str(ch) for ch in channel_list)
 all_bands = all_bands.replace(channel_freq, '').strip()
 
-# Get 2_4GHz and 5GHz channels from full list of channels retreived
-all_5 = [5180, 5200, 5220, 5240, 5260, 5280, 5300, 5320, 5745, 5765, 5785, 5805, 5825, 5845] #check if any one of 5ghz channels are in available list of channels to scan
-for ch in all_5:
-    if(ch in all_5):
-        band_5_idx = channel_list.index(ch) #split list by 5ghz channel found 
-        channels_2_4 = channel_list[:band_5_idx]
-        channels_5 = channel_list[band_5_idx:]
+# Split at first instance of 5GHz channel
+for i, num in enumerate(channel_list):
+    if str(num).startswith('5'):
+        split_index = i
         break
+
+channels_2_4 = channel_list[:split_index]
+channels_5 = channel_list[split_index-1:] # include one 2.4 channel to the 5 band as workaround to bug in max_mag range shift
 
 channels_2_4 = ' '.join(str(ch) for ch in channels_2_4)
 channels_5 = ' '.join(str(ch) for ch in channels_5)
@@ -84,4 +84,3 @@ config = {'debug': True,
 yaml.dump(config, sort_keys=False)
 with open('config_spectralscan.yaml', 'w',) as f :
     yaml.dump(config, f, sort_keys=False)
-
