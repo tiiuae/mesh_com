@@ -79,6 +79,8 @@ def only_mesh():
         mut.start_mesh()
         mut.create_table()
         sleep(2)
+        """
+        # This results in inconsistent table entries
         if mesh_utils.verify_mesh_status():  # verifying that mesh is running
             print("Mesh Running")
             #mesh_utils.get_neighbors_ip()
@@ -88,6 +90,7 @@ def only_mesh():
                         'PubKey_fpr': "----", 'MA_level': 1}
                 print(info)
                 mut.update_table(info)
+        """
     except TypeError:
         print("No password provided for the mesh. Please get the password via provisioning server")
         sys.exit()
@@ -221,7 +224,7 @@ def extable():
     try:
         sectable = pd.read_csv(table)
         sectable.drop_duplicates(inplace=True)
-        start_server_thread = ut.start_server()
+        start_server_thread = ut.start_server(0.75*SEC_BEAT_TIME) # Initial exchange server socket timeout = 0.75*SEC_BEAT_TIME
         sleep(0.5) # So that messages are not sent and dropped before other nodes start server
         ut.exchage_table(sectable, start_server_thread)
     except FileNotFoundError:

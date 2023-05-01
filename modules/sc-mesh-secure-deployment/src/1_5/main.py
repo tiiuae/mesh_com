@@ -5,8 +5,8 @@ import yaml
 def continuous_authentication(sectable, myID):
     print("Starting Continuous Authentication")
     aux = sectable.iloc[:, :5]
-    sectable = aux.drop_duplicates()
-    sectable.drop(sectable.loc[sectable['MAC'] == '----'].index, inplace=True) # To avoid duplicates after exchange table for mesh neighbors not originally mutually authenticated
+    sectable = aux.drop_duplicates(subset=['IP'])
+    #sectable.drop(sectable.loc[sectable['MAC'] == '----'].index, inplace=True) # To avoid duplicates after exchange table for mesh neighbors not originally mutually authenticated
     loop_ca = None
     try:
         loop_ca = asyncio.get_event_loop()
@@ -34,10 +34,10 @@ def only_ca(myID):
         if "Ness_Result" in filetable.columns:
             filetable.drop(["Ness_Result"], axis=1, inplace=True)
         sectable = continuous_authentication(filetable, myID)
-        sleep(2)
+#        sleep(2)
         if sectable is not None:
             # ut.exchage_table(sectable)
-            sleep(2)
+#            sleep(2)
             if 'CA_Result' in set(sectable):
                 sectable.to_csv(table, index=False)
             else:
@@ -84,7 +84,7 @@ def decision_engine(sectable, ma, q):
 
 
 def quaran(ness_result, q, sectable, ma, mapp):
-    quarantineTime = 20  # seconds
+    quarantineTime = SEC_BEAT_TIME  # seconds
     for node in ness_result:
         if ness_result[node] == 194 or (not q.empty() and q.get() == 'malicious'):
             print("Malicious Node: ", ness.remapping(mapp, node))
@@ -100,14 +100,18 @@ def sec_beat(myID):
     ut.checkiptables()
     ma = mba.MBA(mesh_utils.get_mesh_ip_address())
     # Start exchange table server so that it can receive messages as soon as other nodes complete cont auth
-    start_server_thread = ut.start_server()
+    start_server_thread = ut.start_server(0.75*SEC_BEAT_TIME) # Initial exchange server socket timeout = 0.75*SEC_BEAT_TIME
     sectable = only_ca(myID)
     sectable.drop_duplicates(inplace=True)
     ut.exchage_table(sectable, start_server_thread)
     global_table = pd.read_csv('auth/global_table.csv')
-    ness_result, mapp = decision_engine(global_table, ma, q)
-    #quaran(ness_result, q, sectable, ma, mapp)
-    quaran(ness_result, q, global_table, ma, mapp)
+    if global_table.empty:
+        print("Empty Global security table")
+        print("Nothing to do")
+    else:
+        ness_result, mapp = decision_engine(global_table, ma, q)
+        #quaran(ness_result, q, sectable, ma, mapp)
+        quaran(ness_result, q, global_table, ma, mapp)
 
 def mutual_authentication():
     print("Starting Mutual Authentication")

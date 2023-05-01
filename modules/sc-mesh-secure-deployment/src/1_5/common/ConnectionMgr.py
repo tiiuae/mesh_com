@@ -44,6 +44,7 @@ class ConnectionMgr:
         self.mesh_mode = "11s"
         self.gw = False
         self.bridge = False
+        self.concurrency = ""
 
     def starting_mesh(self):  # Get the mesh_com config
         """
@@ -56,9 +57,17 @@ class ConnectionMgr:
         if self.gw:
             print("============================================")
             gw_service = main.AutoGateway()
-            Thread(target=gw_service.run, daemon=True).start()
-        if self.bridge:
-            subprocess.Popen(['bash', '-c', docker_path + '/entrypoint.sh', 'bridge_settings'])
+            gw_thread = Thread(target=gw_service.run, daemon=True)
+            gw_thread.start()
+            gw_thread.join()
+        if str(self.concurrency).replace(' ', '') == "ap+mesh_mcc":
+            # MCC mode: run mcc_settings.sh
+            command = docker_path + '/mcc_settings.sh'
+            subprocess.run(command, shell=True)
+        elif self.bridge:
+            # Bridge mode: run bridge_settings.sh
+            command = docker_path + '/bridge_settings.sh'
+            subprocess.run(command, shell=True)
 
     @property
     def create_mesh_config(self):
@@ -88,6 +97,7 @@ class ConnectionMgr:
         phy_name = f"phy{output.decode().strip()}"
         mesh_ip = config['ip']
         mesh_mac = self.util.get_mac_by_interface(mesh_vif)
+        mcc_channel = config['mcc_channel']
         # Create mesh service config
         Path("/opt/mesh_com").mkdir(parents=True, exist_ok=True)
         with open('/opt/mesh.conf', 'w', encoding='UTF-8') as mesh_config:
@@ -102,6 +112,7 @@ class ConnectionMgr:
             mesh_config.write('COUNTRY=fi\n')
             mesh_config.write(f'MESH_VIF={mesh_vif}' + '\n')
             mesh_config.write(f'PHY={phy_name}' + '\n')
+            mesh_config.write(f'MCC_CHANNEL={mcc_channel}' + '\n')
         if confc['gw_service']:
             self.gw = True
         if config['type'] == '11s':
@@ -112,6 +123,7 @@ class ConnectionMgr:
         self.mesh_ip = mesh_ip
         self.mesh_mac = mesh_mac
         self.bridge = config['bridge']
+        self.concurrency = config['concurrency']
         return self.mesh_ip, self.mesh_mac
 
     # @staticmethod

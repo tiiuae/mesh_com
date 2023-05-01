@@ -9,13 +9,20 @@ from common import mesh_utils, utils
 
 class Quarantine:
     def __init__(self):
-        self.interface = mesh_utils.get_interface(mesh_utils.get_mesh_interface())
+        self.interface = mesh_utils.get_mesh_interface(mesh_utils.get_mesh_interface_from_file())
 
     def block(self, ip, quarantineTime):
         #command = [str(script_path) + '/traffic_block.sh', mac, self.interface]
         #command = ['iptables', '-A', 'INPUT', '-p', 'ALL', '-m', 'mac', '--mac-source', mac, '-j', 'DROP']
         command = ['iptables', '-I', 'INPUT', '-p', 'ALL', '-s', ip, '-j', 'DROP']
         subprocess.call(command, shell=False)
+        command = ['iptables', '-I', 'FORWARD', '-p', 'ALL', '-s', ip, '-j', 'DROP']
+        subprocess.call(command, shell=False)
+        command = ['iptables', '-I', 'FORWARD', '-p', 'ALL', '-d', ip, '-j', 'DROP']
+        subprocess.call(command, shell=False)
+        command = ['iptables', '-I', 'OUTPUT', '-p', 'ALL', '-d', ip, '-j', 'DROP']
+        subprocess.call(command, shell=False)
+
         print(f'blocking IP: {str(ip)} on interface {str(self.interface)}')
         self.iptablesSave()
         for i in range(quarantineTime, 0, -1):
@@ -28,6 +35,12 @@ class Quarantine:
         #command = [str(script_path) + '/traffic_block.sh', mac, self.interface]
         #command = ['iptables', '-D', 'INPUT', '-p', 'ALL', '-m', 'mac', '--mac-source', mac, '-j',  'DROP']
         command = ['iptables', '-D', 'INPUT', '-p', 'ALL', '-s', ip, '-j', 'DROP']
+        subprocess.call(command, shell=False)
+        command = ['iptables', '-D', 'FORWARD', '-p', 'ALL', '-s', ip, '-j', 'DROP']
+        subprocess.call(command, shell=False)
+        command = ['iptables', '-D', 'FORWARD', '-p', 'ALL', '-d', ip, '-j', 'DROP']
+        subprocess.call(command, shell=False)
+        command = ['iptables', '-D', 'OUTPUT', '-p', 'ALL', '-d', ip, '-j', 'DROP']
         subprocess.call(command, shell=False)
         print(f'unblocking IP: {str(ip)} on interface {str(self.interface)}')
         self.iptablesSave()
@@ -45,7 +58,7 @@ class Quarantine:
         """
         common_ut = utils.Utils()
         logger = common_ut.setup_logger('quarantine')
-        blocking_time = 20 #in seconds
+        blocking_time = 120 #in seconds
 
         ip = '127.0.0.1'
         self.printing('Blocking ', ip)

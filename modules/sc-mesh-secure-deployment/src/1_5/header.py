@@ -34,7 +34,7 @@ co = ConnectionMgr.ConnectionMgr()
 _executor = ThreadPoolExecutor()
 executor = ProcessPoolExecutor()
 MUTUALINT = 'wlan1'
-MESHINT = mesh_utils.get_mesh_interface()
+MESHINT = mesh_utils.get_mesh_interface_from_file()
 
 
 client_q = {}
