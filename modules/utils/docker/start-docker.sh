@@ -50,8 +50,6 @@ elif [ "$OS" == "Buildroot" ]; then
                 cp /etc/comms_pcb_version /opt/container-data/mesh/hardware/comms_pcb_version
             fi
         fi
-        # change rootfs location once its mounted in dedicated partation
-        cp mesh.conf /opt/container-data/mesh/ #only for MS1.5
         # change rootfs location once its mounted in dedicated partition
         if [ -f "/root/rootfs.tgz" ]; then
             echo "import rootfs.tgz commms vm"
