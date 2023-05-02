@@ -14,6 +14,7 @@ DHCPD_LEASES="/var/lib/dhcp/dhcpd.leases"
 COMMS_PCB_VERSION_FILE="/opt/hardware/comms_pcb_version"
 BRIDGE_SETTINGS="$MESH_FOLDER/modules/utils/docker/bridge_settings.sh" # script to setup bridge
 MCC_SETTINGS="$MESH_FOLDER/modules/utils/docker/mcc_settings.sh" # script to setup mcc mode
+MESH_CONF="/opt/mesh.conf"
 
 chmod +x $BRIDGE_SETTINGS
 chmod +x $MCC_SETTINGS
@@ -225,6 +226,7 @@ generate_random_mesh_ip() {
 update_mesh_com_conf() {
   local random_ip="$1"
   sed -i "s/ip: .*/ip: $random_ip/" "$MESH_COM_CONF"
+  sed -i "s/IP=.*/IP=$random_ip/" "$MESH_CONF" # Update IP in /opt/mesh.conf
 }
 
 
