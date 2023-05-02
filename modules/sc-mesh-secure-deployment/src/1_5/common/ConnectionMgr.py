@@ -98,6 +98,8 @@ class ConnectionMgr:
         mesh_ip = config['ip']
         mesh_mac = self.util.get_mac_by_interface(mesh_vif)
         mcc_channel = config['mcc_channel']
+
+        """
         # Create mesh service config
         Path("/opt/mesh_com").mkdir(parents=True, exist_ok=True)
         with open('/opt/mesh.conf', 'w', encoding='UTF-8') as mesh_config:
@@ -113,6 +115,7 @@ class ConnectionMgr:
             mesh_config.write(f'MESH_VIF={mesh_vif}' + '\n')
             mesh_config.write(f'PHY={phy_name}' + '\n')
             mesh_config.write(f'MCC_CHANNEL={mcc_channel}' + '\n')
+        """
         if confc['gw_service']:
             self.gw = True
         if config['type'] == '11s':
