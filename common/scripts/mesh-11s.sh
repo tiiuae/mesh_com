@@ -180,6 +180,7 @@ wpa_key_mgmt=WPA-PSK
 wpa_pairwise=TKIP
 rsn_pairwise=CCMP
 beacon_int=1000
+ctrl_interface=/var/run/hostapd
 EOF
 
       # Bridge AP and Mesh
@@ -256,6 +257,7 @@ wpa_passphrase=$psk
 
 wmm_enabled=1
 beacon_int=1000
+ctrl_interface=/var/run/hostapd
 
 ### IEEE 802.11n
 ieee80211n=1

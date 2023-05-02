@@ -9,7 +9,6 @@ import logging
 import threading
 from nats.aio.client import Client as NATS
 
-from src import comms_common as comms
 from src import comms_settings
 from src import comms_command
 from src import comms_status
@@ -46,17 +45,15 @@ class MeshTelemetry:
 
     def run(self):
         """
-        Run method for e
+        Run method to start collecting visualisation telemetry
 
         :return: -
         """
-        self.batman_visual.thread_running = True # thread loop enabled
-        self.batman.thread_running = True # thread loop enabled
-        self.t1 = threading.Thread(target=self.batman_visual.run) # create thread
-        self.t1.start() # start thread
-        self.t2 = threading.Thread(target=self.batman.run) # create thread
-        self.t2.start() # start thread
-        self.visualisation_enabled = True # publisher enabled
+        self.t1 = threading.Thread(target=self.batman_visual.run)  # create thread
+        self.t1.start()  # start thread
+        self.t2 = threading.Thread(target=self.batman.run)  # create thread
+        self.t2.start()  # start thread
+        self.visualisation_enabled = True  # publisher enabled
 
     def stop(self):
         """
@@ -64,11 +61,13 @@ class MeshTelemetry:
 
         :return: -
         """
-        self.visualisation_enabled = False # publisher disabled
-        self.batman_visual.thread_running = False # thread loop disabled
-        self.t1.join() # wait for thread to finish
-        self.batman.thread_running = False # thread loop disabled
-        self.t2.join() # wait for thread to finish
+        self.visualisation_enabled = False  # publisher disabled
+        if self.batman_visual.thread_running:
+            self.batman_visual.thread_running = False  # thread loop disabled
+            self.t1.join()  # wait for thread to finish
+        if self.batman.thread_running:
+            self.batman.thread_running = False  # thread loop disabled
+            self.t2.join()  # wait for thread to finish
 
 
 class CommsController:  # pylint: disable=too-few-public-methods
@@ -79,7 +78,6 @@ class CommsController:  # pylint: disable=too-few-public-methods
         self.nats_server = server
         self.port = port
         self.interval = interval
-        self.comms_status = comms_status.CommsStatus()
 
         # base logger for comms and which is used by all other modules
         self.main_logger = logging.getLogger("comms")
@@ -90,13 +88,14 @@ class CommsController:  # pylint: disable=too-few-public-methods
         console_handler.setFormatter(log_formatter)
         self.main_logger.addHandler(console_handler)
 
+        self.comms_status = comms_status.CommsStatus(self.main_logger.getChild("status"))
         self.settings = comms_settings.CommsSettings(self.comms_status, self.main_logger.getChild("settings"))
         self.command = comms_command.Command(server, port, self.comms_status, self.main_logger.getChild("command"))
         self.telemetry = MeshTelemetry(self.interval, self.main_logger.getChild("telemetry"))
-        self.status = comms.STATUS.no_status
 
         # logger for this module and derived from main logger
         self.logger = self.main_logger.getChild("controller")
+
 
 async def main(server, port, keyfile=None, certfile=None, interval=1000):
     """
@@ -151,24 +150,39 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
         data = msg.data.decode()
         cc.logger.debug("Received a message on '%s': %s", subject, data)
         ret, info, resp = "FAIL", "Not supported subject", ""
-        status = comms.STATUS.no_status
 
         if subject == "comms.settings":
-            ret, info, status = cc.settings.handle_mesh_settings(data)
+            ret, info = cc.settings.handle_mesh_settings(data)
         elif subject == "comms.command":
-            ret, info, status, resp = cc.command.handle_command(data, cc)
-        # elif subject == "comms.status":
+            ret, info, resp = cc.command.handle_command(data, cc)
+        elif subject == "comms.status":
+            ret, info = "OK", "Returning current status"
+        # Update status info
+        cc.comms_status.refresh_status()
 
-        if data is None:
-            response = f"""{{"status":"{ret}","mesh_status":"{status.value}","info":"{info}"}}"""
+        if resp == "":
+            response = (
+                f'{{"status":"{ret}","info":"{info}",'
+                f'"mesh_status":"{cc.comms_status.mesh_status.value}",'
+                f'"mesh_cfg_status":"{cc.comms_status.mesh_cfg_status.value}",'
+                f'"visualisation_active":"{cc.comms_status.is_visualisation_active}",'
+                f'"mesh_radio_on":"{cc.comms_status.is_radio_on}"}}'
+            )
         else:
-            response = f"""{{"status":"{ret}","mesh_status":"{status.value}","info":"{info}","data":"{resp}"}}"""
-
+            response = (
+                f'{{"status":"{ret}","info":"{info}",'
+                f'"mesh_status":"{cc.comms_status.mesh_status.value}",'
+                f'"mesh_cfg_status":"{cc.comms_status.mesh_cfg_status.value}",'
+                f'"visualisation_active":"{cc.comms_status.is_visualisation_active}",'
+                f'"mesh_radio_on":"{cc.comms_status.is_radio_on}",'
+                f'"data":"{resp}"}}'
+            )
         cc.logger.debug("Sending response: %s", response[:1000])
         await msg.respond(response.encode("utf-8"))
 
     await nats_client.subscribe("comms.settings", cb=message_handler)
     await nats_client.subscribe("comms.command", cb=message_handler)
+    await nats_client.subscribe("comms.status", cb=message_handler)
 
     cc.logger.debug("comms_nats_controller Listening for requests")
     while True:

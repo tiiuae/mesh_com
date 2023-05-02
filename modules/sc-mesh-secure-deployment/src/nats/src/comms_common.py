@@ -11,15 +11,11 @@ class STATUS(Enum):  # pylint: disable=too-few-public-methods
     no_status = "MESH_NO_STATUS"  # no stat available
     mesh_default = "MESH_DEFAULT"  # mesh default settings
     mesh_default_connected = "MESH_DEFAULT_CONNECTED"  # mesh default connected
-    mesh_configuration_not_stored = "MESH_CONFIGURATION_NOT_STORED"  # mesh configuration not stored
-    mesh_configuration_stored = "MESH_CONFIGURATION_STORED"  # mesh configuration stored
+    mesh_cfg_not_stored = "MESH_CONFIGURATION_NOT_STORED"  # mesh configuration not stored
+    mesh_cfg_stored = "MESH_CONFIGURATION_STORED"  # mesh configuration stored
     mesh_mission_not_connected = "MESH_MISSION_NOT_CONNECTED"  # mesh mission not connected
     mesh_mission_connected = "MESH_MISSION_CONNECTED"  # mesh mission connected
-    wifi_off = "WIFI_OFF"  # Wi-Fi transmitter is deactivated
-    wifi_on = "WIFI_ON"  # Wi-Fi transmitter is active
-    visualisation_enabled = "VISUALISATION_ENABLED"
-    visualisation_disabled = "VISUALISATION_DISABLED"
-    invalid_command = "INVALID_COMMAND"  # Invalid/not supported command
+    mesh_old_mission_connected = "MESH_OLD_MISSION_CONNECTED"  # old mission mesh still active
     mesh_fail = "MESH_FAIL"  # fails
 
 

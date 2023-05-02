@@ -35,45 +35,45 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.routing = ""
         self.comms_status = comms_status
 
-    def validate_mesh_settings(self) -> (str, str, str):
+    def validate_mesh_settings(self) -> (str, str):
         """
         Validate mesh settings
         """
         # pylint: disable=too-many-return-statements
         if validation.validate_ssid(self.ssid) is False:
-            return "FAIL", comms.STATUS.mesh_fail, "Invalid SSID"
+            return "FAIL", "Invalid SSID"
 
         if validation.validate_wpa3_psk(self.key) is False:
-            return "FAIL", comms.STATUS.mesh_fail, "Invalid WPA3 PSK"
+            return "FAIL", "Invalid WPA3 PSK"
 
         if validation.validate_ip_address(self.ip_address) is False:
-            return "FAIL", comms.STATUS.mesh_fail, "Invalid IP address"
+            return "FAIL", "Invalid IP address"
 
         if validation.validate_mode(self.mode) is False:
-            return "FAIL", comms.STATUS.mesh_fail, "Invalid mode"
+            return "FAIL", "Invalid mode"
 
         if validation.validate_frequency(int(self.frequency)) is False:
-            return "FAIL", comms.STATUS.mesh_fail, "Invalid frequency"
+            return "FAIL", "Invalid frequency"
 
         if validation.validate_frequency(int(self.frequency_mcc)) is False:
-            return "FAIL", comms.STATUS.mesh_fail, "Invalid mcc frequency"
+            return "FAIL", "Invalid mcc frequency"
 
         if validation.validate_country_code(self.country) is False:
-            return "FAIL", comms.STATUS.mesh_fail, "Invalid country code"
+            return "FAIL", "Invalid country code"
 
         if validation.validate_netmask(self.subnet) is False:
-            return "FAIL", comms.STATUS.mesh_fail, "Invalid subnet"
+            return "FAIL", "Invalid subnet"
 
         if validation.validate_tx_power(int(self.tx_power)) is False:
-            return "FAIL", comms.STATUS.mesh_fail, "Invalid tx power"
+            return "FAIL", "Invalid tx power"
 
         if validation.validate_routing(self.routing) is False:
-            return "FAIL", comms.STATUS.mesh_fail, "Invalid routing algo"
+            return "FAIL", "Invalid routing algo"
 
-        return "OK", "", "Mesh settings OK"
+        return "OK", "Mesh settings OK"
 
     def handle_mesh_settings(self, msg: str, path="/opt", file="mesh.conf") \
-            -> (str, str, comms.STATUS):
+            -> (str, str):
         """
         Handle mesh settings
         """
@@ -93,27 +93,27 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             self.mode = quote(str(parameters["mode"]))
             self.routing = quote(str(parameters["routing"]))
 
-            ret, status, info = self.validate_mesh_settings()
+            ret, info = self.validate_mesh_settings()
             self.logger.debug("Mesh settings validation: %s, %s", ret, info)
             if ret == "FAIL":
                 self.comms_status.mesh_cfg_status = \
-                    comms.STATUS.mesh_configuration_not_stored
+                    comms.STATUS.mesh_cfg_not_stored
                 self.logger.error("save settings failed: %s, %s", ret, info)
             else:
-                ret, info, status = self.__save_settings(path, file)
+                ret, info = self.__save_settings(path, file)
                 self.logger.debug("save settings: %s, %s", ret, info)
 
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
             self.comms_status.mesh_cfg_status = \
-                comms.STATUS.mesh_configuration_not_stored
+                comms.STATUS.mesh_cfg_not_stored
             ret, status = "FAIL", self.comms_status.mesh_cfg_status
             info = "JSON format not correct" + str(error)
             self.logger.error("Mesh settings validation: %s, %s", ret, info)
 
-        return ret, info, status
+        return ret, info
 
-    def __save_settings(self, path: str, file: str) -> (str, str, comms.STATUS):
+    def __save_settings(self, path: str, file: str) -> (str, str):
         """
         Save mesh settings
         """
@@ -134,14 +134,11 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write("PHY=phy0\n")
         except:
             self.comms_status.mesh_cfg_status = \
-                comms.STATUS.mesh_configuration_not_stored
+                comms.STATUS.mesh_cfg_not_stored
             self.logger.error("not able to write new mesh.conf")
             return "FAIL", "not able to write new mesh.conf", \
                 self.comms_status.mesh_cfg_status
 
-        self.comms_status.mesh_cfg_status = \
-            comms.STATUS.mesh_configuration_stored
-
+        self.comms_status.mesh_cfg_status = comms.STATUS.mesh_cfg_stored
         self.logger.debug("mesh.conf written")
-        return "OK", "Mesh configuration stored", \
-            self.comms_status.mesh_cfg_status
+        return "OK", "Mesh configuration stored"

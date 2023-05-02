@@ -60,9 +60,6 @@ if [ "$OS" == "Buildroot" ]; then
         echo $meshcom_path
         if [ ! -f "/opt/container-data/mesh/mesh_default.conf" ]; then
             cp /opt/mesh_default.conf /opt/container-data/mesh/
-        fi
-        if [ ! -f "/opt/container-data/mesh/mesh.conf" ]; then
-            cp /opt/mesh_default.conf /opt/container-data/mesh/mesh.conf
             cp $meshcom_path/common/scripts/mesh-11s.sh /opt/container-data/mesh/
             chmod 755 /opt/container-data/mesh/mesh-11s.sh
             cp $meshcom_path/common/scripts/mesh-helper.sh /opt/container-data/mesh/

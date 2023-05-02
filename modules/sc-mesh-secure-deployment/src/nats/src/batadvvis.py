@@ -14,7 +14,7 @@ class BatAdvVis:
 
     def __init__(self, loop_interval:float = 1.0):
         self.latest_topology = "{}"
-        self.thread_running = True
+        self.thread_running = False
         self.interval = loop_interval
 
     @staticmethod
@@ -74,6 +74,7 @@ class BatAdvVis:
 
         :return: None
         """
+        self.thread_running = True
         while self.thread_running:
             self.latest_topology = self.get()
             time.sleep(self.interval)
