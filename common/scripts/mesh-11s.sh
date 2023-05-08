@@ -65,7 +65,7 @@ mode_execute() {
   case "$mode" in
   "mesh")
 
-      cat <<EOF >/var/run/wpa_supplicant-11s.conf
+      cat <<EOF >/var/run/wpa_supplicant-11s_"$wifidev".conf
 ctrl_interface=DIR=/var/run/wpa_supplicant
 # use 'ap_scan=2' on all devices connected to the network
 # this is unnecessary if you only want the network to be created when no other networks..
@@ -153,7 +153,7 @@ EOF
       iptables -A FORWARD --in-interface bat0 -j ACCEPT
       iptables --table nat -A POSTROUTING --out-interface "$br_lan_ip" -j MASQUERADE
 
-      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s.conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_11s.log
+      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$wifidev".conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_11s.log
       ;;
   "ap+mesh_mcc")
       wait_for_intf "br-lan"

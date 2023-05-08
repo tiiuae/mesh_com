@@ -166,7 +166,8 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
                 f'"mesh_status":"{cc.comms_status.mesh_status.value}",'
                 f'"mesh_cfg_status":"{cc.comms_status.mesh_cfg_status.value}",'
                 f'"visualisation_active":"{cc.comms_status.is_visualisation_active}",'
-                f'"mesh_radio_on":"{cc.comms_status.is_radio_on}"}}'
+                f'"mesh_radio_on":"{cc.comms_status.is_mesh_radio_on}",'
+                f'"ap_radio_on":"{cc.comms_status.is_ap_radio_on}"}}'
             )
         else:
             response = (
@@ -174,7 +175,8 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
                 f'"mesh_status":"{cc.comms_status.mesh_status.value}",'
                 f'"mesh_cfg_status":"{cc.comms_status.mesh_cfg_status.value}",'
                 f'"visualisation_active":"{cc.comms_status.is_visualisation_active}",'
-                f'"mesh_radio_on":"{cc.comms_status.is_radio_on}",'
+                f'"mesh_radio_on":"{cc.comms_status.is_mesh_radio_on}",'
+                f'"ap_radio_on":"{cc.comms_status.is_ap_radio_on}",'
                 f'"data":"{resp}"}}'
             )
         cc.logger.debug("Sending response: %s", response[:1000])
@@ -191,8 +193,7 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
             if cc.telemetry.visualisation_enabled:
                 msg = cc.telemetry.mesh_visual()
                 cc.logger.debug("Publishing comms.visual: %s", msg)
-                await nats_client.publish("comms.visual",
-                             msg.encode())
+                await nats_client.publish("comms.visual", msg.encode())
         except Exception as e:
             cc.logger.error("Error:", e)
 

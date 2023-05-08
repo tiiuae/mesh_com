@@ -35,7 +35,7 @@ start() {
 }
 stop() {
     printf 'Stopping %s: ' "$DAEMON"
-    NEW_PID=$(ps ax | grep -E 'wpa_supplicant\-11s.conf' | awk {'print $1'})
+    NEW_PID=$(ps ax | grep -E 'wpa_supplicant\-11s' | awk {'print $1'})
     kill -9 $NEW_PID
     rm -fr /var/run/wpa_supplicant/* 2>/dev/null
     ifconfig "$MESH_VIF" down 2>/dev/null

@@ -29,6 +29,15 @@ class LogFiles:  # pylint: disable=too-few-public-methods
     DMESG_CMD = "dmesg"
 
 
+class ConfigFiles:  # pylint: disable=too-few-public-methods
+    """
+    ConfigFiles class
+    """
+    # Commands
+    WPA = "WPA_CONFIG"
+    HOSTAPD = "HOSTAPD_CONFIG"
+
+
 class Command:  # pylint: disable=too-few-public-methods
     """
     Command class
@@ -92,6 +101,8 @@ class Command:  # pylint: disable=too-few-public-methods
             ret, info = self.__enable_visualisation(cc)
         elif self.command == COMMAND.disable_visualisation:
             ret, info = self.__disable_visualisation(cc)
+        elif self.command == COMMAND.get_config:
+            ret, info, data = self.__get_configs(self.param)
         else:
             ret, info = "FAIL", "Command not supported"
         return ret, info, data
@@ -107,6 +118,7 @@ class Command:  # pylint: disable=too-few-public-methods
         """
         config_file_path = "/opt/mesh.conf"
         hash_file_path = "/opt/mesh.conf_hash"
+        pending_config_file_path = "/opt/mesh_stored.conf"
 
         if os.path.exists(config_file_path):
             try:
@@ -114,6 +126,12 @@ class Command:  # pylint: disable=too-few-public-methods
             except:
                 self.logger.error("Failed to delete mission config")
                 return "FAIL", "Failed to delete mission config"
+
+        if os.path.exists(pending_config_file_path):
+            try:
+                os.remove(pending_config_file_path)
+            except:
+                self.logger.error("Failed to delete pending config")
 
         if os.path.exists(hash_file_path):
             try:
@@ -133,7 +151,7 @@ class Command:  # pylint: disable=too-few-public-methods
                                + str(ret.stdout) \
                                + str(ret.stderr)
 
-        self.logger.debug('Default mesh command applied')
+        self.logger.debug("Default mesh command applied")
         if self.comms_status.is_visualisation_active:
             ret, _, _ = self.__disable_visualisation(cc)
             if ret == "FAIL":
@@ -144,35 +162,51 @@ class Command:  # pylint: disable=too-few-public-methods
 
     def __apply_mission_config(self) -> (str, str):
         """
-        Runs S9011sMesh script with mission specific settings.
+        Replaces active mesh configuration file with previously
+        stored content and restarts S9011Mesh with new configs.
 
         Returns:
             tuple: (str, str)
         """
         if self.comms_status.mesh_cfg_status == STATUS.mesh_cfg_stored:
-            for process in ["/opt/S9011sMesh", "/opt/S90APoint"]:
-                ret = subprocess.run([process, "restart", "mission"],
-                                     shell=False, check=True, capture_output=True)
-                if ret.returncode != 0:
-                    return "FAIL", f"mesh starting failed {process}" \
-                                   + str(ret.returncode) \
-                                   + str(ret.stdout) \
-                                   + str(ret.stderr)
+            try:
+                os.replace("/opt/mesh_stored.conf", "/opt/mesh.conf")
+            except:
+                self.logger.error("Error replacing active config file!")
+                return "FAIL", "Error replacing active config file"
+
             # Create hash file for active config bookkeeping
             try:
                 with open("/opt/mesh.conf", "rb") as f:
                     data = f.read()
                     hash_obj = hashlib.sha256(data)
                     hash_hex = hash_obj.hexdigest()
-                with open('/opt/mesh.conf_hash', 'w') as f_hash:
+                with open("/opt/mesh.conf_hash", "w") as f_hash:
                     f_hash.write(hash_hex)
             except:
-                self.logger.error('Error writing hash file!')
+                self.logger.error("Error writing hash file!")
+                # Return failure amd give client a possibility to retry
+                # instead of running initd script that could cause loss
+                # of connection.
+                return "FAIL", "Error writing hash file"
 
-            self.logger.debug('Mission configurations applied')
+            # Initd script checks hash for mesh.conf config and in case it
+            # matches then mission config is applied. Otherwise, default mesh
+            # is applied. That logic is based on assumption that some
+            # wireless connectivity needs to be ensured after reboot.
+            for process in ["/opt/S9011sMesh", "/opt/S90APoint"]:
+                ret = subprocess.run([process, "restart"],
+                                     shell=False, check=True,
+                                     capture_output=True)
+                if ret.returncode != 0:
+                    return "FAIL", f"mesh starting failed {process}" \
+                                   + str(ret.returncode) \
+                                   + str(ret.stdout) \
+                                   + str(ret.stderr)
+            self.logger.debug("Mission configurations applied")
             return "OK", "Mission configurations applied"
         else:
-            self.logger.debug('No mission config to apply!')
+            self.logger.debug("No mission config to apply!")
             return "FAIL", "No setting to apply"
 
     def __radio_down(self) -> (str, str):
@@ -187,21 +221,15 @@ class Command:  # pylint: disable=too-few-public-methods
                                + str(ret.stdout) \
                                + str(ret.stderr)
 
-        self.logger.debug('Radio deactivated')
-        self.comms_status.is_radio_on = False
+        self.logger.debug("Radio deactivated")
         return "OK", "Radio deactivated"
 
     def __radio_up(self) -> (str, str):
 
         for process in ["/opt/S9011sMesh", "/opt/S90APoint"]:
-            if self.comms_status.is_mission_cfg:
-                ret = subprocess.run([process, "start", "mission"],
-                                     shell=False, check=True,
-                                     capture_output=True)
-            else:
-                ret = subprocess.run([process, "start", "default"],
-                                     shell=False, check=True,
-                                     capture_output=True)
+            ret = subprocess.run([process, "start"],
+                                 shell=False, check=True,
+                                 capture_output=True)
             if ret.returncode != 0:
                 self.logger.error("Failed to activate radio")
                 return "FAIL", f"Radio activation failed {process} " \
@@ -209,7 +237,6 @@ class Command:  # pylint: disable=too-few-public-methods
                                + str(ret.stdout) \
                                + str(ret.stderr)
 
-        self.comms_status.is_radio_on = True
         self.logger.debug("Radio activated")
         return "OK", "Radio activated"
 
@@ -217,10 +244,10 @@ class Command:  # pylint: disable=too-few-public-methods
         try:
             cc.telemetry.run()
         except:
-            self.logger.error('Failed to enable visualisation')
+            self.logger.error("Failed to enable visualisation")
             return "FAIL", "Failed to enable visualisation"
 
-        self.logger.debug('Visualisation enabled')
+        self.logger.debug("Visualisation enabled")
         self.comms_status.is_visualisation_active = True
         return "OK", "Visualisation enabled"
 
@@ -229,10 +256,10 @@ class Command:  # pylint: disable=too-few-public-methods
             cc.telemetry.stop()
             cc.visualisation_enabled = False
         except:
-            self.logger.error('Failed to disable visualisation')
+            self.logger.error("Failed to disable visualisation")
             return "FAIL", "Failed to disable visualisation"
 
-        self.logger.debug('Visualisation disabled')
+        self.logger.debug("Visualisation disabled")
         self.comms_status.is_visualisation_active = False
         return "OK", "Visualisation disabled"
 
@@ -254,10 +281,10 @@ class Command:  # pylint: disable=too-few-public-methods
             files = LogFiles()
             if param == files.WPA:
                 file_b64 = self.__read_log_file(files.WPA_LOG)
-            elif param == files.HOSTAPD_LOG:
+            elif param == files.HOSTAPD:
                 file_b64 = self.__read_log_file(files.HOSTAPD_LOG)
             elif param == files.CONTROLLER:
-                file_b64 = self.__read_log_file(files.CONTROLLER)
+                file_b64 = self.__read_log_file(files.CONTROLLER_LOG)
             elif param == files.DMESG:
                 ret = subprocess.run([files.DMESG_CMD],
                                      shell=False, check=True,
@@ -269,7 +296,34 @@ class Command:  # pylint: disable=too-few-public-methods
                 return "FAIL", "Log file not supported", None
 
         except:
-            return "FAIL", f"{file} read failed", None
+            return "FAIL", f"{param} log reading failed", None
 
-        self.logger.debug('__getlogs done')
+        self.logger.debug("__getlogs done")
         return "OK", "wpa_supplicant log", file_b64.decode()
+
+    def __get_configs(self, param) -> (str, str, str):
+        file_b64 = b'None'
+        try:
+            files = ConfigFiles()
+            self.comms_status.refresh_status()
+            if param == files.WPA:
+                if_name = self.comms_status.mesh_interface_name
+                if if_name:
+                    file_b64 = self.__read_log_file(
+                        f"/var/run/wpa_supplicant-11s_{if_name}.conf")
+            elif param == files.HOSTAPD:
+                if_name = self.comms_status.ap_interface_name
+                if if_name:
+                    file_b64 = self.__read_log_file(
+                        f"/var/run/hostapd-{if_name}.conf")
+            else:
+                return "FAIL", "Parameter not supported", None
+
+        except:
+            return "FAIL", "Not able to get config file", None
+
+        self.logger.debug("__get_configs done")
+        if not if_name:
+            return "FAIL", f"{param}, interface not active", None
+        else:
+            return "OK", f"{param}", file_b64.decode()

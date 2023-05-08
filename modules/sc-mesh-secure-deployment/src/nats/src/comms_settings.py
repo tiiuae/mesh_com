@@ -72,8 +72,8 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
 
         return "OK", "Mesh settings OK"
 
-    def handle_mesh_settings(self, msg: str, path="/opt", file="mesh.conf") \
-            -> (str, str):
+    def handle_mesh_settings(self, msg: str, path="/opt",
+                             file="mesh_stored.conf") -> (str, str):
         """
         Handle mesh settings
         """
@@ -135,10 +135,10 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         except:
             self.comms_status.mesh_cfg_status = \
                 comms.STATUS.mesh_cfg_not_stored
-            self.logger.error("not able to write new mesh.conf")
+            self.logger.error("not able to write new %s", file)
             return "FAIL", "not able to write new mesh.conf", \
                 self.comms_status.mesh_cfg_status
 
         self.comms_status.mesh_cfg_status = comms.STATUS.mesh_cfg_stored
-        self.logger.debug("mesh.conf written")
+        self.logger.debug("%s written", file)
         return "OK", "Mesh configuration stored"
