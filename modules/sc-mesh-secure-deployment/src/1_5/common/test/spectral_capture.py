@@ -36,6 +36,7 @@ if __name__ == "__main__":
       try:
         config = yaml.safe_load(file)
         interface = config["interface"]
+        debug = config["debug"]
 
         if(scan_mode == 'low_latency'):
             scan_channels = config[scan_mode]['channels']
@@ -57,7 +58,7 @@ if __name__ == "__main__":
        spec.execute_scan(interface, scan_channels)
        f = spec.file_open(f"/tmp/data")
        file_stats = os.stat(f"/tmp/data")
-       valid = spec.read(f, file_stats.st_size, scan_channels, scan_count)
+       valid = spec.read(f, file_stats.st_size, scan_channels, scan_count, debug)
        spec.file_close(f)
        if(valid == 1):
           scan_count += 1
