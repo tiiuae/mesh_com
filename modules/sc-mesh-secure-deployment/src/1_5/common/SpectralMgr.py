@@ -29,7 +29,7 @@ class Spectral:
     def __init__(self):
         self.VALUES = dict()
 
-    def read(self, spectral_bin, size, channels, scan_count):
+    def read(self, spectral_bin, size, channels, scan_count, debug):
         self.VALUES = dict()
 
         data = spectral_bin.read(size)  # just read 2048 bytes
@@ -154,6 +154,9 @@ class Spectral:
 
                 self.VALUES[count] = (freq1, noise, max_mag, gain_db, base_pwr_db, rssi, relpwr_db, avgpwr_db)
                 count = count + 1
+                
+                if(debug):
+                   print(f"Channel Width: {chanwidth} Freq1: {freq1} Freq2: {freq2} Noise: {noise} Max Magnitude: {max_mag} Gain>
 
         vals_list = []
         for key, value in self.VALUES.items():
