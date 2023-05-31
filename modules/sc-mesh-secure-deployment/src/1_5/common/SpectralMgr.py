@@ -156,7 +156,7 @@ class Spectral:
                 count = count + 1
                 
                 if(debug):
-                   print(f"Channel Width: {chanwidth} Freq1: {freq1} Freq2: {freq2} Noise: {noise} Max Magnitude: {max_mag} Gain>
+                    print(f"Channel Width: {chanwidth} Freq1: {freq1} Freq2: {freq2} Noise: {noise} Max Magnitude: {max_mag} Gain_db: {gain_db} Base Power_db: {base_pwr_db} TSF: {tsf} Max Index: {max_index} Rssi: {rssi} Rel Power_db: {relpwr_db} Avg Power_db: {avgpwr_db} Max_exp: {max_exp}")
 
         vals_list = []
         for key, value in self.VALUES.items():
@@ -167,7 +167,8 @@ class Spectral:
                                                                    "base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
 
             if(spectral_capture_df["freq1"].nunique() != len(channels.split())):
-               print("Missing: ", set(channels.split()) ^ set(spectral_capture_df["freq1"].unique()))
+               if(debug):
+                  print("Missing: ", set(channels.split()) ^ set(spectral_capture_df["freq1"].unique()))
                valid = 0
                return valid
 
@@ -189,7 +190,7 @@ class Spectral:
 
     def initialize_scan(self):
 
-        write_fix = f"echo -n disable > /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan_ctl"
+        #write_fix = f"echo -n disable > /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan_ctl"
 
         if (DRIVER == "ath9k"):
             # cmd_function =  "echo background > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
@@ -212,13 +213,16 @@ class Spectral:
             #subprocess.call(write_fix, shell=True)
             subprocess.call(cmd_background, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
             subprocess.call(cmd_trigger, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
-
+            
     def execute_scan(self, interface, channels):
         scan = False
         do_scan_cmd = f"iw dev {interface} scan freq {channels} flush"
+        interface_up = f"ip link set dev {interface} up" # activate and enable the interface
+        print(do_scan_cmd)
 
         while (scan == False):
             try:
+                subprocess.call(interface_up, shell=True)
                 subprocess.run(do_scan_cmd, shell=True, stderr=subprocess.STDOUT,stdout=subprocess.DEVNULL, check=True)
                 scan = True
             except:
@@ -237,7 +241,6 @@ class Spectral:
         #subprocess.call(cmd_scan, shell=True)
         subprocess.call(cmd_disable, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
         subprocess.call(cmd_dump, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
-
 
     @staticmethod
     def file_close(file_pointer):
