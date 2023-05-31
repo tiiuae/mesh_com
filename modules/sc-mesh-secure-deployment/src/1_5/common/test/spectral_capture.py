@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     print(scan_mode)
     # CONFIG
-    with open('config_spectralscan.yaml') as file:
+    with open('config.yaml') as file:
       try:
         config = yaml.safe_load(file)
         interface = config["interface"]
@@ -52,7 +52,6 @@ if __name__ == "__main__":
 
 
     while (True):
-       #spec = Spectral()
        spec.initialize_scan()
        print(scan_channels)
        spec.execute_scan(interface, scan_channels)
