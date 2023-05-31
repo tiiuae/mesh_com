@@ -164,7 +164,7 @@ EOF
         echo "bat0 ip address.."
         ifconfig bat0 "$2" netmask "$3"
         echo "bat0 mtu size"
-        ifconfig bat0 mtu 1500
+        ifconfig bat0 mtu 1460
         echo
         ifconfig bat0
 

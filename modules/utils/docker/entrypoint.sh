@@ -350,7 +350,7 @@ elif [ "$mode" = "ap+mesh_mcc" ]; then
   echo "bindaddr = "\"$gw_ip\"";" >> /etc/umurmur.conf
   sleep 10
   umurmurd
-  elif [ "$mode" == "ap+mesh_scc" ]; then
+elif [ "$mode" == "ap+mesh_scc" ]; then
     sleep 2
     # chanbw config
     mount -t debugfs none /sys/kernel/debug
