@@ -65,8 +65,8 @@ cat <<EOF >/var/run/hostapd.conf
 country_code=AE
 interface=$ifname_ap
 ssid=$ssid
-hw_mode=g
-channel=7
+hw_mode=$retval_band
+channel=$retval_channel
 macaddr_acl=0
 auth_algs=1
 ignore_broadcast_ssid=0
