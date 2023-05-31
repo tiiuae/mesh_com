@@ -87,5 +87,5 @@ config = {'debug': True,
 
 # Create YAML for config data
 yaml.dump(config, sort_keys=False)
-with open('config_spectralscan.yaml', 'w',) as f :
+with open('config.yaml', 'w',) as f :
     yaml.dump(config, f, sort_keys=False)
