@@ -51,7 +51,10 @@ elif [ "$OS" == "Buildroot" ]; then
             fi
         fi
         # change rootfs location once its mounted in dedicated partition
-        if [ -f "/root/rootfs.tgz" ]; then
+        running=$(docker container inspect -f '{{.State.Running}}' "mesh_comms_vm")
+        if [ "$running" == "true" ]; then
+            echo "no need to import"
+        elif [ -f "/root/rootfs.tgz" ]; then
             echo "import rootfs.tgz commms vm"
             # shellcheck disable=SC2002
             cat /root/rootfs.tgz | docker import - comms_vm
@@ -74,7 +77,6 @@ elif [ "$OS" == "Buildroot" ]; then
         fi
         cp /etc/umurmur.conf $meshcom_path/modules/utils/docker/umurmur.conf
 
-        running=$(docker container inspect -f '{{.State.Running}}' "mesh_comms_vm")
         if [ "$running" != "true" ]; then
            docker rm -f mesh_comms_vm
            docker run --name mesh_comms_vm -d --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm
