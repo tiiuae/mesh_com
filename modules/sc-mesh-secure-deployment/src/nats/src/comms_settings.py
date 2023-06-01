@@ -33,6 +33,8 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.tx_power = ""
         self.mode = ""
         self.routing = ""
+        self.priority = ""
+        self.role = ""
         self.comms_status = comms_status
 
     def validate_mesh_settings(self) -> (str, str):
@@ -70,6 +72,12 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         if validation.validate_routing(self.routing) is False:
             return "FAIL", "Invalid routing algo"
 
+        if validation.validate_priority(self.priority) is False:
+            return "FAIL", "Invalid priority"
+
+        if validation.validate_role(self.role) is False:
+            return "FAIL", "Invalid role"
+
         return "OK", "Mesh settings OK"
 
     def handle_mesh_settings(self, msg: str, path="/opt",
@@ -92,6 +100,8 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             self.tx_power = quote(str(parameters["tx_power"]))
             self.mode = quote(str(parameters["mode"]))
             self.routing = quote(str(parameters["routing"]))
+            self.priority = quote(str(parameters["priority"]))
+            self.role = quote(str(parameters["role"]))
 
             ret, info = self.validate_mesh_settings()
             self.logger.debug("Mesh settings validation: %s, %s", ret, info)
@@ -130,6 +140,8 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write(f"TXPOWER={quote(self.tx_power)}\n")
                 mesh_conf.write(f"COUNTRY={quote(self.country).upper()}\n")
                 mesh_conf.write(f"ROUTING={quote(self.routing)}\n")
+                mesh_conf.write(f"ROLE={quote(self.role)}\n")
+                mesh_conf.write(f"PRIORITY={quote(self.priority)}\n")
                 mesh_conf.write("MESH_VIF=wlp1s0\n")
                 mesh_conf.write("PHY=phy0\n")
         except:

@@ -11,7 +11,7 @@ PIDFILE="/var/run/$DAEMON.pid"
 LOG_FILE=/opt/nats-server.log
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-NATS_SERVER_ARGS="-l $LOG_FILE -a $2 -p 4222"
+NATS_SERVER_ARGS="-l $LOG_FILE -c /var/run/nats.conf"
 start() {
     echo "$NATS_SERVER_ARGS"
     printf 'Starting %s: ' "$DAEMON"

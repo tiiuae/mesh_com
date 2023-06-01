@@ -205,3 +205,21 @@ def validate_routing(routing: str) -> bool:
     if routing in ("olsr", "batman-adv"):
         return True
     return False
+
+def validate_priority(priority: str) -> bool:
+    """
+    Validates a given priority.
+    Returns True if the priority is valid, False otherwise.
+    """
+    if priority in ("long_range", "high_throughput"):
+        return True
+    return False
+
+def validate_role(role: str) -> bool:
+    """
+    Validates a given role.
+    Returns True if the role is valid, False otherwise.
+    """
+    if role in ("drone", "sleeve", "gcs"):
+        return True
+    return False

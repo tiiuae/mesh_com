@@ -1,17 +1,17 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          S90comms_controller
-# Short-Description: Comms nats client
-# Description:       Starts comms controller NATS node
+# Provides:          S90nats_discovery
+# Short-Description: Comms nats discovery
+# Description:       Starts comms nats discovery
 ### END INIT INFO
 
-DAEMON="comms_nats_controller.py"
+DAEMON="comms_nats_discovery.py"
 DIR="/opt/nats/"
 PIDFILE="/var/run/$DAEMON.pid"
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-LOG_FILE=/opt/comms_controller.log
-ARGS="-s 0.0.0.0 -p 4222"
+LOG_FILE=/opt/comms_discovery.log
+ARGS="--role $2"
 start() {
     echo "$ARGS"
     printf 'Starting %s: ' "$DAEMON"
