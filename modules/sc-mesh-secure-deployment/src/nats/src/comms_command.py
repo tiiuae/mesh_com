@@ -7,6 +7,7 @@ import base64
 from shlex import quote
 import hashlib
 import os
+import netifaces as ni
 
 from .comms_common import STATUS, COMMAND
 from .comms_status import CommsStatus
@@ -22,6 +23,7 @@ class LogFiles:  # pylint: disable=too-few-public-methods
     HOSTAPD = "HOSTAPD"
     CONTROLLER = "CONTROLLER"
     DMESG = "DMESG"
+
     # Log files
     CONTROLLER_LOG = "/opt/comms_controller.log"
     WPA_LOG = "/var/log/wpa_supplicant_11s.log"
@@ -36,6 +38,9 @@ class ConfigFiles:  # pylint: disable=too-few-public-methods
     # Commands
     WPA = "WPA_CONFIG"
     HOSTAPD = "HOSTAPD_CONFIG"
+
+    # Config files
+    IDENTITY = "/opt/identity"
 
 
 class Command:  # pylint: disable=too-few-public-methods
@@ -103,6 +108,8 @@ class Command:  # pylint: disable=too-few-public-methods
             ret, info = self.__disable_visualisation(cc)
         elif self.command == COMMAND.get_config:
             ret, info, data = self.__get_configs(self.param)
+        elif self.command == COMMAND.get_identity:
+            ret, info, data = self.__get_identity()
         else:
             ret, info = "FAIL", "Command not supported"
         return ret, info, data
@@ -327,3 +334,20 @@ class Command:  # pylint: disable=too-few-public-methods
             return "FAIL", f"{param}, interface not active", None
         else:
             return "OK", f"{param}", file_b64.decode()
+
+    def __get_identity(self) -> (str, str, dict):
+        identity_dict = {}
+        try:
+            files = ConfigFiles()
+            self.comms_status.refresh_status()
+
+            with open(files.IDENTITY, "rb") as f:
+                identity = f.read()
+            identity_dict["identity"] = identity.decode().strip()
+            identity_dict["nats_url"] = f"nats://{ni.ifaddresses('br-lan')[ni.AF_INET][0]['addr']}:4222"
+
+        except:
+            return "FAIL", "Not able to get identity file", None
+
+        self.logger.debug("__get_identity done")
+        return "OK", "Identity and NATS URL", identity_dict

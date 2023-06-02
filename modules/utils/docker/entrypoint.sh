@@ -4,6 +4,11 @@ source /opt/mesh-helper.sh
 
 # sources mesh configuration and sets start_opts
 source_configuration
+if [ ! -f "/opt/identity" ]; then
+    # generates identity id (mac address + cpu serial number)
+    generate_identity_id
+fi
+
 # set bridge ip, sets br_lan_ip
 generate_br_lan_ip
 

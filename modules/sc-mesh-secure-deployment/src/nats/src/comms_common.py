@@ -33,3 +33,4 @@ class COMMAND:  # pylint: disable=too-few-public-methods
     enable_visualisation = "ENABLE_VISUALISATION"
     disable_visualisation = "DISABLE_VISUALISATION"
     get_config = "GET_CONFIG"
+    get_identity = "GET_IDENTITY"

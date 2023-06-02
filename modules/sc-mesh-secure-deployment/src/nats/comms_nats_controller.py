@@ -7,6 +7,7 @@ import ssl
 import argparse
 import logging
 import threading
+import json
 from nats.aio.client import Client as NATS
 
 from src import comms_settings
@@ -144,10 +145,10 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
                                   disconnected_cb=disconnected_cb,
                                   max_reconnect_attempts=-1)
 
-    async def message_handler(msg):
-        # reply = msg.reply
-        subject = msg.subject
-        data = msg.data.decode()
+    async def message_handler(message):
+        # reply = message.reply
+        subject = message.subject
+        data = message.data.decode()
         cc.logger.debug("Received a message on '%s': %s", subject, data)
         ret, info, resp = "FAIL", "Not supported subject", ""
 
@@ -160,27 +161,18 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
         # Update status info
         cc.comms_status.refresh_status()
 
-        if resp == "":
-            response = (
-                f'{{"status":"{ret}","info":"{info}",'
-                f'"mesh_status":"{cc.comms_status.mesh_status.value}",'
-                f'"mesh_cfg_status":"{cc.comms_status.mesh_cfg_status.value}",'
-                f'"visualisation_active":"{cc.comms_status.is_visualisation_active}",'
-                f'"mesh_radio_on":"{cc.comms_status.is_mesh_radio_on}",'
-                f'"ap_radio_on":"{cc.comms_status.is_ap_radio_on}"}}'
-            )
-        else:
-            response = (
-                f'{{"status":"{ret}","info":"{info}",'
-                f'"mesh_status":"{cc.comms_status.mesh_status.value}",'
-                f'"mesh_cfg_status":"{cc.comms_status.mesh_cfg_status.value}",'
-                f'"visualisation_active":"{cc.comms_status.is_visualisation_active}",'
-                f'"mesh_radio_on":"{cc.comms_status.is_mesh_radio_on}",'
-                f'"ap_radio_on":"{cc.comms_status.is_ap_radio_on}",'
-                f'"data":"{resp}"}}'
-            )
-        cc.logger.debug("Sending response: %s", response[:1000])
-        await msg.respond(response.encode("utf-8"))
+        response = {'status': ret, 'info': info,
+                    'mesh_status': cc.comms_status.mesh_status.value,
+                    'mesh_cfg_status': cc.comms_status.mesh_cfg_status.value,
+                    'visualisation_active': cc.comms_status.is_visualisation_active,
+                    'mesh_radio_on': cc.comms_status.is_mesh_radio_on,
+                    'ap_radio_on': cc.comms_status.is_ap_radio_on}
+
+        if resp != "":
+            response['data'] = resp
+
+        cc.logger.debug("Sending response: %s", str(response)[:1000])
+        await message.respond(json.dumps(response).encode("utf-8"))
 
     await nats_client.subscribe("comms.settings", cb=message_handler)
     await nats_client.subscribe("comms.command", cb=message_handler)
