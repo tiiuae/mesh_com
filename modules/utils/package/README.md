@@ -32,7 +32,6 @@ REL V1: Packages available in the bundle
 |matplotlib| 3.5.2     | machine_learning_packages |
 |packaging| 21.3      | machine_learning_packages |
 |pyparsing| 3.0.9     | machine_learning_packages |
-|sklearn| 0         | machine_learning_packages |
 |threadpoolctl| 3.1.0     | machine_learning_packages |
 |pypcap|           | machine_learning_packages |
 |setuptools| 65.5.1    | machine_learning_packages |
