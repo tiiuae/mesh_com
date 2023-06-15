@@ -196,6 +196,96 @@ psk="ssrcdemo"
 EOF
 }
 
+#write in the dhcpd.conf and the olsrd.conf add the ipv4 subnet and the random ipv6
+create_dhcpd_config()
+{
+  SUBNET="$1"
+
+  cat > /etc/dhcp/dhcpd.conf <<- EOF
+    default-lease-time 600;
+    max-lease-time 7200;
+    ddns-update-style none;
+    authoritative;
+
+    subnet $SUBNET.0 netmask 255.255.255.0 {
+            range $SUBNET.100 $SUBNET.199;
+            option routers $SUBNET.1;
+    }
+EOF
+  cp /dev/null /var/lib/dhcp/dhcpd.leases
+}
+
+create_olsrd_config()
+{
+  wifidev="$1"
+  SUBNET="$2"
+  IPV6_PREFIX="$3"
+
+  cat > /etc/olsrd/olsrd.conf <<- EOF
+  
+  LinkQualityFishEye   0
+
+  Interface "$wifidev"
+
+  {
+
+  }
+
+  IpVersion               4
+
+  LinkQualityFishEye      0
+
+  LinkQualityAlgorithm "etx_ffeth_nl80211"
+
+  # This is only here to be able to generate a
+
+  # configuration file with the script
+
+  LoadPlugin "/usr/lib/olsrd_jsoninfo.so.1.1"
+
+  {
+
+    PlParam "port"          "9090"
+
+    PlParam "accept"        "0.0.0.0"
+
+  }
+
+  # load arprefresh plugin
+
+  # - UDP packets on port 698
+
+  LoadPlugin "/usr/lib/olsrd_arprefresh.so.0.1"  
+
+  {
+
+  }
+
+  Hna4
+  {
+          $SUBNET.0 255.255.255.0
+  }
+
+  Hna6
+  {
+          $IPV6_PREFIX:0 64
+  }
+EOF
+}
+
+create_radvd_config()
+{
+  IPV6_PREFIX="$1"
+
+  cat > /etc/radvd.conf <<- EOF
+    interface br-lan
+    {
+            AdvSendAdvert on;
+            prefix $IPV6_PREFIX:0/64 {
+            };
+    };
+EOF
+}
 
 generate_random_mesh_ip() {
   local last_oct=$((16#$1))
@@ -370,7 +460,20 @@ elif [ "$mode" == "ap+mesh_scc" ]; then
     iw dev "$mesh_if" interface add "$ifname_ap" type managed addr "00:01:$(echo "$pcie_radio_mac" | cut -b 7-17)"
 
     # Set frequency band and channel from given frequency
-     calculate_wifi_channel "$ch"
+    calculate_wifi_channel "$ch"
+
+    #random generate the ipv6
+    IPV6_PREFIX=$( echo fd`dd if=/dev/urandom bs=7 count=1 status=none | xxd -p` | sed 's/\(....\)/\1:/g' )
+    ip addr add $SUBNET.1/24 dev br-lan && ip addr add $IPV6_PREFIX:1/64 dev br-lan
+
+    create_olsrd_config "wlp1s0" "$SUBNET" "$IPV6_PREFIX"
+    # FIXME: launch olsrd
+
+    create_dhcpd_config "$SUBNET"
+    dhcpd -f br-lan
+
+    create_radvd_config "$IPV6_PREFIX"
+    # FIXME: launch radvd
 
   # AP hostapd config
   cat <<EOF >/var/run/hostapd.conf
