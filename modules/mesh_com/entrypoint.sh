@@ -51,11 +51,37 @@ if [ "$1" == "init" ]; then
         echo "mesh setup done"
         gateway_ip="192.168.247.10" # FIXME: hardcoded for now. later detect automatically.
         route add default gw $gateway_ip bat0
+        echo "INFO: Checking if drone is provisioned..."
+        while true; do
+            if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
+                echo "INFO: Waiting until drone is provisioned..."
+                sleep 5
+            else
+                echo "INFO: Drone is provisioned, continuing"
+                break
+            fi
+        done
+        # Start executor. Required to publish ROS2 topic.
+        echo "INFO: Starting ROS topic"
+        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
         sleep 86400
     elif [ "$DRONE_TYPE" == "groundstation" ]; then
         DEFAULT_MESH_IP="192.168.248.1"
         /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
         echo "mesh setup done"
+        echo "INFO: Checking if drone is provisioned..."
+        while true; do
+            if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
+                echo "INFO: Waiting until drone is provisioned..."
+                sleep 5
+            else
+                echo "INFO: Drone is provisioned, continuing"
+                break
+            fi
+        done
+        # Start executor. Required to publish ROS2 topic.
+        echo "INFO: Starting ROS topic"
+        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
         sleep 86400
     elif [ "$DRONE_TYPE" == "fog" ]; then
         if [ "$MESH_CLASS" == "edge" ]; then
@@ -71,6 +97,19 @@ if [ "$1" == "init" ]; then
             gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
             route add default gw $gateway_ip bat0
         fi
+        echo "INFO: Checking if drone is provisioned..."
+        while true; do
+            if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
+                echo "INFO: Waiting until drone is provisioned..."
+                sleep 5
+            else
+                echo "INFO: Drone is provisioned, continuing"
+                break
+            fi
+        done
+        # Start executor. Required to publish ROS2 topic.
+        echo "INFO: Starting ROS topic"
+        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
         sleep 86400
     elif [ "$DRONE_TYPE" == "singlemesh" ]; then
         # 192.168.248.11-192.168.248.253
@@ -80,6 +119,19 @@ if [ "$1" == "init" ]; then
             # mesh class is gs
         gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
         route add default gw $gateway_ip bat0
+        echo "INFO: Checking if drone is provisioned..."
+        while true; do
+            if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
+                echo "INFO: Waiting until drone is provisioned..."
+                sleep 5
+            else
+                echo "INFO: Drone is provisioned, continuing"
+                break
+            fi
+        done
+        # Start executor. Required to publish ROS2 topic.
+        echo "INFO: Starting ROS topic"
+        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
         sleep 86400
     else
         echo "drone type not implemented: $DRONE_TYPE"
@@ -115,20 +167,6 @@ if [ "$1" == "init" ]; then
     # gateway_ip=$(python3 /usr/bin/default_mesh_router_select.py)
     # route add default gw $gateway_ip bat0
     # sleep 86400
-    
-    echo "INFO: Checking if drone is provisioned..."
-    while true; do
-        if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
-            echo "INFO: Waiting until drone is provisioned..."
-            sleep 5
-        else
-            echo "INFO: Drone is provisioned, continuing"
-            break
-        fi
-    done
-    # Start executor. Required to publish ROS2 topic.
-    echo "INFO: Starting ROS topic"
-    /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
 else
     echo "INFO: Start mesh pub&sub"
 
