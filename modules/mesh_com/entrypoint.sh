@@ -62,7 +62,8 @@ if [ "$1" == "init" ]; then
         done
         # Start executor. Required to publish ROS2 topic.
         echo "INFO: Starting ROS topic"
-        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
+        sleep 30
+        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
         sleep 86400
     elif [ "$DRONE_TYPE" == "groundstation" ]; then
         DEFAULT_MESH_IP="192.168.248.1"
@@ -79,7 +80,8 @@ if [ "$1" == "init" ]; then
         done
         # Start executor. Required to publish ROS2 topic.
         echo "INFO: Starting ROS topic"
-        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
+        sleep 30
+        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
         sleep 86400
     elif [ "$DRONE_TYPE" == "fog" ]; then
         if [ "$MESH_CLASS" == "edge" ]; then
@@ -106,7 +108,8 @@ if [ "$1" == "init" ]; then
         done
         # Start executor. Required to publish ROS2 topic.
         echo "INFO: Starting ROS topic"
-        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
+        sleep 30
+        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
         sleep 86400
     elif [ "$DRONE_TYPE" == "singlemesh" ]; then
         # 192.168.248.11-192.168.248.253
@@ -127,7 +130,8 @@ if [ "$1" == "init" ]; then
         done
         # Start executor. Required to publish ROS2 topic.
         echo "INFO: Starting ROS topic"
-        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
+        sleep 30
+        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
         sleep 86400
     else
         echo "drone type not implemented: $DRONE_TYPE"
