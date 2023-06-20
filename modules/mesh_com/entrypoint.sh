@@ -41,9 +41,8 @@ if [ "$1" == "init" ]; then
     # Enable IPv6. Required to run Alfred.
     sysctl -w net.ipv6.conf.all.disable_ipv6=0
     sysctl -w net.ipv6.conf.default.disable_ipv6=0
-    # Start executor. Required to publish ROS2 topic.
-    # /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
 
+# Set IP based on drone role/type. This code block should be moved to a separate file in future.
     if [ "$DRONE_TYPE" == "recon" ]; then
         # 192.168.240.1-192.168.246.254
         DEFAULT_MESH_IP="192.168.$[ $RANDOM % 7 + 240 ].$[ $RANDOM % 254 + 1 ]"
@@ -116,6 +115,20 @@ if [ "$1" == "init" ]; then
     # gateway_ip=$(python3 /usr/bin/default_mesh_router_select.py)
     # route add default gw $gateway_ip bat0
     # sleep 86400
+    
+    echo "INFO: Checking if drone is provisioned..."
+    while true; do
+        if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
+            echo "INFO: Waiting until drone is provisioned..."
+            sleep 5
+        else
+            echo "INFO: Drone is provisioned, continuing"
+            break
+        fi
+    done
+    # Start executor. Required to publish ROS2 topic.
+    echo "INFO: Starting ROS topic"
+    /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
 else
     echo "INFO: Start mesh pub&sub"
 
