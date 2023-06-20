@@ -37,7 +37,7 @@ class FieldTestLogPlotter:
 
         :param filename: Filename of field test log file (csv).
         :param throughput_unit: b, Kb or Mb.
-       """
+        """
         self.filename = filename
         self.df = None  # To be set later
         self.mac_list = []
@@ -49,6 +49,51 @@ class FieldTestLogPlotter:
         self.throughput_units = throughput_unit
         self.__create_dataframe()
 
+    def __clean_gps_data(self):
+        """
+        Cleans gps related data in dataframe. Invalid coordinates
+        are replaced with known sensible values.
+        """
+        # Convert invalid GPS coordinates to NaN.
+        self.df['latitude'].replace(-999999, np.NaN, inplace=True)
+        self.df['longitude'].replace(-999999, np.NaN, inplace=True)
+        self.df['latitude'].replace(0, np.NaN, inplace=True)
+        self.df['longitude'].replace(0, np.NaN, inplace=True)
+
+        # Get first valid coordinates.
+        row_index = self.df['latitude'].first_valid_index()
+        if row_index:
+            self.__base_latitude = self.df.loc[row_index, 'latitude']
+            self.__base_longitude = self.df.loc[row_index, 'longitude']
+
+            # Replace values on previous rows to match with 1st valid coordinates
+            for i in range(0, row_index):
+                if pd.isna(self.df.loc[i, 'latitude']):
+                    self.df.loc[i, 'latitude'] = self.__base_latitude
+                    self.df.loc[i, 'longitude'] = self.__base_longitude
+
+            # Replace rest of the invalid coordinate values with previously
+            # known valid values
+            if row_index > 0:
+                for i in range(row_index, len(self.df)):
+                    if pd.isna(self.df.loc[i, 'latitude']):
+                        self.df.loc[i, 'latitude'] = self.df.loc[i-1, 'latitude']
+                        self.df.loc[i, 'longitude'] = self.df.loc[i-1, 'longitude']
+
+        # Coordinates have been cleaned/fixed by now except in such case where df
+        # didn't contain any valid coordinates. Replace any NaN values with integers.
+        self.df['latitude'].replace(np.NaN, self.__base_latitude, inplace=True)
+        self.df['longitude'].replace(np.NaN, self.__base_longitude, inplace=True)
+
+        # Initialize invalid PDOP
+        self.df['PDOP'].replace(0, 99.99, inplace=True)
+        row_index = self.df['GPS time'].first_valid_index()
+        if row_index:
+            gpstime = self.df.loc[row_index, 'GPS time']
+        else:
+            gpstime = 0
+        self.df['GPS time'].replace(np.NaN, gpstime, inplace=True)
+
     def __create_dataframe(self):
         """
 
@@ -59,32 +104,12 @@ class FieldTestLogPlotter:
         # Debug
         logger.debug(tabulate(self.df, headers='keys', tablefmt='psql'))
 
-        # Convert invalid GPS coordinates first to NaN. Assumption:
-        # invalid values exists only at the beginning of the log.
-        self.df['latitude'].replace(-999999, np.NaN, inplace=True)
-        self.df['longitude'].replace(-999999, np.NaN, inplace=True)
-        self.df['latitude'].replace(0, np.NaN, inplace=True)
-        self.df['longitude'].replace(0, np.NaN, inplace=True)
-
-        # Then replace NaN values with first valid coordinates.
-        row_index = self.df['latitude'].first_valid_index()
-        if row_index:
-            self.__base_latitude = self.df.loc[row_index, 'latitude']
-            self.__base_longitude = self.df.loc[row_index, 'longitude']
-        self.df['latitude'].replace(np.NaN, self.__base_latitude, inplace=True)
-        self.df['longitude'].replace(np.NaN, self.__base_longitude, inplace=True)
-        # Initialize invalid PDOP
-        self.df['PDOP'].replace(0, 99.99, inplace=True)
-        row_index = self.df['GPS time'].first_valid_index()
-        if row_index:
-            gpstime = self.df.loc[row_index, 'GPS time']
-        else:
-            gpstime = 0
-        self.df['GPS time'].replace(np.NaN, gpstime, inplace=True)
+        # Clean/fix gps related data in dataframe
+        self.__clean_gps_data()
 
         # Replace non-existing RSSI and/or MCS values with some defaults
         self.df['rssi [MAC,dBm;MAC,dBm ...]'].replace(np.nan,
-                                                      '00:00:00:00:00:00,-115 [-119, -118, -117]',
+                                                      '00:00:00:00:00:00,-115 [-115, -115, -115]',
                                                       inplace=True)
         self.df['RX MCS [MAC,MCS;MAC,MCS ...]'].replace(np.nan,
                                                         '00:00:00:00:00:00,-1',
@@ -95,8 +120,8 @@ class FieldTestLogPlotter:
         # Drop any DF lines where timestamp is NaN
         self.df.dropna(subset=['Timestamp'], inplace=True)
         # Drop corrupted DF lines i.e. the ones where the
-        # last expected csv file column is empty.
-        self.df.dropna(subset=self.df.columns[-1], inplace=True)
+        # last expected csv file column (with 'normally guaranteed' data) is empty.
+        self.df.dropna(subset=['3v3 current [mA]'], inplace=True)
         # Reindex DF after any possible line drops
         self.df.reset_index(drop=True, inplace=True)
 
@@ -178,11 +203,23 @@ class FieldTestLogPlotter:
                     self.df[rssi_ant1_dbm] = None
                 if rssi_ant2_dbm not in self.df.columns:
                     self.df[rssi_ant2_dbm] = None
-                # Assign data using row index
+
+                # Assign data using row index. Log is assumed to contain at least RSSI
+                # sum value in index 1. Antenna specific values are treated as optional
+                # and in case they are missing then default value is filled to dataframe
                 self.df.loc[df_row_index, rssi_dbm] = pd.to_numeric(rssi_data[1])
-                self.df.loc[df_row_index, rssi_ant0_dbm] = pd.to_numeric(rssi_data[2])
-                self.df.loc[df_row_index, rssi_ant1_dbm] = pd.to_numeric(rssi_data[3])
-                self.df.loc[df_row_index, rssi_ant2_dbm] = pd.to_numeric(rssi_data[4])
+                if len(rssi_data) > 2:
+                    self.df.loc[df_row_index, rssi_ant0_dbm] = pd.to_numeric(rssi_data[2])
+                else:
+                    self.df.loc[df_row_index, rssi_ant0_dbm] = OUT_OF_SCALE_RSSI
+                if len(rssi_data) > 3:
+                    self.df.loc[df_row_index, rssi_ant1_dbm] = pd.to_numeric(rssi_data[3])
+                else:
+                    self.df.loc[df_row_index, rssi_ant1_dbm] = OUT_OF_SCALE_RSSI
+                if len(rssi_data) > 4:
+                    self.df.loc[df_row_index, rssi_ant2_dbm] = pd.to_numeric(rssi_data[4])
+                else:
+                    self.df.loc[df_row_index, rssi_ant2_dbm] = OUT_OF_SCALE_RSSI
 
         # Convert string/object type data to float
         for _mac in self.mac_list:
@@ -962,9 +999,13 @@ class FieldTestLogPlotter:
 
         subtitle = '_rssi_levels_per_time_' + _mac
         figure_title = self.filename.replace(self.__homedir, '') + subtitle
-        self.df.plot(ax=ax_rssi, x=x_axis, y=rssi_ant0_dbm)
-        self.df.plot(ax=ax_rssi, x=x_axis, y=rssi_ant1_dbm)
-        self.df.plot(ax=ax_rssi, x=x_axis, y=rssi_ant2_dbm)
+        # Include only those antennas to plot that has some real RSSI levels
+        if self.df[rssi_ant0_dbm].max() > OUT_OF_SCALE_RSSI:
+            self.df.plot(ax=ax_rssi, x=x_axis, y=rssi_ant0_dbm)
+        if self.df[rssi_ant1_dbm].max() > OUT_OF_SCALE_RSSI:
+            self.df.plot(ax=ax_rssi, x=x_axis, y=rssi_ant1_dbm)
+        if self.df[rssi_ant2_dbm].max() > OUT_OF_SCALE_RSSI:
+            self.df.plot(ax=ax_rssi, x=x_axis, y=rssi_ant2_dbm)
         self.df.plot(ax=ax_rssi, title=figure_title,
                      grid=True, x=x_axis, y=rssi_dbm,
                      xticks=(np.arange(min_time, max_time, x_interval)),
@@ -1253,7 +1294,7 @@ if __name__ == '__main__':
     is_stationary = False
     x_start_val = None
     x_stop_val = None
-    tp_unit = 'b'
+    tp_unit = 'Mb'
 
     if os.path.isdir(path):
         os.chdir(path)

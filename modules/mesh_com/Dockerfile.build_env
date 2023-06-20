@@ -27,7 +27,7 @@ RUN groupadd -g $GID builder && \
     usermod -aG sudo builder && \
     echo 'builder ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-RUN echo "deb [trusted=yes] https://ssrc.jfrog.io/artifactory/ssrc-debian-public-remote focal fog-sw" >> /etc/apt/sources.list
+RUN echo "deb [trusted=yes] https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local focal fog-sw" >> /etc/apt/sources.list
 
 WORKDIR /$PACKAGE_NAME
 
