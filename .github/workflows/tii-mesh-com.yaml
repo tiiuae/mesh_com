@@ -1,5 +1,9 @@
 name: tii-mesh-com
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   push:
     branches: [ main, develop ]
