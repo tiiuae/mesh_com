@@ -61,8 +61,8 @@ if [ "$1" == "init" ]; then
             fi
         done
         # Start executor. Required to publish ROS2 topic.
+        sleep 120
         echo "INFO: Starting ROS topic"
-        sleep 30
         /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
         sleep 86400
     elif [ "$DRONE_TYPE" == "groundstation" ]; then
@@ -79,8 +79,8 @@ if [ "$1" == "init" ]; then
             fi
         done
         # Start executor. Required to publish ROS2 topic.
+        sleep 120
         echo "INFO: Starting ROS topic"
-        sleep 30
         /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
         sleep 86400
     elif [ "$DRONE_TYPE" == "fog" ]; then
@@ -107,8 +107,8 @@ if [ "$1" == "init" ]; then
             fi
         done
         # Start executor. Required to publish ROS2 topic.
+        sleep 120
         echo "INFO: Starting ROS topic"
-        sleep 30
         /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
         sleep 86400
     elif [ "$DRONE_TYPE" == "singlemesh" ]; then
@@ -129,8 +129,8 @@ if [ "$1" == "init" ]; then
             fi
         done
         # Start executor. Required to publish ROS2 topic.
+        sleep 120
         echo "INFO: Starting ROS topic"
-        sleep 30
         /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
         sleep 86400
     else
