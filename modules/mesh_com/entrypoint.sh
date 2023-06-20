@@ -54,8 +54,7 @@ if [ "$1" == "init" ]; then
         echo "INFO: Checking if drone is provisioned..."
         while true; do
             if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
-                echo "INFO: Waiting until drone is provisioned..."
-                sleep 5
+                sleep 10
             else
                 echo "INFO: Drone is provisioned, continuing"
                 break
@@ -72,8 +71,7 @@ if [ "$1" == "init" ]; then
         echo "INFO: Checking if drone is provisioned..."
         while true; do
             if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
-                echo "INFO: Waiting until drone is provisioned..."
-                sleep 5
+                sleep 10
             else
                 echo "INFO: Drone is provisioned, continuing"
                 break
@@ -100,8 +98,7 @@ if [ "$1" == "init" ]; then
         echo "INFO: Checking if drone is provisioned..."
         while true; do
             if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
-                echo "INFO: Waiting until drone is provisioned..."
-                sleep 5
+                sleep 10
             else
                 echo "INFO: Drone is provisioned, continuing"
                 break
@@ -122,8 +119,7 @@ if [ "$1" == "init" ]; then
         echo "INFO: Checking if drone is provisioned..."
         while true; do
             if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
-                echo "INFO: Waiting until drone is provisioned..."
-                sleep 5
+                sleep 10
             else
                 echo "INFO: Drone is provisioned, continuing"
                 break
