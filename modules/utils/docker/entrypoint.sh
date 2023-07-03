@@ -152,20 +152,11 @@ install_packages()
 mesh_service()
 {
   #start mesh service if mesh provisioning is done
-  hw_platform=$(grep Model /proc/cpuinfo| awk '{print $5}')
-  if [ "$hw_platform" == "Compute" ]; then
-    if [ -f "/opt/S9011sMesh" ]; then
-      #start Mesh service
-      echo "starting 11s mesh service"
-      /opt/S9011sMesh start
-      sleep 2
-    fi
-  else
-    if [ -f "/opt/S90mesh" ]; then
-      echo "starting ibss mesh service"
-      /opt/S90mesh start
-      sleep 2
-    fi
+  if [ -f "/opt/S9011sMesh" ]; then
+    #start Mesh service
+    echo "starting 11s mesh service"
+    /opt/S9011sMesh start
+    sleep 2
   fi
 }
 
