@@ -12,6 +12,8 @@ build_number=${GITHUB_RUN_NUMBER:=0}
 
 ros_distro=${ROS_DISTRO:=humble}
 
+ubuntu_version=${UBUNTU_VERSION:=$(lsb_release -c -s)}
+
 iname=${PACKAGE_NAME:=mesh_com}
 
 iversion=${PACKAGE_VERSION:=latest}
@@ -22,6 +24,7 @@ docker build \
   --build-arg ROS_DISTRO=${ros_distro} \
   --build-arg PACKAGE_NAME=${iname} \
   --pull \
+  --output type=docker \
   -f ./modules/mesh_com/Dockerfile.build_env -t "${iname}_build:${iversion}" .
 
 docker run \
@@ -30,7 +33,8 @@ docker run \
   ${iname}_build:${iversion} \
   modules/mesh_com/package.sh \
   ${build_number} \
-  ${git_version_string}
+  ${git_version_string} \
+  ${ubuntu_version}
 
 mkdir -p ${output_dir}
 cp modules/*.deb ${output_dir}

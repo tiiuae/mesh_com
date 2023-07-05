@@ -1,0 +1,47 @@
+# mesh_com BUILDER
+FROM ros:humble-ros-base as builder
+
+# Install build dependencies
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+    curl \
+    python3-bloom \
+    fakeroot \
+    dh-make \
+    dh-python \
+    python3-pytest \
+    ros-humble-ament-flake8 \
+    ros-humble-ament-pep257 \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG GIT_VERSION_STRING
+# Build mesh_com
+WORKDIR /mesh_com/src
+ADD . /mesh_com/src
+RUN modules/mesh_com/package.sh 0 $GIT_VERSION_STRING
+
+
+# tii-mesh-com image
+FROM ros:humble-ros-core
+
+RUN echo "deb [trusted=yes] https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local jammy fog-sw" >> /etc/apt/sources.list
+
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+    wpasupplicant \
+    iw \
+    batctl \
+    alfred \
+    rfkill \
+    iproute2 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PACKAGE_NAME mesh_com
+ENTRYPOINT ["/mesh_com/entrypoint.sh"]
+
+COPY modules/mesh_com/ros-with-env.sh /usr/bin/ros-with-env
+
+COPY --from=builder /mesh_com/src/modules/mesh_com/entrypoint.sh /mesh_com/entrypoint.sh
+
+# Install mesh_com
+WORKDIR /mesh_com
+COPY --from=builder /mesh_com/src/modules/*.deb .
+RUN dpkg -i *.deb && rm -f *.deb
