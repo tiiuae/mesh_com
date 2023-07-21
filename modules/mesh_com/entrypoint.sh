@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-source /opt/ros/humble/setup.bash
+source /opt/ros/${ROS_DISTRO}/setup.bash
 
 # I don't know what we're doing wrong, but Python isn't able to resolve mesh packages without this.
 # (other Python packages seem to reside under /usr/lib/python3/dist-packages)
@@ -42,128 +42,43 @@ if [ "$1" == "init" ]; then
     sysctl -w net.ipv6.conf.all.disable_ipv6=0
     sysctl -w net.ipv6.conf.default.disable_ipv6=0
 
-# Set IP based on drone role/type. This code block should be moved to a separate file in future.
-    if [ "$DRONE_TYPE" == "recon" ]; then
-        # 192.168.240.1-192.168.246.254
-        DEFAULT_MESH_IP="192.168.$[ $RANDOM % 7 + 240 ].$[ $RANDOM % 254 + 1 ]"
+    # Check if mesh is in "default" mode
+    if [[ "$MESH_ESSID" == *default* ]]; then
+        echo "Proceeding to DEFAULT mesh..."
+        # Call default_mesh.sh
+        /opt/ros/${ROS_DISTRO}/share/bin/default-mesh.sh
 
-        /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-        echo "mesh setup done"
-        gateway_ip="192.168.247.10" # FIXME: hardcoded for now. later detect automatically.
-        route add default gw $gateway_ip bat0
-        echo "INFO: Checking if drone is provisioned..."
-        while true; do
-            if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
-                sleep 10
-            else
-                echo "INFO: Drone is provisioned, continuing"
-                break
-            fi
-        done
-        # Start executor. Required to publish ROS2 topic.
-        sleep 120
-        echo "INFO: Starting ROS topic"
-        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
-        sleep 86400
-    elif [ "$DRONE_TYPE" == "groundstation" ]; then
-        DEFAULT_MESH_IP="192.168.248.1"
-        /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-        echo "mesh setup done"
-        echo "INFO: Checking if drone is provisioned..."
-        while true; do
-            if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
-                sleep 10
-            else
-                echo "INFO: Drone is provisioned, continuing"
-                break
-            fi
-        done
-        # Start executor. Required to publish ROS2 topic.
-        sleep 120
-        echo "INFO: Starting ROS topic"
-        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
-        sleep 86400
-    elif [ "$DRONE_TYPE" == "fog" ]; then
-        if [ "$MESH_CLASS" == "edge" ]; then
-            DEFAULT_MESH_IP="192.168.247.10"
-        else
-            # mesh class is gs
-            DEFAULT_MESH_IP="192.168.248.10"
-        fi
-
-        /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-        echo "mesh setup done"
-        if [ "$MESH_CLASS" == "gs" ]; then
-            gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
-            route add default gw $gateway_ip bat0
-        fi
-        echo "INFO: Checking if drone is provisioned..."
-        while true; do
-            if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
-                sleep 10
-            else
-                echo "INFO: Drone is provisioned, continuing"
-                break
-            fi
-        done
-        # Start executor. Required to publish ROS2 topic.
-        sleep 120
-        echo "INFO: Starting ROS topic"
-        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
-        sleep 86400
-    elif [ "$DRONE_TYPE" == "singlemesh" ]; then
-        # 192.168.248.11-192.168.248.253
-        DEFAULT_MESH_IP="192.168.248.$[ $RANDOM % 243 + 11 ]"
-        /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-        echo "mesh setup done"
-            # mesh class is gs
-        gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
-        route add default gw $gateway_ip bat0
-        echo "INFO: Checking if drone is provisioned..."
-        while true; do
-            if [ "$DRONE_DEVICE_ID" = "bootstrap" ]; then
-                sleep 10
-            else
-                echo "INFO: Drone is provisioned, continuing"
-                break
-            fi
-        done
-        # Start executor. Required to publish ROS2 topic.
-        sleep 120
-        echo "INFO: Starting ROS topic"
-        /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
-        sleep 86400
     else
-        echo "drone type not implemented: $DRONE_TYPE"
-        exit 1
+        echo "Mesh is not DEFAULT"
     fi
+
 
     # Start mesh executor 
     #                     1      2    3      4        5     6       7      8         9         10          11        12             13         14
     # Usage: mesh-11s.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface> <phyname> <routing_algo> <mtu_size> <log_dir>
     # 
     # Number:      Parameter:                    Environment Variable:
-    # 1            <mode>                        $DEFAULT_MESH_MODE
-    # 2            <ip>                          $DEFAULT_MESH_IP
-    # 3            <mask>                        $DEFAULT_MESH_MASK
-    # 4            <AP MAC>                      $DEFAULT_MESH_MAC
-    # 5            <key>                         $DEFAULT_MESH_KEY
-    # 6            <essid>                       $DEFAULT_MESH_ESSID
-    # 7            <freq>                        $DEFAULT_MESH_FREQ
-    # 8	           <txpower>                     $DEFAULT_MESH_TX
-    # 9	           <country>                     $DEFAULT_MESH_COUNTRY
-    # 10           <interface> - optional        $DEFAULT_MESH_IFACE
-    # 11           <phyname> - optional          $DEFAULT_MESH_PHY
-    # 12           <routing_algo> - optional     $DEFAULT_MESH_RTALG
-    # 13           <mtu_dir>   - optional        $DEFAULT_MESH_MTU
-    # 14           <log_dir>   - optional        $DEFAULT_MESH_LOG
+    # 1            <mode>                        $MESH_MODE
+    # 2            <ip>                          $MESH_IP
+    # 3            <mask>                        $MESH_MASK
+    # 4            <AP MAC>                      $MESH_MAC
+    # 5            <key>                         $MESH_KEY
+    # 6            <essid>                       $MESH_ESSID
+    # 7            <freq>                        $MESH_FREQ
+    # 8	           <txpower>                     $MESH_TX
+    # 9	           <country>                     $MESH_COUNTRY
+    # 10           <interface> - optional        $MESH_IFACE
+    # 11           <phyname> - optional          $MESH_PHY
+    # 12           <routing_algo> - optional     $MESH_RTALG
+    # 13           <mtu_dir>   - optional        $MESH_MTU
+    # 14           <log_dir>   - optional        $MESH_LOG
     #
     # example:
     #     mesh-11s.sh mesh 192.168.1.2 255.255.255.0 00:11:22:33:44:55 1234567890 mymesh 5220 30 fi wlan1 phy1
     #     mesh-11s.sh ap
 
     #starting Default mesh
-    # /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+    # /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $MESH_MODE $MESH_IP $MESH_MASK $MESH_MAC $MESH_KEY $MESH_ESSID $MESH_FREQ $MESH_TX $MESH_COUNTRY
     # gateway_ip=$(python3 /usr/bin/default_mesh_router_select.py)
     # route add default gw $gateway_ip bat0
     # sleep 86400
