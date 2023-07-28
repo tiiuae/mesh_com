@@ -21,7 +21,7 @@ if [ "$DRONE_TYPE" == "recon" ]; then
     sleep 120
     echo "INFO: Starting ROS topic"
     /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
-    sleep 86400
+    sleep 604800
 elif [ "$DRONE_TYPE" == "groundstation" ]; then
     MESH_IP="192.168.248.1"
     /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $MESH_MODE $MESH_IP $MESH_MASK $MESH_MAC $MESH_KEY $MESH_ESSID $MESH_FREQ $MESH_TX $MESH_COUNTRY
@@ -39,7 +39,7 @@ elif [ "$DRONE_TYPE" == "groundstation" ]; then
     sleep 120
     echo "INFO: Starting ROS topic"
     /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
-    sleep 86400
+    sleep 604800
 elif [ "$DRONE_TYPE" == "fog" ]; then
     if [ "$MESH_CLASS" == "edge" ]; then
         MESH_IP="192.168.247.10"
@@ -66,7 +66,7 @@ elif [ "$DRONE_TYPE" == "fog" ]; then
     sleep 120
     echo "INFO: Starting ROS topic"
     /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
-    sleep 86400
+    sleep 604800
 elif [ "$DRONE_TYPE" == "singlemesh" ]; then
     # 192.168.248.11-192.168.248.253
     MESH_IP="192.168.248.$[ $RANDOM % 243 + 11 ]"
@@ -88,7 +88,7 @@ elif [ "$DRONE_TYPE" == "singlemesh" ]; then
     sleep 120
     echo "INFO: Starting ROS topic"
     /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
-    sleep 86400
+    sleep 604800
 else
     echo "drone type not implemented: $DRONE_TYPE"
     exit 1

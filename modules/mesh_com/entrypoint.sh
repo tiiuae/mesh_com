@@ -46,7 +46,6 @@ if [ "$1" == "init" ]; then
     if [[ "$MESH_ESSID" == *default* ]]; then
         echo "Proceeding to DEFAULT mesh..."
         # Call default_mesh.sh
-        chmod 755 /opt/ros/${ROS_DISTRO}/share/bin/default-mesh.sh
         /opt/ros/${ROS_DISTRO}/share/bin/default-mesh.sh
 
     else
