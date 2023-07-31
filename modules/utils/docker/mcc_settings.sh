@@ -65,8 +65,8 @@ cat <<EOF >/var/run/hostapd.conf
 country_code=AE
 interface=$ifname_ap
 ssid=$ssid
-hw_mode=g
-channel=7
+hw_mode=$retval_band
+channel=$retval_channel
 macaddr_acl=0
 auth_algs=1
 ignore_broadcast_ssid=0
@@ -85,11 +85,18 @@ if [ "$algo" = "olsr" ]; then
       iptables -A FORWARD --in-interface "$mesh_if" -j ACCEPT
       killall olsrd 2>/dev/null
       (olsrd -i br-lan -d 0)&
+      ifconfig "$mesh_if" mtu 1500
 else
       ##batman-adv###
       brctl addif br-lan bat0 "$ifname_ap"
       iptables -A FORWARD --in-interface bat0 -j ACCEPT
+      ifconfig bat0 mtu 1500
 fi
+
+# Set mtu back to 1500 to support e2e connectivity
+# TODO: Investigate this as it should still work with 1460
+ifconfig br-lan mtu 1500
+
 ifconfig br-lan "$br_lan_ip" netmask "255.255.255.0"
 ifconfig br-lan up
 echo

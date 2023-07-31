@@ -50,6 +50,11 @@ if [ -f "$COMMS_PCB_VERSION_FILE" ]; then
 fi
 echo $eth_port
 
+# Set mtu back to 1500 to support e2e connectivity
+# TODO: Investigate this as it should still work with 1460
+ifconfig bat0 mtu 1500
+ifconfig br-lan mtu 1500
+
 brctl addif br-lan bat0 $eth_port
 echo $br_lan_ip
 ifconfig br-lan $br_lan_ip netmask "255.255.255.0"
