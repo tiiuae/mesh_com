@@ -1,9 +1,9 @@
 #!/bin/bash -e
 
 # Set IP based on drone role/type.
-if [ "$DRONE_TYPE" == "recon" ]; then
+if [[ "$DRONE_TYPE" == "recon" || "$DRONE_TYPE" == "cm-fog" ]]; then
     # 192.168.240.1-192.168.246.254
-    DEFAULT_MESH_IP="192.168.$[ $RANDOM % 7 + 240 ].$[ $RANDOM % 254 + 1 ]"
+    MESH_IP="192.168.$[ $RANDOM % 7 + 240 ].$[ $RANDOM % 254 + 1 ]"
     /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $MESH_MODE $MESH_IP $MESH_MASK $MESH_MAC $MESH_KEY $MESH_ESSID $MESH_FREQ $MESH_TX $MESH_COUNTRY
     echo "mesh setup done"
     gateway_ip="192.168.247.10" # FIXME: hardcoded for now. later detect automatically.
@@ -67,7 +67,7 @@ elif [ "$DRONE_TYPE" == "fog" ]; then
     echo "INFO: Starting ROS topic"
     /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
     sleep 604800
-elif [ "$DRONE_TYPE" == "singlemesh" ]; then
+elif [[ "$DRONE_TYPE" == "singlemesh" || "$DRONE_TYPE" == "r-cm-fog" ]]; then
     # 192.168.248.11-192.168.248.253
     MESH_IP="192.168.248.$[ $RANDOM % 243 + 11 ]"
     /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $MESH_MODE $MESH_IP $MESH_MASK $MESH_MAC $MESH_KEY $MESH_ESSID $MESH_FREQ $MESH_TX $MESH_COUNTRY

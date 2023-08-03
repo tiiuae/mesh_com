@@ -46,6 +46,7 @@ if [ "$1" == "init" ]; then
     if [[ "$MESH_ESSID" == *default* ]]; then
         echo "Proceeding to DEFAULT mesh..."
         # Call default_mesh.sh
+        nohup python3 -u /usr/bin/default_mesh_router_select.py
         /opt/ros/${ROS_DISTRO}/share/bin/default-mesh.sh
 
     else
@@ -79,9 +80,7 @@ if [ "$1" == "init" ]; then
 
     #starting Default mesh
     # /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $MESH_MODE $MESH_IP $MESH_MASK $MESH_MAC $MESH_KEY $MESH_ESSID $MESH_FREQ $MESH_TX $MESH_COUNTRY
-    # gateway_ip=$(python3 /usr/bin/default_mesh_router_select.py)
-    # route add default gw $gateway_ip bat0
-    # sleep 86400
+    
 else
     echo "INFO: Start mesh pub&sub"
 
