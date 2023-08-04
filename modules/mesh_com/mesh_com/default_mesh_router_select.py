@@ -22,51 +22,57 @@ def switch_gateway(gateway):
 # Check drone role. Here is also a dummy for adding other drone roles to the array
 drone_type = os.environ.get('DRONE_TYPE')
 if drone_type in ['recon']:
-    # Read the gw.txt file and store gateways in a list
-    with open('gw.txt') as f:
-        gateways = f.read().splitlines()
-
-    # Verify if all the gateways are in the correct IP format
-    parse_ip = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
-    valid_gateways = all(parse_ip.match(gateway) for gateway in gateways)        
-
-    if valid_gateways:
-        # Set the default gateway to the first entry
-        default_gateway = gateways[0]
-
-        # Variable to track the downtime of the current gateway
-        current_gateway_down_time = 0
-
-        # Variable to track if a gateway switch is happening
-        gateway_switching = False
-
-        # Loop continuously to monitor the gateway
-        while True:
-            if check_gateway(default_gateway):
-                current_gateway_down_time = 0
-            else:
-                print(f"FOG gateway ({default_gateway}) is unreachable.")
-                current_gateway_down_time += 1
+    # Extract the gateway range from the 'MESH_FOG_GW_LIST' environment variable
+    gw_list_value = os.environ.get('MESH_FOG_GW_LIST')
+    match = re.match(r'(\d+\.\d+\.\d+\.\d+)-(\d+)', gw_list_value)
     
-                # Start available gateways check procedure if the downtime is 10 seconds or more
-                if current_gateway_down_time >= 10:
-                    # Wait for 1 second before switching to the next gateway
-                    time.sleep(1)
-    
-                    for gateway in gateways:
-                        if check_gateway(gateway):
-                            if gateway != default_gateway:
-                                gateway_switching = True
-                                switch_gateway(gateway)
-                                default_gateway = gateway
-                                gateway_switching = False
-                                current_gateway_down_time = 0  # Reset downtime counter
-                            break
-            # Wait for 1 second before checking the current gateway again
-            time.sleep(1)
+    if match:
+        start_ip = match.group(1)
+        end_ip = match.group(2)
+        gateways = [f"{start_ip[:-len(end_ip)]}{i}" for i in range(int(start_ip[-len(end_ip):]), int(end_ip) + 1)]
+    else:
+        print("Invalid gateway range format in gw_list. Please check the environment variable.")
+        exit(1)
+
+
+    # Set the default gateway to the first entry
+    default_gateway = gateways[0]
+
+    # Variable to track the downtime of the current gateway
+    current_gateway_down_time = 0
+
+    # Variable to track if a gateway switch is happening
+    gateway_switching = False
+
+    # Loop continuously to monitor the gateway
+    while True:
+        if check_gateway(default_gateway):
+            # Reset the downtime counter if the gateway is reachable
+            current_gateway_down_time = 0
+        else:
+            current_gateway_down_time += 1
+
+            # Start available gateways check procedure if the downtime is 10 seconds or more
+            if current_gateway_down_time >= 10:
+                # Wait for 2 seconds before switching to the next gateway
+                time.sleep(2)
+
+                for gateway in gateways:
+                    if check_gateway(gateway):
+                        if gateway != default_gateway:
+                            gateway_switching = True
+                            switch_gateway(gateway)
+                            default_gateway = gateway
+                            gateway_switching = False
+                            current_gateway_down_time = 0  # Reset downtime counter
+                        break
+            
+        # Wait for 1 second before checking the current gateway again
+        time.sleep(1)
+
             # Print when a gateway switch is happening
-            if gateway_switching:
-                print("Gateway switch in progress...")
+        if gateway_switching:
+            print("Gateway switch in progress...")
 else:
     print("This drone type doen not support FOG gateway switching")
 
