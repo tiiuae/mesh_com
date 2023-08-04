@@ -46,7 +46,7 @@ if [ "$1" == "init" ]; then
     if [[ "$MESH_ESSID" == *default* ]]; then
         echo "Proceeding to DEFAULT mesh..."
         # Call default_mesh.sh
-        nohup python3 -u /usr/bin/default_mesh_router_select.py
+        /opt/ros/${ROS_DISTRO}/lib/mesh_com/default_mesh_router_select &
         /opt/ros/${ROS_DISTRO}/share/bin/default-mesh.sh
 
     else
