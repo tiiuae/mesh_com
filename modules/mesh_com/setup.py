@@ -28,6 +28,7 @@ setup(
         'mesh_subscriber = mesh_com.mesh_subscriber:main',
         'mesh_publisher = mesh_com.mesh_publisher:main',
         'mesh_executor = mesh_com.mesh_executor:main',
+        'default_mesh_router_select = mesh_com.default_mesh_router_select:main',
         ],
     },
 )
