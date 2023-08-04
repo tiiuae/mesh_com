@@ -4,7 +4,7 @@ source /opt/ros/${ROS_DISTRO}/setup.bash
 
 # I don't know what we're doing wrong, but Python isn't able to resolve mesh packages without this.
 # (other Python packages seem to reside under /usr/lib/python3/dist-packages)
-export PYTHONPATH=/opt/ros/${ROS_DISTRO}/lib/python3.8/site-packages
+export PYTHONPATH=/opt/ros/${ROS_DISTRO}/lib/python3.10/site-packages
 
 # Needed in order to make ROS2 nodes exit gracefully.
 # SIGTERM signal is converted to SIGINT.

@@ -40,30 +40,33 @@ if drone_type in ['recon']:
         # Variable to track if a gateway switch is happening
         gateway_switching = False
 
-    # Loop continuously to monitor the gateway
-    while True:
-        if check_gateway(default_gateway):
-            print(f"FOG gateway ({default_gateway}) is reachable.")
-            # Reset the downtime counter if the gateway is reachable
-            current_gateway_down_time = 0
-        else:
-            print(f"FOG gateway ({default_gateway}) is unreachable.")
-            current_gateway_down_time += 1
-
-            # Start available gateways check procedure if the downtime is 10 seconds or more
-            if current_gateway_down_time >= 10:
-                # Wait for 1 second before switching to the next gateway
-                time.sleep(1)
-
-                for gateway in gateways:
-                    if check_gateway(gateway):
-                        print(f"Switching default FOG gateway to {gateway}...")
-                        switch_gateway(gateway)
-                        default_gateway = gateway
-                        current_gateway_down_time = 0  # Reset downtime counter
-                        break
-        # Wait for 1 second before checking the current gateway again
-        time.sleep(1)
+        # Loop continuously to monitor the gateway
+        while True:
+            if check_gateway(default_gateway):
+                current_gateway_down_time = 0
+            else:
+                print(f"FOG gateway ({default_gateway}) is unreachable.")
+                current_gateway_down_time += 1
+    
+                # Start available gateways check procedure if the downtime is 10 seconds or more
+                if current_gateway_down_time >= 10:
+                    # Wait for 1 second before switching to the next gateway
+                    time.sleep(1)
+    
+                    for gateway in gateways:
+                        if check_gateway(gateway):
+                            if gateway != default_gateway:
+                                gateway_switching = True
+                                switch_gateway(gateway)
+                                default_gateway = gateway
+                                gateway_switching = False
+                                current_gateway_down_time = 0  # Reset downtime counter
+                            break
+            # Wait for 1 second before checking the current gateway again
+            time.sleep(1)
+            # Print when a gateway switch is happening
+            if gateway_switching:
+                print("Gateway switch in progress...")
 else:
     print("This drone type doen not support FOG gateway switching")
 
