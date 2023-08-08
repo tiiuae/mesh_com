@@ -42,7 +42,7 @@ elif [ "$DRONE_TYPE" == "groundstation" ]; then
     sleep 604800
 elif [ "$DRONE_TYPE" == "fog" ]; then
     if [ "$MESH_CLASS" == "edge" ]; then
-        MESH_IP="192.168.247.10"
+        MESH_IP=$MESH_FOG_EDGE_IP
     else
         # mesh class is gs
         MESH_IP="192.168.248.10"
