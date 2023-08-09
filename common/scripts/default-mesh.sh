@@ -45,7 +45,7 @@ elif [ "$DRONE_TYPE" == "fog" ]; then
         MESH_IP=$MESH_FOG_EDGE_IP
     else
         # mesh class is gs
-        MESH_IP="192.168.248.10"
+        MESH_IP=$MESH_FOG_GS_IP
     fi
     /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $MESH_MODE $MESH_IP $MESH_MASK $MESH_MAC $MESH_KEY $MESH_ESSID $MESH_FREQ $MESH_TX $MESH_COUNTRY
     echo "mesh setup done"
