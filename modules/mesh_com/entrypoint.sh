@@ -1,6 +1,10 @@
 #!/bin/bash -e
 
-source /opt/ros/humble/setup.bash
+if [ -e /opt/ros/humble/setup.bash ]; then
+    source /opt/ros/humble/setup.bash
+else
+    ROS_DISTRO=humble
+fi
 
 # I don't know what we're doing wrong, but Python isn't able to resolve mesh packages without this.
 # (other Python packages seem to reside under /usr/lib/python3/dist-packages)
