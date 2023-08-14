@@ -45,8 +45,6 @@ if [ "$1" == "init" ]; then
     # Check if mesh is in "default" mode
     if [[ "$MESH_ESSID" == *default* ]]; then
         echo "Proceeding to DEFAULT mesh..."
-        # Call automatic router selection
-        #/opt/ros/${ROS_DISTRO}/lib/mesh_com/default_mesh_router_select &
         # Call default_mesh.sh
         /opt/ros/${ROS_DISTRO}/share/bin/default-mesh.sh
 
