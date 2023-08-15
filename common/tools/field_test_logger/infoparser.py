@@ -46,10 +46,12 @@ class InfoParser:
     InfoParser class is used to parse the information from the system and GPSD.
     """
 
-    def __init__(self):
+    def __init__(self, pcb_version: str):
         """
         Initialize the InfoParser class.
         """
+        self.__pcb_version = pcb_version
+        #
         self.__gpsd_connected = False
         self.__max17260_connected = True
         #
@@ -83,8 +85,6 @@ class InfoParser:
         self.__voltage_mpcie5 = "NaN"
         self.__current_mpcie7 = "NaN"
         self.__voltage_mpcie7 = "NaN"
-        self.__current_nrf2 = "NaN"
-        self.__voltage_nrf2 = "NaN"
         #
         self.__humidity = "NaN"
         self.__pressure = "NaN"
@@ -248,18 +248,6 @@ class InfoParser:
         """
         return self.__voltage_mpcie7
 
-    def get_nrf2_current(self):
-        """
-        Get NRF2 current
-        """
-        return self.__current_nrf2
-
-    def get_nrf2_voltage(self):
-        """
-        Get NRF2 voltage
-        """
-        return self.__voltage_nrf2
-
     def get_humidity(self):
         """
         Get humidity
@@ -321,43 +309,47 @@ class InfoParser:
         """
         Update INA231 status
         """
-        self.__current_mpcie3 = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0046/hwmon/hwmon*/curr1_input"))
-        self.__voltage_mpcie3 = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0046/hwmon/hwmon*/in1_input"))
-        self.__current_mpcie5 = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0045/hwmon/hwmon*/curr1_input"))
-        self.__voltage_mpcie5 = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0045/hwmon/hwmon*/in1_input"))
-        self.__current_mpcie7 = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0040/hwmon/hwmon*/curr1_input"))
-        self.__voltage_mpcie7 = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0040/hwmon/hwmon*/in1_input"))
-        self.__current_nrf2 = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0044/hwmon/hwmon*/curr1_input"))
-        self.__voltage_nrf2 = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0044/hwmon/hwmon*/in1_input"))
+        if self.__pcb_version == "1":
+            self.__current_mpcie3 = read_value(
+                get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0046/hwmon/hwmon*/curr1_input"))
+            self.__voltage_mpcie3 = read_value(
+                get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0046/hwmon/hwmon*/in1_input"))
+            self.__current_mpcie5 = read_value(
+                get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0045/hwmon/hwmon*/curr1_input"))
+            self.__voltage_mpcie5 = read_value(
+                get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0045/hwmon/hwmon*/in1_input"))
+            self.__current_mpcie7 = read_value(
+                get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0040/hwmon/hwmon*/curr1_input"))
+            self.__voltage_mpcie7 = read_value(
+                get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0040/hwmon/hwmon*/in1_input"))
+            self.__current_nrf = read_value(
+                get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0044/hwmon/hwmon*/curr1_input"))
+            self.__voltage_nrf = read_value(
+                get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0044/hwmon/hwmon*/in1_input"))
 
     def __update_ina2xx_status(self):
         """
         Update INA2xx status
         """
-        self.__current_nrf = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0040/hwmon/hwmon*/curr1_input"))
-        self.__voltage_nrf = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0040/hwmon/hwmon*/in1_input"))
+        if self.__pcb_version != "1":
+            self.__current_nrf = read_value(
+                get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0040/hwmon/hwmon*/curr1_input"))
+            self.__voltage_nrf = read_value(
+                get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0040/hwmon/hwmon*/in1_input"))
 
-        self.__current_3v3 = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0045/hwmon/hwmon*/curr1_input"))
-
-        self.__voltage_3v3 = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0045/hwmon/hwmon*/in1_input"))
+            self.__current_3v3 = read_value(
+                get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0045/hwmon/hwmon*/curr1_input"))
+            self.__voltage_3v3 = read_value(
+                get_hwmon_path("/sys/class/i2c-adapter/i2c-1/1-0045/hwmon/hwmon*/in1_input"))
 
         self.__current_dc = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-0/0-0041/hwmon/hwmon*/curr1_input"))
-
+            get_hwmon_path_from_options(
+                ["/sys/class/i2c-adapter/i2c-0/0-0041/hwmon/hwmon*/curr1_input",
+                "/sys/class/i2c-adapter/i2c-1/1-0041/hwmon/hwmon*/curr1_input"]))
         self.__voltage_dc = read_value(
-            get_hwmon_path("/sys/class/i2c-adapter/i2c-0/0-0041/hwmon/hwmon*/in1_input"))
+            get_hwmon_path_from_options(
+                ["/sys/class/i2c-adapter/i2c-0/0-0041/hwmon/hwmon*/in1_input",
+                "/sys/class/i2c-adapter/i2c-1/1-0041/hwmon/hwmon*/in1_input"]))
 
     def __update_temperatures(self):
         """

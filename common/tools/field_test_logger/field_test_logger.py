@@ -115,13 +115,19 @@ if __name__ == '__main__':
         INTERFACE_ARG = args.interface
 
     if args.unique is None or args.unique == "":
-        UNIQUE_ARG = ""
+        UNIQUE_ARG = f"_{INTERFACE_ARG}_{BATMAN_ARG}"
     else:
-        UNIQUE_ARG = f"_{args.unique}"
+        UNIQUE_ARG = f"_{INTERFACE_ARG}_{BATMAN_ARG}_{args.unique}"
+
+    try:
+        with open("/etc/comms_pcb_version", "r") as file_r:
+            PCB_VERSION = file_r.read().strip().split("=")[1]
+    except FileNotFoundError:
+        PCB_VERSION = "unknown"
 
     ftl = FieldTestLogger()
     wifi_stats = wifi_info.WifiInfo(LOGGING_INTERVAL_SECONDS, INTERFACE_ARG, BATMAN_ARG)
-    info = infoparser.InfoParser()
+    info = infoparser.InfoParser(PCB_VERSION)
 
     ftl.register_logger_function("Timestamp", timestamp)
     wifi_stats.update()
@@ -159,8 +165,6 @@ if __name__ == '__main__':
     ftl.register_logger_function("3V3 mpcie5 current [mA]", info.get_mpcie5_current)
     ftl.register_logger_function("3V3 mpcie7 voltage [mV]", info.get_mpcie7_voltage)
     ftl.register_logger_function("3V3 mpcie7 current [mA]", info.get_mpcie7_current)
-    ftl.register_logger_function("nrf2 voltage [mV]", info.get_nrf2_voltage)
-    ftl.register_logger_function("nrf2 current [mA]", info.get_nrf2_current)
 
     ftl.register_logger_function("bme280 rel. humidity [m%]", info.get_humidity)
     ftl.register_logger_function("bme280 pressure [kPa]", info.get_pressure)
