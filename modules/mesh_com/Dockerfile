@@ -44,6 +44,8 @@ RUN echo "deb http://security.ubuntu.com/ubuntu focal-security main" | tee /etc/
         libnl-route-3-200 \
         libpcsclite1 \
         libssl1.1 \
+        keepalived \
+        iputils-ping \
         # ifconfig not installed by default anymore
         net-tools && \
     rm -rf /var/lib/apt/lists/* && \
