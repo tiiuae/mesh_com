@@ -83,6 +83,8 @@ network={
     ieee80211w=2
     beacon_int=1000
     mesh_fwding=0
+    # 11b rates dropped (for better performance)
+    mesh_basic_rates=60 90 120 180 240 360 480 540
 }
 EOF
 
@@ -106,7 +108,13 @@ EOF
       iw phy "$phyname" interface add "$wifidev" type mp
   
       echo "Longer range tweak.."
-      iw phy "$phyname" set distance 1000
+      if [ "$priority" == "long_range" ]; then
+        iw phy "$phyname" set distance 8000
+      elif [ "$priority" == "low_latency" ]; then
+        iw phy "$phyname" set distance 0
+      else
+        iw phy "$phyname" set distance 1000
+      fi
 
       echo "$wifidev create 11s.."
       ifconfig "$wifidev" mtu 1560
@@ -303,6 +311,23 @@ main () {
   source /opt/mesh-helper.sh
   # sources mesh configuration
   source_configuration
+
+  # Modes: mesh, ap+mesh_scc, ap+mesh_mcc
+  # MODE=mesh
+  # IP=10.20.15.3
+  # MASK=255.255.255.0
+  # MAC=00:11:22:33:44:55
+  # KEY=1234567890
+  # ESSID=gold
+  # FREQ=5805
+  # FREQ_MCC=2412
+  # TXPOWER=30
+  # COUNTRY=AE
+  # MESH_VIF=wlp1s0
+  # PHY=phy0
+  # ROUTING=batman-adv
+  # ROLE=drone
+  # PRIORITY=long_range
   # set bridge ip, sets br_lan_ip
   generate_br_lan_ip
 
@@ -330,6 +355,8 @@ main () {
   algo=$ROUTING
   wifidev=$MESH_VIF
   phyname=$PHY
+  priority=$PRIORITY
+  role=$ROLE
 
   echo "Used: $wifidev $phyname"
 
