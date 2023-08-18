@@ -19,6 +19,5 @@ COPY modules/mesh_com/entrypoint.sh /entrypoint.sh
 # Replicate the ROS2 directory structure to so scripts do not need to be refactored.
 RUN mkdir -p /opt/ros/humble/share/bin/
 COPY common/scripts/mesh-11s.sh /opt/ros/humble/share/bin/mesh-11s.sh
-COPY common/scripts/mesh-ibss.sh /opt/ros/humble/share/bin/mesh-ibss.sh
 
 ENTRYPOINT [ "/entrypoint.sh" ]
