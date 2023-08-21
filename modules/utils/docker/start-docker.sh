@@ -62,17 +62,21 @@ if [ "$OS" == "Buildroot" ]; then
             cp /opt/mesh_default.conf /opt/container-data/mesh/
             cp $meshcom_path/common/scripts/mesh-11s.sh /opt/container-data/mesh/
             chmod 755 /opt/container-data/mesh/mesh-11s.sh
+            cp $meshcom_path/common/scripts/mesh-11s_nats.sh /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/mesh-11s_nats.sh
             cp $meshcom_path/common/scripts/mesh-helper.sh /opt/container-data/mesh/
             chmod 755 /opt/container-data/mesh/mesh-helper.sh
             cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S9011sMesh /opt/container-data/mesh/
             chmod 755 /opt/container-data/mesh/S9011sMesh
-            cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90APoint /opt/container-data/mesh/
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S9011sNatsMesh /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S9011sNatsMesh
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90APoint /opt/container-data/mesh/
             chmod 755 /opt/container-data/mesh/S90APoint
-            cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90nats_server /opt/container-data/mesh/
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90nats_server /opt/container-data/mesh/
             chmod 755 /opt/container-data/mesh/S90nats_server
-            cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90comms_controller /opt/container-data/mesh/
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90comms_controller /opt/container-data/mesh/
             chmod 755 /opt/container-data/mesh/S90comms_controller
-            cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90nats_discovery /opt/container-data/mesh/
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90nats_discovery /opt/container-data/mesh/
             chmod 755 /opt/container-data/mesh/S90nats_discovery
             cp -R $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/ /opt/container-data/mesh/
             chmod -R 755 /opt/container-data/mesh/nats/*.py

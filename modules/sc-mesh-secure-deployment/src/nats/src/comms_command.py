@@ -147,7 +147,7 @@ class Command:  # pylint: disable=too-few-public-methods
                 # Not fatal
                 self.logger.debug("Failed to delete hash file")
 
-        for process in ["/opt/S9011sMesh", "/opt/S90APoint"]:
+        for process in ["/opt/S9011sNatsMesh", "/opt/S90APoint"]:
             # Restart mesh with default settings
             ret = subprocess.run([process, "restart"],
                                  shell=False, check=True, capture_output=True)
@@ -201,7 +201,7 @@ class Command:  # pylint: disable=too-few-public-methods
             # matches then mission config is applied. Otherwise, default mesh
             # is applied. That logic is based on assumption that some
             # wireless connectivity needs to be ensured after reboot.
-            for process in ["/opt/S9011sMesh", "/opt/S90APoint"]:
+            for process in ["/opt/S9011sNatsMesh", "/opt/S90APoint"]:
                 ret = subprocess.run([process, "restart"],
                                      shell=False, check=True,
                                      capture_output=True)
@@ -218,7 +218,7 @@ class Command:  # pylint: disable=too-few-public-methods
 
     def __radio_down(self) -> (str, str):
 
-        for process in ["/opt/S9011sMesh", "/opt/S90APoint"]:
+        for process in ["/opt/S9011sNatsMesh", "/opt/S90APoint"]:
             ret = subprocess.run([process, "stop"],
                                  shell=False, check=True, capture_output=True)
             if ret.returncode != 0:
@@ -233,7 +233,7 @@ class Command:  # pylint: disable=too-few-public-methods
 
     def __radio_up(self) -> (str, str):
 
-        for process in ["/opt/S9011sMesh", "/opt/S90APoint"]:
+        for process in ["/opt/S9011sNatsMesh", "/opt/S90APoint"]:
             ret = subprocess.run([process, "start"],
                                  shell=False, check=True,
                                  capture_output=True)

@@ -1,6 +1,6 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          S9011sAP
+# Provides:          S9011APoint
 # Should-Start:      $syslog
 # Should-Stop:       $syslog
 # Default-Start:     2 3 4 5
@@ -10,7 +10,7 @@
 #                    automatically
 ### END INIT INFO
 
-DAEMON="mesh-11s.sh"
+DAEMON="mesh-11s_nats.sh"
 DIR="/opt/"
 PIDFILE="/var/run/{$DAEMON}_hostapd.pid"
 LOG_FILE=/opt/mesh-11s_AP.log
