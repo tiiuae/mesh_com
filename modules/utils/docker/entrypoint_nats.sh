@@ -6,7 +6,6 @@ source /opt/mesh-helper.sh
 source_configuration
 
 if [ "$MSVERSION" != "nats" ]; then
-  cp /opt/mesh_default.conf /opt/mesh.conf
   /bin/bash /usr/local/bin/entrypoint.sh
 else
 
@@ -39,7 +38,6 @@ else
   /opt/S90nats_server start
   /opt/S90comms_controller start
 
-  #start gw manager TBD
+  # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"
-  # nohup python -u /opt/mesh_com/modules/sc-mesh-secure-deployment/src/gw/main.py
 fi
