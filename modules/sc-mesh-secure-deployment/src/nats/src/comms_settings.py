@@ -129,6 +129,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         """
         try:
             with open(f"{path}/{file}", "w", encoding="utf-8") as mesh_conf:
+                mesh_conf.write(f"MSVERSION=nats\n")
                 mesh_conf.write(f"MODE={quote(self.mode)}\n")
                 mesh_conf.write("IP=10.20.15.3\n")
                 mesh_conf.write("MASK=255.255.255.0\n")
