@@ -47,12 +47,13 @@ if [ "$OS" == "Buildroot" ]; then
                 cp /etc/comms_pcb_version /opt/container-data/mesh/hardware/comms_pcb_version
             fi
         fi
-        running=$(docker container inspect -f '{{.State.Running}}' "mesh_comms_vm")
         # change rootfs location once its mounted in dedicated partition
-        if  "$running" == "true" ]; then
-            echo "mesh_comms_vm is running"
+        running=$(docker container inspect -f '{{.State.Running}}' "mesh_comms_vm")
+        if [ "$running" == "true" ]; then
+            echo "no need to import"
         elif [ -f "/root/rootfs.tgz" ]; then
             echo "import rootfs.tgz commms vm"
+            # shellcheck disable=SC2002
             cat /root/rootfs.tgz | docker import - comms_vm
             docker build -t comms_vm .
         fi

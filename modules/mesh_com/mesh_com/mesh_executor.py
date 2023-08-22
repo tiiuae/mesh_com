@@ -8,6 +8,7 @@ import subprocess
 import syslog
 import select
 import threading
+import os
 
 try:
     # in deb import
@@ -53,15 +54,25 @@ class MeshNetwork:
         self.batman_visual = BatAdvVis()
         self.batman = Batman()
         self.status = STATUS()
-
+        self.mesh_class = ""
+        self.mesh_params_ros = ""
+        self.mesh_params = ""
+                
     def __handle_msg(self, msg):
+        ###  1st level
+        # {
+        # "edge": {2-nd level},                 mesh network class: can be "edge" or "gs"
+        #                                                           edge=EDGE mesh network, 
+        #                                                           gs=GS mesh network
+        # }
 
+        ###  2nd level
         # {
         #     "api_version": 1,                 interface version for future purposes
         #     "ssid": "gold",                   0-32 octets, UTF-8, shlex.quote chars limiting
         #     "key": "foobar",                  key for the network
         #     "ap_mac": "00:11:22:33:44:55",    bssid for mesh network
-        #     "country": "UA",                  Country code, sets tx power limits and supported
+        #     "country": "FI",                  Country code, sets tx power limits and supported
         #                                       channels
         #     "frequency": "5220",              wifi channel frequency, depends on the country
         #                                       code and HW
@@ -73,9 +84,42 @@ class MeshNetwork:
         #                                       purposes (e.g. 5dBm)
         #     "mode": "mesh"                    mesh=mesh network, ap=debug hotspot
         # }
+        
+        #
+        #Read environment variable to determine the mesh network class
+        try:
+            self.mesh_class=os.environ.get('MESH_CLASS')
+        except (json.decoder.JSONDecodeError, KeyError,
+                TypeError, AttributeError) as error:
+            print("Environment variable MESH_CLASS not set")
+            syslog.syslog("Environment variable MESH_CLASS not set")
+            syslog.syslog(str(error))
+        try:
+            self.mesh_params_ros=json.loads(msg)
+        except (json.decoder.JSONDecodeError, KeyError,
+                TypeError, AttributeError) as error:
+            print("JSON format not correct, msg processing error. Probably incorrect Google IoT 'initial-wifi' settings")
+            syslog.syslog("JSON format not correct, msg processing error. Probably incorrect Google IoT 'initial-wifi' settings")
+            syslog.syslog(str(error))
+
+        #Read mesh parameters according to the MESH_CLASS and convert it to normal JSON
+        try:
+            self.mesh_params=str(self.mesh_params_ros[self.mesh_class])
+        except (json.decoder.JSONDecodeError, KeyError,
+                TypeError, AttributeError) as error:
+            print("JSON format not correct, MESH_CLASS processing error. Probably incorrect Google IoT 'initial-wifi' settings")
+            syslog.syslog("JSON format not correct, MESH_CLASS processing error. Probably incorrect Google IoT 'initial-wifi' settings")
+            syslog.syslog(str(error))
+        try:
+            self.mesh_params=self.mesh_params.replace("\'", "\"")
+        except (json.decoder.JSONDecodeError, KeyError,
+                TypeError, AttributeError) as error:
+            print("JSON format not correct, msg processing error. Probably incorrect Google IoT 'initial-wifi' settings")
+            syslog.syslog("JSON format not correct. Error while processing 2nd lvl JSON message. Probably incorrect Google IoT 'initial-wifi' settings")
+            syslog.syslog(str(error))
 
         try:
-            parameters = json.loads(msg)
+            parameters = json.loads(self.mesh_params)
             self.settings.api_version = int(parameters["api_version"])
             self.settings.ssid = str(parameters["ssid"])
             self.settings.key = str(parameters["key"])
@@ -90,6 +134,7 @@ class MeshNetwork:
             self.__change_configuration()
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
+            print("JSON format not correct")
             syslog.syslog("JSON format not correct")
             syslog.syslog(str(error))
 

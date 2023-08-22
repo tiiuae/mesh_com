@@ -61,7 +61,7 @@ def decrypt_response(encr):  # assuming that data is on a file called payload.en
     session.logout()
     session.closeSession()
     if debug:
-        print(f'> Decrypted message: {str(bytes(dec))}')
+        print(f'> Decrypted message: {bytes(dec)}')
     # logout
     return dec
 
@@ -78,17 +78,30 @@ def sign_hsm(msg):
 
 def delete_key(node_name):  # check if it is possible to delete on python (destroy_objetc)
     label = f'--label={node_name}'
-    command = ['pkcs11-tool', '--module', LIB, '--delete-object', label, '--type=pubkey']
-    subprocess.call(command, shell=False)
-
-
-def verify_key_exists(node_name):
+    k = []
     session = get_session()
     keys = session.findObjects()
     for key in range(len(keys)):
         aux = keys[key].to_dict()
         if aux['CKA_LABEL'] == node_name:
-            return True
+            aux = keys[key].to_dict()
+            k.append(aux)
+    for _ in range(len(k)):
+        command = ['pkcs11-tool', '--module', LIB, '--delete-object', label, '--type=pubkey']
+        subprocess.call(command, shell=False)
+
+
+def verify_key_exists(node_name):
+    k = []
+    session = get_session()
+    keys = session.findObjects()
+    for key in range(len(keys)):
+        aux = keys[key].to_dict()
+        if aux['CKA_LABEL'] == node_name:
+            aux = keys[key].to_dict()
+            k.append(aux)
+    if k:
+        return True
 
 
 def import_cert(client_key, node_name):
@@ -96,22 +109,39 @@ def import_cert(client_key, node_name):
     if exist:
         delete_key(node_name)
     filename = f'{node_name}.der'
-    id = node_name.split('_')[-1]
-    with open(filename, 'wb') as writer:
-        writer.write(client_key.read())
+    if node_name == 'root':
+        filename = client_key
+        ID = str(999)
+    else:
+        ID = node_name.split('_')[-1]
+        try:
+            with open(filename, 'wb') as writer:
+                writer.write(client_key.read())
+        except AttributeError:
+            with open(filename, 'wb') as writer:
+                writer.write(client_key)
     command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', '1234', '--write-object', filename, '--type',
-               'pubkey',
-               '--id', id, '--label', node_name]
+               'pubkey', '--id', ID, '--label', node_name]
     subprocess.call(command, shell=False)
 
 
-def verify_hsm(msg, sig, name):
+def get_public_key(name):
+    pubKey = None
     session = get_session()
     keys = session.findObjects()
     for key in range(len(keys)):
         aux = keys[key].to_dict()
         if aux['CKA_LABEL'] == name:
             pubKey = keys[key]  ##check here need to verify if not exported
+    if pubKey:
+        return pubKey
+    else:
+        print("No Key Found")
+
+
+def verify_hsm(msg, sig, name):
+    pubKey = get_public_key(name)
+    session = get_session()
     ver = session.verify(pubKey, msg, sig)
     # logout
     session.logout()
@@ -128,7 +158,7 @@ def verify_certificate(sig_received, node_name, dig_received, cert):
                 break
             blk.update(data)
     dig = blk.hexdigest()
-    if dig == dig_received.decode('UTF-8'):
+    if dig == dig_received:  # decode('UTF-8'):
         return verify_hsm(dig_received, sig_received, node_name)
 
 
@@ -151,6 +181,32 @@ def clean_all():
         keys = session.findObjects()
         for key in range(len(keys)):
             session.destroyObject(keys[key])
+
+
+def chunks(file_obj, size=10000):
+    counter, chunks = 0, []
+    for line in file_obj:
+        if line == '\n':
+            continue
+        counter += 1
+        chunks.append(line)
+        if counter == size:
+            yield chunks
+            counter, chunks = 0, []
+    file_obj.close()
+    if counter:
+        yield chunks
+
+
+def get_labels():
+    labels = []
+    session = get_session()
+    keys = session.findObjects()
+    for key in range(len(keys)):
+        aux = keys[key].to_dict()
+        if aux['CKA_CLASS'] == 'CKO_PRIVATE_KEY':
+            labels.append(aux['CKA_LABEL'])
+    return list(set(labels))[0]
 
 
 def main():
