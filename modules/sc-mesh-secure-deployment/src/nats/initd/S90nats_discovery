@@ -11,7 +11,11 @@ PIDFILE="/var/run/$DAEMON.pid"
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
 LOG_FILE=/opt/comms_discovery.log
-ARGS="--role $2"
+
+source /opt/mesh-helper.sh
+source_configuration
+ARGS="--role $ROLE"
+
 start() {
     echo "$ARGS"
     printf 'Starting %s: ' "$DAEMON"

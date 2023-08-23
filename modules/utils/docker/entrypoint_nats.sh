@@ -29,7 +29,7 @@ else
   done
 
   # Start nats server and client nodes
-  /opt/S90nats_discovery start "$ROLE"
+  /opt/S90nats_discovery start
 
   # wait for nats.conf to be created
   until [ -f /var/run/nats.conf ]; do
