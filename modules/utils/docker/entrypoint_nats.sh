@@ -37,6 +37,7 @@ else
   done
   /opt/S90nats_server start
   /opt/S90comms_controller start
+  /opt/S90provisioning_agent start
 
   # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"

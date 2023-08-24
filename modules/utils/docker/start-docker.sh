@@ -79,6 +79,9 @@ if [ "$OS" == "Buildroot" ]; then
             chmod 755 /opt/container-data/mesh/S90comms_controller
             cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90nats_discovery /opt/container-data/mesh/
             chmod 755 /opt/container-data/mesh/S90nats_discovery
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90provisioning_agent /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S90provisioning_agent
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/conf/comms_openssl.cnf /opt/container-data/mesh/
             cp -R $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/ /opt/container-data/mesh/
             chmod -R 755 /opt/container-data/mesh/nats/*.py
         fi
