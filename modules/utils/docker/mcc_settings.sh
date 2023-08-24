@@ -184,20 +184,20 @@ create_radvd_config "$IPV6_PREFIX"
 # FIXME: launch radvd
 
 # AP hostapd config
-cat > /var/run/hostapd.conf <<- EOF
-  country_code=AE
-  interface=$ifname_ap
-  ssid=$ssid
-  hw_mode=g
-  channel=$retval_channel
-  macaddr_acl=0
-  auth_algs=1
-  ignore_broadcast_ssid=0
-  wpa=2
-  wpa_passphrase=ssrcdemo
-  wpa_key_mgmt=WPA-PSK
-  wpa_pairwise=TKIP
-  rsn_pairwise=CCMP
+cat <<EOF >/var/run/hostapd.conf
+country_code=AE
+interface=$ifname_ap
+ssid=$ssid
+hw_mode=$retval_band
+channel=$retval_channel
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=ssrcdemo
+wpa_key_mgmt=WPA-PSK
+wpa_pairwise=TKIP
+rsn_pairwise=CCMP
 EOF
 
 # Start AP
