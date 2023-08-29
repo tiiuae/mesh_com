@@ -1,4 +1,4 @@
-FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-f8defd3
+FROM ghcr.io/tiiuae/fog-ros-baseimage:feat-multiarch-pkcs11
 
 # Not really needed for now because ROS2 components are disabled.
 #ENV ROS_DISTRO=humble
