@@ -26,7 +26,7 @@ configure
 ###Deciding IP address to be assigned to br-lan from WiFi MAC
 mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
 ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
-br_lan_ip="192.168.$SUBNET."$((16#$ip_random))
+br_lan_ip="$SUBNET."$((16#$ip_random))
 ifname_ap="$(ifconfig -a | grep "wlan*" | awk -F':' '{ print $1 }')"
 wlp1s0_ip="192.168.11."$((16#$ip_random))
 ifconfig wlp1s0 "$wlp1s0_ip" 
