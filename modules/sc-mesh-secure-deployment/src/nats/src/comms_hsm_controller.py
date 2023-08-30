@@ -11,10 +11,18 @@ from datetime import datetime
 
 import PyKCS11.LowLevel
 from PyKCS11 import PyKCS11Error
+from PyKCS11 import Mechanism
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import Certificate
 from cryptography.x509 import load_der_x509_certificate
+
+# To create CSR manually
+from asn1crypto import x509
+from asn1crypto import csr
+from asn1crypto import keys
+from asn1crypto import pem
+from asn1crypto import core
 
 # To export pin
 from Crypto.Protocol.KDF import PBKDF2
@@ -28,7 +36,6 @@ class CommsHSMController:
     Comms HSM Controller class.
     """
     def __init__(self, base_dir: str, board_version: float) -> None:
-        print("CommsHSMController: __init__")
         self.__pkcs11_session = None
         self.__token_user_pin = ""
         self.__token_so_pin = ""
@@ -62,7 +69,6 @@ class CommsHSMController:
         Returns:
             bool: True if session was opened, False otherwise.
         """
-        print("CommsHSMController: open_session")
         self.__token_user_pin = self.__recover_pin(self.__user_pin_file)
         self.__token_so_pin = self.__recover_pin(self.__so_pin_file)
         self.__pkcs11_session = self.__get_pkcs11_session()
@@ -172,7 +178,6 @@ class CommsHSMController:
                 self.__get_token_info(slot)
                 if self.__login_required:
                     if self.__user_pin_initialized is False:
-                        print("login so user")
                         # Login as security officer
                         session.login(pin=self.__token_so_pin,
                                       user_type=PyKCS11.LowLevel.CKU_SO)
@@ -229,11 +234,16 @@ class CommsHSMController:
             token_info.flags & PyKCS11.LowLevel.CKF_USER_PIN_INITIALIZED)
         self.__token_has_rng = bool(token_info.flags & PyKCS11.LowLevel.CKF_RNG)
 
+        """
         print("login_required", self.__login_required)
         print("so_pin_required", self.__so_pin_required)
         print("so_pin_to_be_changed", self.__so_pin_to_be_changed)
         print("user_pin_initialized", self.__user_pin_initialized)
         print("token_has_rng", self.__token_has_rng)
+        mechanisms = self.__pkcs11.getMechanismList(slot)
+        for mech in mechanisms:
+            print(mech)
+        """
 
     def save_certificate(self, cert_pem: Certificate, keypair_id, label: str):
         """
@@ -316,14 +326,20 @@ class CommsHSMController:
             str or None: Certificate in PEM format or None if not found.
         """
         cka_id = bytes.fromhex(keypair_id)
+        
+        filter_template = [
+            (PyKCS11.LowLevel.CKA_CLASS, PyKCS11.LowLevel.CKO_CERTIFICATE),
+            (PyKCS11.LowLevel.CKA_ID, cka_id)
+        ]
+
+        if self.__use_soft_hsm:
+            filter_template.append((PyKCS11.LowLevel.CKA_LABEL, label))
+
         # Get certificate objects by label and id
-        certificate_objects = self.__pkcs11_session.findObjects(
-            [(PyKCS11.LowLevel.CKA_CLASS, PyKCS11.LowLevel.CKO_CERTIFICATE),
-             (PyKCS11.LowLevel.CKA_LABEL, label),
-             (PyKCS11.LowLevel.CKA_ID, cka_id)])
+        certificate_objects = self.__pkcs11_session.findObjects(filter_template)
 
         if len(certificate_objects) > 0:
-            print(certificate_objects[0])
+            # print(certificate_objects[0])
             for certificate_object in certificate_objects:
                 certificate_bytes = bytes(
                     self.__pkcs11_session.getAttributeValue(certificate_object,
@@ -416,11 +432,9 @@ class CommsHSMController:
         cka_id = bytes.fromhex(keypair_id)
 
         public_key_template = [
-            # Uncomment "CKA_TOKEN" line in order
-            # to store public key into HSM.
             (PyKCS11.LowLevel.CKA_CLASS, PyKCS11.LowLevel.CKO_PUBLIC_KEY),
             (PyKCS11.LowLevel.CKA_PRIVATE, PyKCS11.LowLevel.CK_FALSE),
-            # (PyKCS11.LowLevel.CKA_TOKEN, PyKCS11.CK_TRUE),
+            (PyKCS11.LowLevel.CKA_TOKEN, PyKCS11.CK_TRUE),
             (PyKCS11.LowLevel.CKA_ENCRYPT, PyKCS11.LowLevel.CK_TRUE),
             (PyKCS11.LowLevel.CKA_VERIFY, PyKCS11.LowLevel.CK_TRUE),
             (PyKCS11.LowLevel.CKA_WRAP, PyKCS11.LowLevel.CK_TRUE),
@@ -474,8 +488,6 @@ class CommsHSMController:
         ec_params = bytes.fromhex("06082A8648CE3D030107")
 
         public_key_template = [
-            # Uncomment "CKA_TOKEN" line in order
-            # to store public key into HSM.
             (PyKCS11.LowLevel.CKA_CLASS, PyKCS11.LowLevel.CKO_PUBLIC_KEY),
             (PyKCS11.LowLevel.CKA_PRIVATE, PyKCS11.LowLevel.CK_FALSE),
             (PyKCS11.LowLevel.CKA_TOKEN, PyKCS11.LowLevel.CK_TRUE),
@@ -517,7 +529,7 @@ class CommsHSMController:
             print("Generated EC keypair")
             return True
 
-    def create_csr(self, priv_key_id: str, subject: str, filename: str):
+    def create_csr_via_openssl(self, priv_key_id: str, device_id: str, filename: str):
         """
         Create a Certificate Signing Request (CSR) using OpenSSL with
         the provided arguments.
@@ -535,6 +547,7 @@ class CommsHSMController:
 
         # Openssl requires environment variable usage for pin
         os.environ['PKCS11_PIN'] = self.__token_user_pin
+        subject = "/CN=" + device_id
 
         # SoftHSM engine used by default
         pkcs_engine = 'pkcs11'
@@ -564,3 +577,171 @@ class CommsHSMController:
             print("Error output:")
             print(result.stderr)
             return False
+
+    def __get_private_key_handle(self, keypair_id):
+        """
+        Finds a private key object from the HSM using the provided arguments
+        and returns a handle to it.
+
+        Arguments:
+            keypair_id (str) -- Identifier number for the private key.
+
+        Returns:
+            Handle to private key object or None
+        """
+        cka_id = bytes.fromhex(keypair_id)
+
+        filter_template = [
+            (PyKCS11.LowLevel.CKA_CLASS, PyKCS11.LowLevel.CKO_PRIVATE_KEY),
+            (PyKCS11.LowLevel.CKA_ID, cka_id)
+        ]
+
+        # Get private key objects
+        priv_key_objects = self.__pkcs11_session.findObjects(filter_template)
+        # print(priv_key_objects)
+        if len(priv_key_objects) > 0:
+            # There is at least one matching object
+            return priv_key_objects[0]
+        # Not found
+        return None
+
+    def __get_public_key(self, keypair_id):
+        """
+        Finds a public key object from the HSM using the provided arguments
+        and returns a handle to it.
+
+        Arguments:
+            keypair_id (str) -- Identifier number for the public key.
+
+        Returns:
+            Handle to publick key object or None
+        """
+        cka_id = bytes.fromhex(keypair_id)
+
+        filter_template = [
+            (PyKCS11.LowLevel.CKA_CLASS, PyKCS11.LowLevel.CKO_PUBLIC_KEY),
+            (PyKCS11.LowLevel.CKA_ID, cka_id)
+        ]
+
+        # Get public key objects
+        pub_key_objects = self.__pkcs11_session.findObjects(filter_template)
+        # print(pub_key_objects)
+        if len(pub_key_objects) > 0:
+            # There is at least one matching object
+            return pub_key_objects[0]
+        # Not found
+        return None
+
+    def __get_public_key_data(self, object_handle):
+
+        attributes = [
+            PyKCS11.LowLevel.CKA_KEY_TYPE,
+            # For RSA keys
+            PyKCS11.LowLevel.CKA_PUBLIC_EXPONENT,
+            PyKCS11.LowLevel.CKA_MODULUS,
+            # For EC keys
+            PyKCS11.LowLevel.CKA_EC_POINT,
+            PyKCS11.LowLevel.CKA_EC_PARAMS,
+        ]
+
+        # Get the attributes of the private key
+        attrs = self.__pkcs11_session.getAttributeValue(object_handle, attributes)
+
+        # Extract the attribute values
+        key_type = attrs[0]
+        public_exponent = attrs[1]
+        modulus = attrs[2]
+        ec_point = attrs[3]
+        ec_params = attrs[4]
+
+        if key_type == PyKCS11.LowLevel.CKK_RSA:
+            e = int.from_bytes(public_exponent, byteorder='big')
+            n = int.from_bytes(modulus, byteorder='big')
+            public_key = keys.RSAPublicKey({'modulus': n, 'public_exponent': e}).dump()
+            parameters = core.Null
+        elif key_type == PyKCS11.LowLevel.CKK_EC:
+            public_key = bytes(core.OctetString.load(bytes(ec_point)))
+            parameters = keys.ECDomainParameters.load(bytes(ec_params))
+        else:
+            return None
+
+        return public_key, parameters, key_type
+
+    def create_csr(self, priv_key_id: str, device_id: str, filename: str):
+        """
+        Create a Certificate Signing Request (CSR) using asn1crypto library.
+        CSR is signed via HSM.
+
+        Arguments:
+            priv_key_id (str) -- Identifier number for the private key.
+            subject (str) -- Subject to be used in CSR.
+            filename (str) -- Output file name.
+
+        Returns:
+            bool: True if CSR generation is successful, False otherwise.
+        """
+        # Create directories if they don't exist
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+        # Get the private key handle for signing CSR
+        private_key_handle = self.__get_private_key_handle(priv_key_id)
+        public_key_handle = self.__get_public_key(priv_key_id)
+
+        if private_key_handle is None:
+            print("Private key not found")
+            return False
+
+        if public_key_handle is None:
+            return False
+
+        subject = x509.Name.build({"common_name": device_id})
+        public_key, parameters, key_type = self.__get_public_key_data(public_key_handle)
+
+        if key_type == PyKCS11.LowLevel.CKK_RSA:
+            public_key = keys.RSAPublicKey.load(public_key)
+            mechanism = Mechanism(PyKCS11.LowLevel.CKM_SHA256_RSA_PKCS, None)
+            algorithm_name = "rsa"
+            sign_algorithm_name = "sha256_rsa"
+        else:  # key_type == PyKCS11.LowLevel.CKK_EC
+            mechanism = Mechanism(PyKCS11.LowLevel.CKM_ECDSA, None)
+            algorithm_name = "ec"
+            sign_algorithm_name = "ecdsa"
+
+        csr_info = csr.CertificationRequestInfo({
+            'version': 0,
+            'subject': subject,
+            'subject_pk_info': {
+                'algorithm': {
+                        'algorithm': algorithm_name,
+                        'parameters': parameters,
+                        },
+                'public_key': public_key
+            },
+            'attributes': csr.CRIAttributes([])
+        })
+
+        # Sign the CSR Info
+        signature = self.__pkcs11_session.sign(private_key_handle,
+                                               csr_info.dump(),
+                                               mechanism)
+
+        # Combine CSR info with the signature
+        signed_csr = csr.CertificationRequest({
+            'certification_request_info': csr_info,  # Unsigned CSR data
+            'signature_algorithm': {
+                'algorithm': sign_algorithm_name,
+                'parameters': None,
+            },
+            'signature': bytes(signature),  # The actual signature
+        })
+
+        # Write CSR in PEM format to a file
+        try:
+            pem_csr = pem.armor("CERTIFICATE REQUEST", signed_csr.dump())
+            with open(filename, 'wb') as csr_file:
+                csr_file.write(pem_csr)
+        except Exception as e:
+            print(f"Error {e} when writing CSR file")
+            return False
+
+        return True

@@ -35,8 +35,6 @@ class CommsProvisioning:
         self.__device_id = self.__get_device_id()
         self.__pcb_version = self.__get_comms_pcb_version("/opt/hardware/comms_pcb_version")
 
-        # TODO: subject to be redefined to use also tenant and so on...
-        self.__csr_subject = "/CN=" + self.__device_id
         self.__auth_key_id = "99887766"
         self.__auth_key_label = "CommsDeviceAuth"
         self.__hsm_ctrl = comms_hsm_controller.CommsHSMController(
@@ -85,11 +83,14 @@ class CommsProvisioning:
         if self.__hsm_ctrl.get_certificate(self.__auth_key_id, self.__auth_key_label) is None:
             if not self.__hsm_ctrl.has_private_key(self.__auth_key_id, self.__auth_key_label):
                 self.__hsm_ctrl.generate_rsa_keypair(self.__auth_key_id, self.__auth_key_label)
-                # self.hsm_ctrl.generate_ec_keypair(self.auth_key_id, self.auth_key_label)
+                # self.__hsm_ctrl.generate_ec_keypair(self.__auth_key_id, self.__auth_key_label)
 
             # Create certificate signing request
+            # csr_created = self.__hsm_ctrl.create_csr_via_openssl(priv_key_id=self.__auth_key_id,
+            #                                                     device_id=self.__device_id,
+            #                                                     filename=self.__csr_file)
             csr_created = self.__hsm_ctrl.create_csr(priv_key_id=self.__auth_key_id,
-                                                     subject=self.__csr_subject,
+                                                     device_id=self.__device_id,
                                                      filename=self.__csr_file)
             if csr_created:
                 # TODO: Works with RSA key only for now.
