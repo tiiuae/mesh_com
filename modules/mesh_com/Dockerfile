@@ -10,6 +10,7 @@ RUN apt update -y && apt install -y --no-install-recommends \
     iproute2 \
     iw \
     net-tools \
+    libnl \
     pcsc-lite \
     rfkill \
     wpa-supplicant=2.9-r0 && \
