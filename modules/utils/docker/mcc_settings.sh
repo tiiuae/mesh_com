@@ -26,10 +26,8 @@ configure
 ###Deciding IP address to be assigned to br-lan from WiFi MAC
 mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
 ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
-br_lan_ip="$SUBNET."$((16#$ip_random))
+br_lan_ip="192.168.1."$((16#$ip_random))
 ifname_ap="$(ifconfig -a | grep "wlan*" | awk -F':' '{ print $1 }')"
-wlp1s0_ip="192.168.11."$((16#$ip_random))
-ifconfig wlp1s0 "$wlp1s0_ip" 
 
 calculate_wifi_channel()
 {
@@ -50,19 +48,15 @@ calculate_wifi_channel()
     fi
 }
 
-
-
 create_ap_config()
 {
-  cat > ap.conf <<- EOF
-    network={
-      ssid="WirelessLab"
-      psk="ssrcdemo"
-    }
-  EOF
+cat <<EOF > ap.conf
+network={
+ssid="WirelessLab"
+psk="ssrcdemo"
 }
-
-
+EOF
+}
 
 create_dhcpd_config()
 {
@@ -78,11 +72,9 @@ create_dhcpd_config()
             range $SUBNET.100 $SUBNET.199;
             option routers $SUBNET.1;
     }
-  EOF
+EOF
   cp /dev/null /var/lib/dhcp/dhcpd.leases
 }
-
-
 
 create_olsrd_config()
 {
@@ -92,7 +84,7 @@ create_olsrd_config()
 
   cat > /etc/olsrd/olsrd.conf <<- EOF
   
-  LinkQualityFishEye 	0
+  LinkQualityFishEye   0
 
   Interface "$wifidev"
 
@@ -100,15 +92,11 @@ create_olsrd_config()
 
   }
 
- 
-
   IpVersion               4
 
-  #LinkQualityFishEye      0
+  LinkQualityFishEye      0
 
   LinkQualityAlgorithm "etx_ffeth_nl80211"
-
- 
 
   # This is only here to be able to generate a
 
@@ -116,6 +104,13 @@ create_olsrd_config()
 
   #LoadPlugin "/usr/lib/olsrd_jsoninfo.so.1.1"
 
+  #{
+
+    #PlParam "port"          "9090"
+
+    #PlParam "accept"        "0.0.0.0"
+
+  #}
 
   # load arprefresh plugin
 
@@ -136,10 +131,8 @@ create_olsrd_config()
   {
           $IPV6_PREFIX:0 64
   }
-  EOF
+EOF
 }
-
-
 
 create_radvd_config()
 {
@@ -152,36 +145,18 @@ create_radvd_config()
             prefix $IPV6_PREFIX:0/64 {
             };
     };
-  EOF
+EOF
 }
-
-
-
-
-
 
 # mcc_settings
 echo "Running mcc_settings"
 # Create bridge br-lan
 brctl addbr br-lan
-ifname_ap="$(ifconfig -a | grep -E '^wlan' -m 1 | awk -F':' '{ print $1 }')"
 ap_if_mac="$(ip -brief link | grep "$ifname_ap" | awk '{print $3; exit}')"
 ssid="comms_sleeve#$(echo "$ap_if_mac" | cut -b 13-14,16-17)"
 # Set frequency band and channel from given frequency
 calculate_wifi_channel "$ch"
-ifconfig $ifname_ap up
-  
-IPV6_PREFIX=$( echo fd`dd if=/dev/urandom bs=7 count=1 status=none | xxd -p` | sed 's/\(....\)/\1:/g' )
-ip addr add $SUBNET.1/24 dev br-lan && ip addr add $IPV6_PREFIX:1/64 dev br-lan
-
-create_olsrd_config "wlp1s0" "$SUBNET" "$IPV6_PREFIX"
-# FIXME: launch olsrd
-
-create_dhcpd_config "$SUBNET"
-dhcpd -f br-lan
-
-create_radvd_config "$IPV6_PREFIX"
-# FIXME: launch radvd
+ifconfig "$ifname_ap" up
 
 # AP hostapd config
 cat <<EOF >/var/run/hostapd.conf
@@ -204,6 +179,16 @@ EOF
 /usr/sbin/hostapd -B /var/run/hostapd.conf -f /tmp/hostapd.log
 # Bridge AP and Mesh
 if [ "$algo" = "olsr" ]; then
+  IPV6_PREFIX=$( echo fd`dd if=/dev/urandom bs=7 count=1 status=none | xxd -p` | sed 's/\(....\)/\1:/g' )
+  ip addr add $SUBNET.1/24 dev br-lan && ip addr add $IPV6_PREFIX:1/64 dev br-lan
+  create_olsrd_config "wlp1s0" "$SUBNET" "$IPV6_PREFIX"
+  # FIXME: launch olsrd
+  create_dhcpd_config "$SUBNET"
+  dhcpd -f br-lan
+  create_radvd_config "$IPV6_PREFIX"
+# FIXME: launch radvd
+  wlp1s0_ip="192.168.11."$((16#$ip_random))
+  ifconfig wlp1s0 "$wlp1s0_ip" 
   brctl addif br-lan "$ifname_ap"
   iptables -A FORWARD --in-interface $mesh_if -j ACCEPT
   killall olsrd 2>/dev/null	
