@@ -58,13 +58,15 @@ class Command:  # pylint: disable=too-few-public-methods
         self.interval = 1
         self.comms_status = comms_status
 
-    def handle_command(self, msg: str, cc) -> (str, str, str):
+    def handle_command(self, msg: str, cc, csa=False, delay="0") -> (str, str, str):
         """
         handler for commands
 
         Args:
             msg: JSON formatted data from NATS message.
             cc: CommsController class
+            csa: bool: True if CSA is active
+            delay: str: delay for channel change in csa case
 
         Returns:
             str: OK/FAIL
@@ -93,7 +95,7 @@ class Command:  # pylint: disable=too-few-public-methods
         elif self.command == COMMAND.revoke:
             ret, info = self.__revoke(cc)
         elif self.command == COMMAND.apply:
-            ret, info = self.__apply_mission_config()
+            ret, info = self.__apply_mission_config(csa, delay)
         elif self.command == COMMAND.wifi_down:
             ret, info = self.__radio_down()
         elif self.command == COMMAND.wifi_up:
@@ -167,7 +169,7 @@ class Command:  # pylint: disable=too-few-public-methods
 
         return "OK", "Mesh settings revoked"
 
-    def __apply_mission_config(self) -> (str, str):
+    def __apply_mission_config(self, csa=False, delay="0") -> (str, str):
         """
         Replaces active mesh configuration file with previously
         stored content and restarts S9011Mesh with new configs.
@@ -201,7 +203,17 @@ class Command:  # pylint: disable=too-few-public-methods
             # matches then mission config is applied. Otherwise, default mesh
             # is applied. That logic is based on assumption that some
             # wireless connectivity needs to be ensured after reboot.
-            for process in ["/opt/S9011sNatsMesh", "/opt/S90APoint", "/opt/S90nats_discovery"]:
+            if csa:
+                processes = ["/opt/S9011sNatsMesh", "/opt/S90APoint"]
+            else:
+                processes = ["/opt/S9011sNatsMesh", "/opt/S90APoint", "/opt/S90nats_discovery"]
+
+            for process in processes:
+                # delay before restarting mesh using delay
+                if delay != "0":
+                    ret = subprocess.run(["sleep", delay],
+                                            shell=False, check=True,
+                                            capture_output=True)
                 ret = subprocess.run([process, "restart"],
                                      shell=False, check=True,
                                      capture_output=True)

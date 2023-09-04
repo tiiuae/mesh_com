@@ -70,7 +70,7 @@ class MeshTelemetry:
             self.batman.thread_running = False  # thread loop disabled
             self.t2.join()  # wait for thread to finish
 
-
+# pylint: disable=too-many-instance-attributes
 class CommsController:  # pylint: disable=too-few-public-methods
     """
     Mesh network
@@ -90,20 +90,32 @@ class CommsController:  # pylint: disable=too-few-public-methods
         self.main_logger.addHandler(console_handler)
 
         self.comms_status = comms_status.CommsStatus(self.main_logger.getChild("status"))
-        self.settings = comms_settings.CommsSettings(self.comms_status, self.main_logger.getChild("settings"))
-        self.command = comms_command.Command(server, port, self.comms_status, self.main_logger.getChild("command"))
+        self.settings = comms_settings.CommsSettings(self.comms_status,
+                                                     self.main_logger.getChild("settings"))
+        self.command = comms_command.Command(server, port, self.comms_status,
+                                             self.main_logger.getChild("command"))
         self.telemetry = MeshTelemetry(self.interval, self.main_logger.getChild("telemetry"))
 
         # logger for this module and derived from main logger
         self.logger = self.main_logger.getChild("controller")
 
+class CommsCsa: # pylint: disable=too-few-public-methods
+    """
+    Comms CSA class to storage settings for CSA for a state change
+    """
+    def __init__(self):
+        self.delay = "0"
+        self.ack_sent = False
 
+
+# pylint: disable=too-many-arguments, too-many-locals, too-many-statements
 async def main(server, port, keyfile=None, certfile=None, interval=1000):
     """
     main
     """
     cc = CommsController(server, port, interval)
     nats_client = NATS()
+    csac = CommsCsa()
 
     async def stop():
         await asyncio.sleep(1)
@@ -144,6 +156,23 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
                                   reconnected_cb=reconnected_cb,
                                   disconnected_cb=disconnected_cb,
                                   max_reconnect_attempts=-1)
+    async def handle_settings_csa_post(ret):
+        if ret == "OK":
+            ret = "ACK"
+        elif ret == "TRIGGER":
+            cmd = json.dumps({"api_version": 1, "cmd": "APPLY"})
+            cc.command.handle_command(cmd, cc, True, csac.delay)
+        elif ret == "COUNT":
+            ret = "COUNT"  # not to send ACK/NACK
+        else:
+            ret = "NACK"
+
+        if ret in ("ACK", "NACK") and csac.ack_sent is False:
+            response = {'status': ret}
+            cc.logger.debug("publish response: %s", str(response))
+            await nats_client.publish("comms.settings_csa",
+                                      json.dumps(response).encode("utf-8"))
+            csac.ack_sent = True
 
     async def message_handler(message):
         # reply = message.reply
@@ -154,27 +183,37 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
 
         if subject == "comms.settings":
             ret, info = cc.settings.handle_mesh_settings(data)
+        elif subject == "comms.settings_csa":
+            ret, info, delay = cc.settings.handle_mesh_settings_csa(data)
+            csac.delay = delay
+            csac.ack_sent = "status" in data
+
         elif subject == "comms.command":
             ret, info, resp = cc.command.handle_command(data, cc)
         elif subject == "comms.status":
             ret, info = "OK", "Returning current status"
-        # Update status info
-        cc.comms_status.refresh_status()
 
-        response = {'status': ret, 'info': info,
-                    'mesh_status': cc.comms_status.mesh_status.value,
-                    'mesh_cfg_status': cc.comms_status.mesh_cfg_status.value,
-                    'visualisation_active': cc.comms_status.is_visualisation_active,
-                    'mesh_radio_on': cc.comms_status.is_mesh_radio_on,
-                    'ap_radio_on': cc.comms_status.is_ap_radio_on}
+        if subject == "comms.settings_csa":
+            await handle_settings_csa_post(ret)
+        else:
+            # Update status info
+            cc.comms_status.refresh_status()
+            response = {'status': ret, 'info': info,
+                        'mesh_status': cc.comms_status.mesh_status,
+                        'mesh_cfg_status': cc.comms_status.mesh_cfg_status,
+                        'visualisation_active': cc.comms_status.is_visualisation_active,
+                        'mesh_radio_on': cc.comms_status.is_mesh_radio_on,
+                        'ap_radio_on': cc.comms_status.is_ap_radio_on,
+                        'security_status': cc.comms_status.security_status }
 
-        if resp != "":
-            response['data'] = resp
+            if resp != "":
+                response['data'] = resp
 
-        cc.logger.debug("Sending response: %s", str(response)[:1000])
-        await message.respond(json.dumps(response).encode("utf-8"))
+            cc.logger.debug("Sending response: %s", str(response)[:1000])
+            await message.respond(json.dumps(response).encode("utf-8"))
 
     await nats_client.subscribe("comms.settings", cb=message_handler)
+    await nats_client.subscribe("comms.settings_csa", cb=message_handler)
     await nats_client.subscribe("comms.command", cb=message_handler)
     await nats_client.subscribe("comms.status", cb=message_handler)
 

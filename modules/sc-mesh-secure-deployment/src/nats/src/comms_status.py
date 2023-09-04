@@ -112,6 +112,10 @@ class CommsStatus:
         self.__update_status()
 
     @property
+    def security_status(self):
+        return STATUS.no_status
+
+    @property
     def mesh_status(self):
         return self.__mesh_status
 

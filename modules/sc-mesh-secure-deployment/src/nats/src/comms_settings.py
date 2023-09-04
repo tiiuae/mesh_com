@@ -3,6 +3,7 @@ mesh setting nats node
 """
 import json
 from shlex import quote
+import subprocess
 
 try:
     import comms_common as comms
@@ -35,7 +36,14 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.routing = ""
         self.priority = ""
         self.role = ""
+        self.mesh_vif = ""
+        self.phy = ""
+        self.msversion = ""
+        self.delay = ""    # delay for channel change
         self.comms_status = comms_status
+        self.csa_state = 0  # 0: not started, 1: stored, 2: triggered
+        self.csa_count = 0  # number of CSA triggered
+        self.device_amount = "0"
 
     def validate_mesh_settings(self) -> (str, str):
         """
@@ -80,6 +88,58 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
 
         return "OK", "Mesh settings OK"
 
+    def handle_mesh_settings_csa(self, msg: str, path="/opt",
+                             file="mesh_stored.conf") -> (str, str, str):
+        """
+        Handle mesh settings
+        """
+        try:
+            parameters = json.loads(msg)
+            if "status" in parameters and self.csa_state == 1:
+                self.csa_count = self.csa_count + 1
+                if self.csa_count >= int(self.device_amount):
+                    self.csa_state = 2
+                    self.logger.debug(f"Trigger channel switch to {self.frequency}")
+                    return "TRIGGER", "Channel switch triggered", self.delay
+                return "COUNT", "Channel switch count", self.delay
+
+            self.csa_state = 0
+            ret, info = self.__load_settings()
+            self.logger.debug("load settings: %s, %s", ret, info)
+
+            #self.api_version = int(parameters["api_version"])
+            self.frequency, self.delay, self.device_amount= map(quote,
+                                                                (str(parameters["frequency"]),
+                                                                 str(parameters["delay"]),
+                                                                 str(parameters["amount"])))
+
+            if validation.validate_delay(self.delay) and validation.validate_frequency(int(self.frequency)):
+                ret, info  = "OK", "CSA settings OK"
+            else:
+                ret, info = "FAIL", "Invalid delay or frequency"
+
+            self.logger.debug(" settings validation: %s, %s", ret, info)
+            if ret == "FAIL":
+                self.comms_status.mesh_cfg_status = \
+                    comms.STATUS.mesh_cfg_not_stored
+                self.logger.error("save settings failed: %s, %s", ret, info)
+            else:
+                ret, info = self.__save_settings(path, file)
+                self.logger.debug("save settings: %s, %s", ret, info)
+                self.csa_state = 1
+                self.csa_count = 0
+
+                return ret, info, self.delay
+
+        except (json.decoder.JSONDecodeError, KeyError,
+                TypeError, AttributeError) as error:
+            self.comms_status.mesh_cfg_status = \
+                comms.STATUS.mesh_cfg_not_stored
+            ret, info = "FAIL", "JSON format not correct" + str(error)
+            self.logger.error("csa settings validation: %s, %s", ret, info)
+
+        return ret, info, self.delay
+
     def handle_mesh_settings(self, msg: str, path="/opt",
                              file="mesh_stored.conf") -> (str, str):
         """
@@ -88,6 +148,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         try:
             parameters = json.loads(msg)
             print(parameters)
+            self.msversion = "nats"
             self.api_version = int(parameters["api_version"])
             self.ssid = quote(str(parameters["ssid"]))
             self.key = quote(str(parameters["key"]))
@@ -102,6 +163,10 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             self.routing = quote(str(parameters["routing"]))
             self.priority = quote(str(parameters["priority"]))
             self.role = quote(str(parameters["role"]))
+            # not currently in json mesh_settings
+            self.mesh_vif = "wlp1s0"
+            # not currently in json mesh_settings
+            self.phy = "phy0"
 
             ret, info = self.validate_mesh_settings()
             self.logger.debug("Mesh settings validation: %s, %s", ret, info)
@@ -129,10 +194,11 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         """
         try:
             with open(f"{path}/{file}", "w", encoding="utf-8") as mesh_conf:
-                mesh_conf.write(f"MSVERSION=nats\n")
+                # not currently in json mesh_settings
+                mesh_conf.write(f"MSVERSION={quote(self.msversion)}\n")
                 mesh_conf.write(f"MODE={quote(self.mode)}\n")
-                mesh_conf.write("IP=10.20.15.3\n")
-                mesh_conf.write("MASK=255.255.255.0\n")
+                mesh_conf.write(f"IP={quote(self.ip_address)}\n")
+                mesh_conf.write(f"MASK={quote(self.subnet)}\n")
                 mesh_conf.write(f"MAC={quote(self.ap_mac)}\n")
                 mesh_conf.write(f"KEY={quote(self.key)}\n")
                 mesh_conf.write(f"ESSID={quote(self.ssid)}\n")
@@ -143,15 +209,80 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write(f"ROUTING={quote(self.routing)}\n")
                 mesh_conf.write(f"ROLE={quote(self.role)}\n")
                 mesh_conf.write(f"PRIORITY={quote(self.priority)}\n")
-                mesh_conf.write("MESH_VIF=wlp1s0\n")
-                mesh_conf.write("PHY=phy0\n")
+                # not currently in json mesh_settings
+                mesh_conf.write(f"MESH_VIF={quote(self.mesh_vif)}\n")
+                # not currently in json mesh_settings
+                mesh_conf.write(f"PHY={quote(self.phy)}\n")
         except:
             self.comms_status.mesh_cfg_status = \
                 comms.STATUS.mesh_cfg_not_stored
             self.logger.error("not able to write new %s", file)
-            return "FAIL", "not able to write new mesh.conf", \
-                self.comms_status.mesh_cfg_status
+            return "FAIL", "not able to write new mesh.conf"
 
         self.comms_status.mesh_cfg_status = comms.STATUS.mesh_cfg_stored
         self.logger.debug("%s written", file)
         return "OK", "Mesh configuration stored"
+
+    def __read_configs(self, mesh_conf_lines):
+        import re
+        pattern = r'(\w+)=(.*?)(?:\s*#.*)?$'
+        # Find all key-value pairs in the text
+        matches = re.findall(pattern, mesh_conf_lines, re.MULTILINE)
+        for match in matches:
+            print(f"{match[0]}={match[1]}")
+            if match[0] == "MODE":
+                self.mode = match[1]
+            elif match[0] == "IP":
+                self.ip_address = match[1]
+            elif match[0] == "MASK":
+                self.subnet = match[1]
+            elif match[0] == "MAC":
+                self.ap_mac = match[1]
+            elif match[0] == "KEY":
+                self.key = match[1]
+            elif match[0] == "ESSID":
+                self.ssid = match[1]
+            elif match[0] == "FREQ":
+                self.frequency = match[1]
+            elif match[0] == "FREQ_MCC":
+                self.frequency_mcc = match[1]
+            elif match[0] == "TXPOWER":
+                self.tx_power = match[1]
+            elif match[0] == "COUNTRY":
+                self.country = match[1]
+            elif match[0] == "ROUTING":
+                self.routing = match[1]
+            elif match[0] == "ROLE":
+                self.role = match[1]
+            elif match[0] == "PRIORITY":
+                self.priority = match[1]
+            elif match[0] == "MESH_VIF":
+                self.mesh_vif = match[1]
+            elif match[0] == "PHY":
+                self.phy = match[1]
+            elif match[0] == "MSVERSION":
+                self.msversion = match[1]
+            else:
+                self.logger.debug("unknown config parameter: %s", match[0])
+
+    def __load_settings(self) -> (str, str):
+        """
+        Load mesh settings
+        return: OK, FAIL
+        """
+        config_file_path = "/opt/mesh_default.conf"
+        mission_config_file_path = "/opt/mesh.conf"
+
+        try:
+            with open(mission_config_file_path, "r", encoding="utf-8") as mesh_conf:
+                mesh_conf_lines = mesh_conf.read()
+                self.__read_configs(mesh_conf_lines)
+        except FileNotFoundError:
+            try:
+                with open(config_file_path, "r", encoding="utf-8") as mesh_conf:
+                    mesh_conf_lines = mesh_conf.read()
+                    self.__read_configs(mesh_conf_lines)
+            except FileNotFoundError:
+                self.logger.error("not able to read mesh config files")
+                return "FAIL", "not able to read mesh config files"
+        return "OK", "Mesh configuration loaded"

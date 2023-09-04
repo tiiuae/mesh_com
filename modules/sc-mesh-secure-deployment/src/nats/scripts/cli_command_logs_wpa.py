@@ -14,10 +14,13 @@ async def main():
     rep = await nc.request("comms.command",
                             cmd.encode(),
                             timeout=2)
-    #print(rep.data)
+    print(rep.data)
     parameters = json.loads(rep.data.decode())
-    b64_data = base64.b64decode(parameters["data"].encode())
-    print(b64_data.decode())
+    if parameters["data"] is None:
+        print("No logs available")
+    else:
+        b64_data = base64.b64decode(parameters["data"].encode())
+        print(b64_data.decode())
 
     await nc.close()
     exit(0)

@@ -4,7 +4,7 @@ Commonly used comms settings/command definitions
 from enum import Enum
 
 
-class STATUS(Enum):  # pylint: disable=too-few-public-methods
+class STATUS:  # pylint: disable=too-few-public-methods
     """
     Comms status values
     """

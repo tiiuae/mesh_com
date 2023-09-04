@@ -223,3 +223,16 @@ def validate_role(role: str) -> bool:
     if role in ("drone", "sleeve", "gcs"):
         return True
     return False
+
+def validate_delay(delay: str) -> bool:
+    """
+    Validates a given delay.
+    Returns True if the delay is valid, False otherwise.
+    """
+    try:
+        delay = int(delay)
+        if delay < 0 or delay == 0:
+            return False
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
