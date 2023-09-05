@@ -188,10 +188,8 @@ if [ "$algo" = "olsr" ]; then
   dhcpd -f br-lan
   create_radvd_config "$IPV6_PREFIX"
 # FIXME: launch radvd
-  mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
-  ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
-  br_lan_ip="$SUBNET."$((16#$ip_random))
-  ifname_ap="$(ifconfig -a | grep "wlan*" | awk -F':' '{ print $1 }')"	
+  
+  br_lan_ip="$SUBNET."$((16#$ip_random))	
   wlp1s0_ip="192.168.11."$((16#$ip_random))
   ifconfig wlp1s0 "$wlp1s0_ip" 
   brctl addif br-lan "$ifname_ap"
