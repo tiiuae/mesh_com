@@ -13,14 +13,14 @@ export PYTHONPATH=/opt/ros/${ROS_DISTRO}/lib/python3.8/site-packages
 if [ "$1" == "init" ]; then
     echo "Start mesh executor"
 
-if [ "$DRONE_TYPE" == "recon" ]; then
+if [ "$DRONE_TYPE" == "cm-recon" ]; then
     DEFAULT_MESH_IP="192.168.$((RANDOM % 7 + 240)).$((RANDOM % 254 + 1))"
     gateway_ip="192.168.247.10" # FIXME: hardcoded for now. later detect automatically.
     
 elif [ "$DRONE_TYPE" == "groundstation" ]; then
     DEFAULT_MESH_IP="192.168.248.1"
     
-elif [ "$DRONE_TYPE" == "fog" ]; then
+elif [ "$DRONE_TYPE" == "cm-fog" ]; then
     if [ "$MESH_CLASS" == "edge" ]; then
         DEFAULT_MESH_IP="192.168.247.10"
     elif [ "$MESH_CLASS" == "gs" ]; then
