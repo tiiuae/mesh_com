@@ -52,6 +52,15 @@ bug_initializing()
 
 configure
 bug_initializing
+
+### Start only mesh mode only for network boot as ethernet port will be dedicated
+### to network boot.
+if [ -f /root/build.info ]; then
+	if grep -Fxq "TCDIST_PLATFORM=\"cm4io_nfs\"" /root/build.info ; then
+                mode = "mesh"
+	fi
+fi
+
 ###Deciding IP address to be assigned to br-lan from WiFi MAC
 mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
 ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
@@ -416,8 +425,15 @@ EOF
     echo "Mesh Point + AP done."
   else
     mesh_service
+    # Start only mesh service with out bridge for network boot as ethernet port will be dedicated
+    # to network boot.
+    if [ -f /root/build.info ]; then
+            if grep -Fxq "TCDIST_PLATFORM=\"cm4io_nfs\"" /root/build.info ; then
+                    mesh_service
+            fi
+    else
     /bin/bash "$BRIDGE_SETTINGS"
-fi
+    fi
 fi
 
 #start comms sleeve web server for companion phone
