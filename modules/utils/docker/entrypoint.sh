@@ -57,7 +57,7 @@ bug_initializing
 ### to network boot.
 if [ -f /root/build.info ]; then
 	if grep -Fxq "TCDIST_PLATFORM=\"cm4io_nfs\"" /root/build.info ; then
-                mode = "mesh"
+                mode="mesh"
 	fi
 fi
 
