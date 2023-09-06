@@ -48,30 +48,20 @@ calculate_wifi_channel()
     fi
 }
 
-create_ap_config()
-{
-cat <<EOF > ap.conf
-network={
-ssid="WirelessLab"
-psk="ssrcdemo"
-}
-EOF
-}
-
 create_dhcpd_config()
 {
   SUBNET="$1"
 
   cat > /etc/dhcp/dhcpd.conf <<- EOF
-    default-lease-time 600;
-    max-lease-time 7200;
-    ddns-update-style none;
-    authoritative;
+  default-lease-time 600;
+  max-lease-time 7200;
+  ddns-update-style none;
+  authoritative;
 
-    subnet $SUBNET.0 netmask 255.255.255.0 {
-            range $SUBNET.100 $SUBNET.199;
-            option routers $SUBNET.1;
-    }
+  subnet $SUBNET.0 netmask 255.255.255.0 {
+    range $SUBNET.100 $SUBNET.199;
+    option routers $SUBNET.1;
+  }
 EOF
   cp /dev/null /var/lib/dhcp/dhcpd.leases
 }
@@ -81,55 +71,29 @@ create_olsrd_config()
   wifidev="$1"
   SUBNET="$2"
   IPV6_PREFIX="$3"
-
   cat > /etc/olsrd/olsrd.conf <<- EOF
-  
   LinkQualityFishEye   0
 
   Interface "$wifidev"
-
   {
-
   }
 
   IpVersion               4
-
   LinkQualityFishEye      0
-
   LinkQualityAlgorithm "etx_ffeth_nl80211"
 
-  # This is only here to be able to generate a
-
-  # configuration file with the script
-
-  #LoadPlugin "/usr/lib/olsrd_jsoninfo.so.1.1"
-
-  #{
-
-    #PlParam "port"          "9090"
-
-    #PlParam "accept"        "0.0.0.0"
-
-  #}
-
-  # load arprefresh plugin
-
-  # - UDP packets on port 698
-
   LoadPlugin "/usr/lib/olsrd_arprefresh.so.0.1"  
-
   {
-
   }
 
   Hna4
   {
-          $SUBNET.0 255.255.255.0
+    $SUBNET.0 255.255.255.0
   }
 
   Hna6
   {
-          $IPV6_PREFIX:0 64
+    $IPV6_PREFIX:0 64
   }
 EOF
 }
@@ -137,14 +101,13 @@ EOF
 create_radvd_config()
 {
   IPV6_PREFIX="$1"
-
   cat > /etc/radvd.conf <<- EOF
-    interface br-lan
-    {
-            AdvSendAdvert on;
-            prefix $IPV6_PREFIX:0/64 {
-            };
+  interface br-lan
+  {
+    AdvSendAdvert on;
+    prefix $IPV6_PREFIX:0/64 {
     };
+  };
 EOF
 }
 
