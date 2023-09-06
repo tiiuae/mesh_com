@@ -424,15 +424,15 @@ EOF
     ip addr flush dev bat0
     echo "Mesh Point + AP done."
   else
-    mesh_service
     # Start only mesh service with out bridge for network boot as ethernet port will be dedicated
     # to network boot.
     if [ -f /root/build.info ]; then
-            if grep -Fxq "TCDIST_PLATFORM=\"cm4io_nfs\"" /root/build.info ; then
-                    mesh_service
-            fi
+        if grep -Fxq "TCDIST_PLATFORM=\"cm4io_nfs\"" /root/build.info ; then
+            mesh_service
+        fi
     else
-    /bin/bash "$BRIDGE_SETTINGS"
+        mesh_service
+        /bin/bash "$BRIDGE_SETTINGS"
     fi
 fi
 fi
