@@ -435,6 +435,7 @@ EOF
     /bin/bash "$BRIDGE_SETTINGS"
     fi
 fi
+fi
 
 #start comms sleeve web server for companion phone
 #nohup python -u /opt/mesh_com/modules/utils/docker/comms_sleeve_server.py -ip $br_lan_ip -ap_if $ifname_ap  -mesh_if $mesh_if
