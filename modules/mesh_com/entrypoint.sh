@@ -85,6 +85,6 @@ else
     mkdir -p ~/.ros/log
 
     # Start mesh publisher
-    ros-with-env ros2 run mesh_com mesh_publisher --ros-args -r __ns:=/$DRONE_DEVICE_ID &
+    ros-with-env ros2 run mesh_com mesh_publisher --ros-args -r __ns:=/$DRONE_DEVICE_ID
 
 fi
