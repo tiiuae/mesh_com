@@ -9,7 +9,7 @@ import os
 from .comms_common import STATUS
 
 
-class CommsStatus:
+class CommsStatus: # pylint: disable=too-many-instance-attributes
     """
     Maintains mesh and radio statuses
     """
@@ -32,6 +32,9 @@ class CommsStatus:
             self.uuid = ""
 
         def reset(self):
+            """
+            Reset wpa_supplicant status
+            """
             self.interface = ""
             self.bssid = ""
             self.freq = ""
@@ -74,6 +77,9 @@ class CommsStatus:
             self.ssid = ""
 
         def reset(self):
+            """
+            Reset hostapd status
+            """
             self.interface = ""
             self.state = "DISABLED"
             self.phy = ""
@@ -103,6 +109,7 @@ class CommsStatus:
         self.__old_hostapd_status = copy.copy(self.__hostapd_status)
         self.__mesh_status = STATUS.no_status
         self.__mesh_cfg_status = STATUS.mesh_default
+        self.__security_status = STATUS.security_non_provisioned
         self.__is_mission_cfg = False  # True when mission cfg has been applied
         self.__is_mesh_radio_on = True  # True since mesh is started via initd
         self.__is_visualisation_active = False
@@ -113,48 +120,81 @@ class CommsStatus:
 
     @property
     def security_status(self):
-        return STATUS.no_status
+        """
+        Get security status
+        """
+        return self.__security_status
 
     @property
     def mesh_status(self):
+        """
+        Get mesh status
+        """
         return self.__mesh_status
 
     @property
     def mesh_cfg_status(self):
+        """
+        Get mesh configuration status
+        """
         return self.__mesh_cfg_status
 
     @mesh_cfg_status.setter
     def mesh_cfg_status(self, status: STATUS):
+        """
+        Set mesh configuration status
+        """
         if status is STATUS.mesh_cfg_stored \
                 or status is STATUS.mesh_cfg_not_stored:
             self.__mesh_cfg_status = status
 
     @property
     def is_mission_cfg(self):
+        """
+        Get whether mission config is applied or not
+        """
         return self.__is_mission_cfg
 
     @property
     def is_mesh_radio_on(self):
+        """
+        Get whether mesh radio is on or not
+        """
         return self.__is_mesh_radio_on
 
     @property
     def is_visualisation_active(self):
+        """
+        Get whether visualisation is active or not
+        """
         return self.__is_visualisation_active
 
     @is_visualisation_active.setter
     def is_visualisation_active(self, value: bool):
+        """
+        Set whether visualisation is active or not
+        """
         self.__is_visualisation_active = value
 
     @property
     def is_ap_radio_on(self):
+        """
+        Get whether AP radio is on or not
+        """
         return self.__is_ap_radio_on
 
     @property
     def ap_interface_name(self):
+        """
+        Get AP interface name
+        """
         return self.__hostapd_status.interface
 
     @property
     def mesh_interface_name(self):
+        """
+        Get mesh interface name
+        """
         return self.__wpa_status.interface
 
     def refresh_status(self):
@@ -169,7 +209,7 @@ class CommsStatus:
 
         return "OK", "Current status read"
 
-    def __update_status(self):
+    def __update_status(self): # pylint: disable=too-many-branches
         """
         Get mesh configuration status and wpa_supplicant
         status and update internal states accordingly.
@@ -229,10 +269,25 @@ class CommsStatus:
         else:  # ENABLED, COUNTRY_UPDATE, ACS, HT_SCAN, DFS
             self.__is_ap_radio_on = True
 
+        # TBD this is definitely not the right way to check whether security is compromised and
+        # more checks are needed.
+        if self.__mesh_cfg_status == STATUS.mesh_cfg_tampered:
+            self.__security_status = STATUS.security_compromised
+        else:
+            # /etc/ssl/certs/comms_auth_cert.pem and /etc/ssl/certs/root-ca.cert.pem files
+            # are used to check whether security is provisioned or not.
+            # If those files are missing, security is not provisioned.
+            if os.path.exists("/etc/ssl/certs/comms_auth_cert.pem") and \
+                    os.path.exists("/etc/ssl/certs/root-ca.cert.pem"):
+                self.__security_status = STATUS.security_provisioned
+            else:
+                self.__security_status = STATUS.security_non_provisioned
+
         # Unlock thread
         self.__lock.release()
 
-    def __get_wpa_supplicant_pid(self) -> str:
+    @staticmethod
+    def __get_wpa_supplicant_pid() -> str:
         """
         Get wpa_supplicant process ID.
         """
@@ -308,7 +363,8 @@ class CommsStatus:
             self.__logger.debug("address=%s", self.__wpa_status.address)
             self.__logger.debug("uuid=%s", self.__wpa_status.uuid)
 
-    def __get_hostapd_pid(self) -> str:
+    @staticmethod
+    def __get_hostapd_pid() -> str:
         """
         Get hostapd process ID.
         """

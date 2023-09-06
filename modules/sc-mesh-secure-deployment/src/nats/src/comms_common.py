@@ -19,6 +19,10 @@ class STATUS:  # pylint: disable=too-few-public-methods
     mesh_mission_connected = "MESH_MISSION_CONNECTED"  # mesh mission connected
     mesh_fail = "MESH_FAIL"  # fails
 
+    security_provisioned = "SECURITY_PROVISIONED"  # security provisioned
+    security_non_provisioned = "SECURITY_NON_PROVISIONED"  # security non provisioned
+    security_compromised = "SECURITY_COMPROMISED"
+    # TBD add more status
 
 class COMMAND:  # pylint: disable=too-few-public-methods
     """
