@@ -68,7 +68,7 @@ elif [ "$DRONE_TYPE" == "fog" ]; then
     /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
     sleep 604800
 elif [[ "$DRONE_TYPE" == "singlemesh" || "$DRONE_TYPE" == "cm-fog" ]]; then
-    # 192.168.248.11-192.168.248.254
+    # singlemesh: 192.168.248.11-254; single cm-fog: 192.168.248.10; multiple cm-fog: 192.168.248.2-9
     MESH_IP="$RECON_GS_IP"
     /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $MESH_MODE $MESH_IP $MESH_MASK $MESH_MAC $MESH_KEY $MESH_ESSID $MESH_FREQ $MESH_TX $MESH_COUNTRY
     echo "mesh setup done"
