@@ -1,11 +1,5 @@
 #!/bin/bash -e
 
-source /opt/ros/humble/setup.bash
-
-# I don't know what we're doing wrong, but Python isn't able to resolve mesh packages without this.
-# (other Python packages seem to reside under /usr/lib/python3/dist-packages)
-export PYTHONPATH=/opt/ros/${ROS_DISTRO}/lib/python3.8/site-packages
-
 # Needed in order to make ROS2 nodes exit gracefully.
 # SIGTERM signal is converted to SIGINT.
 _term() {
@@ -38,48 +32,40 @@ trap _term TERM
 if [ "$1" == "init" ]; then
     echo "Start mesh executor"
 
-    if [ "$DRONE_TYPE" == "recon" ]; then
-        # 192.168.240.1-192.168.246.254
-        DEFAULT_MESH_IP="192.168.$[ $RANDOM % 7 + 240 ].$[ $RANDOM % 254 + 1 ]"
-
-        /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-        echo "mesh setup done"
-        gateway_ip="192.168.247.10" # FIXME: hardcoded for now. later detect automatically.
-        route add default gw $gateway_ip bat0
-        sleep 86400
-    elif [ "$DRONE_TYPE" == "groundstation" ]; then
-        DEFAULT_MESH_IP="192.168.248.1"
-        /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-        echo "mesh setup done"
-        sleep 86400
-    elif [ "$DRONE_TYPE" == "fog" ]; then
-        if [ "$MESH_CLASS" == "edge" ]; then
-            DEFAULT_MESH_IP="192.168.247.10"
-        else
-            # mesh class is gs
-            DEFAULT_MESH_IP="192.168.248.10"
-        fi
-
-        /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-        echo "mesh setup done"
-        if [ "$MESH_CLASS" == "gs" ]; then
-            gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
-            route add default gw $gateway_ip bat0
-        fi
-        sleep 86400
-    elif [ "$DRONE_TYPE" == "singlemesh" ]; then
-        # 192.168.248.11-192.168.248.253
-        DEFAULT_MESH_IP="192.168.248.$[ $RANDOM % 243 + 11 ]"
-        /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-        echo "mesh setup done"
-            # mesh class is gs
+if [ "$DRONE_TYPE" == "cm-recon" ]; then
+    DEFAULT_MESH_IP="192.168.$((RANDOM % 7 + 240)).$((RANDOM % 254 + 1))"
+    gateway_ip="192.168.247.10" # FIXME: hardcoded for now. later detect automatically.
+    
+elif [ "$DRONE_TYPE" == "groundstation" ]; then
+    DEFAULT_MESH_IP="192.168.248.1"
+    
+elif [ "$DRONE_TYPE" == "fog" ]; then
+    if [ "$MESH_CLASS" == "edge" ]; then
+        DEFAULT_MESH_IP="192.168.247.10"
+    elif [ "$MESH_CLASS" == "gs" ]; then
+        DEFAULT_MESH_IP="192.168.248.10"
         gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
-        route add default gw $gateway_ip bat0
-        sleep 86400
     else
-        echo "drone type not implemented: $DRONE_TYPE"
-        exit 1
-    fi
+			echo "Undefined mesh class"   
+	 fi 
+
+elif [ "$DRONE_TYPE" == "cm-fog" ]; then
+    DEFAULT_MESH_IP="192.168.248.$((RANDOM % 243 + 11))"
+    gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
+    
+else
+    echo "drone type not implemented: $DRONE_TYPE"
+    exit 1
+fi
+
+/opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+echo "mesh setup done"
+
+if [ -n "$gateway_ip" ]; then
+    route add default gw $gateway_ip bat0
+fi
+
+sleep 86400
 
     # Start mesh executor 
     #                     1      2    3      4        5     6       7      8         9         10          11        12             13         14
