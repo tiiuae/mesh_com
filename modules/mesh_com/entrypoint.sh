@@ -38,7 +38,7 @@ trap _term TERM
 if [ "$1" == "init" ]; then
     echo "Start mesh executor"
 
-    if [ "$DRONE_TYPE" == "recon" ]; then
+    if [ "$DRONE_TYPE" == "recon" ] || [ "$DRONE_TYPE" == "cm-recon" ]; then
         # 192.168.240.1-192.168.246.254
         DEFAULT_MESH_IP="192.168.$[ $RANDOM % 7 + 240 ].$[ $RANDOM % 254 + 1 ]"
 
@@ -52,7 +52,7 @@ if [ "$1" == "init" ]; then
         /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
         echo "mesh setup done"
         sleep 86400
-    elif [ "$DRONE_TYPE" == "fog" ]; then
+    elif [ "$DRONE_TYPE" == "fog" ] || [ "$DRONE_TYPE" == "cm-fog" ]; then
         if [ "$MESH_CLASS" == "edge" ]; then
             DEFAULT_MESH_IP="192.168.247.10"
         else
