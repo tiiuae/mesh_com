@@ -155,8 +155,9 @@ if [ "$algo" = "olsr" ]; then
   br_lan_ip="$SUBNET."$((16#$ip_random))	
   wlp1s0_ip="192.168.11."$((16#$ip_random))
   ifconfig wlp1s0 "$wlp1s0_ip" 
-  brctl addif br-lan "$ifname_ap"
   iptables -A FORWARD --in-interface $mesh_if -j ACCEPT
+  iptables -A FORWARD -i br-lan -o $mesh_if -j ACCEPT 
+  iptables -A FORWARD -o br-lan -i $mesh_if -j ACCEPT
   killall olsrd 2>/dev/null	
   (qos-olsrd -i wlp1s0 -d 0)&
   ifconfig "$mesh_if" mtu 1500
@@ -172,10 +173,13 @@ ifconfig br-lan mtu 1500
 ifconfig br-lan "$br_lan_ip" netmask "255.255.255.0"
 ifconfig br-lan up
 # Add forwarding rules from AP to $mesh_if interface
+# FIXME: Changes the default IP forwarding policy to accept for all, which makes the previous iptables lines useless
 iptables -P FORWARD ACCEPT
-route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
-route add -net 192.168.1.0 gw "$br_lan_ip" netmask 255.255.255.0 dev br-lan
-iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
+# FIXME: Can't think of a reason for lines 231 and 232, and they are likely to be creating problems
+#route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
+#route add -net 192.168.1.0 gw "$br_lan_ip" netmask 255.255.255.0 dev br-lan
+# FIXME: Line has no reason to exist as we do not want NAT
+#iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
 
 #setup minimalistic Mumble server configuration
 rm /etc/umurmur.conf
