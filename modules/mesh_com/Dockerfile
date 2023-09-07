@@ -1,4 +1,4 @@
-FROM ghcr.io/tiiuae/fog-ros-baseimage:feat-multiarch-caml
+FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-5d4476d
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 
