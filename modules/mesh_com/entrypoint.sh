@@ -1,14 +1,39 @@
 #!/bin/bash -e
 
-if [ -e /opt/ros/humble/setup.bash ]; then
-    source /opt/ros/humble/setup.bash
-else
-    ROS_DISTRO=humble
-fi
+source /opt/ros/humble/setup.bash
 
 # I don't know what we're doing wrong, but Python isn't able to resolve mesh packages without this.
 # (other Python packages seem to reside under /usr/lib/python3/dist-packages)
 export PYTHONPATH=/opt/ros/${ROS_DISTRO}/lib/python3.8/site-packages
+
+# Needed in order to make ROS2 nodes exit gracefully.
+# SIGTERM signal is converted to SIGINT.
+_term() {
+    # FILL UP PROCESS SEARCH PATTERN HERE TO FIND PROPER PROCESS FOR SIGINT:
+    pattern="mesh_com/mesh_publisher"
+    pid_value="$(ps -ax | grep $pattern | grep -v grep | awk '{ print $1 }')"
+    if [ "$pid_value" != "" ]; then
+        pid=$pid_value
+        echo "Send SIGINT to pid $pid"
+    else
+        pid=1
+        echo "Pattern not found, send SIGINT to pid $pid"
+    fi
+    kill -s SIGINT $pid
+
+    pattern="mesh_com/mesh_subscriber"
+    pid_value="$(ps -ax | grep $pattern | grep -v grep | awk '{ print $1 }')"
+    if [ "$pid_value" != "" ]; then
+        pid=$pid_value
+        echo "Send SIGINT to pid $pid"
+    else
+        pid=1
+        echo "Pattern not found, send SIGINT to pid $pid"
+    fi
+    kill -s SIGINT $pid
+}
+# Use SIGTERM or TERM, does not seem to make any difference.
+trap _term TERM
 
 if [ "$1" == "init" ]; then
     echo "Start mesh executor"
@@ -56,7 +81,6 @@ if [ "$1" == "init" ]; then
         exit 1
     fi
 
-    echo "Start mesh executor"
     # Start mesh executor 
     #                     1      2    3      4        5     6       7      8         9         10          11        12             13         14
     # Usage: mesh-11s.sh <mode> <ip> <mask> <AP MAC> <key> <essid> <freq> <txpower> <country> <interface> <phyname> <routing_algo> <mtu_size> <log_dir>
@@ -66,7 +90,7 @@ if [ "$1" == "init" ]; then
     # 2            <ip>                          $DEFAULT_MESH_IP
     # 3            <mask>                        $DEFAULT_MESH_MASK
     # 4            <AP MAC>                      $DEFAULT_MESH_MAC
-    # 5            <WEP key>                     $DEFAULT_MESH_KEY
+    # 5            <key>                         $DEFAULT_MESH_KEY
     # 6            <essid>                       $DEFAULT_MESH_ESSID
     # 7            <freq>                        $DEFAULT_MESH_FREQ
     # 8	           <txpower>                     $DEFAULT_MESH_TX
@@ -88,13 +112,38 @@ if [ "$1" == "init" ]; then
     # route add default gw $gateway_ip bat0
     # sleep 86400
 else
-    echo "Start mesh pub&sub"
+    echo "INFO: Start mesh pub&sub"
 
     mkdir -p ~/.ros/log
 
     # Start mesh publisher
-    ros2 run mesh_com mesh_publisher --ros-args -r __ns:=/$DRONE_DEVICE_ID &
+    ros-with-env ros2 run mesh_com mesh_publisher --ros-args -r __ns:=/$DRONE_DEVICE_ID &
+    pub_child=$!
+    # Quick fix. Give time to the publisher to stop using the keys.
+    sleep 4
     # Start mesh subscriber
-    ros2 run mesh_com mesh_subscriber --ros-args -r __ns:=/$DRONE_DEVICE_ID
+    ros-with-env ros2 run mesh_com mesh_subscriber --ros-args -r __ns:=/$DRONE_DEVICE_ID &
+    sub_child=$!
+    echo "INFO: Waiting for publisher pid $pub_child and subscriber pid $sub_child."
+    # * Calling "wait" will then wait for the job with the specified by $child to finish, or for any signals to be fired.
+    #   Due to "or for any signals to be fired", "wait" will also handle SIGTERM and it will shutdown before
+    #   the node ends gracefully.
+    #   The solution is to add a second "wait" call and remove the trap between the two calls.
+    # * Do not use -e flag in the first wait call because wait will exit with error after catching SIGTERM.
+    set +e
+    wait $sub_child
+    trap - TERM
+    wait $sub_child
+    wait $pub_child
+    RESULT=$?
+    set -e
+
+    if [ $RESULT -ne 0 ]; then
+        echo "ERROR: Mesh pub&sub node failed with code $RESULT" >&2
+        exit $RESULT
+    else
+        echo "INFO: Mesh pub&sub node finished successfully, but returning 125 code for docker to restart properly." >&2
+        exit 125
+    fi
 
 fi
