@@ -1,5 +1,13 @@
 #!/bin/bash -e
 
+# Check if proper default mesh class is set
+if [[ "$MESH_CLASS" != "gs" && "$MESH_CLASS" != "edge" ]]; then
+  echo "Wrong mesh class, check container env parameters"
+  exit 1
+else
+  echo "Mesh class: " $MESH_CLASS
+fi
+
 # Set IP based on drone role/type.
 if [[ "$DRONE_TYPE" == "recon" ]]; then
     # 192.168.240.1-192.168.246.255
@@ -40,11 +48,11 @@ elif [ "$DRONE_TYPE" == "groundstation" ]; then
     echo "INFO: Starting ROS topic"
     /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
     sleep 604800
-elif [ "$DRONE_TYPE" == "fog" ]; then
-    if [ "$MESH_CLASS" == "edge" ]; then
+elif [[ "$DRONE_TYPE" == "fog" || "$DRONE_TYPE" == "cm-fog" ]]; then
+    if [ "$MESH_CLASS" == "edge" ]; then # mesh class is edge
         MESH_IP=$EDGE_IP
     else
-        # mesh class is gs
+        # mesh class is gs; single cm-fog or fog: 192.168.248.10; multiple cm-fog: 192.168.248.2-9
         MESH_IP=$FOG_GS_IP
     fi
     /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $MESH_MODE $MESH_IP $MESH_MASK $MESH_MAC $MESH_KEY $MESH_ESSID $MESH_FREQ $MESH_TX $MESH_COUNTRY
@@ -67,8 +75,8 @@ elif [ "$DRONE_TYPE" == "fog" ]; then
     echo "INFO: Starting ROS topic"
     /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
     sleep 604800
-elif [[ "$DRONE_TYPE" == "singlemesh" || "$DRONE_TYPE" == "cm-fog" ]]; then
-    # singlemesh: 192.168.248.11-254; single cm-fog: 192.168.248.10; multiple cm-fog: 192.168.248.2-9
+elif [[ "$DRONE_TYPE" == "singlemesh" ]]; then
+    # singlemesh: 192.168.248.11-254
     MESH_IP="$RECON_GS_IP"
     /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $MESH_MODE $MESH_IP $MESH_MASK $MESH_MAC $MESH_KEY $MESH_ESSID $MESH_FREQ $MESH_TX $MESH_COUNTRY
     echo "mesh setup done"
