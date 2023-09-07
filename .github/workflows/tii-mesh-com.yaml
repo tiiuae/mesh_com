@@ -9,6 +9,10 @@ on:
       - v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+
   pull_request:
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   tii-mesh-com:
     runs-on: ubuntu-latest
