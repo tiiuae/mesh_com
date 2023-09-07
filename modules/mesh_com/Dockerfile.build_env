@@ -1,5 +1,5 @@
 # fog-sw BUILDER
-ARG ROS_DISTRO="galactic"
+ARG ROS_DISTRO="humble"
 FROM ros:${ROS_DISTRO}-ros-base as fog-sw-builder
 
 ARG UID=1000
@@ -27,7 +27,7 @@ RUN groupadd -g $GID builder && \
     usermod -aG sudo builder && \
     echo 'builder ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-RUN echo "deb [trusted=yes] https://ssrc.jfrog.io/artifactory/ssrc-debian-public-remote focal fog-sw" >> /etc/apt/sources.list
+RUN echo "deb [trusted=yes] https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local focal fog-sw" >> /etc/apt/sources.list
 
 WORKDIR /$PACKAGE_NAME
 
