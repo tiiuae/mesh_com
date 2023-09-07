@@ -6,10 +6,6 @@ else
     ROS_DISTRO=humble
 fi
 
-# I don't know what we're doing wrong, but Python isn't able to resolve mesh packages without this.
-# (other Python packages seem to reside under /usr/lib/python3/dist-packages)
-export PYTHONPATH=/opt/ros/${ROS_DISTRO}/lib/python3.8/site-packages
-
 if [ "$1" == "init" ]; then
     echo "Start mesh executor"
 
