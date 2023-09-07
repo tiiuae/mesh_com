@@ -105,6 +105,8 @@ create_radvd_config()
   interface br-lan
   {
     AdvSendAdvert on;
+    MinRtrAdvInterval 3;
+    MaxRtrAdvInterval 10;
     prefix $IPV6_PREFIX:0/64 {
     };
   };
@@ -140,18 +142,16 @@ EOF
 
 # Start AP
 /usr/sbin/hostapd -B /var/run/hostapd.conf -f /tmp/hostapd.log
+
 # Bridge AP and Mesh
 if [ "$algo" = "olsr" ]; then
   brctl addif br-lan "$ifname_ap"
   IPV6_PREFIX=$( echo fd`dd if=/dev/urandom bs=7 count=1 status=none | xxd -p` | sed 's/\(....\)/\1:/g' )
   ip addr add $SUBNET.1/24 dev br-lan && ip addr add $IPV6_PREFIX:1/64 dev br-lan
   create_olsrd_config "wlp1s0" "$SUBNET" "$IPV6_PREFIX"
-  # FIXME: launch olsrd
   create_dhcpd_config "$SUBNET"
   dhcpd -f br-lan
   create_radvd_config "$IPV6_PREFIX"
-# FIXME: launch radvd
-  
   br_lan_ip="$SUBNET."$((16#$ip_random))	
   wlp1s0_ip="192.168.11."$((16#$ip_random))
   ifconfig wlp1s0 "$wlp1s0_ip" 
@@ -161,7 +161,6 @@ if [ "$algo" = "olsr" ]; then
   (qos-olsrd -i wlp1s0 -d 0)&
   ifconfig "$mesh_if" mtu 1500
 else
-  ##batman-adv###
   brctl addif br-lan bat0 "$ifname_ap"
   iptables -A FORWARD --in-interface bat0 -j ACCEPT
   ifconfig bat0 mtu 1500
@@ -170,11 +169,8 @@ fi
 # Set mtu back to 1500 to support e2e connectivity
 # TODO: Investigate this as it should still work with 1460
 ifconfig br-lan mtu 1500
-
 ifconfig br-lan "$br_lan_ip" netmask "255.255.255.0"
 ifconfig br-lan up
-echo
-ifconfig br-lan
 # Add forwarding rules from AP to $mesh_if interface
 iptables -P FORWARD ACCEPT
 route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
