@@ -16,6 +16,7 @@ Usage:
 import argparse
 import asyncio
 import requests
+import os
 
 from cryptography.x509 import load_pem_x509_certificate
 
@@ -31,7 +32,7 @@ class CommsProvisioning:
         self.__outdir = outdir
         self.__device_id_file = self.__outdir + "/identity"
         self.__csr_file = self.__outdir + "/csr/prov_csr.csr"
-        self.__server_url = "http://" + server + ":" + port + "/api/devices/provision"
+        self.__server_url = "http://" + server + ":" + port + "/api/mesh/provision"
         self.__device_id = self.__get_device_id()
         self.__pcb_version = self.__get_comms_pcb_version("/opt/hardware/comms_pcb_version")
 
@@ -82,7 +83,9 @@ class CommsProvisioning:
         """
         if self.__hsm_ctrl.get_certificate(self.__auth_key_id, self.__auth_key_label) is None:
             if not self.__hsm_ctrl.has_private_key(self.__auth_key_id, self.__auth_key_label):
-                self.__hsm_ctrl.generate_rsa_keypair(self.__auth_key_id, self.__auth_key_label)
+                self.__hsm_ctrl.generate_rsa_keypair_via_openssl(self.__auth_key_id, self.__auth_key_label)
+                # self.__hsm_ctrl.generate_ec_keypair_via_openssl(self.__auth_key_id, self.__auth_key_label)
+                # self.__hsm_ctrl.generate_rsa_keypair(self.__auth_key_id, self.__auth_key_label)
                 # self.__hsm_ctrl.generate_ec_keypair(self.__auth_key_id, self.__auth_key_label)
 
             # Create certificate signing request
@@ -121,7 +124,7 @@ class CommsProvisioning:
         # Extract the signed certificate from the response
         response_json = response.json()
         signed_certificate_data = response_json["certificate"]
-        ca_certificate = response_json["ca_certificate"]
+        ca_certificate = response_json["caCertificate"]
 
         print("### Printing received certificates from server: ###")
         print(signed_certificate_data)
@@ -131,6 +134,23 @@ class CommsProvisioning:
         print(ca_certificate)
         print("### Finished printing CA certificate from server ###")
 
+        # Save received certificates into filesystem
+        certificate = "/etc/ssl/certs/comms_auth_cert.pem"
+        root_certificate = "/etc/ssl/certs/root-ca.cert.pem"
+
+        # Create directories if they don't exist
+        os.makedirs(os.path.dirname(certificate), exist_ok=True)
+
+        # Open the file in write mode and write the PEM data
+        try:
+            with open(certificate, "w") as file:
+                file.write(signed_certificate_data)
+            with open(root_certificate, "w") as file:
+                file.write(ca_certificate)
+        except Exception as e:
+            print(f"Error saving certificate files: {str(e)}")
+
+        # Save certificates to HSM:
         # Provisioning server response "certificate" contains two
         # certificates i.e. the device id specific client certificate
         # and the provisioning CA certificate.
@@ -140,7 +160,6 @@ class CommsProvisioning:
         # Remove any empty strings from the split operation
         signed_certificates = [cert.strip() for cert in signed_certificates if cert.strip()]
 
-        # Save certificates
         for index, cert_data in enumerate(signed_certificates):
             cert_data = cert_data + "\n-----END CERTIFICATE-----\n"
 
@@ -152,7 +171,7 @@ class CommsProvisioning:
                 return False
 
             device_id = self.__device_id
-            cert_name = self.__auth_key_label + " Certificate"
+            cert_name = self.__auth_key_label
 
             if device_id in certificate.subject.rfc4514_string():
                 label = cert_name

@@ -53,14 +53,20 @@ class CommsHSMController:
 
         # Used with SoftHSM and related PIN encryption
         self.__token_label = "secccoms"
+        self.__current_token_label = ""
 
         # Define configuration file for openssl
         os.environ['OPENSSL_CONF'] = self.__base_dir + "/comms_openssl.cnf"
 
+        self.__pkcs11_engine = ""
+        self.__pkcs11lib = ""
+        # Set engine and lib config
+        self.__set_openssl_engine_properties()
+
         # Instantiate PyKCS11Lib
         self.__pkcs11 = PyKCS11.PyKCS11Lib()
         # Load library into use
-        self.__pkcs11.load(self.__get_hsm_library())
+        self.__pkcs11.load(self.__pkcs11lib)
 
     def open_session(self):
         """
@@ -95,7 +101,7 @@ class CommsHSMController:
     def __del__(self):
         self.close_session()
 
-    def __get_hsm_library(self):
+    def __set_openssl_engine_properties(self):
 
         # CM2.0 has SE050_C i.e. is using libsss_pkcs11.so
         if self.__comms_board_version == 1:
@@ -103,7 +109,10 @@ class CommsHSMController:
             if os.path.exists(path):
                 self.__use_soft_hsm = False
                 print(path)
-                return path
+                self.__pkcs11lib = path
+                self.__pkcs11_engine = "e4sss"
+                # Force SoftHSM in use for now
+                # return None
 
         # Use SoftHSM for others
         paths_to_check = [
@@ -114,8 +123,10 @@ class CommsHSMController:
         for path in paths_to_check:
             if os.path.exists(path):
                 self.__use_soft_hsm = True
+                self.__pkcs11lib = path
+                self.__pkcs11_engine = "pkcs11"
                 print(path)
-                return path
+                return None
         return None
 
     def __recover_pin(self, filename):
@@ -135,7 +146,7 @@ class CommsHSMController:
             # Decrypt with AES-256 / CBC / PKCS7 Padding
             cipher = AES.new(key, AES.MODE_CBC, iv)
             return unpad(cipher.decrypt(ciphertext), 16).decode().split('\n')[0]
-        except FileNotFoundError:
+        except:
             print("No pin found")
             return ""
 
@@ -195,6 +206,7 @@ class CommsHSMController:
                     session.login(self.__token_user_pin, user_type=PyKCS11.LowLevel.CKU_USER)
                     # Refresh login requirements
                     self.__get_token_info(slot)
+                print("Token:", self.__current_token_label)
                 print("so_pin", self.__token_so_pin)
                 print("user_pin", self.__token_user_pin)
                 return session
@@ -223,7 +235,7 @@ class CommsHSMController:
         token_info = self.__pkcs11.getTokenInfo(slot)
 
         # Get token name and strip out extra zeroes (seen at least with SoftHSM label names)
-        self.__token_label = token_info.label.replace("\x00", "")
+        self.__current_token_label = token_info.label.replace("\x00", "").strip()
 
         # Set few member variables from token flags bitmask
         self.__login_required = bool(token_info.flags & PyKCS11.LowLevel.CKF_LOGIN_REQUIRED)
@@ -326,7 +338,7 @@ class CommsHSMController:
             str or None: Certificate in PEM format or None if not found.
         """
         cka_id = bytes.fromhex(keypair_id)
-        
+
         filter_template = [
             (PyKCS11.LowLevel.CKA_CLASS, PyKCS11.LowLevel.CKO_CERTIFICATE),
             (PyKCS11.LowLevel.CKA_ID, cka_id)
@@ -339,24 +351,14 @@ class CommsHSMController:
         certificate_objects = self.__pkcs11_session.findObjects(filter_template)
 
         if len(certificate_objects) > 0:
-            # print(certificate_objects[0])
             for certificate_object in certificate_objects:
-                certificate_bytes = bytes(
-                    self.__pkcs11_session.getAttributeValue(certificate_object,
-                                                            [PyKCS11.LowLevel.CKA_VALUE])[0])
-
-                # Verify the validity of the certificate
-                certificate = load_der_x509_certificate(certificate_bytes)
-                current_time = datetime.now()
-                if certificate.not_valid_before <= current_time <= certificate.not_valid_after:
-                    # Return first valid certiticate as PEM format
-                    return certificate.public_bytes(
-                        encoding=serialization.Encoding.PEM).decode()
-                else:
-                    print("Certificate is not valid.")
-                    # Delete invalid certificate
-                    self.__pkcs11_session.destroyObject(certificate_object)
-                    print("Invalid certificate has been deleted.")
+                cka_value = self.__pkcs11_session.getAttributeValue(certificate_object,
+                                                                    [PyKCS11.LowLevel.CKA_VALUE])[0]
+                if cka_value:
+                    certificate_bytes = bytes(cka_value)
+                    # Verify the validity of the certificate
+                    certificate = load_der_x509_certificate(certificate_bytes)
+                    return certificate.public_bytes(encoding=serialization.Encoding.PEM).decode()
         return None
 
     def has_private_key(self, keypair_id, label):
@@ -417,6 +419,214 @@ class CommsHSMController:
             return True
         # Not found
         return False
+
+    def generate_rsa_keypair_via_openssl(self, keypair_id: str, label: str) -> bool:
+        """
+        Generates an RSA keypair via openssl.
+
+        Arguments:
+            keypair_id (str) -- Identifier number for key objects.
+            label (str) -- Label name for key objects (used with SoftHSM only).
+
+        Returns:
+            bool: True if the keypair was generated, False otherwise.
+        """
+        # Openssl requires environment variable usage for pin
+        os.environ['PKCS11_PIN'] = self.__token_user_pin
+
+        private_key = "/etc/ssl/private/comms_auth_private_key.pem"
+        public_key = "/etc/ssl/public/comms_auth_public_key.pem"
+        # Create directories if they don't exist
+        os.makedirs(os.path.dirname(private_key), exist_ok=True)
+        os.makedirs(os.path.dirname(public_key), exist_ok=True)
+
+        if self.__pkcs11_engine == "e4sss":
+            label = "sss:" + keypair_id
+
+        # Generate private key
+        command = [
+            'openssl',
+            'genpkey',
+            '-algorithm', 'RSA',
+            '-out', private_key,
+            '-engine', self.__pkcs11_engine
+            ]
+
+        # Run the command
+        result = subprocess.run(command, capture_output=True, text=True)
+        # Check the result
+        if result.returncode != 0:
+            print("Private key generation failed:")
+            print(result.stderr)
+            return False
+
+        # Generate public key from private
+        command = [
+            'openssl',
+            'rsa',
+            '-in', private_key,
+            '-pubout',
+            '-out', public_key,
+            '-engine', self.__pkcs11_engine
+            ]
+
+        # Run the command
+        result = subprocess.run(command, capture_output=True, text=True)
+        # Check the result
+        if result.returncode != 0:
+            print("Public key generation failed:")
+            print(result.stderr)
+            return False
+
+        # Import private key to HSM
+        command = [
+            'pkcs11-tool',
+            '--module', self.__pkcs11lib,
+            '--token', self.__current_token_label,
+            '--login',
+            '--pin', 'env:PKCS11_PIN',
+            '--label', label,
+            '--id', keypair_id,
+            '--write-object', private_key,
+            '--type', 'privkey'
+            ]
+        print(command)
+
+        # Run the command
+        result = subprocess.run(command, capture_output=True, text=True)
+        # Check the result
+        if result.returncode != 0:
+            print("Private key import to HSM failed:")
+            print(result.stderr)
+            return False
+
+        # Import public key to HSM
+        command = [
+            'pkcs11-tool',
+            '--module', self.__pkcs11lib,
+            '--token', self.__current_token_label,
+            '--login',
+            '--pin',  'env:PKCS11_PIN',
+            '--label', label,
+            '--id', keypair_id,
+            '--write-object', public_key,
+            '--type', 'pubkey'
+            ]
+
+        # Run the command
+        result = subprocess.run(command, capture_output=True, text=True)
+        # Check the result
+        if result.returncode != 0:
+            print("Public key import to HSM failed:")
+            print(result.stderr)
+            return False
+        # All good
+        return True
+
+    def generate_ec_keypair_via_openssl(self, keypair_id: str, label: str) -> bool:
+        """
+        Generates an EC keypair via openssl.
+
+        Arguments:
+            keypair_id (str) -- Identifier number for key objects.
+            label (str) -- Label name for key objects (used with SoftHSM only).
+
+        Returns:
+            bool: True if the keypair was generated, False otherwise.
+        """
+        # Openssl requires environment variable usage for pin
+        os.environ['PKCS11_PIN'] = self.__token_user_pin
+
+        private_key = "/etc/ssl/private/comms_auth_private_key.pem"
+        public_key = "/etc/ssl/public/comms_auth_public_key.pem"
+        # Create directories if they don't exist
+        os.makedirs(os.path.dirname(private_key), exist_ok=True)
+        os.makedirs(os.path.dirname(public_key), exist_ok=True)
+
+        if self.__pkcs11_engine == "e4sss":
+            label = "sss:" + keypair_id
+
+        # Generate private key
+        command = [
+            'openssl',
+            'ecparam',
+            '-name', 'prime256v1',
+            '-genkey',
+            '-out', private_key,
+            '-engine', self.__pkcs11_engine
+            ]
+
+        print(command)
+        # Run the command
+        result = subprocess.run(command, capture_output=True, text=True)
+        # Check the result
+        if result.returncode != 0:
+            print("Private key generation failed:")
+            print(result.stderr)
+            return False
+
+        # Generate public key from private
+        command = [
+            'openssl',
+            'ec',
+            '-in', private_key,
+            '-pubout',
+            '-out', public_key,
+            '-engine', self.__pkcs11_engine
+            ]
+
+        # Run the command
+        result = subprocess.run(command, capture_output=True, text=True)
+        # Check the result
+        if result.returncode != 0:
+            print("Public key generation failed:")
+            print(result.stderr)
+            return False
+
+        # Import private key to HSM
+        command = [
+            'pkcs11-tool',
+            '--module', self.__pkcs11lib,
+            '--token', self.__current_token_label,
+            '--login',
+            '--pin', 'env:PKCS11_PIN',
+            '--label', label,
+            '--id', keypair_id,
+            '--write-object', private_key,
+            '--type', 'privkey'
+            ]
+        print(command)
+
+        # Run the command
+        result = subprocess.run(command, capture_output=True, text=True)
+        # Check the result
+        if result.returncode != 0:
+            print("Private key import to HSM failed:")
+            print(result.stderr)
+            return False
+
+        # Import public key to HSM
+        command = [
+            'pkcs11-tool',
+            '--module', self.__pkcs11lib,
+            '--token', self.__current_token_label,
+            '--login',
+            '--pin',  'env:PKCS11_PIN',
+            '--label', label,
+            '--id', keypair_id,
+            '--write-object', public_key,
+            '--type', 'pubkey'
+            ]
+
+        # Run the command
+        result = subprocess.run(command, capture_output=True, text=True)
+        # Check the result
+        if result.returncode != 0:
+            print("Public key import to HSM failed:")
+            print(result.stderr)
+            return False
+        # All good
+        return True
 
     def generate_rsa_keypair(self, keypair_id: str, label: str) -> bool:
         """
@@ -598,7 +808,6 @@ class CommsHSMController:
 
         # Get private key objects
         priv_key_objects = self.__pkcs11_session.findObjects(filter_template)
-        # print(priv_key_objects)
         if len(priv_key_objects) > 0:
             # There is at least one matching object
             return priv_key_objects[0]
