@@ -10,11 +10,11 @@ if [ "$MSVERSION" != "nats" ]; then
 else
 
   if [ ! -f "/opt/identity" ]; then
-      # generates identity id (mac address + cpu serial number)
+      echo "generates identity id"
       generate_identity_id
   fi
 
-  # set bridge ip, sets br_lan_ip
+  echo "set bridge ip"
   generate_br_lan_ip
 
   echo "starting 11s mesh service"
@@ -23,20 +23,29 @@ else
   echo "starting AP service"
   /opt/S90APoint start
 
-  # wait for bridge to be up
+  echo "wait for bridge to be up..."
   while ! (ifconfig | grep -e "$br_lan_ip") > /dev/null; do
     sleep 1
   done
 
-  # Start nats server and client nodes
+  echo "Start nats server and client nodes"
   /opt/S90nats_discovery start
 
-  # wait for nats.conf to be created
+  echo "wait for nats.conf to be created"
   until [ -f /var/run/nats.conf ]; do
     sleep 1
   done
+
+  echo "starting nats server"
   /opt/S90nats_server start
+
+  echo "starting radvd & socat"
+  radvd -C /etc/radvd.conf  # for some reason init.d is not working
+  /opt/S90socat start  # socat is used to provide IPv6 NATS IF
+
+  echo "starting comms services"
   /opt/S90comms_controller start
+  echo "starting provisioning agent"
   /opt/S90provisioning_agent start
 
   # alive
