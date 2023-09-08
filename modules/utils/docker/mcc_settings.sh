@@ -29,7 +29,6 @@ ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
 br_lan_ip="192.168.1."$((16#$ip_random))
 ifname_ap="$(ifconfig -a | grep "wlan*" | awk -F':' '{ print $1 }')"
 
-
 calculate_wifi_channel()
 {
     # arguments:
@@ -49,6 +48,70 @@ calculate_wifi_channel()
     fi
 }
 
+create_dhcpd_config()
+{
+  SUBNET="$1"
+
+  cat > /etc/dhcp/dhcpd.conf <<- EOF
+  default-lease-time 600;
+  max-lease-time 7200;
+  ddns-update-style none;
+  authoritative;
+
+  subnet $SUBNET.0 netmask 255.255.255.0 {
+    range $SUBNET.100 $SUBNET.199;
+    option routers $SUBNET.1;
+  }
+EOF
+  cp /dev/null /var/lib/dhcp/dhcpd.leases
+}
+
+create_olsrd_config()
+{
+  wifidev="$1"
+  SUBNET="$2"
+  IPV6_PREFIX="$3"
+  cat > /etc/olsrd/olsrd.conf <<- EOF
+  LinkQualityFishEye   0
+
+  Interface "$wifidev"
+  {
+  }
+
+  IpVersion               4
+  LinkQualityFishEye      0
+  LinkQualityAlgorithm "etx_ffeth_nl80211"
+
+  LoadPlugin "/usr/lib/olsrd_arprefresh.so.0.1"  
+  {
+  }
+
+  Hna4
+  {
+    $SUBNET.0 255.255.255.0
+  }
+
+  Hna6
+  {
+    $IPV6_PREFIX:0 64
+  }
+EOF
+}
+
+create_radvd_config()
+{
+  IPV6_PREFIX="$1"
+  cat > /etc/radvd.conf <<- EOF
+  interface br-lan
+  {
+    AdvSendAdvert on;
+    MinRtrAdvInterval 3;
+    MaxRtrAdvInterval 10;
+    prefix $IPV6_PREFIX:0/64 {
+    };
+  };
+EOF
+}
 
 # mcc_settings
 echo "Running mcc_settings"
@@ -79,33 +142,44 @@ EOF
 
 # Start AP
 /usr/sbin/hostapd -B /var/run/hostapd.conf -f /tmp/hostapd.log
+
 # Bridge AP and Mesh
 if [ "$algo" = "olsr" ]; then
-      brctl addif br-lan "$mesh_if" "$ifname_ap"
-      iptables -A FORWARD --in-interface "$mesh_if" -j ACCEPT
-      killall olsrd 2>/dev/null
-      (olsrd -i br-lan -d 0)&
-      ifconfig "$mesh_if" mtu 1500
+  brctl addif br-lan "$ifname_ap"
+  IPV6_PREFIX=$( echo fd`dd if=/dev/urandom bs=7 count=1 status=none | xxd -p` | sed 's/\(....\)/\1:/g' )
+  ip addr add $SUBNET.1/24 dev br-lan && ip addr add $IPV6_PREFIX:1/64 dev br-lan
+  create_olsrd_config "wlp1s0" "$SUBNET" "$IPV6_PREFIX"
+  create_dhcpd_config "$SUBNET"
+  dhcpd -f br-lan
+  create_radvd_config "$IPV6_PREFIX"
+  br_lan_ip="$SUBNET."$((16#$ip_random))	
+  wlp1s0_ip="192.168.11."$((16#$ip_random))
+  ifconfig wlp1s0 "$wlp1s0_ip" 
+  iptables -A FORWARD --in-interface $mesh_if -j ACCEPT
+  iptables -A FORWARD -i br-lan -o $mesh_if -j ACCEPT 
+  iptables -A FORWARD -o br-lan -i $mesh_if -j ACCEPT
+  killall olsrd 2>/dev/null	
+  (qos-olsrd -i wlp1s0 -d 0)&
+  ifconfig "$mesh_if" mtu 1500
 else
-      ##batman-adv###
-      brctl addif br-lan bat0 "$ifname_ap"
-      iptables -A FORWARD --in-interface bat0 -j ACCEPT
-      ifconfig bat0 mtu 1500
+  brctl addif br-lan bat0 "$ifname_ap"
+  iptables -A FORWARD --in-interface bat0 -j ACCEPT
+  ifconfig bat0 mtu 1500
 fi
 
 # Set mtu back to 1500 to support e2e connectivity
 # TODO: Investigate this as it should still work with 1460
 ifconfig br-lan mtu 1500
-
 ifconfig br-lan "$br_lan_ip" netmask "255.255.255.0"
 ifconfig br-lan up
-echo
-ifconfig br-lan
 # Add forwarding rules from AP to $mesh_if interface
+# FIXME: Changes the default IP forwarding policy to accept for all, which makes the previous iptables lines useless
 iptables -P FORWARD ACCEPT
-route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
-route add -net 192.168.1.0 gw "$br_lan_ip" netmask 255.255.255.0 dev br-lan
-iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
+# FIXME: Can't think of a reason for lines 231 and 232, and they are likely to be creating problems
+#route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
+#route add -net 192.168.1.0 gw "$br_lan_ip" netmask 255.255.255.0 dev br-lan
+# FIXME: Line has no reason to exist as we do not want NAT
+#iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
 
 #setup minimalistic Mumble server configuration
 rm /etc/umurmur.conf
