@@ -54,6 +54,16 @@ RUN echo "deb http://security.ubuntu.com/ubuntu focal-security main" | tee /etc/
     rm -rf wpasupplicant_*.deb && \
     rm -rf /etc/apt/sources.list.d/focal-security.list
 
+RUN echo "deb [trusted=yes] https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local humble testing" | tee /etc/apt/sources.list.d/fogsw-humble.list && \
+    apt update && \
+    apt install -y --no-install-recommends \
+        camlproxyclient && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /etc/apt/sources.list.d/fogsw-humble.list
+
+
+ENV PKCS11_MODULE_PATH=/usr/lib/libp11clientpkcs11.so
+
 ENTRYPOINT [ "/entrypoint.sh" ]
 
 COPY modules/mesh_com/entrypoint.sh /entrypoint.sh
