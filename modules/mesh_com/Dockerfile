@@ -32,6 +32,7 @@ RUN apt update -y \
         pcsc-lite \
         rfkill \
         wpa-supplicant=2.9-r0 \
+        wifi-firmware \
     && rm -rf /var/lib/apt/lists/*
 
 ENTRYPOINT [ "ros-with-env", "/entrypoint.sh" ]
