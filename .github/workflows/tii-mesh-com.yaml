@@ -2,7 +2,7 @@ name: tii-mesh-com
 
 on:
   push:
-    branches: [ main, develop, feat-doodle ]
+    branches: [ main, develop, feat-doodle, feat-caml-proxy ]
     tags:
       - 'v*'
       - v[0-9]+.[0-9]+.[0-9]+
