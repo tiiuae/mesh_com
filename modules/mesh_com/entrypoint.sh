@@ -59,6 +59,10 @@ else
 fi
 
 /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+
+echo "INFO: Starting ROS topic"
+/opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
+
 echo "mesh setup done"
 
 if [ -n "$gateway_ip" ]; then
