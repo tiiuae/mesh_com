@@ -141,7 +141,7 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
     # Create SSL context if certfile and keyfile are provided
     ssl_context = None
     if certfile and keyfile:
-        ssl_context = ssl.create_default_context()
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_context.load_cert_chain(certfile=certfile, keyfile=keyfile)
 
     # Connect to NATS server with TLS enabled if ssl_context is provided
