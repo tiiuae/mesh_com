@@ -32,44 +32,31 @@ trap _term TERM
 if [ "$1" == "init" ]; then
     echo "Start mesh executor"
 
-if [ "$DRONE_TYPE" == "cm-recon" ]; then
-    DEFAULT_MESH_IP="192.168.$((RANDOM % 7 + 240)).$((RANDOM % 254 + 1))"
-    gateway_ip="192.168.247.10" # FIXME: hardcoded for now. later detect automatically.
-    
-elif [ "$DRONE_TYPE" == "groundstation" ]; then
-    DEFAULT_MESH_IP="192.168.248.1"
-    
-elif [ "$DRONE_TYPE" == "fog" ]; then
-    if [ "$MESH_CLASS" == "edge" ]; then
-        DEFAULT_MESH_IP="192.168.247.10"
-    elif [ "$MESH_CLASS" == "gs" ]; then
-        DEFAULT_MESH_IP="192.168.248.10"
+    if [ "$DRONE_TYPE" == "cm-recon" ]; then
+        DEFAULT_MESH_IP="192.168.$((RANDOM % 7 + 240)).$((RANDOM % 254 + 1))"
+        gateway_ip="192.168.247.10" # FIXME: hardcoded for now. later detect automatically.
+        
+    elif [ "$DRONE_TYPE" == "groundstation" ]; then
+        DEFAULT_MESH_IP="192.168.248.1"
+        
+    elif [ "$DRONE_TYPE" == "fog" ]; then
+        if [ "$MESH_CLASS" == "edge" ]; then
+            DEFAULT_MESH_IP="192.168.247.10"
+        elif [ "$MESH_CLASS" == "gs" ]; then
+            DEFAULT_MESH_IP="192.168.248.10"
+            gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
+        else
+                echo "Undefined mesh class"   
+        fi 
+
+    elif [ "$DRONE_TYPE" == "cm-fog" ]; then
+        DEFAULT_MESH_IP="192.168.248.$((RANDOM % 243 + 11))"
         gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
+        
     else
-			echo "Undefined mesh class"   
-	 fi 
-
-elif [ "$DRONE_TYPE" == "cm-fog" ]; then
-    DEFAULT_MESH_IP="192.168.248.$((RANDOM % 243 + 11))"
-    gateway_ip="192.168.248.1" # FIXME: hardcoded for now. later detect automatically.
-    
-else
-    echo "drone type not implemented: $DRONE_TYPE"
-    exit 1
-fi
-
-/opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-
-echo "INFO: Starting ROS topic"
-/opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor &
-
-echo "mesh setup done"
-
-if [ -n "$gateway_ip" ]; then
-    route add default gw $gateway_ip bat0
-fi
-
-sleep 86400
+        echo "drone type not implemented: $DRONE_TYPE"
+        exit 1
+    fi
 
     # Start mesh executor 
     #                     1      2    3      4        5     6       7      8         9         10          11        12             13         14
@@ -96,11 +83,12 @@ sleep 86400
     #     mesh-11s.sh ap
 
     #starting Default mesh
-    # /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
-    # /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
-    # gateway_ip=$(python3 /usr/bin/default_mesh_router_select.py)
-    # route add default gw $gateway_ip bat0
-    # sleep 86400
+    /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $DEFAULT_MESH_MODE $DEFAULT_MESH_IP $DEFAULT_MESH_MASK $DEFAULT_MESH_MAC $DEFAULT_MESH_KEY \
+        $DEFAULT_MESH_ESSID $DEFAULT_MESH_FREQ $DEFAULT_MESH_TX $DEFAULT_MESH_COUNTRY
+    if [ -n "$gateway_ip" ]; then
+        route add default gw $gateway_ip bat0
+    fi
+    ros-with-env /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
 else
     echo "INFO: Start mesh pub&sub"
 
