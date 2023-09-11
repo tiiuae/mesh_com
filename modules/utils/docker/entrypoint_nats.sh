@@ -28,6 +28,19 @@ else
     sleep 1
   done
 
+
+  echo "starting provisioning agent"
+  /opt/S90provisioning_agent start
+  loop_count=0
+  while ps aux | grep [c]omms_provisioning >/dev/null; do
+    sleep 1
+    ((loop_count++))
+    if [ "$loop_count" -ge 30 ]; then
+	  echo "Stopping provisioning agent due to timeout"
+      /opt/S90provisioning_agent stop
+    fi
+  done
+  
   echo "Start nats server and client nodes"
   /opt/S90nats_discovery start
 
@@ -45,8 +58,6 @@ else
 
   echo "starting comms services"
   /opt/S90comms_controller start
-  echo "starting provisioning agent"
-  /opt/S90provisioning_agent start
 
   # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"

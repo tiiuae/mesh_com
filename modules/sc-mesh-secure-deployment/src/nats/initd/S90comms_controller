@@ -11,7 +11,15 @@ PIDFILE="/var/run/$DAEMON.pid"
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
 LOG_FILE=/opt/comms_controller.log
-ARGS="-s 0.0.0.0 -p 4222"
+
+KEY_FILE="/etc/ssl/private/comms_auth_private_key.pem"
+CERT_FILE="/etc/ssl/certs/comms_auth_cert.pem"
+
+if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
+  ARGS="-s 0.0.0.0 -p 4222 -k $KEY_FILE -c $CERT_FILE"
+else
+  ARGS="-s 0.0.0.0 -p 4222"
+fi
 start() {
     echo "$ARGS"
     printf 'Starting %s: ' "$DAEMON"
