@@ -135,9 +135,9 @@ def generate_data_imputation(df, amount=100, label='simulated', plot=False):
     # jamming5 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) > 3000) & (~df['label'].str.contains('0_dBm'))]
 
     normal2 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) < 3000) & (df['label'].str.contains('floor'))]
-    jamming2 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) < 3000) & (df['label'].str.contains('_10dBm'))]
+    jamming2 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) < 3000) & (df['label'].str.contains('_12dBm'))]
     normal5 = df[(df['bin_label'] == 0) & (pd.to_numeric(df['freq1']) > 3000) & (df['label'].str.contains('floor'))]
-    jamming5 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) > 3000) & (df['label'].str.contains('_10dBm'))]
+    jamming5 = df[(df['bin_label'] == 1) & (pd.to_numeric(df['freq1']) > 3000) & (df['label'].str.contains('_12dBm'))]
 
     for i in tqdm.tqdm(range(amount)):
         r = np.random.rand()
@@ -149,6 +149,9 @@ def generate_data_imputation(df, amount=100, label='simulated', plot=False):
         freq1 = norm_serie['freq1'].iloc[0]
 
         jamming_freq = jamming[jamming['freq1'] == freq1]
+        if jamming_freq.empty:
+            continue
+
         jam_serie_id = jamming_freq.sample(n=1, random_state=np.random.randint(0, 10000))['series_id'].values[0]
         jam_serie = jamming_freq[jamming_freq['series_id'] == jam_serie_id]
 
@@ -244,6 +247,7 @@ def load_data(plot=False):
 
     # Transform df into np.array
     num_series = df['series_id'].nunique()
+    print(num_series)
     feat_array = np.array(df_norm[feat_cols])
     feat_array = np.reshape(feat_array, [num_series, NUM_MEASUREMENT, len(feat_cols)])
     bin_target_array = np.array(df_norm['bin_label'])

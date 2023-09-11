@@ -52,8 +52,8 @@ def test(model, loaders, load_best=False):
     _, _, test_dl = loaders
 
     if load_best:
-        model.load_state_dict(torch.load('best.pth'))
-        # model.load_state_dict(torch.load('best_bin.pth'))  # Test accuracy multiclass: 0.9930551602436386, bin accuracy: 1.0
+        # model.load_state_dict(torch.load('best.pth'))
+        model.load_state_dict(torch.load('best_bin.pth'))  # Test accuracy multiclass: 0.9930551602436386, bin accuracy: 1.0
 
     model.eval()
     correct, bin_correct, total = 0, 0, 0
@@ -66,7 +66,7 @@ def test(model, loaders, load_best=False):
         correct += (preds == y_batch).sum().item()
 
         # Compute normal vs. all
-        bin_preds = torch.where(preds > 3, 1, 0)
+        bin_preds = torch.where(preds > 2, 1, 0)
         bin_correct += (bin_preds == y_bin_batch).sum().item()
 
         total += y_batch.size(0)
@@ -170,7 +170,7 @@ def train(model, loaders, len_train_data):
             correct += (preds == targets).sum().item()
 
             # Compute normal vs. all
-            bin_preds = torch.where(preds > 3, 1, 0)
+            bin_preds = torch.where(preds > 2, 1, 0)
             bin_correct += (bin_preds == y_bin_batch).sum().item()
 
             total += targets.size(0)
@@ -249,7 +249,7 @@ def main():
     util.model_summary(model)
 
     # Train
-    # train(model, loaders, len_train_data)
+    train(model, loaders, len_train_data)
 
     # Test
     test(model, loaders, load_best=True)

@@ -14,7 +14,8 @@ from sklearn.model_selection import train_test_split
 
 from util import SEED, NUM_MEASUREMENT, ORDERED_COLS, CHANNELS
 
-normal_folders = ['communication', 'floor', 'inter_mid', 'inter_high']
+# normal_folders = ['communication', 'floor', 'inter_mid', 'inter_high']
+normal_folders = ['floor', 'inter_mid', 'inter_high']
 max_files = 1000
 
 
@@ -149,10 +150,13 @@ def preprocess_raw_files(dataset_path='raw_dataset', storing_folder='preprocesse
             split_filename = file_name.split("_")
             frequency = int(split_filename[3].split("MHz")[0])
             frequency = '2' if frequency < 3000 else '5'
-            distance = split_filename[4].split("cm")[0]
-            power_level = split_filename[5].split("dBm")[0]
+            # distance = split_filename[4].split("cm")[0]
+            distance = 0
+            # power_level = split_filename[5].split("dBm")[0]
+            power_level = split_filename[4].split("dBm")[0]
+
             if int(distance) == 0:
-                jam_type = split_filename[6]
+                jam_type = split_filename[5]
                 df_serie['label'] = f'jam_{frequency}GHz_{distance}cm_{power_level}dBm_{jam_type}'
             else:
                 df_serie['label'] = f'jam_{frequency}GHz_{distance}cm_{power_level}dBm'

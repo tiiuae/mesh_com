@@ -13,6 +13,7 @@ __pycache__/
 
 /data
 /1_preprocessing/raw_dataset
+/1_preprocessing/Dataset_v1_3
 /1_preprocessing/raw_dataset (copy)
 /1_preprocessing/preprocessed
 /1_preprocessing/train_test_split
