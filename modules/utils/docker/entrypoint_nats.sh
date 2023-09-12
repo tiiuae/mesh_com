@@ -6,7 +6,11 @@ source /opt/mesh-helper.sh
 source_configuration
 
 if [ "$MSVERSION" != "nats" ]; then
-  /bin/bash /usr/local/bin/entrypoint.sh
+  if [ -f "/usr/local/bin/entrypoint.sh" ]; then
+     /bin/bash /usr/local/bin/entrypoint.sh
+  else
+     /bin/bash /opt/mesh_com/modules/utils/docker/entrypoint.sh
+  fi
 else
 
   if [ ! -f "/opt/identity" ]; then
@@ -27,7 +31,6 @@ else
   while ! (ifconfig | grep -e "$br_lan_ip") > /dev/null; do
     sleep 1
   done
-
 
   echo "starting provisioning agent"
   /opt/S90provisioning_agent start
@@ -53,7 +56,7 @@ else
   /opt/S90nats_server start
 
   echo "starting radvd & socat"
-  radvd -C /etc/radvd.conf  # for some reason init.d is not working
+  radvd -C /etc/radvd.conf  # TODO: for some reason init.d is not working
   /opt/S90socat start  # socat is used to provide IPv6 NATS IF
 
   echo "starting comms services"
