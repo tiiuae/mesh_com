@@ -27,6 +27,7 @@ RUN apt update \
         batctl \
         keepalived \
         iproute2 \
+	    iperf3 \
         iw \
         net-tools \
         libnl \
