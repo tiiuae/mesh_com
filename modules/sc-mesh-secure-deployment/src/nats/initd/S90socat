@@ -1,0 +1,60 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          S90socat
+# Short-Description: socat
+# Description:       Starts socat to provive IPv6 NATS IF
+### END INIT INFO
+
+DAEMON="socat"
+DIR="/usr/bin/"
+PIDFILE="/var/run/$DAEMON.pid"
+# shellcheck source=/dev/null
+[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
+LOG_FILE=/opt/socat.log
+
+ip=$(ifconfig br-lan | awk '/inet / {print $2}')
+ARGS="TCP6-LISTEN:6222,fork,reuseaddr TCP4:$ip:4222"
+
+start() {
+    echo "$ARGS"
+    printf 'Starting %s: ' "$DAEMON"
+    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON \
+          $ARGS > $LOG_FILE 2>&1"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+stop() {
+    printf 'Stopping %s: ' "$DAEMON"
+    start-stop-daemon -K -q -p "$PIDFILE"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        rm -f "$PIDFILE"
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+restart() {
+    stop
+    sleep 1
+    start
+}
+case "$1" in
+    start|stop|restart)
+        "$1";;
+    reload)
+        # Restart, since there is no true "reload" feature.
+        restart;;
+    *)
+        echo "Usage: $0 {start|stop|restart|reload}"
+        exit 1
+esac
+
+exit 0
+
