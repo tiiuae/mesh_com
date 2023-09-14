@@ -13,7 +13,7 @@ async def main():
                 "ip": "192.168.1.2", "subnet": "255.255.255.0", "tx_power": "5",
                 "mode": "ap+mesh_scc", "role": f"{config.MODULE_ROLE}"}
     cmd = json.dumps(cmd_dict)
-    rep = await nc.request("comms.settings",
+    rep = await nc.request(f"comms.settings.{config.MODULE_IDENTITY}",
                            cmd.encode(),
                            timeout=2)
     parameters = json.loads(rep.data)

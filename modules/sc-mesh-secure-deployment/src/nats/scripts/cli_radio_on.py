@@ -9,7 +9,7 @@ async def main():
 
     cmd_dict = {"api_version": 1,"cmd": "UP"}
     cmd = json.dumps(cmd_dict)
-    rep = await nc.request("comms.command",
+    rep = await nc.request(f"comms.command.{config.MODULE_IDENTITY}",
                            cmd.encode(), timeout=2)
     parameters = json.loads(rep.data)
     print(parameters)

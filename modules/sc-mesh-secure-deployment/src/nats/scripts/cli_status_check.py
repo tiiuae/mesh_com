@@ -9,7 +9,7 @@ async def main():
     nc = await nats.connect(f"{config.MODULE_IP}:{config.MODULE_PORT}")
     cmd_dict = {"api_version": 1}
     cmd = json.dumps(cmd_dict)
-    rep = await nc.request("comms.status",
+    rep = await nc.request(f"comms.status.{config.MODULE_IDENTITY}",
                            cmd.encode(),
                            timeout=1)
     parameters = json.loads(rep.data)

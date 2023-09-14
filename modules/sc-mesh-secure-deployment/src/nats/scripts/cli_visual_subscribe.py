@@ -45,7 +45,7 @@ async def run(loop):
     for sig in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(getattr(signal, sig), signal_handler)
 
-    await nc.subscribe("comms.visual", "", cb=subscribe_handler)
+    await nc.subscribe("comms.visual.*", "", cb=subscribe_handler)
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()

@@ -117,6 +117,15 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
     nats_client = NATS()
     csac = CommsCsa()
 
+    status, _, identity_dict = cc.command.get_identity()
+
+    if status == "OK":
+        identity = identity_dict["identity"]
+        cc.logger.debug("Identity: %s", identity)
+    else:
+        cc.logger.error("Failed to get identity!")
+        return
+
     async def stop():
         await asyncio.sleep(1)
         asyncio.get_running_loop().stop()
@@ -181,16 +190,16 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
         cc.logger.debug("Received a message on '%s': %s", subject, data)
         ret, info, resp = "FAIL", "Not supported subject", ""
 
-        if subject == "comms.settings":
+        if subject == f"comms.settings.{identity}":
             ret, info = cc.settings.handle_mesh_settings(data)
         elif subject == "comms.settings_csa":
             ret, info, delay = cc.settings.handle_mesh_settings_csa(data)
             csac.delay = delay
             csac.ack_sent = "status" in data
 
-        elif subject == "comms.command":
+        elif subject == f"comms.command.{identity}" or "GET_IDENTITY" in data:
             ret, info, resp = cc.command.handle_command(data, cc)
-        elif subject == "comms.status":
+        elif subject == f"comms.status.{identity}":
             ret, info = "OK", "Returning current status"
 
         if subject == "comms.settings_csa":
@@ -212,10 +221,10 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
             cc.logger.debug("Sending response: %s", str(response)[:1000])
             await message.respond(json.dumps(response).encode("utf-8"))
 
-    await nats_client.subscribe("comms.settings", cb=message_handler)
+    await nats_client.subscribe(f"comms.settings.{identity}", cb=message_handler)
     await nats_client.subscribe("comms.settings_csa", cb=message_handler)
-    await nats_client.subscribe("comms.command", cb=message_handler)
-    await nats_client.subscribe("comms.status", cb=message_handler)
+    await nats_client.subscribe(f"comms.command.>", cb=message_handler)
+    await nats_client.subscribe(f"comms.status.{identity}", cb=message_handler)
 
     cc.logger.debug("comms_nats_controller Listening for requests")
     while True:
@@ -223,8 +232,8 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
         try:
             if cc.telemetry.visualisation_enabled:
                 msg = cc.telemetry.mesh_visual()
-                cc.logger.debug("Publishing comms.visual: %s", msg)
-                await nats_client.publish("comms.visual", msg.encode())
+                cc.logger.debug(f"Publishing comms.visual.{identity}: %s", msg)
+                await nats_client.publish(f"comms.visual.{identity}", msg.encode())
         except Exception as e:
             cc.logger.error("Error:", e)
 
