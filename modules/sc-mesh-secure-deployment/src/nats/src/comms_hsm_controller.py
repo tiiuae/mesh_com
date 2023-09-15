@@ -30,6 +30,9 @@ from Crypto.Hash import SHA256
 from Crypto.Util.Padding import unpad
 from Crypto.Cipher import AES
 
+# To get IP addresses for CSR SAN extension
+import netifaces as ni
+
 
 class CommsHSMController:
     """
@@ -55,7 +58,8 @@ class CommsHSMController:
         self.__token_label = "secccoms"
         self.__current_token_label = ""
 
-        # Define configuration file for openssl
+        # Define configuration files for openssl
+        self.__csr_cnf_file = self.__base_dir + "/csr.cnf"
         os.environ['OPENSSL_CONF'] = self.__base_dir + "/comms_openssl.cnf"
 
         self.__pkcs11_engine = ""
@@ -146,8 +150,8 @@ class CommsHSMController:
             # Decrypt with AES-256 / CBC / PKCS7 Padding
             cipher = AES.new(key, AES.MODE_CBC, iv)
             return unpad(cipher.decrypt(ciphertext), 16).decode().split('\n')[0]
-        except:
-            print("No pin found")
+        except Exception as e:
+            print("No pin found, error:", e)
             return ""
 
     def __generate_pin(self):
@@ -739,7 +743,7 @@ class CommsHSMController:
             print("Generated EC keypair")
             return True
 
-    def create_csr_via_openssl(self, priv_key_id: str, device_id: str, filename: str):
+    def create_csr_via_openssl(self, priv_key_id: str, device_id: str, filename: str, is_server=False):
         """
         Create a Certificate Signing Request (CSR) using OpenSSL with
         the provided arguments.
@@ -748,6 +752,7 @@ class CommsHSMController:
             priv_key_id (str) -- Identifier number for the private key.
             subject (str) -- Subject to be used in CSR.
             filename (str) -- Output file name.
+            is_server (bool) -- Defines for what role CSR is created,
 
         Returns:
             bool: True if CSR generation is successful, False otherwise.
@@ -759,23 +764,22 @@ class CommsHSMController:
         os.environ['PKCS11_PIN'] = self.__token_user_pin
         subject = "/CN=" + device_id
 
-        # SoftHSM engine used by default
-        pkcs_engine = 'pkcs11'
-        if not self.__use_soft_hsm:
-            pkcs_engine = 'e4sss'
+        # Generate CSR config file
+        self.__generate_csr_config_file(subject, is_server)
 
         command = [
             'openssl',
             'req',
             '-new',
-            '-engine', pkcs_engine,
+            '-engine', self.__pkcs11_engine,
             '-keyform', 'engine',
             '-key', str(priv_key_id),
             '-passin', 'env:PKCS11_PIN',
             '-out', str(filename),
-            '-subj', str(subject)
+            '-subj', str(subject),
+            '-config', self.__csr_cnf_file
             ]
-
+        print(command)
         # Run the command
         result = subprocess.run(command, capture_output=True, text=True)
 
@@ -876,7 +880,141 @@ class CommsHSMController:
 
         return public_key, parameters, key_type
 
-    def create_csr(self, priv_key_id: str, device_id: str, filename: str):
+    def __create_csr_info(self, subject, public_key, algorithm_name, pub_key_params, is_server):
+        """
+        Creates the csr info to be used in certificate request.
+
+        Arguments:
+            subject (str) -- Identifies to be used as common name identifier.
+            public_key (any) -- Public key object instance
+            algorithm_name  -- Algorithm name to be used in CSR
+            pub_key_params -- Public key paramters
+            is_server (bool) -- Boolean value to define is the CSR for server or
+                                client usage.
+        Returns:
+            Handle to publick key object or None
+
+        """
+        x509_subject = x509.Name.build({"common_name": subject})
+
+        if is_server:
+            key_usage = "server_auth"
+        else:
+            key_usage = "client_auth"
+
+        extensions = [("basic_constraints",
+                       x509.BasicConstraints({"ca": False}),
+                       False),
+                      ("key_usage",
+                       x509.KeyUsage({"digital_signature",
+                                      "key_encipherment"}),
+                       True),
+                      ("extended_key_usage",
+                       x509.ExtKeyUsageSyntax([key_usage]),
+                       False)]
+
+        if is_server:
+            ip_list = self.__get_ip_addresses()
+            names = x509.GeneralNames()
+            for ip in ip_list:
+                names.append(x509.GeneralName("ip_address", ip))
+            extensions.append(("subject_alt_name", names, False))
+
+        csr_info = csr.CertificationRequestInfo({
+            "version": "v1",
+            "subject": x509_subject,
+            "subject_pk_info": {
+                "algorithm": {
+                    "algorithm": algorithm_name,
+                    "parameters": pub_key_params,
+                },
+                "public_key": public_key
+            },
+            "attributes": [{
+                "type": "extension_request",
+                "values": [[self.__create_extension(x) for x in extensions]]
+            }]
+        })
+        return csr_info
+
+    def __create_extension(self, extension):
+        """
+        Creates an ASN.1 certificate request extension structure
+
+        Arguments:
+            extension (tuple): -- Tuple with three values: name of the
+                                  extension (str), value for the extension(str)
+                                  and boolean to express if extension should be
+                                  considered critical.
+        Returns:
+            Extension dictionary.
+        """
+        name, value, critical = extension
+        return {"extn_id": name,
+                "extn_value": value,
+                "critical": critical}
+
+    def __get_ip_addresses(self):
+        """
+        Creates a list of IP addresses from device network interfaces.
+
+        Arguments:
+            server (bool) -- Boolean value to determine is CSR meant
+                             for server or client usage.
+        Returns:
+            List of IP addresses
+        """
+        ip_addresses = []
+
+        # TODO: Perhaps this list should be limited still?
+        interfaces = ni.interfaces()
+        for interface in interfaces:
+            addrs = ni.ifaddresses(interface)
+
+            if ni.AF_INET in addrs:
+                ipv4_addresses = [addr['addr'] for addr in addrs[ni.AF_INET]]
+                ip_addresses.extend(ipv4_addresses)
+
+            if ni.AF_INET6 in addrs:
+                ipv6_addresses = [addr['addr'].split('%')[0] for addr in addrs[ni.AF_INET6]]
+                ip_addresses.extend(ipv6_addresses)
+        return ip_addresses
+
+    def __generate_csr_config_file(self, subject: str, server=False):
+        """
+        Creates a configurarion file for CSR creation via openssl
+
+        Arguments:
+            server (bool) -- Boolean value to determine is CSR meant
+                             for server or client usage.
+        Returns:
+            bool: True if the config file was generated, False otherwise.
+        """
+        try:
+            with open(self.__csr_cnf_file, 'w') as file:
+                file.write("[ req ]\n")
+                file.write("distinguished_name=req_distinguished_name\n")
+                file.write("req_extensions = v3_req\n")
+                file.write("\n[ req_distinguished_name ]\n")
+                file.write(subject+"\n")
+                file.write("\n[ v3_req ]\n")
+                file.write("basicConstraints=CA:FALSE\n")
+                file.write("keyUsage=digitalSignature, keyEncipherment\n")
+                if not server:
+                    file.write("extendedKeyUsage=clientAuth\n")
+                else:
+                    ip_addresses = self.__get_ip_addresses()
+                    file.write("extendedKeyUsage=serverAuth\n")
+                    file.write("subjectAltName=@alt_names\n")
+                    file.write("\n[alt_names]\n")
+                    for i, ip_address in enumerate(ip_addresses, start=1):
+                        file.write(f"IP.{i} = {ip_address}\n")
+            return True
+        except Exception as e:
+            print("Error creating CSR config file:", e)
+            return False
+
+    def create_csr(self, priv_key_id: str, device_id: str, filename: str, server=False):
         """
         Create a Certificate Signing Request (CSR) using asn1crypto library.
         CSR is signed via HSM.
@@ -885,7 +1023,8 @@ class CommsHSMController:
             priv_key_id (str) -- Identifier number for the private key.
             subject (str) -- Subject to be used in CSR.
             filename (str) -- Output file name.
-
+            server (bool)  -- Boolean value to define is this CSR for server
+                              or client usage.
         Returns:
             bool: True if CSR generation is successful, False otherwise.
         """
@@ -903,8 +1042,7 @@ class CommsHSMController:
         if public_key_handle is None:
             return False
 
-        subject = x509.Name.build({"common_name": device_id})
-        public_key, parameters, key_type = self.__get_public_key_data(public_key_handle)
+        public_key, pub_key_params, key_type = self.__get_public_key_data(public_key_handle)
 
         if key_type == PyKCS11.LowLevel.CKK_RSA:
             public_key = keys.RSAPublicKey.load(public_key)
@@ -916,18 +1054,7 @@ class CommsHSMController:
             algorithm_name = "ec"
             sign_algorithm_name = "ecdsa"
 
-        csr_info = csr.CertificationRequestInfo({
-            'version': 0,
-            'subject': subject,
-            'subject_pk_info': {
-                'algorithm': {
-                        'algorithm': algorithm_name,
-                        'parameters': parameters,
-                        },
-                'public_key': public_key
-            },
-            'attributes': csr.CRIAttributes([])
-        })
+        csr_info = self.__create_csr_info(device_id, public_key, algorithm_name, pub_key_params, server)
 
         # Sign the CSR Info
         signature = self.__pkcs11_session.sign(private_key_handle,
