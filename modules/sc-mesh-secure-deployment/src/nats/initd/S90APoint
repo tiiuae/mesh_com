@@ -1,0 +1,78 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          S9011APoint
+# Should-Start:      $syslog
+# Should-Stop:       $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: start S9011sAP during boot time
+# Description:       wifi mesh daemon for configuring mesh network
+#                    automatically
+### END INIT INFO
+
+DAEMON="mesh-11s_nats.sh"
+DIR="/opt/"
+PIDFILE="/var/run/{$DAEMON}_hostapd.pid"
+LOG_FILE=/opt/mesh-11s_AP.log
+
+source /opt/mesh-helper.sh
+# sources mesh configuration
+source_configuration
+
+# shellcheck source=/dev/null
+[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
+
+start() {
+    if [ "$MODE" == "ap+mesh_mcc" ] || [ "$MODE" == "ap+mesh_scc" ]; then
+      printf 'Starting %s: ' "$DAEMON"
+      start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON > $LOG_FILE 2>&1"
+      status=$?
+      if [ "$status" -eq 0 ]; then
+        echo "OK"
+      else
+        echo "FAIL"
+      fi
+    else
+      echo "ap+mesh not starting..."
+      return 0
+    fi
+    return "$status"
+}
+stop() {
+    printf 'Stopping %s: ' "$DAEMON"
+    # shellcheck disable=SC2009 #pgrep is not available
+    NEW_PID=$(ps ax | grep -E '[h]ostapd' | awk {'print $1'})
+    kill -9 "$NEW_PID"
+    start-stop-daemon -K -o -q -p "$PIDFILE"
+    rm -fr /var/run/hostapd/* 2>/dev/null
+    ifconfig "$MESH_VIF"-1 down 2>/dev/null
+    iw dev "$MESH_VIF"-1 del 2>/dev/null
+    ifname_ap="$(ifconfig -a | grep -m 1 "wlan*" | awk -F':' '{ print $1 }')"
+    ifconfig "$ifname_ap" down 2>/dev/null
+    iw dev "$ifname_ap" del 2>/dev/null
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        rm -f "$PIDFILE"
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+restart() {
+    stop
+    sleep 1
+    start
+}
+case "$1" in
+    start|stop|restart)
+        "$1";;
+    reload)
+        # Restart, since there is no true "reload" feature.
+        restart;;
+    *)
+        echo "Usage: $0 {start|stop|restart|reload}"
+        exit 1
+esac
+
+exit 0

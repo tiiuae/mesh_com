@@ -8,6 +8,7 @@ import pandas as pd
 import sys
 import os
 import traceback
+import subprocess
 sys.path.insert(0, '../../')
 
 from features.mutual.mutual import *
@@ -26,6 +27,7 @@ def initiate_client(server_ip, ID, logger=None):
 
         # connect to server socket
         try:
+            cli_sock.settimeout(10)
             cli_sock.connect((server_ip, 9999))
 
             if logger:
@@ -112,7 +114,7 @@ def initiate_client(server_ip, ID, logger=None):
             #start_time = time.time()
             #timestamp = start_time  # Gives current timestamp in seconds
             time_flag = 1  # Initialization of time flag
-            max_count = 3
+            max_count = 2
             flag_ctr = 0
 
             #period = 2  # Period for each authentication in seconds
@@ -131,7 +133,10 @@ def initiate_client(server_ip, ID, logger=None):
                     print("Processing authentication request")
                     # Generate share and share authenticator
                     while True:  # Select random x until unique share is generated
-                        rand_num = random.randint(1, 9999)  # Generate random x
+                        #rand_num = random.randint(1, 9999)  # Generate random x
+                        command = ['od', '-An', '-N4', '-i', '/dev/random'] # Read a 4 byte random number from /dev/random
+                        out = subprocess.run(command, shell=False, capture_output=True, text=True)
+                        rand_num = int(out.stdout)
                         shared_sec = secret + time_flag + rand_num  # Share = secret + time flag + random number x
                         if sent_shares.count(shared_sec) == 0:  # Check that new share has not been sent previously
                             sent_shares.append(shared_sec)
@@ -192,7 +197,7 @@ def initiate_client(server_ip, ID, logger=None):
             # Test
             print("Test partial_result: ", partial_result)
             print("Share storage cost: ", sys.getsizeof(sent_shares))
-        except (ConnectionRefusedError, OSError):
+        except (ConnectionRefusedError, OSError, socket.timeout):
             if logger:
                 logger.error("Connection refused from server (%s, 9999)", server_ip)
             #return 3 # Check if this needs to be returned at all

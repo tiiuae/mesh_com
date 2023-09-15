@@ -34,7 +34,9 @@ co = ConnectionMgr.ConnectionMgr()
 _executor = ThreadPoolExecutor()
 executor = ProcessPoolExecutor()
 MUTUALINT = 'wlan1'
-MESHINT = 'bat0'
+MESHINT = mesh_utils.get_mesh_interface_from_file()
+
+
 client_q = {}
 ness = ness_main.NESS()
 qua = quarantine.Quarantine()

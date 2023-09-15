@@ -1,6 +1,5 @@
 #! /bin/bash
-function help
-{
+function help {
     echo
     echo "Usage: sudo ./start-docker.sh <docker_env"
     echo "Parameters:"
@@ -11,10 +10,10 @@ function help
 }
 
 echo "sudo  start-docker.sh $1"
-    if [[ -z "$1" ]]; then
-        echo "check arguments..."
-        help
-    fi
+if [[ -z "$1" ]]; then
+    echo "check arguments..."
+    help
+fi
 
 docker_exec_env=$1
 
@@ -27,10 +26,8 @@ elif [ -f /etc/lsb-release ]; then
     OS=$DISTRIB_ID
     VER=$DISTRIB_RELEASE
 fi
-if [ "$OS" == "Ubuntu" ]; then
-    docker build -t comms_vm .
-    docker run -it --privileged --net="host" --rm comms_vm /bin/bash
-elif [ "$OS" == "Buildroot" ]; then
+
+if [ "$OS" == "Buildroot" ]; then
     if [ "$docker_exec_env" == "sec_os" ]; then
         if [ ! -d "/opt/container-data/mesh" ]; then
             echo "create persist mesh container data partition"
@@ -50,35 +47,53 @@ elif [ "$OS" == "Buildroot" ]; then
                 cp /etc/comms_pcb_version /opt/container-data/mesh/hardware/comms_pcb_version
             fi
         fi
-        # change rootfs location once its mounted in dedicated partation
-        cp mesh.conf /opt/container-data/mesh/ #only for MS1.5
         # change rootfs location once its mounted in dedicated partition
-        if [ -f "/root/rootfs.tgz" ]; then
+        running=$(docker container inspect -f '{{.State.Running}}' "mesh_comms_vm")
+        if [ "$running" == "true" ]; then
+            echo "no need to import"
+        elif [ -f "/root/rootfs.tgz" ]; then
             echo "import rootfs.tgz commms vm"
             # shellcheck disable=SC2002
             cat /root/rootfs.tgz | docker import - comms_vm
             docker build -t comms_vm .
-        else
-            docker import - comms_vm < /rootfs.tar
         fi
         meshcom_path="/opt/container-data/mesh/mesh_com/"
-        echo "$meshcom_path"
-        if [ ! -f "/opt/container-data/mesh/mesh.conf" ]; then
-		cp /opt/mesh_default.conf /opt/container-data/mesh/mesh.conf
-		cp $meshcom_path/common/scripts/mesh-ibss.sh  /opt/container-data/mesh/.
-		chmod 755 /opt/container-data/mesh/mesh-ibss.sh
-		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S90mesh /opt/container-data/mesh/.
-		chmod 755 /opt/container-data/mesh/S90mesh
-		cp $meshcom_path/common/scripts/mesh-11s.sh  /opt/container-data/mesh/.
-		chmod 755 /opt/container-data/mesh/mesh-11s.sh
-		cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S9011sMesh /opt/container-data/mesh/.
-		chmod 755 /opt/container-data/mesh/S9011sMesh
+        echo $meshcom_path
+        if [ ! -f "/opt/container-data/mesh/mesh_default.conf" ]; then
+            cp /opt/mesh_default.conf /opt/container-data/mesh/
+            cp $meshcom_path/common/scripts/mesh-11s.sh /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/mesh-11s.sh
+            cp $meshcom_path/common/scripts/mesh-11s_nats.sh /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/mesh-11s_nats.sh
+            cp $meshcom_path/common/scripts/mesh-helper.sh /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/mesh-helper.sh
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/services/initd/S9011sMesh /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S9011sMesh
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S9011sNatsMesh /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S9011sNatsMesh
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90APoint /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S90APoint
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90nats_server /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S90nats_server
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90comms_controller /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S90comms_controller
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90nats_discovery /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S90nats_discovery
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90provisioning_agent /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S90provisioning_agent
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90socat /opt/container-data/mesh/
+            chmod 755 /opt/container-data/mesh/S90socat
+            cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/conf/comms_openssl.cnf /opt/container-data/mesh/
+            cp -R $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/ /opt/container-data/mesh/
+            chmod -R 755 /opt/container-data/mesh/nats/*.py
         fi
-        cp /etc/umurmur.conf $meshcom_path/modules/utils/docker/umurmur.conf
-        docker rm -f mesh_comms_vm
-        docker run --name mesh_comms_vm -d --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm
-        #Add restart policy of the container if it stops or device rebooted
-        docker update --restart unless-stopped mesh_comms_vm
+
+        if [ "$running" != "true" ]; then
+           docker rm -f mesh_comms_vm
+           docker run --name mesh_comms_vm -d --env EXECUTION_CTX='docker' -it --privileged --net="host" -v /opt/container-data/mesh:/opt comms_vm
+           #Add restart policy of the container if it stops or device rebooted
+           docker update --restart unless-stopped mesh_comms_vm
+        fi
     elif [ "$docker_exec_env" == "ubuntu" ]; then
         docker build -t comms_vm .
         docker run -it --privileged --net="host" --rm comms_vm /bin/bash

@@ -1,0 +1,66 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          S90nats_server
+# Short-Description: start nats during boot time
+# Description:       NATS server starter
+### END INIT INFO
+
+DAEMON="nats-server"
+DIR="/usr/bin/"
+PIDFILE="/var/run/$DAEMON.pid"
+LOG_FILE=/opt/nats-server.log
+# shellcheck source=/dev/null
+[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
+
+KEY_FILE="/etc/ssl/private/comms_auth_private_key.pem"
+CERT_FILE="/etc/ssl/certs/comms_auth_cert.pem"
+
+if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
+  NATS_SERVER_ARGS="-l $LOG_FILE -c /var/run/nats.conf --tlsverify --tlscert=$CERT_FILE --tlskey=$KEY_FILE"
+else
+  NATS_SERVER_ARGS="-l $LOG_FILE -c /var/run/nats.conf"
+fi
+
+start() {
+    echo "$NATS_SERVER_ARGS"
+    printf 'Starting %s: ' "$DAEMON"
+    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON \
+          $NATS_SERVER_ARGS > $LOG_FILE 2>&1"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+stop() {
+    printf 'Stopping %s: ' "$DAEMON"
+    start-stop-daemon -K -q -p "$PIDFILE"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        rm -f "$PIDFILE"
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+restart() {
+    stop
+    sleep 1
+    start
+}
+case "$1" in
+    start|stop|restart)
+        "$1";;
+    reload)
+        # Restart, since there is no true "reload" feature.
+        restart;;
+    *)
+        echo "Usage: $0 {start|stop|restart|reload}"
+        exit 1
+esac
+
+exit 0
+

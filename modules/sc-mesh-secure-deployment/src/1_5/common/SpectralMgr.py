@@ -1,52 +1,35 @@
 #!/usr/bin/python
-from datetime import datetime
-import pandas as pd
-import subprocess
-import struct
 import math
-import time
-import yaml
-import sys
 import os
+import stat
+import struct
+import subprocess
+import sys
+import time
+from datetime import datetime
 
+import pandas as pd
+
+HEADER_SIZE = 3
+TYPE1_PACKET_SIZE = 17 + 56
+TYPE2_PACKET_SIZE = 24 + 128
+TYPE3_PACKET_SIZE = 26 + 64
+
+# ieee 802.11 constants
+SC_WIDE = 0.3125  # in MHz
+
+DRIVERS = ["ath9k", "ath10k"]
+DRIVER = os.popen('ls /sys/kernel/debug/ieee80211/phy* | grep ath').read().strip()
+if DRIVER not in DRIVERS: sys.exit("No driver detected.")
+
+outfile = "scan"
 
 class Spectral:
-    header_size = 3
-    type1_packet_size = 17 + 56
-    type2_packet_size = 24 + 128
-    type3_packet_size = 26 + 64
-
-    # ieee 802.11 constants
-    sc_wide = 0.3125  # in MHz
-
-    VALUES = []
-
-    # DRIVER
-    drivers = ["ath9k", "ath10k"]
-    driver = os.popen('ls /sys/kernel/debug/ieee80211/phy* | grep ath').read().strip()
-    if(driver not in drivers):
-        sys.exit("No driver detected.")
-
-    # CONFIG FILE
-    with open('config_spectralscan.yaml') as file:
-        try:
-           config = yaml.safe_load(file)
-           debug = config['debug']
-           interface = config['interface']
-        except yaml.YAMLError as exc:
-          print(exc)
-          sys.exit("Config file error.")
-
-
-    # DEBUG CSV FILE
-    if(debug):
-       outfile = "spectral_scan"
-
 
     def __init__(self):
         self.VALUES = dict()
 
-    def read(self, spectral_bin, size, all_channels, channels, csv_count, missing_scan_count):
+    def read(self, spectral_bin, size, channels, scan_count, debug):
         self.VALUES = dict()
 
         data = spectral_bin.read(size)  # just read 2048 bytes
@@ -54,16 +37,16 @@ class Spectral:
         pos = 0
         while pos < len(data):
             (stype, slen) = struct.unpack_from(">BH", data, pos)
-            if not ((stype == 1 and slen == self.type1_packet_size) or
-                    (stype == 2 and slen == self.type2_packet_size) or
-                    (stype == 3 and slen == self.type3_packet_size)):
+            if not ((stype == 1 and slen == TYPE1_PACKET_SIZE) or
+                    (stype == 2 and slen == TYPE2_PACKET_SIZE) or
+                    (stype == 3 and slen == TYPE3_PACKET_SIZE)):
                 print("skip malformed packet")
                 break
             # 20 MHz
             if stype == 1:
-                if pos >= len(data) - self.header_size - self.type1_packet_size + 1:
+                if pos >= len(data) - HEADER_SIZE - TYPE1_PACKET_SIZE + 1:
                     break
-                pos += self.header_size
+                pos += HEADER_SIZE
                 (max_exp, freq, rssi, noise, max_mag, max_index, hweight, tsf) = \
                     struct.unpack_from(">BHbbHBBQ", data, pos)
                 pos += 17
@@ -75,34 +58,35 @@ class Spectral:
                 sum_square_sample = 0
                 samples = []
                 for raw_sample in sdata:
-                   if raw_sample == 0:
+                    if raw_sample == 0:
                         sample = 1
-                   else:
+                    else:
                         sample = raw_sample << max_exp
-                   sum_square_sample += sample * sample
-                   samples.append(sample)
+                    sum_square_sample += sample * sample
+                    samples.append(sample)
 
                 if sum_square_sample == 0:
                     sum_square_sample = 1
                 sum_square_sample = 10 * math.log10(sum_square_sample)
 
                 sc_total = 56  # HT20: 56 OFDM subcarrier, HT40: 128
-                first_sc = freq - self.sc_wide * (sc_total / 2 + 0.5)
+                first_sc = freq - SC_WIDE * (sc_total / 2 + 0.5)
 
                 for i, sample in enumerate(samples):
-                    subcarrier_freq = first_sc + i * self.sc_wide
+                    subcarrier_freq = first_sc + i * SC_WIDE
                     sigval = noise + rssi + 20 * math.log10(sample) - sum_square_sample
                     self.VALUES[count] = (tsf, subcarrier_freq, noise, rssi, sigval)
 
-                    if(self.debug):
-                       print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (tsf, subcarrier_freq, noise, rssi, sigval))
+                    if (self.debug):
+                        print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f" % (
+                            tsf, subcarrier_freq, noise, rssi, sigval))
                     count = count + 1
-                    
+
             # 40 MHz
             elif stype == 2:
-                if pos >= len(data) - self.header_size - self.type2_packet_size + 1:
+                if pos >= len(data) - HEADER_SIZE - TYPE2_PACKET_SIZE + 1:
                     break
-                pos += self.header_size
+                pos += HEADER_SIZE
                 (chantype, freq, rssi_l, rssi_u, tsf, noise_l, noise_u,
                  max_mag_l, max_mag_u, max_index_l, max_index_u,
                  hweight_l, hweight_u, max_exp) = \
@@ -143,24 +127,22 @@ class Spectral:
                     print("got unknown chantype: %d" % chantype)
                     raise
 
-                first_sc = freq - self.sc_wide * (sc_total / 2 + 0.5)
+                first_sc = freq - SC_WIDE * (sc_total / 2 + 0.5)
                 for i, sample in enumerate(samples):
                     if i < 64:
                         sigval = noise_l + rssi_l + 20 * math.log10(sample) - sum_square_sample_lower
                     else:
                         sigval = noise_u + rssi_u + 20 * math.log10(sample) - sum_square_sample_upper
-                    subcarrier_freq = first_sc + i * self.sc_wide
-                    self.VALUES[count] = (subcarrier_freq, (noise_l + noise_u) / 2, (rssi_l + rssi_u) / 2, sigval, (max_mag_l + max_mag_u)/2)
 
-                    if(self.debug):
-                       print("TSF: %d Freq: %d Noise: %d Rssi: %d Signal: %f Max Magnitude %d" % (tsf, subcarrier_freq, (noise_l+noise_u)/2, (rssi_l + rssi_u) / 2, sigval, (max_mag_l + max_mag_u)/2))
+                    subcarrier_freq = first_sc + i * SC_WIDE
+                    self.VALUES[count] = (subcarrier_freq, (noise_l + noise_u) / 2, (rssi_l + rssi_u) / 2, sigval, (max_mag_l + max_mag_u) / 2)
                     count = count + 1
 
             # ath10k
             elif stype == 3:
-                if pos >= len(data) - self.header_size - self.type3_packet_size + 1:
+                if pos >= len(data) - HEADER_SIZE - TYPE3_PACKET_SIZE + 1:
                     break
-                pos += self.header_size
+                pos += HEADER_SIZE
                 (chanwidth, freq1, freq2, noise, max_mag, gain_db,
                  base_pwr_db, tsf, max_index, rssi, relpwr_db, avgpwr_db,
                  max_exp) = \
@@ -171,112 +153,94 @@ class Spectral:
                 pos += 64
 
                 self.VALUES[count] = (freq1, noise, max_mag, gain_db, base_pwr_db, rssi, relpwr_db, avgpwr_db)
-
-                if(self.debug):
-                   print(f"Channel Width: {chanwidth} Freq1: {freq1} Freq2: {freq2} Noise: {noise} Max Magnitude: {max_mag} Gain_db: {gain_db} Base Power_db: {base_pwr_db} TSF: {tsf} Max Index: {max_index} Rssi: {rssi} Rel Power_db: {relpwr_db} Avg Power_db: {avgpwr_db} Max_exp: {max_exp}")
                 count = count + 1
-
+                
+                if(debug):
+                    print(f"Channel Width: {chanwidth} Freq1: {freq1} Freq2: {freq2} Noise: {noise} Max Magnitude: {max_mag} Gain_db: {gain_db} Base Power_db: {base_pwr_db} TSF: {tsf} Max Index: {max_index} Rssi: {rssi} Rel Power_db: {relpwr_db} Avg Power_db: {avgpwr_db} Max_exp: {max_exp}")
 
         vals_list = []
         for key, value in self.VALUES.items():
             vals_list.append(list(value))
 
-        if(self.driver == "ath9k"): 
-            spectral_capture_df = pd.DataFrame(vals_list, columns = ["freq1", "noise", "rssi", "signal", "max magnitude"])
-            spectral_capture_df = spectral_capture_df.reindex(columns = ["freq1", "noise","signal", "max_magnitude","total_gain_db", "base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
-            if(self.debug):
-                print(f"all_saved csv {self.outfile}_{csv_count}.csv")
-                spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
-            return [all_channels, 0]
+        if (DRIVER == "ath10k"):
+            spectral_capture_df = pd.DataFrame(vals_list, columns=["freq1", "noise", "max_magnitude", "total_gain_db",
+                                                                   "base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
 
-        elif(self.driver == "ath10k"):
-            spectral_capture_df = pd.DataFrame(vals_list, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
+            if(spectral_capture_df["freq1"].nunique() != len(channels.split())):
+               if(debug):
+                  print("Missing: ", set(channels.split()) ^ set(spectral_capture_df["freq1"].unique()))
+               valid = 0
+               return valid
 
+            else:
+                valid = 1
+                print(f"Scan {scan_count} complete")
+                spectral_capture_df.to_csv(f'{outfile}_{scan_count}.csv', index=False)
+                return valid
 
-            if(spectral_capture_df['freq1'].nunique() != len(channels.split())): # scan is missing channels
-                missing_scan_count += 1
-                
-                # first instance of missing scan
-                if(missing_scan_count == 0):       
-                    present_channels = list(map(str, spectral_capture_df['freq1'].unique()))
-                    vals_list_scanning = vals_list
-
-                # add remaining missing channels from subsequent scans
-                elif(missing_scan_count > 0): 
-                    scanned_channels = list(map(str, spectral_capture_df['freq1'].unique()))
-                    present_channels += scanned_channels
-                    vals_list_scanning += vals_list
-
-            
-                channels_missing_set = set(channels.split()) ^ set(present_channels)
-                sorted_channels = list(map(int,list(channels_missing_set)))
-                sorted_channels.sort()
-                channels = ' '.join(list(map(str, sorted_channels)))       # converting to string to pass to do_scan_cmd
-                return [channels, missing_scan_count]
-            
-                if(channels == ''): # if all missing channels have been retreived in the scans
-                    present_channels = []
-                    missing_scan_count = 0
-                    if(self.debug):
-                        print(f"cont_saved csv {self.outfile}_{csv_count}.csv")
-                        spectral_capture_df = pd.DataFrame(vals_list_scanning, columns = ["freq1", "noise", "max_magnitude", "total_gain_db","base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"])
-                        spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
-                    return [all_channels, missing_scan_count]
-
-            elif(spectral_capture_df['freq1'].nunique() == len(channels.split())): # if scan has all channels
-                if(self.debug):
-                    print(f"all_saved csv {self.outfile}_{csv_count}.csv")
-                    spectral_capture_df.to_csv(f'{self.outfile}_{csv_count}.csv', index=False)
-                return [all_channels, missing_scan_count]
-
+        if (DRIVER == "ath9k"):
+            spectral_capture_df = pd.DataFrame(vals_list, columns=["freq1", "noise", "rssi", "signal", "max magnitude"])
+            spectral_capture_df = spectral_capture_df.reindex(
+                columns=["freq1", "noise", "signal", "max_magnitude", "total_gain_db", "base_pwr_db", "rssi",
+                         "relpwr_db", "avgpwr_db"])
+            return spectral_capture_df
 
     def get_values(self):
         return self.VALUES
 
     def initialize_scan(self):
 
-        if(self.driver == "ath9k"):
-           # cmd_function =  "echo background > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
-           cmd_function = "echo manual > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
-           #cmd_count = "echo 25 > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_count"
-           cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
+        #write_fix = f"echo -n disable > /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan_ctl"
 
-           subprocess.call(cmd_function, shell=True)
-           #subprocess.call(cmd_count, shell=True)
-           subprocess.call(cmd_trigger, shell=True)
+        if (DRIVER == "ath9k"):
+            # cmd_function =  "echo background > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
+            cmd_function = "echo manual > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
+            # cmd_count = "echo 25 > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_count"
+            cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath9k/spectral_scan_ctl"
 
-        elif(self.driver == "ath10k"):
-           cmd_background = "echo background > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
-           cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
+            #subprocess.call(write_fix, shell=True)
+            subprocess.call(cmd_function, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+            # subprocess.call(cmd_count, shell=True)
+            subprocess.call(cmd_trigger, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
 
-           subprocess.call(cmd_background, shell=True)
-           subprocess.call(cmd_trigger, shell=True)
+        elif (DRIVER == "ath10k"):
+            file_exists = os.path.exists("/sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl")
+            if (file_exists == False):
+                print("no file spectral_scan_ctl")
+            cmd_background = "echo background > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
+            cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
 
-
-    def execute_scan(self, channels):
+            #subprocess.call(write_fix, shell=True)
+            subprocess.call(cmd_background, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+            subprocess.call(cmd_trigger, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+            
+    def execute_scan(self, interface, channels):
         scan = False
-        do_scan_cmd = f"iw dev {self.interface} scan freq {channels}"
+        do_scan_cmd = f"iw dev {interface} scan freq {channels} flush"
+        interface_up = f"ip link set dev {interface} up" # activate and enable the interface
+        print(do_scan_cmd)
 
-        while(scan == False):
+        while (scan == False):
             try:
-                proc = subprocess.run(do_scan_cmd, shell=True, stdout=subprocess.DEVNULL, check=True)
-                #proc = subprocess.run(do_scan_cmd, shell=True, stdout=subprocess.DEVNULL)
+                subprocess.call(interface_up, shell=True)
+                subprocess.run(do_scan_cmd, shell=True, stderr=subprocess.STDOUT,stdout=subprocess.DEVNULL, check=True)
                 scan = True
             except:
                 time.sleep(0.1)
                 scan = False
 
-            if(scan == True):
-                print(f"Scan time {datetime.now()}")
+            if (scan == True):
                 break
 
+        #cmd_background = f"echo -n background > /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan_ctl"
+        #cmd_scan = f"echo -n trigger > /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan_ctl"
+        cmd_disable = f"echo disable > /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan_ctl"
+        cmd_dump = f"cat /sys/kernel/debug/ieee80211/phy0/{DRIVER}/spectral_scan0 > /tmp/data"
 
-        cmd_scan = f"echo trigger > /sys/kernel/debug/ieee80211/phy0/{self.driver}/spectral_scan_ctl"
-        cmd_dump = f"cat /sys/kernel/debug/ieee80211/phy0/{self.driver}/spectral_scan0 > /tmp/data"
-
-        subprocess.call(cmd_scan, shell=True)
-        subprocess.call(cmd_dump, shell=True)
-
+        #subprocess.call(cmd_background, shell=True)
+        #subprocess.call(cmd_scan, shell=True)
+        subprocess.call(cmd_disable, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+        subprocess.call(cmd_dump, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
 
     @staticmethod
     def file_close(file_pointer):
@@ -285,8 +249,8 @@ class Spectral:
     @staticmethod
     def file_open(fn="data"):
         file_exists = os.path.exists(fn)
-        if(file_exists):
+        if (file_exists):
             return open(fn, 'rb')
-        elif(file_exists == False):
+        elif (file_exists == False):
             os.system("touch " + fn)
             return open(fn, 'rb')

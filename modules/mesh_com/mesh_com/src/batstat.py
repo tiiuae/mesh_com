@@ -6,7 +6,7 @@ import re
 import json
 from time import sleep
 import netifaces
-
+from datetime import datetime
 
 class STATUS:  # pylint: disable=too-few-public-methods
     """
@@ -225,6 +225,10 @@ class Batman:
         self._update_survey_dump()
         self.hw_name = "Wi-Fi"  # needs implementation if radio is not Wi-Fi
 
+    @staticmethod
+    def _timestamp() -> str:
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+
     def _create_template(self):
         """
         Create report template
@@ -234,7 +238,8 @@ class Batman:
 
         self._update_device_info()
 
-        self.topology = {'status': self.status,  # "MESH/OFF/NO_CONFIG/ONGOING/AP/"
+        self.topology = {'ts': self._timestamp(), # timestamp
+                         'status': self.status,  # "MESH/OFF/NO_CONFIG/ONGOING/AP/"
                          'my_mac': self._get_my_mac,  # e.g. 00:11:22:33:44:55
                          'noise': self.device_noise_dict[self.freq]
                          if self.freq in self.device_noise_dict

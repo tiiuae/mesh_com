@@ -19,6 +19,7 @@ ut = Utils()
 
 script_path = Path(__file__).parent.resolve()
 src_path = str(script_path).split('common', maxsplit=1)[0].split('1_5')[0]
+docker_path = str(script_path).split('common')[0].split('1_5')[0].split('src')[0].split('sc-mesh-secure-deployment')[0] + 'utils/docker'
 
 
 class ConnectionMgr:
@@ -42,6 +43,8 @@ class ConnectionMgr:
         # 11s :default mesh mode
         self.mesh_mode = "11s"
         self.gw = False
+        self.bridge = False
+        self.concurrency = ""
 
     def starting_mesh(self):  # Get the mesh_com config
         """
@@ -54,7 +57,17 @@ class ConnectionMgr:
         if self.gw:
             print("============================================")
             gw_service = main.AutoGateway()
-            Thread(target=gw_service.run, daemon=True).start()
+            gw_thread = Thread(target=gw_service.run, daemon=True)
+            gw_thread.start()
+            gw_thread.join()
+        if str(self.concurrency).replace(' ', '') == "ap+mesh_mcc":
+            # MCC mode: run mcc_settings.sh
+            command = docker_path + '/mcc_settings.sh'
+            subprocess.run(command, shell=True)
+        elif self.bridge:
+            # Bridge mode: run bridge_settings.sh
+            command = docker_path + '/bridge_settings.sh'
+            subprocess.run(command, shell=True)
 
     @property
     def create_mesh_config(self):
@@ -84,6 +97,9 @@ class ConnectionMgr:
         phy_name = f"phy{output.decode().strip()}"
         mesh_ip = config['ip']
         mesh_mac = self.util.get_mac_by_interface(mesh_vif)
+        mcc_channel = config['mcc_channel']
+
+        """
         # Create mesh service config
         Path("/opt/mesh_com").mkdir(parents=True, exist_ok=True)
         with open('/opt/mesh.conf', 'w', encoding='UTF-8') as mesh_config:
@@ -98,6 +114,8 @@ class ConnectionMgr:
             mesh_config.write('COUNTRY=fi\n')
             mesh_config.write(f'MESH_VIF={mesh_vif}' + '\n')
             mesh_config.write(f'PHY={phy_name}' + '\n')
+            mesh_config.write(f'MCC_CHANNEL={mcc_channel}' + '\n')
+        """
         if confc['gw_service']:
             self.gw = True
         if config['type'] == '11s':
@@ -107,6 +125,8 @@ class ConnectionMgr:
         self.mesh_if = self.util.get_interface_by_pattern(confc['mesh_inf'])
         self.mesh_ip = mesh_ip
         self.mesh_mac = mesh_mac
+        self.bridge = config['bridge']
+        self.concurrency = config['concurrency']
         return self.mesh_ip, self.mesh_mac
 
     # @staticmethod
