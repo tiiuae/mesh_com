@@ -37,9 +37,9 @@ class NatsDiscovery:  # pylint: disable=too-few-public-methods
 
         config = """
 listen: 0.0.0.0:4222
-leafnodes {{
+leafnodes {
     port: 7422
-}}
+}
 """
         with open('/var/run/nats.conf', 'w',  encoding='UTF-8') as file_nats_conf:
             file_nats_conf.write(config)
