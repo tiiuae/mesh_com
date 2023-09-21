@@ -15,8 +15,11 @@ Usage:
 
 import argparse
 import asyncio
-import requests
 import os
+import requests
+import time
+from hw_control import LedControl
+
 
 from cryptography.x509 import load_pem_x509_certificate
 
@@ -272,27 +275,42 @@ class CommsProvisioning:
         return saved
 
 
-async def main(server, port, outdir):
+async def main(server, port, outdir, timeout):
     """
     main
     """
+    led_status = LedControl()
+    led_status.provisioning_led_control("start")
+    # start time of provisioning
+    start_time = time.time()
+
     prov_agent = CommsProvisioning(server, port, outdir)
 
     while True:
+        led_status.provisioning_led_control("active")
         status = prov_agent.do_provisioning()
         if status:
             prov_agent.close_session()
+            led_status.provisioning_led_control("stop")
             break
-        await asyncio.sleep(10)
 
+        led_status.provisioning_led_control("start")
+        time.sleep(10)
+        # if provisioning takes more than 30 seconds, break out
+        if time.time() - start_time > int(timeout):
+            led_status.provisioning_led_control("fail")
+            break
+
+        time.sleep(5)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Provisioning agent settings')
     parser.add_argument('-s', '--server', help='Provisioning Server IP', required=False)
     parser.add_argument('-p', '--port', help='Server port', required=False)
     parser.add_argument('-o', '--outdir', help='Output folder for files', required=False)
+    parser.add_argument('-t', '--timeout', help='Timeout for provisioning trial', required=False)
     args = parser.parse_args()
 
     loop = asyncio.new_event_loop()
-    loop.run_until_complete(main(args.server, args.port, args.outdir))
+    loop.run_until_complete(main(args.server, args.port, args.outdir, args.timeout))
     loop.close()

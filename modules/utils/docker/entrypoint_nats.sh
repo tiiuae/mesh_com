@@ -33,17 +33,10 @@ else
   done
 
   echo "starting provisioning agent"
-  /opt/S90provisioning_agent start
-  loop_count=0
-  while ps aux | grep [c]omms_provisioning >/dev/null; do
-    sleep 1
-    ((loop_count++))
-    if [ "$loop_count" -ge 30 ]; then
-	  echo "Stopping provisioning agent due to timeout"
-      /opt/S90provisioning_agent stop
-    fi
-  done
-  
+  # blocks execution until provisioning is done or timeout (30s)
+  # IP address and port are passed as arguments and hardcoded. TODO: mDNS
+  python /opt/nats/src/comms_provisioning.py -t 30 -s 192.168.1.254 -p 8080 -o /opt > /opt/comms_provisioning.log 2>&1
+
   echo "Start nats server and client nodes"
   /opt/S90nats_discovery start
 
