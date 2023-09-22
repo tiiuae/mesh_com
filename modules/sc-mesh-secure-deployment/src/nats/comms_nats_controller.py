@@ -70,6 +70,7 @@ class MeshTelemetry:
             self.batman.thread_running = False  # thread loop disabled
             self.t2.join()  # wait for thread to finish
 
+
 # pylint: disable=too-many-instance-attributes
 class CommsController:  # pylint: disable=too-few-public-methods
     """
@@ -99,7 +100,8 @@ class CommsController:  # pylint: disable=too-few-public-methods
         # logger for this module and derived from main logger
         self.logger = self.main_logger.getChild("controller")
 
-class CommsCsa: # pylint: disable=too-few-public-methods
+
+class CommsCsa:  # pylint: disable=too-few-public-methods
     """
     Comms CSA class to storage settings for CSA for a state change
     """
@@ -165,6 +167,7 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
                                   reconnected_cb=reconnected_cb,
                                   disconnected_cb=disconnected_cb,
                                   max_reconnect_attempts=-1)
+
     async def handle_settings_csa_post(ret):
         if ret == "OK":
             ret = "ACK"
@@ -197,7 +200,7 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
             csac.delay = delay
             csac.ack_sent = "status" in data
 
-        elif subject == f"comms.command.{identity}" or "GET_IDENTITY" in data:
+        elif subject == f"comms.command.{identity}" or subject == "comms.identity":
             ret, info, resp = cc.command.handle_command(data, cc)
         elif subject == f"comms.status.{identity}":
             ret, info = "OK", "Returning current status"
@@ -213,7 +216,7 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
                         'visualisation_active': cc.comms_status.is_visualisation_active,
                         'mesh_radio_on': cc.comms_status.is_mesh_radio_on,
                         'ap_radio_on': cc.comms_status.is_ap_radio_on,
-                        'security_status': cc.comms_status.security_status }
+                        'security_status': cc.comms_status.security_status}
 
             if resp != "":
                 response['data'] = resp
@@ -223,7 +226,8 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
 
     await nats_client.subscribe(f"comms.settings.{identity}", cb=message_handler)
     await nats_client.subscribe("comms.settings_csa", cb=message_handler)
-    await nats_client.subscribe(f"comms.command.>", cb=message_handler)
+    await nats_client.subscribe(f"comms.command.{identity}", cb=message_handler)
+    await nats_client.subscribe("comms.identity", cb=message_handler)
     await nats_client.subscribe(f"comms.status.{identity}", cb=message_handler)
 
     cc.logger.debug("comms_nats_controller Listening for requests")

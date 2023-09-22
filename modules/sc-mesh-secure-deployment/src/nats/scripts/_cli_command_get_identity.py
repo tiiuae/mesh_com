@@ -9,7 +9,7 @@ async def main():
 
     cmd_dict = {"api_version": 1, "cmd": "GET_IDENTITY"}
     cmd = json.dumps(cmd_dict)
-    rep = await nc.request("comms.command.>",
+    rep = await nc.request("comms.identity",
                            cmd.encode(),
                            timeout=2)
     print(rep.data)
