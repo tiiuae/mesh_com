@@ -91,19 +91,7 @@ class CommsProvisioning:
             if not self.__hsm_ctrl.has_private_key(self.__auth_key_id, self.__auth_key_label):
                 self.__hsm_ctrl.generate_rsa_keypair_via_openssl(self.__auth_key_id,
                                                                  self.__auth_key_label)
-                """
-                self.__hsm_ctrl.generate_ec_keypair_via_openssl(self.__auth_key_id,
-                                                                 self.__auth_key_label)
-                self.__hsm_ctrl.generate_rsa_keypair(self.__auth_key_id, self.__auth_key_label)
-                self.__hsm_ctrl.generate_ec_keypair(self.__auth_key_id, self.__auth_key_label)
-                """
-
             # Create certificate signing request to get client certificate
-            """
-            client_csr_created = self.__hsm_ctrl.create_csr_via_openssl(priv_key_id=self.__auth_key_id,
-                                                                        device_id=self.__device_id,
-                                                                        filename=self.__client_csr_file)
-            """
             client_csr_created = self.__hsm_ctrl.create_csr(priv_key_id=self.__auth_key_id,
                                                             device_id=self.__device_id,
                                                             filename=self.__client_csr_file)
@@ -117,14 +105,10 @@ class CommsProvisioning:
                     return False
 
             # Create certificate signing request to get server certificate
-            server_csr_created = self.__hsm_ctrl.create_csr_via_openssl(priv_key_id=self.__auth_key_id,
-                                                                        device_id=self.__device_id,
-                                                                        filename=self.__server_csr_file,
-                                                                        is_server=True)
-            # server_csr_created = self.__hsm_ctrl.create_csr(priv_key_id=self.__auth_key_id,
-            #                                                device_id=self.__device_id,
-            #                                                filename=self.__server_csr_file,
-            #                                                server=True)
+            server_csr_created = self.__hsm_ctrl.create_csr(priv_key_id=self.__auth_key_id,
+                                                            device_id=self.__device_id,
+                                                            filename=self.__server_csr_file,
+                                                            server=True)
             if not server_csr_created:
                 print("Problem creating server CSR")
                 return False

@@ -12,14 +12,7 @@ LOG_FILE=/opt/nats-server.log
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
 
-KEY_FILE="/etc/ssl/private/comms_auth_private_key.pem"
-CERT_FILE="/etc/ssl/certs/comms_server_cert.pem"
-
-if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
-  NATS_SERVER_ARGS="-l $LOG_FILE -c /var/run/nats.conf --tlsverify --tlscert=$CERT_FILE --tlskey=$KEY_FILE"
-else
-  NATS_SERVER_ARGS="-l $LOG_FILE -c /var/run/nats.conf"
-fi
+NATS_SERVER_ARGS="-l $LOG_FILE -c /var/run/nats.conf"
 
 start() {
     echo "$NATS_SERVER_ARGS"

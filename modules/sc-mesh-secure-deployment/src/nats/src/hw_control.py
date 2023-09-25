@@ -11,11 +11,12 @@ class LedControl:
     """
 
     def __init__(self):
+        self.not_supported = False
         try:
             with open("/etc/comms_pcb_version", "r", encoding="utf8") as version_file:
                 self.comms_pcb_version = float(version_file.read().split("=")[-1].strip())
         except FileNotFoundError:
-            sys.exit(1)
+            self.not_supported = True
 
     @staticmethod
     def _write_to_file(path, file, value):
@@ -117,7 +118,9 @@ class LedControl:
         :param state: start, active, stop, fail
         :return: None
         """
-
+        if self.not_supported:
+            return None
+        
         if self.comms_pcb_version == 1:
             self._led_control_1(state)
         elif self.comms_pcb_version in (0.5, 0):

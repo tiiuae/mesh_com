@@ -46,6 +46,7 @@ class CommsHSMController:
         self.__user_pin_file = self.__base_dir + "/hsm/user_pin"
         self.__so_pin_file = self.__base_dir + "/hsm/so_pin"
         self.__comms_board_version = board_version
+        self.__ip_addresses = ["10.10.10.2", "10.10.20.2"]
 
         self.__use_soft_hsm = False
         self.__login_required = False        # CKF_LOGIN_REQUIRED
@@ -55,7 +56,7 @@ class CommsHSMController:
         self.__token_has_rng = False         # CKF_RNG (Random Number Generator)
 
         # Used with SoftHSM and related PIN encryption
-        self.__token_label = "secccoms"
+        self.__token_label = "nats_token"
         self.__current_token_label = ""
 
         # Define configuration files for openssl
@@ -964,21 +965,28 @@ class CommsHSMController:
         Returns:
             List of IP addresses
         """
-        ip_addresses = []
+        ip_address_set = set(self.__ip_addresses)
 
-        # TODO: Perhaps this list should be limited still?
         interfaces = ni.interfaces()
         for interface in interfaces:
             addrs = ni.ifaddresses(interface)
 
             if ni.AF_INET in addrs:
                 ipv4_addresses = [addr['addr'] for addr in addrs[ni.AF_INET]]
-                ip_addresses.extend(ipv4_addresses)
+                for ipv4_addr in ipv4_addresses:
+                    if ipv4_addr not in ip_address_set:
+                        self.__ip_addresses.append(ipv4_addr)
 
             if ni.AF_INET6 in addrs:
                 ipv6_addresses = [addr['addr'].split('%')[0] for addr in addrs[ni.AF_INET6]]
-                ip_addresses.extend(ipv6_addresses)
-        return ip_addresses
+                for ipv6_addr in ipv6_addresses:
+                    if ipv6_addr not in ip_address_set:
+                        self.__ip_addresses.append(ipv6_addr)
+
+        # Remove any Docker interfaces
+        self.__ip_addresses = [ip for ip in self.__ip_addresses if not ip.startswith("docker")]
+
+        return self.__ip_addresses
 
     def __generate_csr_config_file(self, subject: str, server=False):
         """
@@ -998,14 +1006,14 @@ class CommsHSMController:
                 file.write("\n[ req_distinguished_name ]\n")
                 file.write(subject+"\n")
                 file.write("\n[ v3_req ]\n")
-                file.write("basicConstraints=CA:FALSE\n")
+                file.write("basicConstraints = CA:FALSE\n")
                 file.write("keyUsage=digitalSignature, keyEncipherment\n")
                 if not server:
-                    file.write("extendedKeyUsage=clientAuth\n")
+                    file.write("extendedKeyUsage = clientAuth\n")
                 else:
                     ip_addresses = self.__get_ip_addresses()
-                    file.write("extendedKeyUsage=serverAuth\n")
-                    file.write("subjectAltName=@alt_names\n")
+                    file.write("extendedKeyUsage = serverAuth\n")
+                    file.write("subjectAltName = @alt_names\n")
                     file.write("\n[alt_names]\n")
                     for i, ip_address in enumerate(ip_addresses, start=1):
                         file.write(f"IP.{i} = {ip_address}\n")

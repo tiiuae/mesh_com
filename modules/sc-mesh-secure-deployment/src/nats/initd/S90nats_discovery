@@ -17,9 +17,11 @@ source_configuration
 
 KEY_FILE="/etc/ssl/private/comms_auth_private_key.pem"
 CERT_FILE="/etc/ssl/certs/comms_auth_cert.pem"
+SERVER_CERT_FILE="/etc/ssl/certs/comms_server_cert.pem"
+CA="/etc/ssl/certs/root-ca.cert.pem"
 
 if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
-  ARGS="--role $ROLE -k $KEY_FILE -c $CERT_FILE"
+  ARGS="--role $ROLE -k $KEY_FILE -c $CERT_FILE -s $SERVER_CERT_FILE -a $CA"
 else
   ARGS="--role $ROLE"
 fi

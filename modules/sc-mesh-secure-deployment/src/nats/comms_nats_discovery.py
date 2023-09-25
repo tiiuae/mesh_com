@@ -5,17 +5,27 @@ import time
 import logging
 import argparse
 import netifaces as netifaces
+import os
+import textwrap
+
 
 class NatsDiscovery:  # pylint: disable=too-few-public-methods
     """
     Nats Discovery class.  Utilizes the batctl command to discover devices on the mesh network.
     """
-    def __init__(self, role, key, cert):
+    def __init__(self, role, key, cert, servercert, ca):
         self.role = role
         self.key = key
         self.cert = cert
+        self.server_cert = servercert
+        self.cert_authority = ca
         self.leaf_port = 7422
         self.seed_ip_address = ""
+        self.tls_required = False
+
+        if os.path.exists(self.key) and os.path.exists(self.cert) \
+           and os.path.exists(self.server_cert) and os.path.exists(self.cert_authority):
+            self.tls_required = True
 
         # base logger for discovery
         self.main_logger = logging.getLogger("nats")
@@ -35,32 +45,79 @@ class NatsDiscovery:  # pylint: disable=too-few-public-methods
         :return: None
         """
 
-        config = """
-listen: 0.0.0.0:4222
-leafnodes {
-    port: 7422
-}
-"""
+        if self.tls_required:
+            config = textwrap.dedent(f"""
+                listen: 0.0.0.0:4222
+                tls {{
+                    key_file: {self.key}
+                    cert_file: {self.server_cert}
+                    ca_file: {self.cert_authority}
+                    verify: true
+                }}
+                leafnodes {{
+                    port: 7422
+                    tls {{
+                        key_file: {self.key}
+                        cert_file: {self.server_cert}
+                        ca_file: {self.cert_authority}
+                        verify: true
+                    }}
+                }}
+            """)
+        else:
+            config = textwrap.dedent("""
+                listen: 0.0.0.0:4222
+                leafnodes {
+                    port: 7422
+                }
+            """)
+
         with open('/var/run/nats.conf', 'w',  encoding='UTF-8') as file_nats_conf:
             file_nats_conf.write(config)
 
-    @staticmethod
-    def __generate_leaf_config(_seed_route) -> None:
+    def __generate_leaf_config(self, _seed_route) -> None:
         """
         Generate the nats-server configuration file for the leaf node.
         :param _seed_route: seed node route
         :return: None
         """
-        config = f"""
-listen: 0.0.0.0:4222
-leafnodes {{
-    remotes = [
-        {{
-            url: "nats://{_seed_route}"
-        }},
-    ]
-}}
-"""
+        if self.tls_required:
+            protocol = "tls"
+            config = textwrap.dedent(f"""
+                listen: 0.0.0.0:4222
+                tls {{
+                    key_file: {self.key}
+                    cert_file: {self.server_cert}
+                    ca_file: {self.cert_authority}
+                    verify: true
+                }}
+                leafnodes {{
+                    remotes = [
+                        {{
+                            url: "{protocol}://{_seed_route}"
+                            tls {{
+                                key_file: {self.key}
+                                cert_file: {self.cert}
+                                ca_file: {self.cert_authority}
+                                verify: true
+                            }}
+                        }}
+                    ]
+                }}
+            """)
+        else:
+            protocol = "nats"
+            config = textwrap.dedent(f"""
+                listen: 0.0.0.0:4222
+                leafnodes {{
+                    remotes = [
+                        {{
+                            url: "{protocol}://{_seed_route}"
+                        }}
+                    ]
+                }}
+            """)
+
         with open('/var/run/nats.conf', 'w',  encoding='UTF-8') as file_nats_conf:
             file_nats_conf.write(config)
 
@@ -123,7 +180,7 @@ leafnodes {{
         """
         ip_br_lan = netifaces.ifaddresses('br-lan')[netifaces.AF_INET][0]['addr'].split(".")[0:-1]
         ip_br_lan = ".".join(ip_br_lan) + "."
-        return ip_br_lan + str(int(mac.split(":")[-1],16))
+        return ip_br_lan + str(int(mac.split(":")[-1], 16))
 
     @staticmethod
     def __scan_port(host, port) -> bool:
@@ -175,12 +232,15 @@ leafnodes {{
 
             time.sleep(4)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='NATS Discovery')
     parser.add_argument('-r', '--role', help='device role', required=True)
     parser.add_argument('-k', '--key', help='key file', required=False)
-    parser.add_argument('-c', '--cert', help='cert file', required=False)
+    parser.add_argument('-c', '--cert', help='client cert file', required=False)
+    parser.add_argument('-s', '--servercert', help='server cert file', required=False)
+    parser.add_argument('-a', '--ca', help='certificate authority file', required=False)
     args = parser.parse_args()
 
-    forrest = NatsDiscovery(args.role, args.key, args.cert)
+    forrest = NatsDiscovery(args.role, args.key, args.cert, args.servercert, args.ca)
     forrest.run()
