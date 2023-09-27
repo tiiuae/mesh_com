@@ -4,18 +4,28 @@ import re
 import time
 import logging
 import argparse
-import netifaces as ni
+import netifaces as netifaces
+import os
+import textwrap
 
-class NatsDiscovery:
+
+class NatsDiscovery:  # pylint: disable=too-few-public-methods
     """
     Nats Discovery class.  Utilizes the batctl command to discover devices on the mesh network.
     """
-    def __init__(self, role, key, cert):
+    def __init__(self, role, key, cert, servercert, ca):
         self.role = role
         self.key = key
         self.cert = cert
+        self.server_cert = servercert
+        self.cert_authority = ca
         self.leaf_port = 7422
         self.seed_ip_address = ""
+        self.tls_required = False
+
+        if os.path.exists(self.key) and os.path.exists(self.cert) \
+           and os.path.exists(self.server_cert) and os.path.exists(self.cert_authority):
+            self.tls_required = True
 
         # base logger for discovery
         self.main_logger = logging.getLogger("nats")
@@ -29,40 +39,41 @@ class NatsDiscovery:
         # logger for this module and derived from main logger
         self.logger = self.main_logger.getChild("discovery")
 
-    def __get_authorization_config(self) -> str:
-        """
-        Get the authorization configuration for the nats-server configuration file.
-        :return: authorization configuration
-        """
-        if self.key is not None or self.cert is not None:
-            authorization = f"""
-tls {{
-    cert_file: "{self.cert}"
-    key_file: "{self.key}"
-    timeout: 2
-    verify: true
-}}
-"""
-        else:
-            authorization = ""
-
-        return authorization
-
     def __generate_seed_config(self) -> None:
         """
         Generate the nats-server configuration file for the seed node.
         :return: None
         """
 
-        config = f"""
-listen: 0.0.0.0:4222
-leafnodes {{
-    port: 7422
-}}
-{self.__get_authorization_config()}
-"""
-        with open('/var/run/nats.conf', 'w') as f:
-            f.write(config)
+        if self.tls_required:
+            config = textwrap.dedent(f"""
+                listen: 0.0.0.0:4222
+                tls {{
+                    key_file: {self.key}
+                    cert_file: {self.server_cert}
+                    ca_file: {self.cert_authority}
+                    verify: true
+                }}
+                leafnodes {{
+                    port: 7422
+                    tls {{
+                        key_file: {self.key}
+                        cert_file: {self.server_cert}
+                        ca_file: {self.cert_authority}
+                        verify: true
+                    }}
+                }}
+            """)
+        else:
+            config = textwrap.dedent("""
+                listen: 0.0.0.0:4222
+                leafnodes {
+                    port: 7422
+                }
+            """)
+
+        with open('/var/run/nats.conf', 'w',  encoding='UTF-8') as file_nats_conf:
+            file_nats_conf.write(config)
 
     def __generate_leaf_config(self, _seed_route) -> None:
         """
@@ -70,19 +81,45 @@ leafnodes {{
         :param _seed_route: seed node route
         :return: None
         """
-        config = f"""
-listen: 0.0.0.0:4222
-leafnodes {{
-    remotes = [
-        {{
-            url: "nats://{_seed_route}"
-        }},
-    ]
-}}
-{self.__get_authorization_config()}
-"""
-        with open('/var/run/nats.conf', 'w') as f:
-            f.write(config)
+        if self.tls_required:
+            protocol = "tls"
+            config = textwrap.dedent(f"""
+                listen: 0.0.0.0:4222
+                tls {{
+                    key_file: {self.key}
+                    cert_file: {self.server_cert}
+                    ca_file: {self.cert_authority}
+                    verify: true
+                }}
+                leafnodes {{
+                    remotes = [
+                        {{
+                            url: "{protocol}://{_seed_route}"
+                            tls {{
+                                key_file: {self.key}
+                                cert_file: {self.cert}
+                                ca_file: {self.cert_authority}
+                                verify: true
+                            }}
+                        }}
+                    ]
+                }}
+            """)
+        else:
+            protocol = "nats"
+            config = textwrap.dedent(f"""
+                listen: 0.0.0.0:4222
+                leafnodes {{
+                    remotes = [
+                        {{
+                            url: "{protocol}://{_seed_route}"
+                        }}
+                    ]
+                }}
+            """)
+
+        with open('/var/run/nats.conf', 'w',  encoding='UTF-8') as file_nats_conf:
+            file_nats_conf.write(config)
 
     def __reload_nats_server_config(self) -> int:
         """
@@ -102,14 +139,14 @@ leafnodes {{
 
         return 0
 
-    def __update_configurations_and_restart(self, ip) -> None:
+    def __update_configurations_and_restart(self, ip_address) -> None:
         """
         Update the nats-server configuration and restart the nats-server.
-        :param ip: ip address of the seed node
+        :param ip_address: ip address of the seed node
         :return: None
         """
         self.logger.debug("Updating configurations and reloading nats-server configuration")
-        self.__generate_leaf_config(ip)
+        self.__generate_leaf_config(ip_address)
 
         # reload nats-server configuration
         ret = self.__reload_nats_server_config()
@@ -124,12 +161,13 @@ leafnodes {{
         :return: list of mac addresses
         """
         try:
-            ret = subprocess.run(["batctl", "o", "-H"], shell=False, check=True, capture_output=True)
+            ret = subprocess.run(["batctl", "o", "-H"], shell=False,
+                                 check=True, capture_output=True)
             if ret.returncode != 0:
                 return []
-            else:
-                macs = re.findall(r' \* (([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2}))', ret.stdout.decode('utf-8'))
-                return [mac[0] for mac in macs]
+            macs = re.findall(r' \* (([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2}))',
+                              ret.stdout.decode('utf-8'))
+            return [mac[0] for mac in macs]
         except:
             return []
 
@@ -140,9 +178,9 @@ leafnodes {{
         :param mac: mac address
         :return: ip address
         """
-        ip_br_lan = ni.ifaddresses('br-lan')[ni.AF_INET][0]['addr'].split(".")[0:-1]
+        ip_br_lan = netifaces.ifaddresses('br-lan')[netifaces.AF_INET][0]['addr'].split(".")[0:-1]
         ip_br_lan = ".".join(ip_br_lan) + "."
-        return ip_br_lan + str(int(mac.split(":")[-1],16))
+        return ip_br_lan + str(int(mac.split(":")[-1], 16))
 
     @staticmethod
     def __scan_port(host, port) -> bool:
@@ -171,20 +209,19 @@ leafnodes {{
             self.__generate_seed_config()
             self.__reload_nats_server_config()
             return
-        else:
-            # create temporary leaf configuration for nats-server to start
-            self.__generate_leaf_config("192.168.1.2")
+        # create temporary leaf configuration for nats-server to start
+        self.__generate_leaf_config("192.168.1.2")
 
         while True:
             macs = self.__get_mesh_macs()
             self.logger.debug(f"{macs} len: {len(macs)}")
 
             for mac in macs:
-                ip = self.__mac_to_ip(mac)
+                ip_address = self.__mac_to_ip(mac)
                 if self.seed_ip_address == "":
-                    self.logger.debug(f"Scanning {ip}, {mac}")
-                    if self.__scan_port(ip, self.leaf_port):
-                        self.seed_ip_address = ip
+                    self.logger.debug(f"Scanning {ip_address}, {mac}")
+                    if self.__scan_port(ip_address, self.leaf_port):
+                        self.seed_ip_address = ip_address
                         gcs_found = 1
 
             if gcs_found:
@@ -195,17 +232,15 @@ leafnodes {{
 
             time.sleep(4)
 
+
 if __name__ == "__main__":
-    """
-    Main function.
-    :param args: command line arguments
-    :return: None
-    """
     parser = argparse.ArgumentParser(description='NATS Discovery')
     parser.add_argument('-r', '--role', help='device role', required=True)
     parser.add_argument('-k', '--key', help='key file', required=False)
-    parser.add_argument('-c', '--cert', help='cert file', required=False)
+    parser.add_argument('-c', '--cert', help='client cert file', required=False)
+    parser.add_argument('-s', '--servercert', help='server cert file', required=False)
+    parser.add_argument('-a', '--ca', help='certificate authority file', required=False)
     args = parser.parse_args()
 
-    forrest = NatsDiscovery(args.role, args.key, args.cert)
+    forrest = NatsDiscovery(args.role, args.key, args.cert, args.servercert, args.ca)
     forrest.run()

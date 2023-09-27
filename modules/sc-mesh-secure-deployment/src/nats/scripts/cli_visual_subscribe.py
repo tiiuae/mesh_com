@@ -2,7 +2,8 @@ import asyncio
 import signal
 import json
 from nats.aio.client import Client as NATS
-import config
+import client
+
 
 async def run(loop):
     nc = NATS()
@@ -17,7 +18,7 @@ async def run(loop):
         await nc.close()
 
     async def reconnected_cb():
-        print(f"Connected to NATS ...")
+        print("Connected to NATS ...")
 
     async def subscribe_handler(msg):
         subject = msg.subject
@@ -27,10 +28,9 @@ async def run(loop):
           subject=subject, reply=reply, data=data))
 
     try:
-        await nc.connect(f"nats://{config.MODULE_IP}:{config.MODULE_PORT}",
-                         reconnected_cb=reconnected_cb,
-                         closed_cb=closed_cb,
-                         max_reconnect_attempts=-1)
+        await client.connect(nc, reconnected_cb=reconnected_cb,
+                             closed_cb=closed_cb,
+                             max_reconnect_attempts=-1)
     except Exception as e:
         print(e)
 
@@ -45,7 +45,7 @@ async def run(loop):
     for sig in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(getattr(signal, sig), signal_handler)
 
-    await nc.subscribe("comms.visual", "", cb=subscribe_handler)
+    await nc.subscribe("comms.visual.*", "", cb=subscribe_handler)
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()

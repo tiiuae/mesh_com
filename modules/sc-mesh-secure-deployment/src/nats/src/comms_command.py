@@ -43,7 +43,7 @@ class ConfigFiles:  # pylint: disable=too-few-public-methods
     IDENTITY = "/opt/identity"
 
 
-class Command:  # pylint: disable=too-few-public-methods
+class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attributes
     """
     Command class
     """
@@ -111,7 +111,7 @@ class Command:  # pylint: disable=too-few-public-methods
         elif self.command == COMMAND.get_config:
             ret, info, data = self.__get_configs(self.param)
         elif self.command == COMMAND.get_identity:
-            ret, info, data = self.__get_identity()
+            ret, info, data = self.get_identity()
         else:
             ret, info = "FAIL", "Command not supported"
         return ret, info, data
@@ -347,7 +347,7 @@ class Command:  # pylint: disable=too-few-public-methods
         else:
             return "OK", f"{param}", file_b64.decode()
 
-    def __get_identity(self) -> (str, str, dict):
+    def get_identity(self) -> (str, str, dict):
         identity_dict = {}
         try:
             files = ConfigFiles()
@@ -361,5 +361,5 @@ class Command:  # pylint: disable=too-few-public-methods
         except:
             return "FAIL", "Not able to get identity file", None
 
-        self.logger.debug("__get_identity done")
+        self.logger.debug("get_identity done")
         return "OK", "Identity and NATS URL", identity_dict
