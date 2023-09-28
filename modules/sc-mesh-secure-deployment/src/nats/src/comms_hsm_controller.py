@@ -503,7 +503,6 @@ class CommsHSMController:
             bool: True if the keypair was generated, False otherwise.
         """
         if key_params.algorithm != "rsa" and key_params.algorithm != "ec":
-            print(key_params.algorithm)
             self.log.debug("Not supported algorithm!")
             return False
 
@@ -528,7 +527,6 @@ class CommsHSMController:
         """
         # Openssl requires environment variable usage for pin
         os.environ['PKCS11_PIN'] = self.__token_user_pin
-        print("pin:", self.__token_user_pin)
 
         # Create directories if they don't exist
         os.makedirs(os.path.dirname(key_params.private_key), exist_ok=True)
@@ -1068,7 +1066,7 @@ class CommsHSMController:
             },
             'signature': bytes(signature),  # The actual signature
         })
-        print(csr_params.filename)
+
         # Write CSR in PEM format to a file
         try:
             pem_csr = pem.armor("CERTIFICATE REQUEST", signed_csr.dump())
