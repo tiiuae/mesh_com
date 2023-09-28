@@ -18,33 +18,80 @@ import asyncio
 import os
 import requests
 import time
+import subprocess
+import logging
+from datetime import datetime
 from hw_control import LedControl
-
 
 from cryptography.x509 import load_pem_x509_certificate
 
-import comms_hsm_controller
+from comms_hsm_controller import CommsHSMController
+from comms_hsm_controller import KeyParams
+from comms_hsm_controller import CsrParams
 
 
 class CommsProvisioning:
     """
     Comms Provisioning class.
     """
-    def __init__(self, server: str = "localhost", port: str = "80", outdir: str = "/opt") -> None:
+    def __init__(self, server: str = "localhost", port: str = "80",
+                 outdir: str = "/opt", algorithm: str = "rsa") -> None:
         self.__session = None
         self.__outdir = outdir
         self.__device_id_file = self.__outdir + "/identity"
         self.__client_csr_file = self.__outdir + "/csr/client_csr.csr"
         self.__server_csr_file = self.__outdir + "/csr/server_csr.csr"
         self.__server_url = "http://" + server + ":" + port + "/api/mesh/provision"
+
+        # Base logger for all provisioning related modules
+        self.__main_logger = logging.getLogger("provisioning")
+        self.__main_logger.setLevel(logging.DEBUG)
+        log_formatter = logging.Formatter(
+            fmt='%(asctime)s :: %(name)-18s :: %(levelname)-8s :: %(message)s')
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(log_formatter)
+        self.__main_logger.addHandler(console_handler)
+
+        # logger for this module and derived from main logger
+        self.log = self.__main_logger.getChild("agent")
+
         self.__device_id = self.__get_device_id()
         self.__pcb_version = self.__get_comms_pcb_version("/opt/hardware/comms_pcb_version")
+        self.__reference_date = datetime(2023, 9, 1)
 
         self.__auth_key_id = "99887766"
         self.__auth_key_label = "CommsDeviceAuth"
         self.__server_cert_label = "CommsServerCert"
-        self.__hsm_ctrl = comms_hsm_controller.CommsHSMController(
-            self.__outdir, self.__pcb_version)
+
+        self.__crypto_files_location = "/etc/ssl"
+        self.__client_cert_file = self.__crypto_files_location + "/certs/comms_auth_cert.pem"
+        self.__server_cert_file = self.__crypto_files_location + "/certs/comms_server_cert.pem"
+        self.__root_ca_file = self.__crypto_files_location + "/certs/root-ca.cert.pem"
+
+        self.__key_params = KeyParams(
+            id=self.__auth_key_id,
+            label=self.__auth_key_label,
+            private_key=self.__crypto_files_location + "/private/comms_auth_private_key.pem",
+            public_key=self.__crypto_files_location + "/public/comms_auth_public_key.pem",
+            algorithm=algorithm,
+            use_openssl=True  # This is needed in order to write keys to filesystem.
+        )
+
+        # Openssl needs to be used to create CSR with EC keys as SoftHSM signing
+        # algorithm is not supported by the Provisioning Server.
+        if self.__key_params.algorithm == "ec":
+            csr_use_openssl = True
+        else:
+            csr_use_openssl = False
+
+        self.__csr_params = CsrParams(
+            key_id=self.__auth_key_id,
+            device_id=self.__device_id,
+            filename=self.__client_cert_file,
+            use_openssl=csr_use_openssl
+        )
+        self.__hsm_ctrl = CommsHSMController(self.__outdir, self.__pcb_version,
+                                             self.__main_logger.getChild("hsm_control"))
         self.__session = self.__hsm_ctrl.open_session()
 
     def close_session(self):
@@ -64,7 +111,7 @@ class CommsProvisioning:
                 device_id = file.readline()
                 return device_id
         except FileNotFoundError:
-            # FIXME: temporary for testing
+            # FIXME: temporary for workstatiom testing
             return "None"
 
     def __get_comms_pcb_version(self, file_path):
@@ -86,36 +133,41 @@ class CommsProvisioning:
         Returns:
             bool: True if provisioning is ready, False otherwise.
         """
-        if self.__hsm_ctrl.get_certificate(self.__auth_key_id, self.__auth_key_label) is None or \
-           self.__hsm_ctrl.get_certificate(self.__auth_key_id, self.__server_cert_label) is None:
+        client_certificate = self.__hsm_ctrl.get_certificate(self.__auth_key_id, self.__auth_key_label)
+        server_certificate = self.__hsm_ctrl.get_certificate(self.__auth_key_id, self.__server_cert_label)
+
+        if datetime.now() < self.__reference_date:
+            # Use client certificate to set system time
+            self.__update_system_time(client_certificate.validity_start)
+
+        if client_certificate is None or server_certificate is None:
             if not self.__hsm_ctrl.has_private_key(self.__auth_key_id, self.__auth_key_label):
-                self.__hsm_ctrl.generate_rsa_keypair_via_openssl(self.__auth_key_id,
-                                                                 self.__auth_key_label)
+                self.__hsm_ctrl.generate_keypair(self.__key_params)
+
             # Create certificate signing request to get client certificate
-            client_csr_created = self.__hsm_ctrl.create_csr(priv_key_id=self.__auth_key_id,
-                                                            device_id=self.__device_id,
-                                                            filename=self.__client_csr_file)
+            self.__csr_params.is_server = False
+            self.__csr_params.filename = self.__client_csr_file
+            client_csr_created = self.__hsm_ctrl.create_csr(self.__csr_params)
             if not client_csr_created:
-                print("Problem creating client CSR")
+                self.log.debug("Problem creating client CSR")
                 return False
             else:
                 client_req_status = self.__request_client_certificate()
                 if not client_req_status:
-                    print("Problem getting client certificate")
+                    self.log.debug("Problem getting client certificate")
                     return False
 
             # Create certificate signing request to get server certificate
-            server_csr_created = self.__hsm_ctrl.create_csr(priv_key_id=self.__auth_key_id,
-                                                            device_id=self.__device_id,
-                                                            filename=self.__server_csr_file,
-                                                            server=True)
+            self.__csr_params.is_server = True
+            self.__csr_params.filename = self.__server_csr_file
+            server_csr_created = self.__hsm_ctrl.create_csr(self.__csr_params)
             if not server_csr_created:
-                print("Problem creating server CSR")
+                self.log.debug("Problem creating server CSR")
                 return False
             else:
                 server_req_status = self.__request_server_certificate()
                 if not server_req_status:
-                    print("Problem getting server certificate")
+                    self.log.debug("Problem getting server certificate")
                     return False
         else:
             return True
@@ -131,7 +183,7 @@ class CommsProvisioning:
             response = requests.post(url, headers=headers, json=payload, timeout=5)
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
-            print(f"Connection error: {e}")
+            self.log.debug("Connection error: %s", e)
             return False
 
         # Extract the signed certificate from the response
@@ -139,21 +191,16 @@ class CommsProvisioning:
         signed_certificate_data = response_json["certificate"]
         ca_certificate = response_json["caCertificate"]
 
-        # Save received certificates into filesystem
-        certificate = "/etc/ssl/certs/comms_auth_cert.pem"
-        root_certificate = "/etc/ssl/certs/root-ca.cert.pem"
-
-        # Create directories if they don't exist
-        os.makedirs(os.path.dirname(certificate), exist_ok=True)
-
-        # Open the file in write mode and write the PEM data
+        # Save certificates into filesystem. Note! This is temporary
+        # until all modules are able to use keys and certificates via HSM.
+        os.makedirs(os.path.dirname(self.__client_cert_file), exist_ok=True)
         try:
-            with open(certificate, "w") as file:
+            with open(self.__client_cert_file, "w") as file:
                 file.write(signed_certificate_data)
-            with open(root_certificate, "w") as file:
+            with open(self.__root_ca_file, "w") as file:
                 file.write(ca_certificate)
         except Exception as e:
-            print(f"Error saving certificate files: {str(e)}")
+            self.log.debug("Error saving certificate files: %s", e)
 
         # Save certificates to HSM:
         # Provisioning server response "certificate" contains two
@@ -172,7 +219,7 @@ class CommsProvisioning:
                 # Read certificate as PEM format
                 certificate = load_pem_x509_certificate(cert_data.encode("utf-8"))
             except Exception as e:
-                print("Could not load certificate at index {index}", e)
+                self.log.debug("Could not load certificate at index %d, err: %s", index, e)
                 return False
 
             device_id = self.__device_id
@@ -184,14 +231,14 @@ class CommsProvisioning:
                 label = cert_name + " Issuer " + str(index)
             saved = self.__hsm_ctrl.save_certificate(certificate, self.__auth_key_id, label)
             if not saved:
-                print("Failed to store certificate with label {label} in index {index}")
+                self.log.debug("Failed to store certificate with label %s in index %d", label, index)
                 return False
 
         try:
             # Save root CA certificate
             certificate = load_pem_x509_certificate(ca_certificate.encode("utf-8"))
         except Exception as e:
-            print("Could not load root CA certificate", e)
+            self.log.debug("Could not load root CA certificate, %s", e)
             return False
         else:
             label = "Root CA Certificate"
@@ -209,25 +256,21 @@ class CommsProvisioning:
             response = requests.post(url, headers=headers, json=payload, timeout=5)
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
-            print(f"Connection error: {e}")
+            self.log.debug("Connection error: %s", e)
             return False
 
         # Extract the signed certificate from the response
         response_json = response.json()
         signed_certificate_data = response_json["certificate"]
 
-        # Save received certificates into filesystem
-        certificate = "/etc/ssl/certs/comms_server_cert.pem"
-
-        # Create directories if they don't exist
-        os.makedirs(os.path.dirname(certificate), exist_ok=True)
-
-        # Open the file in write mode and write the PEM data
+        # Save certificate into filesystem. Note! This is temporary
+        # until all modules are able to use keys and certificates via HSM.
+        os.makedirs(os.path.dirname(self.__server_cert_file), exist_ok=True)
         try:
-            with open(certificate, "w") as file:
+            with open(self.__server_cert_file, "w") as file:
                 file.write(signed_certificate_data)
         except Exception as e:
-            print(f"Error saving server certificate file: {str(e)}")
+            self.log.debug("Error saving server certificate file: %s", e)
 
         # Save certificate to HSM:
         signed_certificates = signed_certificate_data.split('-----END CERTIFICATE-----\n')
@@ -242,7 +285,7 @@ class CommsProvisioning:
                 # Read certificate as PEM format
                 certificate = load_pem_x509_certificate(cert_data.encode("utf-8"))
             except Exception as e:
-                print("Could not load certificate at index {index}", e)
+                self.log.debug("Could not load certificate at index %d, err: %s", index, e)
                 return False
 
             device_id = self.__device_id
@@ -254,12 +297,17 @@ class CommsProvisioning:
                 label = cert_name + " Issuer " + str(index)
             saved = self.__hsm_ctrl.save_certificate(certificate, self.__auth_key_id, label)
             if not saved:
-                print("Failed to store certificate with label {label} in index {index}")
+                self.log.debug("Failed to store certificate with label %s in index %d", label, index)
                 return False
         return saved
 
+    def __update_system_time(self, new_datetime):
+        new_time_str = new_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        subprocess.run(["date", "-s", new_time_str])
+        subprocess.run(["hwclock", "--systohc"])
 
-async def main(server, port, outdir, timeout):
+
+async def main(server, port, outdir, timeout=None, algorithm=None):
     """
     main
     """
@@ -268,7 +316,12 @@ async def main(server, port, outdir, timeout):
     # start time of provisioning
     start_time = time.time()
 
-    prov_agent = CommsProvisioning(server, port, outdir)
+    if timeout is None:
+        timeout = 0
+    if algorithm is None:
+        algorithm = "rsa"
+
+    prov_agent = CommsProvisioning(server, port, outdir, algorithm)
 
     while True:
         led_status.provisioning_led_control("active")
@@ -293,8 +346,9 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port', help='Server port', required=False)
     parser.add_argument('-o', '--outdir', help='Output folder for files', required=False)
     parser.add_argument('-t', '--timeout', help='Timeout for provisioning trial', required=False)
+    parser.add_argument('-a', '--alg', help='Keypair algorithm (rsa or ec)', required=False)
     args = parser.parse_args()
 
     loop = asyncio.new_event_loop()
-    loop.run_until_complete(main(args.server, args.port, args.outdir, args.timeout))
+    loop.run_until_complete(main(args.server, args.port, args.outdir, args.timeout, args.alg))
     loop.close()
