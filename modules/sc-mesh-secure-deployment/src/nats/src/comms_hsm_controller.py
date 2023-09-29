@@ -34,11 +34,72 @@ from Crypto.Cipher import AES
 import netifaces as ni
 
 
+class Cert:
+    """
+    A class to hold certificate PEM data and validity star/end dates.
+    """
+
+    def __init__(self):
+        self.pem_data = ""
+        self.validity_start = datetime.fromtimestamp(0)
+        self.validity_end = datetime.fromtimestamp(0)
+
+
+class KeyParams:
+    """
+    A class to hold keypair generation and storing related params.
+
+    Attributes:
+        id (str) -- HSM object identifier for the keypair
+        label (str) -- HSM object label
+        private_key (str) -- Private key file name (full path).
+        public_key (str) -- Public key file name (full path).
+        algorithm (str) -- Supported values "rsa" or "ec"
+        modulus_bits (int) -- Number of modulus bits used for RSA type of key.
+        ec_param (str) -- Elliptic curve param used with EC type of key generation.
+        use_openssl (bool) -- Defines whether keypair is create via openssl or not.
+
+    """
+    def __init__(self, id: str, label: str, private_key: str, public_key: str,
+                 algorithm: str = "rsa", modulus_bits: int = 4096,
+                 ec_param: str = "prime256v1", use_openssl: bool = True):
+        self.id = id
+        self.label = label
+        self.private_key = private_key
+        self.public_key = public_key
+        self.algorithm = algorithm
+        self.modulus_bits = modulus_bits
+        self.ec_param = ec_param
+        self.use_openssl = use_openssl
+
+
+class CsrParams:
+    """
+    A class to hold CSR params.
+
+    Attributes:
+        key_id (str) -- HSM id of the private key to sign the CSR
+        device_id (str) -- Device ID to be used as common name.
+        filename (str) -- Output filename for the CSR (full path).
+        is_server (bool) -- Boolean value to define whether to request
+                            certificate for server or client authentication
+                            purposes.
+        use_openssl (bool) -- Defines whether CSR is create via openssl or not.
+    """
+    def __init__(self, key_id: str, device_id: str, filename: str,
+                 is_server: bool = False, use_openssl: bool = False):
+        self.key_id = key_id
+        self.device_id = device_id
+        self.filename = filename
+        self.is_server = is_server
+        self.use_openssl = use_openssl
+
+
 class CommsHSMController:
     """
     Comms HSM Controller class.
     """
-    def __init__(self, base_dir: str, board_version: float) -> None:
+    def __init__(self, base_dir: str, board_version: float, logger) -> None:
         self.__pkcs11_session = None
         self.__token_user_pin = ""
         self.__token_so_pin = ""
@@ -48,6 +109,7 @@ class CommsHSMController:
         self.__comms_board_version = board_version
         self.__ip_addresses = ["10.10.10.2", "10.10.20.2"]
 
+        self.log = logger
         self.__use_soft_hsm = False
         self.__login_required = False        # CKF_LOGIN_REQUIRED
         self.__so_pin_required = False       # CKF_SO_PIN_LOCKED
@@ -113,7 +175,7 @@ class CommsHSMController:
             path = "/usr/lib/libsss_pkcs11.so"
             if os.path.exists(path):
                 self.__use_soft_hsm = False
-                print(path)
+                self.log.debug("pkcs11 library path %s", path)
                 self.__pkcs11lib = path
                 self.__pkcs11_engine = "e4sss"
                 # Force SoftHSM in use for now
@@ -130,7 +192,7 @@ class CommsHSMController:
                 self.__use_soft_hsm = True
                 self.__pkcs11lib = path
                 self.__pkcs11_engine = "pkcs11"
-                print(path)
+                self.log.debug("pkcs11 library path %s", path)
                 return None
         return None
 
@@ -152,7 +214,7 @@ class CommsHSMController:
             cipher = AES.new(key, AES.MODE_CBC, iv)
             return unpad(cipher.decrypt(ciphertext), 16).decode().split('\n')[0]
         except Exception as e:
-            print("No pin found, error:", e)
+            self.log.debug("No pin found, error: %s", e)
             return ""
 
     def __generate_pin(self):
@@ -178,7 +240,8 @@ class CommsHSMController:
 
         ret = subprocess.run(openssl_command, shell=True)
         if ret.returncode != 0:
-            print(str(ret.returncode) + str(ret.stdout) + str(ret.stderr))
+            self.log.debug("Return Code: %s\nSTDOUT: %s\nSTDERR: %s",
+                           ret.returncode, ret.stdout, ret.stderr)
             return False
         return True
 
@@ -211,12 +274,12 @@ class CommsHSMController:
                     session.login(self.__token_user_pin, user_type=PyKCS11.LowLevel.CKU_USER)
                     # Refresh login requirements
                     self.__get_token_info(slot)
-                print("Token:", self.__current_token_label)
-                print("so_pin", self.__token_so_pin)
-                print("user_pin", self.__token_user_pin)
+                self.log.debug("Token: %s", self.__current_token_label)
+                self.log.debug("so_pin %s", self.__token_so_pin)
+                self.log.debug("user_pin %s", self.__token_user_pin)
                 return session
             except PyKCS11Error as e:
-                print("exception:", e)
+                self.log.debug("exception: %s", e)
         return None
 
     def __create_token(self, token_name):
@@ -233,7 +296,7 @@ class CommsHSMController:
                 self.__pkcs11.initToken(slot, self.__token_so_pin, token_name)
                 break
             except PyKCS11Error as e:
-                print("Create token exception:", e)
+                self.log.debug("Create token exception: %s", e)
 
     def __get_token_info(self, slot):
         # Get token info
@@ -252,14 +315,14 @@ class CommsHSMController:
         self.__token_has_rng = bool(token_info.flags & PyKCS11.LowLevel.CKF_RNG)
 
         """
-        print("login_required", self.__login_required)
-        print("so_pin_required", self.__so_pin_required)
-        print("so_pin_to_be_changed", self.__so_pin_to_be_changed)
-        print("user_pin_initialized", self.__user_pin_initialized)
-        print("token_has_rng", self.__token_has_rng)
+        self.log.debug("login_required %s", self.__login_required)
+        self.log.debug("so_pin_required %s", self.__so_pin_required)
+        self.log.debug("so_pin_to_be_changed %s", self.__so_pin_to_be_changed)
+        self.log.debug("user_pin_initialized %s", self.__user_pin_initialized)
+        self.log.debug("token_has_rng %s", self.__token_has_rng)
         mechanisms = self.__pkcs11.getMechanismList(slot)
         for mech in mechanisms:
-            print(mech)
+            self.log.debug(mech)
         """
 
     def save_certificate(self, cert_pem: Certificate, keypair_id, label: str):
@@ -275,20 +338,21 @@ class CommsHSMController:
             bool: True if certificate was saved, False otherwise.
         """
         try:
-            print("Certificate Subject:", cert_pem.subject)
-            print("Certificate Issuer:", cert_pem.issuer.rfc4514_string())
-            print("Certificate Not Before:", cert_pem.not_valid_before)
-            print("Certificate Not After:", cert_pem.not_valid_after)
-            print("Certificate Serial Number:", cert_pem.serial_number)
-            print("Certificate version:", cert_pem.version)
-            print("=" * 50)
+            self.log.debug("=" * 70)
+            self.log.debug("Certificate label: %s", label)
+            self.log.debug("Certificate subject: %s", cert_pem.subject)
+            self.log.debug("Certificate issuer: %s", cert_pem.issuer.rfc4514_string())
+            self.log.debug("Certificate not Before: %s", cert_pem.not_valid_before)
+            self.log.debug("Certificate not After: %s", cert_pem.not_valid_after)
+            self.log.debug("Certificate serial Number %s:", cert_pem.serial_number)
+            self.log.debug("Certificate version: %s", cert_pem.version)
 
             cka_id = bytes.fromhex(keypair_id)
 
             # Verify the validity of the received certificate
             current_time = datetime.now()
             if current_time > cert_pem.not_valid_after:
-                print("Received certificate has already expired.")
+                self.log.debug("Received certificate has already expired.")
                 return False
 
             # Convert the PEM-encoded certificate to DER format
@@ -323,11 +387,11 @@ class CommsHSMController:
 
             # Store certificate to HSM
             self.__pkcs11_session.createObject(cert_template)
-            print("Certificate saved successfully.")
+            self.log.debug("Certificate saved successfully.")
             return True
 
         except PyKCS11Error as e:
-            print("Failed to save certificate:", e)
+            self.log.debug("Failed to save certificate: %s", e)
             return False
 
     def get_certificate(self, keypair_id, label):
@@ -343,6 +407,7 @@ class CommsHSMController:
             str or None: Certificate in PEM format or None if not found.
         """
         cka_id = bytes.fromhex(keypair_id)
+        cert = Cert()
 
         filter_template = [
             (PyKCS11.LowLevel.CKA_CLASS, PyKCS11.LowLevel.CKO_CERTIFICATE),
@@ -361,9 +426,11 @@ class CommsHSMController:
                                                                     [PyKCS11.LowLevel.CKA_VALUE])[0]
                 if cka_value:
                     certificate_bytes = bytes(cka_value)
-                    # Verify the validity of the certificate
                     certificate = load_der_x509_certificate(certificate_bytes)
-                    return certificate.public_bytes(encoding=serialization.Encoding.PEM).decode()
+                    cert.pem_data = certificate.public_bytes(encoding=serialization.Encoding.PEM).decode()
+                    cert.validity_start = certificate.not_valid_before
+                    cert.validity_end = certificate.not_valid_after
+                    return cert
         return None
 
     def has_private_key(self, keypair_id, label):
@@ -425,13 +492,35 @@ class CommsHSMController:
         # Not found
         return False
 
-    def generate_rsa_keypair_via_openssl(self, keypair_id: str, label: str) -> bool:
+    def generate_keypair(self, key_params: KeyParams) -> bool:
         """
-        Generates an RSA keypair via openssl.
+        Generates private/public keypair using given paramters.
 
         Arguments:
-            keypair_id (str) -- Identifier number for key objects.
-            label (str) -- Label name for key objects (used with SoftHSM only).
+            key_params (KeyParams) -- KeyParams object.
+
+        Returns:
+            bool: True if the keypair was generated, False otherwise.
+        """
+        if key_params.algorithm != "rsa" and key_params.algorithm != "ec":
+            self.log.debug("Not supported algorithm!")
+            return False
+
+        if key_params.use_openssl:
+            retval = self.__generate_keypair_via_openssl(key_params)
+        else:
+            if key_params.algorithm == "rsa":
+                retval = self.__generate_rsa_keypair(key_params.id, key_params.label)
+            else:
+                retval = self.__generate_ec_keypair(key_params.id, key_params.label)
+        return retval
+
+    def __generate_keypair_via_openssl(self, key_params: KeyParams) -> bool:
+        """
+        Generates authentication keypair via openssl.
+
+        Arguments:
+           key_params (KeyParams) -- KeyParams object.
 
         Returns:
             bool: True if the keypair was generated, False otherwise.
@@ -439,48 +528,43 @@ class CommsHSMController:
         # Openssl requires environment variable usage for pin
         os.environ['PKCS11_PIN'] = self.__token_user_pin
 
-        private_key = "/etc/ssl/private/comms_auth_private_key.pem"
-        public_key = "/etc/ssl/public/comms_auth_public_key.pem"
         # Create directories if they don't exist
-        os.makedirs(os.path.dirname(private_key), exist_ok=True)
-        os.makedirs(os.path.dirname(public_key), exist_ok=True)
+        os.makedirs(os.path.dirname(key_params.private_key), exist_ok=True)
+        os.makedirs(os.path.dirname(key_params.public_key), exist_ok=True)
 
+        label = key_params.label
         if self.__pkcs11_engine == "e4sss":
-            label = "sss:" + keypair_id
+            label = "sss:" + key_params.id
 
         # Generate private key
-        command = [
-            'openssl',
-            'genpkey',
-            '-algorithm', 'RSA',
-            '-out', private_key,
-            '-engine', self.__pkcs11_engine
-            ]
+        if key_params.algorithm == "rsa":
+            command = ['openssl', 'genpkey', '-algorithm', 'RSA', '-out',
+                       key_params.private_key, '-engine', self.__pkcs11_engine]
+        elif key_params.algorithm == "ec":
+            command = ['openssl', 'ecparam', '-name', key_params.ec_param, '-genkey',
+                       '-out', key_params.private_key, '-engine', self.__pkcs11_engine]
+        else:
+            self.log.debug("Not supported algorithm!")
+            return False
 
         # Run the command
         result = subprocess.run(command, capture_output=True, text=True)
         # Check the result
         if result.returncode != 0:
-            print("Private key generation failed:")
-            print(result.stderr)
+            self.log.debug("Private key generation failed:")
+            self.log.debug(result.stderr)
             return False
 
         # Generate public key from private
-        command = [
-            'openssl',
-            'rsa',
-            '-in', private_key,
-            '-pubout',
-            '-out', public_key,
-            '-engine', self.__pkcs11_engine
-            ]
+        command = ['openssl', key_params.algorithm, '-in', key_params.private_key,
+                   '-pubout', '-out', key_params.public_key, '-engine', self.__pkcs11_engine]
 
         # Run the command
         result = subprocess.run(command, capture_output=True, text=True)
         # Check the result
         if result.returncode != 0:
-            print("Public key generation failed:")
-            print(result.stderr)
+            self.log.debug("Public key generation failed:")
+            self.log.debug(result.stderr)
             return False
 
         # Import private key to HSM
@@ -491,18 +575,17 @@ class CommsHSMController:
             '--login',
             '--pin', 'env:PKCS11_PIN',
             '--label', label,
-            '--id', keypair_id,
-            '--write-object', private_key,
+            '--id', key_params.id,
+            '--write-object', key_params.private_key,
             '--type', 'privkey'
             ]
-        print(command)
 
         # Run the command
         result = subprocess.run(command, capture_output=True, text=True)
         # Check the result
         if result.returncode != 0:
-            print("Private key import to HSM failed:")
-            print(result.stderr)
+            self.log.debug("Private key import to HSM failed:")
+            self.log.debug(result.stderr)
             return False
 
         # Import public key to HSM
@@ -513,8 +596,8 @@ class CommsHSMController:
             '--login',
             '--pin',  'env:PKCS11_PIN',
             '--label', label,
-            '--id', keypair_id,
-            '--write-object', public_key,
+            '--id', key_params.id,
+            '--write-object', key_params.public_key,
             '--type', 'pubkey'
             ]
 
@@ -522,118 +605,13 @@ class CommsHSMController:
         result = subprocess.run(command, capture_output=True, text=True)
         # Check the result
         if result.returncode != 0:
-            print("Public key import to HSM failed:")
-            print(result.stderr)
+            self.log.debug("Public key import to HSM failed:")
+            self.log.debug(result.stderr)
             return False
         # All good
         return True
 
-    def generate_ec_keypair_via_openssl(self, keypair_id: str, label: str) -> bool:
-        """
-        Generates an EC keypair via openssl.
-
-        Arguments:
-            keypair_id (str) -- Identifier number for key objects.
-            label (str) -- Label name for key objects (used with SoftHSM only).
-
-        Returns:
-            bool: True if the keypair was generated, False otherwise.
-        """
-        # Openssl requires environment variable usage for pin
-        os.environ['PKCS11_PIN'] = self.__token_user_pin
-
-        private_key = "/etc/ssl/private/comms_auth_private_key.pem"
-        public_key = "/etc/ssl/public/comms_auth_public_key.pem"
-        # Create directories if they don't exist
-        os.makedirs(os.path.dirname(private_key), exist_ok=True)
-        os.makedirs(os.path.dirname(public_key), exist_ok=True)
-
-        if self.__pkcs11_engine == "e4sss":
-            label = "sss:" + keypair_id
-
-        # Generate private key
-        command = [
-            'openssl',
-            'ecparam',
-            '-name', 'prime256v1',
-            '-genkey',
-            '-out', private_key,
-            '-engine', self.__pkcs11_engine
-            ]
-
-        print(command)
-        # Run the command
-        result = subprocess.run(command, capture_output=True, text=True)
-        # Check the result
-        if result.returncode != 0:
-            print("Private key generation failed:")
-            print(result.stderr)
-            return False
-
-        # Generate public key from private
-        command = [
-            'openssl',
-            'ec',
-            '-in', private_key,
-            '-pubout',
-            '-out', public_key,
-            '-engine', self.__pkcs11_engine
-            ]
-
-        # Run the command
-        result = subprocess.run(command, capture_output=True, text=True)
-        # Check the result
-        if result.returncode != 0:
-            print("Public key generation failed:")
-            print(result.stderr)
-            return False
-
-        # Import private key to HSM
-        command = [
-            'pkcs11-tool',
-            '--module', self.__pkcs11lib,
-            '--token', self.__current_token_label,
-            '--login',
-            '--pin', 'env:PKCS11_PIN',
-            '--label', label,
-            '--id', keypair_id,
-            '--write-object', private_key,
-            '--type', 'privkey'
-            ]
-        print(command)
-
-        # Run the command
-        result = subprocess.run(command, capture_output=True, text=True)
-        # Check the result
-        if result.returncode != 0:
-            print("Private key import to HSM failed:")
-            print(result.stderr)
-            return False
-
-        # Import public key to HSM
-        command = [
-            'pkcs11-tool',
-            '--module', self.__pkcs11lib,
-            '--token', self.__current_token_label,
-            '--login',
-            '--pin',  'env:PKCS11_PIN',
-            '--label', label,
-            '--id', keypair_id,
-            '--write-object', public_key,
-            '--type', 'pubkey'
-            ]
-
-        # Run the command
-        result = subprocess.run(command, capture_output=True, text=True)
-        # Check the result
-        if result.returncode != 0:
-            print("Public key import to HSM failed:")
-            print(result.stderr)
-            return False
-        # All good
-        return True
-
-    def generate_rsa_keypair(self, keypair_id: str, label: str) -> bool:
+    def __generate_rsa_keypair(self, keypair_id: str, label: str) -> bool:
         """
         Generates an RSA keypair via HSM.
 
@@ -680,13 +658,13 @@ class CommsHSMController:
                                                   private_key_template,
                                                   PyKCS11.MechanismRSAGENERATEKEYPAIR)
         except PyKCS11Error as e:
-            print("GenerateKeyPair exception:", e)
+            self.log.debug("GenerateKeyPair exception: %s", e)
             return False
         else:
-            print("Generated RSA keypair")
+            self.log.debug("Generated RSA keypair")
             return True
 
-    def generate_ec_keypair(self, keypair_id: str, label: str) -> bool:
+    def __generate_ec_keypair(self, keypair_id: str, label: str) -> bool:
         """
         Generates an EC keypair via HSM.
 
@@ -738,35 +716,32 @@ class CommsHSMController:
                 PyKCS11.MechanismECGENERATEKEYPAIR)
 
         except PyKCS11Error as e:
-            print("GenerateKeyPair exception:", e)
+            self.log.debug("GenerateKeyPair exception: %s", e)
             return False
         else:
-            print("Generated EC keypair")
+            self.log.debug("Generated EC keypair")
             return True
 
-    def create_csr_via_openssl(self, priv_key_id: str, device_id: str, filename: str, is_server=False):
+    def __create_csr_via_openssl(self, csr_params: CsrParams):
         """
         Create a Certificate Signing Request (CSR) using OpenSSL with
         the provided arguments.
 
         Arguments:
-            priv_key_id (str) -- Identifier number for the private key.
-            subject (str) -- Subject to be used in CSR.
-            filename (str) -- Output file name.
-            is_server (bool) -- Defines for what role CSR is created,
+            csr_params (CsrParams) -- CsrParams object holding CSR parameters.
 
         Returns:
             bool: True if CSR generation is successful, False otherwise.
         """
         # Create directories if they don't exist
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        os.makedirs(os.path.dirname(csr_params.filename), exist_ok=True)
 
         # Openssl requires environment variable usage for pin
         os.environ['PKCS11_PIN'] = self.__token_user_pin
-        subject = "/CN=" + device_id
+        subject = "/CN=" + csr_params.device_id
 
         # Generate CSR config file
-        self.__generate_csr_config_file(subject, is_server)
+        self.__generate_csr_config_file(subject, csr_params.is_server)
 
         command = [
             'openssl',
@@ -774,13 +749,12 @@ class CommsHSMController:
             '-new',
             '-engine', self.__pkcs11_engine,
             '-keyform', 'engine',
-            '-key', str(priv_key_id),
+            '-key', csr_params.key_id,
             '-passin', 'env:PKCS11_PIN',
-            '-out', str(filename),
-            '-subj', str(subject),
+            '-out', csr_params.filename,
+            '-subj', subject,
             '-config', self.__csr_cnf_file
             ]
-        print(command)
         # Run the command
         result = subprocess.run(command, capture_output=True, text=True)
 
@@ -788,9 +762,9 @@ class CommsHSMController:
         if result.returncode == 0:
             return True
         else:
-            print("Command execution failed.")
-            print("Error output:")
-            print(result.stderr)
+            self.log.debug("Command execution failed.")
+            self.log.debug("Error output:")
+            self.log.debug(result.stderr)
             return False
 
     def __get_private_key_handle(self, keypair_id):
@@ -839,7 +813,7 @@ class CommsHSMController:
 
         # Get public key objects
         pub_key_objects = self.__pkcs11_session.findObjects(filter_template)
-        # print(pub_key_objects)
+        # self.log.debug(pub_key_objects)
         if len(pub_key_objects) > 0:
             # There is at least one matching object
             return pub_key_objects[0]
@@ -1019,32 +993,45 @@ class CommsHSMController:
                         file.write(f"IP.{i} = {ip_address}\n")
             return True
         except Exception as e:
-            print("Error creating CSR config file:", e)
+            self.log.debug("Error creating CSR config file: %s", e)
             return False
 
-    def create_csr(self, priv_key_id: str, device_id: str, filename: str, server=False):
+    def create_csr(self, csr_params: CsrParams):
+        """
+        Create a Certificate Signing Request (CSR) either via openssl or
+        asn1crypto library depending on given parameters.
+
+        Arguments:
+            csr_params (CsrParams) -- CsrParams object holding CSR parameters.
+
+        Returns:
+            bool: True if CSR generation is successful, False otherwise.
+        """
+        if csr_params.use_openssl:
+            retval = self.__create_csr_via_openssl(csr_params)
+        else:
+            retval = self.__create_csr(csr_params)
+        return retval
+
+    def __create_csr(self, csr_params: CsrParams):
         """
         Create a Certificate Signing Request (CSR) using asn1crypto library.
         CSR is signed via HSM.
 
         Arguments:
-            priv_key_id (str) -- Identifier number for the private key.
-            subject (str) -- Subject to be used in CSR.
-            filename (str) -- Output file name.
-            server (bool)  -- Boolean value to define is this CSR for server
-                              or client usage.
+            csr_params (CsrParams) -- CsrParams object holding CSR parameters.
         Returns:
             bool: True if CSR generation is successful, False otherwise.
         """
         # Create directories if they don't exist
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        os.makedirs(os.path.dirname(csr_params.filename), exist_ok=True)
 
         # Get the private key handle for signing CSR
-        private_key_handle = self.__get_private_key_handle(priv_key_id)
-        public_key_handle = self.__get_public_key(priv_key_id)
+        private_key_handle = self.__get_private_key_handle(csr_params.key_id)
+        public_key_handle = self.__get_public_key(csr_params.key_id)
 
         if private_key_handle is None:
-            print("Private key not found")
+            self.log.debug("Private key not found")
             return False
 
         if public_key_handle is None:
@@ -1062,7 +1049,8 @@ class CommsHSMController:
             algorithm_name = "ec"
             sign_algorithm_name = "ecdsa"
 
-        csr_info = self.__create_csr_info(device_id, public_key, algorithm_name, pub_key_params, server)
+        csr_info = self.__create_csr_info(csr_params.device_id, public_key, algorithm_name,
+                                          pub_key_params, csr_params.is_server)
 
         # Sign the CSR Info
         signature = self.__pkcs11_session.sign(private_key_handle,
@@ -1082,10 +1070,10 @@ class CommsHSMController:
         # Write CSR in PEM format to a file
         try:
             pem_csr = pem.armor("CERTIFICATE REQUEST", signed_csr.dump())
-            with open(filename, 'wb') as csr_file:
+            with open(csr_params.filename, 'wb') as csr_file:
                 csr_file.write(pem_csr)
         except Exception as e:
-            print(f"Error {e} when writing CSR file")
+            self.log.debug("Error %s when writing CSR file", e)
             return False
 
         return True
