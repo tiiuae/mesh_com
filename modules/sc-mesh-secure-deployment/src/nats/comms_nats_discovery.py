@@ -5,7 +5,6 @@ import time
 import logging
 import argparse
 import netifaces as netifaces
-import os
 import textwrap
 
 
@@ -23,8 +22,8 @@ class NatsDiscovery:  # pylint: disable=too-few-public-methods
         self.seed_ip_address = ""
         self.tls_required = False
 
-        if os.path.exists(self.key) and os.path.exists(self.cert) \
-           and os.path.exists(self.server_cert) and os.path.exists(self.cert_authority):
+        if self.key is not None and self.cert is not None \
+           and self.server_cert is not None and self.cert_authority is not None:
             self.tls_required = True
 
         # base logger for discovery
