@@ -1,5 +1,5 @@
 # Given dynamically from CI job.
-FROM --platform=${BUILDPLATFORM:-linux/amd64} ghcr.io/tiiuae/fog-ros-sdk:sha-6d67ecf-${TARGETARCH:-amd64} AS builder
+FROM --platform=${BUILDPLATFORM:-linux/amd64} ghcr.io/tiiuae/fog-ros-sdk:sha-ba8047f-${TARGETARCH:-amd64} AS builder
 
 # Must be defined another time after "FROM" keyword.
 ARG TARGETARCH
@@ -17,7 +17,7 @@ RUN /packaging/build_colcon_sdk.sh ${TARGETARCH:-amd64}
 #  ▲               runtime ──┐
 #  └── build                 ▼
 
-FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-6d67ecf
+FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-ba8047f
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 
@@ -33,6 +33,7 @@ RUN apt update \
         pcsc-lite \
         rfkill \
         wpa-supplicant=2.9-r0 \
+    && apt clean \
     && rm -rf /var/lib/apt/lists/*
 
 COPY modules/mesh_com/entrypoint.sh /entrypoint.sh
