@@ -1,12 +1,7 @@
 name: tii-mesh-com
 
-permissions:
-  contents: read
-  packages: write
-
 on:
   push:
-    branches: [ main, develop ]
     tags:
       - 'v*'
       - v[0-9]+.[0-9]+.[0-9]+
@@ -17,8 +12,10 @@ on:
 jobs:
   tii-mesh-com:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
-
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
