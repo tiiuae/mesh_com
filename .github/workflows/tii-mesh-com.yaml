@@ -2,6 +2,7 @@ name: tii-mesh-com
 
 on:
   push:
+    branches: [ feat-multiarch-both ]
     tags:
       - 'v*'
       - v[0-9]+.[0-9]+.[0-9]+
