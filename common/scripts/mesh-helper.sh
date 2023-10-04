@@ -87,3 +87,27 @@ source_configuration() {
       exit 1
   fi
 }
+
+install_python_packages() {
+  # install the python packages
+  MESH_FOLDER="/opt/mesh_com"
+  if [ -d "$MESH_FOLDER/modules/utils/package/python_packages" ]; then
+     echo "Directory $MESH_FOLDER/modules/utils/package/python_packages exists."
+  else
+    #!/bin/bash
+    tar -C $MESH_FOLDER/modules/utils/package/ -zxvf $MESH_FOLDER/modules/utils/package/python_packages.tar.gz
+    cd $MESH_FOLDER/modules/utils/package/python_packages || return
+
+    for f in {*.whl,*.gz};
+      do
+        name="$(echo "$f" | cut -d"-" -f1)"
+        if python -c 'import pkgutil; exit(not pkgutil.find_loader("$name"))'; then
+          echo "$name" "installed"
+        else
+          echo "$name" "not found"
+          echo "installing" "$name"
+          pip install --no-index "$f" --find-links .;
+        fi
+    done
+  fi
+}

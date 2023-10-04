@@ -1,8 +1,8 @@
 only_mesh: false
 NESS: false
-continuous: false
-mutual: true
+continuous: true
+mutual: false
 secbeat: true
 quarantine: false
-mesh: true
+mesh: false
 provisioning: false

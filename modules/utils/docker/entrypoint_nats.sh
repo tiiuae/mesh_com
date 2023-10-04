@@ -35,7 +35,33 @@ else
   echo "starting provisioning agent"
   # blocks execution until provisioning is done or timeout (30s)
   # IP address and port are passed as arguments and hardcoded. TODO: mDNS
-  python /opt/nats/src/comms_provisioning.py -t 30 -s 192.168.1.254 -p 8080 -o /opt > /opt/comms_provisioning.log 2>&1
+
+  # TODO commented out to test ms1.5
+  #python /opt/nats/src/comms_provisioning.py -t 30 -s 192.168.1.254 -p 8080 -o /opt > /opt/comms_provisioning.log 2>&1
+
+  ############### 1.5 begin ###############
+
+  # TODO: move this copy to mesh_start.sh, currently for debugging purposes
+  if [ ! -f "/opt/S90MS15" ]; then
+
+    # TODO: remove this when the root cert is provided by the provisioning server
+    MESH_FOLDER="/opt/mesh_com"
+    ROOT_CERT="$MESH_FOLDER/modules/sc-mesh-secure-deployment/src/1_5/common/test/root_cert.der"
+    cp "$ROOT_CERT" "/etc/ssl/certs/"
+    # TODO: modify it to provisoning server root
+    /opt/mesh_com/common/scripts/generate_keys.sh
+
+    # TODO: remove whole installation step when need libraries are included in host image
+    # install the python packages
+    install_python_packages
+    meshcom_path="/opt/mesh_com/"
+    cp $meshcom_path/modules/sc-mesh-secure-deployment/src/nats/initd/S90MS15 /opt/.
+    cp -r $meshcom_path/modules/sc-mesh-secure-deployment/src/1_5/. /opt/.
+    chmod +x /opt/S90MS15
+  fi
+  /opt/S90MS15 start
+
+  ############### 1.5 end ###############
 
   echo "Start nats server and client nodes"
   /opt/S90nats_discovery start

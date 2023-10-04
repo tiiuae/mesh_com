@@ -100,9 +100,10 @@ def CA():
     os.system('clear')
     print('\'Continuous Authentication\'')
     sectable = pd.read_csv('auth/dev.csv')
-    if not mesh_utils.verify_mesh_status():  # verifying that mesh is running
-        print("Mesh network not established")
-        only_mesh()
+    # if not mesh_utils.verify_mesh_status():  # verifying that mesh is running
+    #     print("Mesh network not established")
+    #     only_mesh()
+    # added from only_mesh()
     return only_ca(myID)
 
 
