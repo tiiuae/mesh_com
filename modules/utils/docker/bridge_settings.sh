@@ -9,7 +9,7 @@ configure()
       ch=$MCC_CHANNEL
       ipaddr=$IP
       nmask=$MASK
-      cc=$COUNTR
+      cc=$COUNTRY
       psk=$KEY
       txpwr=$TXPOWER
       algo=$ROUTING
@@ -17,6 +17,9 @@ configure()
       meshVersion=$MSVERSION
       ML=$ML
       bridge=$BRIDGE
+      subnet=$SUBNET
+      wifi_interface=$WIFI_INTERFACE
+      
   else
       mode="mesh"
   fi

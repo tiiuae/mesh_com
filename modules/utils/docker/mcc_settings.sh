@@ -16,6 +16,8 @@ configure()
       meshVersion=$MSVERSION
       ML=$ML
       bridge=$BRIDGE
+      subnet=$SUBNET
+      wifi_interface=$WIFI_INTERFACE
   else
       mode="mesh"
   fi
