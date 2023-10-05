@@ -63,9 +63,108 @@ mode_execute() {
   # parameters:
   # $1 = mode
   case "$mode" in
+    "halow")  # TODO: implement, currently copy of "mesh"
+      cat <<EOF >/var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf
+ctrl_interface=DIR=/var/run/wpa_supplicant
+# use 'ap_scan=2' on all devices connected to the network
+# this is unnecessary if you only want the network to be created when no other networks..
+ap_scan=1
+country=$cc
+p2p_disabled=1
+mesh_max_inactivity=50
+network={
+    ssid="$ssid"
+    bssid=$mac
+    mode=5
+    frequency=$freq
+    psk="$psk"
+    key_mgmt=SAE
+    ieee80211w=2
+    beacon_int=1000
+    mesh_fwding=0
+    # 11b rates dropped (for better performance)
+    mesh_basic_rates=60 90 120 180 240 360 480 540
+}
+EOF
+
+      echo "Killing wpa_supplicant..."
+
+      if [ "$routing_algo" == "batman-adv" ]; then
+        killall alfred 2>/dev/null
+        killall batadv-vis 2>/dev/null
+        rm -f /var/run/alfred.sock
+
+        #Check if batman_adv is built-in module
+        if [[ -d "/sys/module/batman_adv" ]]; then
+          modprobe batman-adv
+        fi
+      elif [ "$routing_algo" == "olsr" ]; then
+         killall olsrd 2>/dev/null
+      fi
+
+      echo "$wifidev down.."
+      iw dev "$wifidev" del
+      iw phy "$phyname" interface add "$wifidev" type mp
+
+      echo "Longer range tweak.."
+      if [ "$priority" == "long_range" ]; then
+        iw phy "$phyname" set distance 8000
+      elif [ "$priority" == "low_latency" ]; then
+        iw phy "$phyname" set distance 0
+      else
+        iw phy "$phyname" set distance 1000
+      fi
+
+      echo "$wifidev create 11s.."
+      ifconfig "$wifidev" mtu 1560
+
+      echo "$wifidev up.."
+      ip link set "$wifidev" up
+
+      if [ "$routing_algo" == "batman-adv" ]; then
+        batctl if add "$wifidev"
+        echo "bat0 up.."
+        ifconfig bat0 up
+        echo "bat0 ip address.."
+        ifconfig bat0 "$ipaddr" netmask "$nmask"
+        echo "bat0 mtu size"
+        ifconfig bat0 mtu 1460
+        echo
+        ifconfig bat0
+
+        sleep 3
+
+        # for visualisation
+        (alfred -i bat0 -m)&
+        echo "started alfred"
+        (batadv-vis -i bat0 -s)&
+        echo "started batadv-vis"
+      elif [ "$routing_algo" == "olsr" ]; then
+        ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
+        # Enable debug level as necessary
+        (olsrd -i "$wifidev" -d 0)&
+      fi
+
+      # Radio parameters
+      iw dev "$wifidev" set txpower limit "$txpwr"00
+
+      brctl addif br-lan bat0 $eth_port
+      ifconfig br-lan "$br_lan_ip" netmask "255.255.255.0"
+      ifconfig br-lan up
+      echo
+      ifconfig br-lan
+      # Add forwarding rules from AP to bat0 interface
+      iptables -P FORWARD ACCEPT
+      route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
+      route add -net 192.168.1.0 gw "$br_lan_ip" netmask 255.255.255.0 dev br-lan
+      iptables -A FORWARD --in-interface bat0 -j ACCEPT
+      iptables --table nat -A POSTROUTING --out-interface "$br_lan_ip" -j MASQUERADE
+
+      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
+      ;;
   "mesh")
 
-      cat <<EOF >/var/run/wpa_supplicant-11s_"$wifidev".conf
+      cat <<EOF >/var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf
 ctrl_interface=DIR=/var/run/wpa_supplicant
 # use 'ap_scan=2' on all devices connected to the network
 # this is unnecessary if you only want the network to be created when no other networks..
@@ -161,7 +260,7 @@ EOF
       iptables -A FORWARD --in-interface bat0 -j ACCEPT
       iptables --table nat -A POSTROUTING --out-interface "$br_lan_ip" -j MASQUERADE
 
-      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$wifidev".conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_11s.log
+      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
       ;;
   "ap+mesh_mcc")
       wait_for_intf "br-lan"
@@ -173,7 +272,7 @@ EOF
       ifconfig "$ifname_ap" up
 
       # AP hostapd config
-      cat <<EOF >/var/run/hostapd-"$ifname_ap".conf
+      cat <<EOF >/var/run/hostapd-"$INDEX"_"$ifname_ap".conf
 country_code=$cc
 interface=$ifname_ap
 ssid=$ssid
@@ -215,7 +314,7 @@ EOF
       iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
 
       # Start AP
-      /usr/sbin/hostapd -B /var/run/hostapd-"$ifname_ap".conf -f /tmp/hostapd.log
+      /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX"_"$ifname_ap".conf -f /tmp/hostapd_"$INDEX".log
       ;;
   "ap+mesh_scc")
       wait_for_intf "br-lan"
@@ -246,7 +345,7 @@ EOF
       calculate_wifi_channel "$freq"
 
       # AP hostapd config
-      cat <<EOF >/var/run/hostapd-"$ifname_ap".conf
+      cat <<EOF >/var/run/hostapd-"$INDEX"_"$ifname_ap".conf
 ctrl_interface=/var/run/hostapd
 interface=$ifname_ap
 hw_mode=$retval_band
@@ -285,7 +384,7 @@ EOF
       ip addr flush dev bat0
 
       # Start AP
-      /usr/sbin/hostapd -B /var/run/hostapd-"$ifname_ap".conf -f /tmp/hostapd.log
+      /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX"_"$ifname_ap".conf  -f /tmp/hostapd_"$INDEX".log
       ;;
   off)
       # service off
@@ -313,50 +412,65 @@ main () {
   source_configuration
 
   # Modes: mesh, ap+mesh_scc, ap+mesh_mcc
-  # MODE=mesh
-  # IP=10.20.15.3
-  # MASK=255.255.255.0
-  # MAC=00:11:22:33:44:55
-  # KEY=1234567890
-  # ESSID=gold
-  # FREQ=5805
-  # FREQ_MCC=2412
-  # TXPOWER=30
-  # COUNTRY=AE
-  # MESH_VIF=wlp1s0
-  # PHY=phy0
-  # ROUTING=batman-adv
-  # ROLE=drone
-  # PRIORITY=long_range
-  # set bridge ip, sets br_lan_ip
+  # idx_MODE=mesh
+  # idx_.....
   generate_br_lan_ip
 
   # local find eth port
   find_ethernet_port
   echo $eth_port
 
-  if [ "$1" == "mesh" ] || "$1" == "off"; then
+  echo "index=$2 mode=$1"
+  INDEX=$2
+
+  # default mesh handling and power off radio
+  if [ "$1" == "mesh" ] || [ "$1" == "off" ]; then
     mode=$1
   else
     # shellcheck disable=SC2153
-    mode="$MODE"
+    _mode="${INDEX}_MODE"
+    mode="${!_mode}"
   fi
-  ssid=$ESSID
-  ipaddr=$IP
-  nmask=$MASK
-  mac=$MAC
-  # shellcheck disable=SC2153
-  freq=$FREQ
-  # shellcheck disable=SC2153
-  freq_mcc=$FREQ_MCC
-  cc=$COUNTRY
-  psk=$KEY
-  txpwr=$TXPOWER
-  algo=$ROUTING
-  wifidev=$MESH_VIF
-  phyname=$PHY
-  priority=$PRIORITY
-  role=$ROLE
+
+  _ssid="${INDEX}_ESSID"
+  ssid="${!_ssid}"
+
+  _ipaddr="${INDEX}_IP"
+  ipaddr="${!_ipaddr}"
+
+  _nmask="${INDEX}_MASK"
+  nmask="${!_nmask}"
+
+  _mac="${INDEX}_MAC"
+  mac="${!_mac}"
+
+  _freq="${INDEX}_FREQ"
+  freq="${!_freq}"
+
+  _freq_mcc="${INDEX}_FREQ_MCC"
+  freq_mcc="${!_freq_mcc}"
+
+  _cc="${INDEX}_COUNTRY"
+  cc="${!_cc}"
+
+  _psk="${INDEX}_KEY"
+  psk="${!_psk}"
+
+  _txpwr="${INDEX}_TXPOWER"
+  txpwr="${!_txpwr}"
+
+  _algo="${INDEX}_ROUTING"
+  algo="${!_algo}"
+
+  _mesh_vif="${INDEX}_MESH_VIF"
+  wifidev="${!_mesh_vif}"
+
+  _phy="${INDEX}_PHY"
+  phyname="${!_phy}"
+
+  _priority="${INDEX}_PRIORITY"
+  priority="${!_priority}"
+  role=${ROLE}
 
   echo "Used: $wifidev $phyname"
 

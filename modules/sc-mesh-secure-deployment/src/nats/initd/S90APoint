@@ -10,10 +10,13 @@
 #                    automatically
 ### END INIT INFO
 
+RADIO_INDEX=$2
 DAEMON="mesh-11s_nats.sh"
 DIR="/opt/"
-PIDFILE="/var/run/{$DAEMON}_hostapd.pid"
-LOG_FILE=/opt/mesh-11s_AP.log
+_WIFI="${RADIO_INDEX}_MESH_VIF"
+_MODE="${RADIO_INDEX}_MODE"
+PIDFILE="/var/run/${DAEMON}_hostapd_${RADIO_INDEX}_${!_WIFI}.pid"
+LOG_FILE=/opt/mesh-11s_AP_${RADIO_INDEX}_${!_WIFI}.log
 
 source /opt/mesh-helper.sh
 # sources mesh configuration
@@ -23,9 +26,9 @@ source_configuration
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
 
 start() {
-    if [ "$MODE" == "ap+mesh_mcc" ] || [ "$MODE" == "ap+mesh_scc" ]; then
+    if [ "${!_MODE}" == "ap+mesh_mcc" ] || [ "${!_MODE}" == "ap+mesh_scc" ]; then
       printf 'Starting %s: ' "$DAEMON"
-      start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON > $LOG_FILE 2>&1"
+      start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON ${!_MODE} ${RADIO_INDEX} > $LOG_FILE 2>&1"
       status=$?
       if [ "$status" -eq 0 ]; then
         echo "OK"

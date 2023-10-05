@@ -22,10 +22,10 @@ else
   generate_br_lan_ip
 
   echo "starting 11s mesh service"
-  /opt/S9011sNatsMesh start
+  /opt/S9011sNatsMesh start id0
 
   echo "starting AP service"
-  /opt/S90APoint start
+  /opt/S90APoint start id0
 
   echo "wait for bridge to be up..."
   while ! (ifconfig | grep -e "$br_lan_ip") > /dev/null; do
