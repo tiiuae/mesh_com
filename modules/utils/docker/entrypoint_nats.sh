@@ -59,6 +59,7 @@ else
     cp -r $meshcom_path/modules/sc-mesh-secure-deployment/src/1_5/. /opt/.
     chmod +x /opt/S90MS15
   fi
+  cd /opt/
   /opt/S90MS15 start
 
   ############### 1.5 end ###############
