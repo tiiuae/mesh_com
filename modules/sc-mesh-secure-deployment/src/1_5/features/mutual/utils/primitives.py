@@ -35,6 +35,10 @@ TODO:create a function to verify if keys exist and are valid
 
 mid = hashlib.blake2b(util.get_mac_by_interface('wlp1s0').encode(), digest_size=4).hexdigest()
 
+# Dirty global:
+slot = "0"
+
+
 def recover_pin():
     try:
         with open('/opt/output.txt') as file:
@@ -58,14 +62,17 @@ def recover_pin():
 def get_session():
     pkcs11 = PyKCS11Lib()
     pkcs11.load()  # define environment variable PYKCS11LIB=YourPKCS11Lib
-    slot = pkcs11.getSlotList(tokenPresent=True)[0]
-    try:
-        session = pkcs11.openSession(slot, CKF_SERIAL_SESSION | CKF_RW_SESSION)
-        session.login(recover_pin())
-        return session
-    except PyKCS11Error:
-        print('No previous keys')
-        return False
+    slots = pkcs11.getSlotList(tokenPresent=True)
+    for _slot in slots:
+        try:
+            session = pkcs11.openSession(_slot, CKF_SERIAL_SESSION | CKF_RW_SESSION)
+            session.login(recover_pin())
+            global slot
+            slot = str(_slot)
+            return session
+        except PyKCS11Error:
+            print('No previous keys')
+    return False
     # get 1st slot
 
 
@@ -84,7 +91,7 @@ def derive_ecdh_secret(node_name, client_mesh_name):
         pubKey_filename = f'pubKeys/{client_mesh_name}.der'  # when called from cont auth, node_name = '', select public key from pubKeys/client_mesh_name.der Eg. pubKeys/10_10_10_4.der
     else:
         pubKey_filename = f'{node_name}.der'  # when called from mutual, node_name != '', select public key from node_name.der
-    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', recover_pin(), '--label', myID, '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE']
+    command = ['pkcs11-tool', '--slot', slot, '--module', LIB, '-l', '--pin', recover_pin(), '--label', myID, '--derive', '-i', pubKey_filename, '--mechanism', 'ECDH1-DERIVE']
     # Output of ecdh derive is the secret byte + b'Using derive algorithm 0x00001050 ECDH1-DERIVE\n'
     # Extracting the secret byte
     secret_byte = subprocess.check_output(command, shell=False).rstrip(b'Using derive algorithm 0x00001050 ECDH1-DERIVE\n')
@@ -165,7 +172,7 @@ def delete_key(node_name):  # check if it is possible to delete on python (destr
             aux = keys[key].to_dict()
             k.append(aux)
     for _ in k:
-        command = ['pkcs11-tool', '--module', LIB, '--delete-object', label, '--type=pubkey']
+        command = ['pkcs11-tool', '--slot', slot, '--module', LIB, '--delete-object', label, '--type=pubkey']
         subprocess.call(command, shell=False)
 
 
@@ -197,7 +204,7 @@ def import_cert(client_key, node_name):
         except AttributeError:
             with open(filename, 'wb') as writer:
                 writer.write(client_key)
-    command = ['pkcs11-tool', '--module', LIB, '-l', '--pin', recover_pin(), '--write-object', filename, '--type',
+    command = ['pkcs11-tool', '--slot', slot, '--module', LIB, '-l', '--pin', recover_pin(), '--write-object', filename, '--type',
                'pubkey', '--id', ID, '--label', node_name]
     subprocess.call(command, shell=False)
 
