@@ -27,12 +27,17 @@ LOG_FILE=/opt/mesh_11s_${RADIO_INDEX}_${!_WIFI}.log
 
 start() {
     printf 'Starting %s: ' "$DAEMON"
-    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON ${!_MODE} $RADIO_INDEX > $LOG_FILE 2>&1"
-    status=$?
-    if [ "$status" -eq 0 ]; then
-        echo "OK"
+    if [ "${!_MODE}" == "mesh" ] || [ "${!_MODE}" == "halow" ]; then
+      start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON ${!_MODE} $RADIO_INDEX > $LOG_FILE 2>&1"
+      status=$?
+      if [ "$status" -eq 0 ]; then
+          echo "OK"
+      else
+          echo "FAIL"
+      fi
     else
-        echo "FAIL"
+      echo "mesh/halow not starting..."
+      return 0
     fi
     return "$status"
 }
