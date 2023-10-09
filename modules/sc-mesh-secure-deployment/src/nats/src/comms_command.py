@@ -55,6 +55,7 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
         self.api_version = 1
         self.command = ""
         self.param = ""
+        self.radio_index = ""
         self.interval = 1
         self.comms_status = comms_status
 
@@ -83,6 +84,8 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
                 self.param = quote(str(parameters["param"]))
             if "interval" in parameters:
                 self.interval = int(parameters["interval"])
+            if "radio_index" in parameters:
+                self.radio_index = parameters["radio_index"]
             self.logger.debug("Command: %s", self.command)
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
@@ -214,7 +217,8 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
                     ret = subprocess.run(["sleep", delay],
                                             shell=False, check=True,
                                             capture_output=True)
-                ret = subprocess.run([process, "restart"],
+
+                ret = subprocess.run([process, "restart", "id" + self.radio_index],
                                      shell=False, check=True,
                                      capture_output=True)
                 if ret.returncode != 0:

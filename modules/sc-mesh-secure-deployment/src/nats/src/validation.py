@@ -236,3 +236,44 @@ def validate_delay(delay: str) -> bool:
         return True
     except (ValueError, TypeError, AttributeError):
         return False
+
+def validate_radio_index(radio_index: str) -> bool:
+    """
+    Validates a given radio index.
+    Returns True if the radio index is valid, False otherwise.
+    """
+    try:
+        radio_index = int(radio_index)
+        if radio_index < 0 or radio_index > 10:
+            return False
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+def validate_phy(phy: str) -> bool:
+    """
+    Validates a given phy.
+    Returns True if the phy is valid, False otherwise.
+    """
+    if "phy" in phy and int(phy.replace("phy", "")) >= 0:
+        return True
+    return False
+
+def validate_mesh_vif(mesh_vif: str) -> bool:
+    """
+    Validates a given mesh vif.
+    Returns True if the mesh vif is valid, False otherwise.
+    """
+    # todo add more checks
+    if mesh_vif.startswith("wl"):
+        return True
+    return False
+
+def validate_batman_iface(batman_iface: str) -> bool:
+    """
+    Validates a given batman iface.
+    Returns True if the batman iface is valid, False otherwise.
+    """
+    if "bat" in batman_iface and int(batman_iface.replace("bat", "")) >= 0:
+        return True
+    return False
