@@ -50,7 +50,6 @@ generate_br_lan_ip() {
   ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
   br_lan_ip="192.168.1."$((16#$ip_random))
 
-
   cat > /etc/radvd.conf <<- EOF
 interface br-lan {
   AdvSendAdvert on;

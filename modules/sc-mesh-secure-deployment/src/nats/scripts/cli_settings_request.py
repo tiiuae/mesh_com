@@ -48,8 +48,7 @@ async def main():
                 "batman_iface": "bat0",
             },
         ],
-        "bridge": [ { "br-mesh": "bat0 eth0 eth1 lan1",
-                      "br-lan": "lan1 lan2" } ]
+        "bridge": [ { "br-mesh": "bat0 eth0 eth1 lan1" } ]
     }
 
     cmd = json.dumps(cmd_dict)
