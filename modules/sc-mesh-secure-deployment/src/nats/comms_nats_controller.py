@@ -29,8 +29,8 @@ class MeshTelemetry:
         # milliseconds to seconds
         self.interval = float(loop_interval / 1000.0)
         self.logger = logger
-        self.batman_visual = batadvvis.BatAdvVis(self.interval*0.2)
-        self.batman = batstat.Batman(self.interval*0.2)
+        self.batman_visual = batadvvis.BatAdvVis(self.interval * 0.2)
+        self.batman = batstat.Batman(self.interval * 0.2)
         self.visualisation_enabled = False
 
     def mesh_visual(self):
@@ -76,6 +76,7 @@ class CommsController:  # pylint: disable=too-few-public-methods
     """
     Mesh network
     """
+
     def __init__(self, server: str, port: str, interval: int = 1000):
         self.nats_server = server
         self.port = port
@@ -90,7 +91,11 @@ class CommsController:  # pylint: disable=too-few-public-methods
         console_handler.setFormatter(log_formatter)
         self.main_logger.addHandler(console_handler)
 
-        self.comms_status = comms_status.CommsStatus(self.main_logger.getChild("status"))
+        self.comms_status = []
+        #TODO how many radios?
+        self.comms_status.append(comms_status.CommsStatus(self.main_logger.getChild("status 0")))
+        self.comms_status.append(comms_status.CommsStatus(self.main_logger.getChild("status 1")))
+        self.comms_status.append(comms_status.CommsStatus(self.main_logger.getChild("status 2")))
         self.settings = comms_settings.CommsSettings(self.comms_status,
                                                      self.main_logger.getChild("settings"))
         self.command = comms_command.Command(server, port, self.comms_status,
@@ -105,6 +110,7 @@ class CommsCsa:  # pylint: disable=too-few-public-methods
     """
     Comms CSA class to storage settings for CSA for a state change
     """
+
     def __init__(self):
         self.delay = "0"
         self.ack_sent = False
@@ -209,14 +215,30 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
             await handle_settings_csa_post(ret)
         else:
             # Update status info
-            cc.comms_status.refresh_status()
+            # TODO how many radios?
+            cc.comms_status[0].refresh_status()
+            cc.comms_status[1].refresh_status()
+            cc.comms_status[2].refresh_status()
             response = {'status': ret, 'info': info,
-                        'mesh_status': cc.comms_status.mesh_status,
-                        'mesh_cfg_status': cc.comms_status.mesh_cfg_status,
-                        'visualisation_active': cc.comms_status.is_visualisation_active,
-                        'mesh_radio_on': cc.comms_status.is_mesh_radio_on,
-                        'ap_radio_on': cc.comms_status.is_ap_radio_on,
-                        'security_status': cc.comms_status.security_status}
+                        'mesh_status': [cc.comms_status[0].mesh_status,
+                                        cc.comms_status[1].mesh_status,
+                                        cc.comms_status[2].mesh_status],
+                        'mesh_cfg_status': [cc.comms_status[0].mesh_cfg_status,
+                                            cc.comms_status[1].mesh_cfg_status,
+                                            cc.comms_status[2].mesh_cfg_status],
+                        'visualisation_active': [cc.comms_status[0].is_visualisation_active,
+                                                 cc.comms_status[1].is_visualisation_active,
+                                                 cc.comms_status[2].is_visualisation_active],
+                        'mesh_radio_on': [cc.comms_status[0].is_mesh_radio_on,
+                                          cc.comms_status[1].is_mesh_radio_on,
+                                          cc.comms_status[2].is_mesh_radio_on],
+                        'ap_radio_on': [cc.comms_status[0].is_ap_radio_on,
+                                        cc.comms_status[1].is_ap_radio_on,
+                                        cc.comms_status[2].is_ap_radio_on],
+                        'security_status': [cc.comms_status[0].security_status,
+                                            cc.comms_status[1].security_status,
+                                            cc.comms_status[2].security_status]
+                        }
 
             if resp != "":
                 response['data'] = resp

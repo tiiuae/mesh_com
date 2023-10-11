@@ -3,7 +3,6 @@ mesh setting nats node
 """
 import json
 from shlex import quote
-import subprocess
 import logging
 import re
 
@@ -22,7 +21,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
     Comms settings class
     """
 
-    def __init__(self, comms_status: cs.CommsStatus, logger):
+    def __init__(self, comms_status: [cs.CommsStatus, ...], logger):
         self.logger: logging = logger
         self.api_version: int = 1
         self.radio_index = []
@@ -42,7 +41,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.mesh_vif = []
         self.phy = []
         self.batman_iface = []
-        self.bridge = []
+        self.bridge: str = ""
         self.msversion: str = ""
         self.delay:str = ""    # delay for channel change
         self.comms_status = comms_status
@@ -203,76 +202,67 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 self.phy.append(quote(str(parameters["phy"])))
                 self.batman_iface.append(quote(str(parameters["batman_iface"])))
 
-            bridges = parameters_set["bridge"]
-            for bridge in bridges:
-                for key, values in bridge.items():
-                    self.bridge.append(f"{quote(str(key))} {quote(str(values))}")
+            self.bridge = quote(str(parameters_set["bridge"]))
 
             ret, info = "FAIL", "Before validation"
 
             for index in self.radio_index:
                 self.logger.debug("Mesh settings validation index: %s", str(index))
                 ret, info = self.validate_mesh_settings(index)
-                if ret == "FAIL":
-                    break
 
-            self.logger.debug("Mesh settings validation: %s, %s", ret, info)
-            if ret == "FAIL":
-                self.comms_status.mesh_cfg_status = \
-                    comms.STATUS.mesh_cfg_not_stored
-                self.logger.error("save settings failed: %s, %s", ret, info)
-            else:
-                ret, info = self.__save_settings(path, file)
-                self.logger.debug("save settings: %s, %s", ret, info)
+                self.logger.debug("Mesh settings validation id %s: %s, %s", str(index), ret, info)
+                if ret == "FAIL":
+                    self.comms_status[index].mesh_cfg_status = \
+                        comms.STATUS.mesh_cfg_not_stored
+                    self.logger.error("save settings failed: %s, %s", ret, info)
+                else:
+                    ret, info = self.__save_settings(path, file, index)
+                    self.logger.debug("save settings index %s: %s, %s", str(index), ret, info)
 
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
             self.comms_status.mesh_cfg_status = \
                 comms.STATUS.mesh_cfg_not_stored
-            ret, status = "FAIL", self.comms_status.mesh_cfg_status
+            ret, _ = "FAIL", self.comms_status.mesh_cfg_status
             info = "JSON format not correct" + str(error)
             self.logger.error("Mesh settings validation: %s, %s", ret, info)
 
         return ret, info
 
-    def __save_settings(self, path: str, file: str) -> (str, str):
+    def __save_settings(self, path: str, file: str, index: int) -> (str, str):
         """
         Save mesh settings
         """
         try:
-            with open(f"{path}/{file}", "w", encoding="utf-8") as mesh_conf:
+            with open(f"{path}/{str(index)}_{file}", "w", encoding="utf-8") as mesh_conf:
                 # not currently in json mesh_settings
                 mesh_conf.write(f"ROLE={quote(self.role)}\n")
                 mesh_conf.write(f"MSVERSION={quote(self.msversion)}\n")
-                for index in self.radio_index:
-                    mesh_conf.write(f"id{index}_MODE={quote(self.mode[index])}\n")
-                    mesh_conf.write(f"id{index}_IP={quote(self.ip_address[index])}\n")
-                    mesh_conf.write(f"id{index}_MASK={quote(self.subnet[index])}\n")
-                    mesh_conf.write(f"id{index}_MAC={quote(self.ap_mac[index])}\n")
-                    mesh_conf.write(f"id{index}_KEY={quote(self.key[index])}\n")
-                    mesh_conf.write(f"id{index}_ESSID={quote(self.ssid[index])}\n")
-                    mesh_conf.write(f"id{index}_FREQ={quote(self.frequency[index])}\n")
-                    mesh_conf.write(f"id{index}_FREQ_MCC={quote(self.frequency_mcc[index])}\n")
-                    mesh_conf.write(f"id{index}_TXPOWER={quote(self.tx_power[index])}\n")
-                    mesh_conf.write(f"id{index}_COUNTRY={quote(self.country[index]).upper()}\n")
-                    mesh_conf.write(f"id{index}_ROUTING={quote(self.routing[index])}\n")
-                    mesh_conf.write(f"id{index}_PRIORITY={quote(self.priority[index])}\n")
-                    mesh_conf.write(f"id{index}_MESH_VIF={quote(self.mesh_vif[index])}\n")
-                    mesh_conf.write(f"id{index}_PHY={quote(self.phy[index])}\n")
-                    mesh_conf.write(f"id{index}_BATMAN_IFACE={quote(self.batman_iface[index])}\n")
+                mesh_conf.write(f"id{str(index)}_MODE={quote(self.mode[index])}\n")
+                mesh_conf.write(f"id{str(index)}_IP={quote(self.ip_address[index])}\n")
+                mesh_conf.write(f"id{str(index)}_MASK={quote(self.subnet[index])}\n")
+                mesh_conf.write(f"id{str(index)}_MAC={quote(self.ap_mac[index])}\n")
+                mesh_conf.write(f"id{str(index)}_KEY={quote(self.key[index])}\n")
+                mesh_conf.write(f"id{str(index)}_ESSID={quote(self.ssid[index])}\n")
+                mesh_conf.write(f"id{str(index)}_FREQ={quote(self.frequency[index])}\n")
+                mesh_conf.write(f"id{str(index)}_FREQ_MCC={quote(self.frequency_mcc[index])}\n")
+                mesh_conf.write(f"id{str(index)}_TXPOWER={quote(self.tx_power[index])}\n")
+                mesh_conf.write(f"id{str(index)}_COUNTRY={quote(self.country[index]).upper()}\n")
+                mesh_conf.write(f"id{str(index)}_ROUTING={quote(self.routing[index])}\n")
+                mesh_conf.write(f"id{str(index)}_PRIORITY={quote(self.priority[index])}\n")
+                mesh_conf.write(f"id{str(index)}_MESH_VIF={quote(self.mesh_vif[index])}\n")
+                mesh_conf.write(f"id{str(index)}_PHY={quote(self.phy[index])}\n")
+                mesh_conf.write(f"id{str(index)}_BATMAN_IFACE={quote(self.batman_iface[index])}\n")
+                mesh_conf.write(f"BRIDGE=\"{self.bridge}\"\n")
 
-                mesh_conf.write("BRIDGE=")
-                for name in self.bridge:
-                    mesh_conf.write(f"{name},")
-                mesh_conf.write("\n")
         except:
-            self.comms_status.mesh_cfg_status = \
+            self.comms_status[index].mesh_cfg_status = \
                 comms.STATUS.mesh_cfg_not_stored
-            self.logger.error("not able to write new %s", file)
+            self.logger.error("not able to write new %s", f"{str(index)}_{file}")
             return "FAIL", "not able to write new mesh.conf"
 
-        self.comms_status.mesh_cfg_status = comms.STATUS.mesh_cfg_stored
-        self.logger.debug("%s written", file)
+        self.comms_status[index].mesh_cfg_status = comms.STATUS.mesh_cfg_stored
+        self.logger.debug("%s written", f"{str(index)}_{file}")
         return "OK", "Mesh configuration stored"
 
     def __read_configs(self, mesh_conf_lines):

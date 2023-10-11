@@ -23,6 +23,13 @@ else
 
   echo "starting 11s mesh service"
   /opt/S9011sNatsMesh start id0
+  if [ -f "opt/1_mesh.conf" ]; then
+    /opt/S9011sNatsMesh start id1
+  fi
+  if [ -f "opt/2_mesh.conf" ]; then
+    /opt/S9011sNatsMesh start id2
+  fi
+
 
   echo "starting AP service"
   /opt/S90APoint start id0
@@ -50,7 +57,6 @@ else
 
   echo "starting radvd & socat"
   radvd -C /etc/radvd.conf  # TODO: for some reason init.d is not working
-  /opt/S90socat start  # socat is used to provide IPv6 NATS IF
 
   echo "starting comms services"
   /opt/S90comms_controller start

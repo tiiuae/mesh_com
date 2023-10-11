@@ -43,12 +43,12 @@ async def main():
                 "subnet": "255.255.255.0",
                 "tx_power": "5",
                 "mode": "mesh",
-                "mesh_vif": "wlp1s0",
-                "phy": "phy0",
+                "mesh_vif": "wlp1s2",
+                "phy": "phy1",
                 "batman_iface": "bat0",
             },
         ],
-        "bridge": [ { "br-mesh": "bat0 eth0 eth1 lan1" } ]
+        "bridge": "br-lan bat0 lan1"
     }
 
     cmd = json.dumps(cmd_dict)

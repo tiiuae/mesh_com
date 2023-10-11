@@ -48,7 +48,7 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
     Command class
     """
 
-    def __init__(self, server, port, comms_status: CommsStatus, logger):
+    def __init__(self, server, port, comms_status: [CommsStatus, ...], logger):
         self.nats_server = server
         self.port = port
         self.logger = logger
@@ -164,7 +164,7 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
                                + str(ret.stderr)
 
         self.logger.debug("Default mesh command applied")
-        if self.comms_status.is_visualisation_active:
+        if self.comms_status[int(self.radio_index)].is_visualisation_active:
             ret, _, _ = self.__disable_visualisation(cc)
             if ret == "FAIL":
                 return "FAIL", "Revoke failed partially." \
@@ -180,20 +180,20 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
         Returns:
             tuple: (str, str)
         """
-        if self.comms_status.mesh_cfg_status == STATUS.mesh_cfg_stored:
+        if self.comms_status[int(self.radio_index)].mesh_cfg_status == STATUS.mesh_cfg_stored:
             try:
-                os.replace("/opt/mesh_stored.conf", "/opt/mesh.conf")
+                os.replace(f"/opt/{self.radio_index}_mesh_stored.conf", f"/opt/{self.radio_index}_mesh.conf")
             except:
                 self.logger.error("Error replacing active config file!")
                 return "FAIL", "Error replacing active config file"
 
             # Create hash file for active config bookkeeping
             try:
-                with open("/opt/mesh.conf", "rb") as f:
+                with open(f"/opt/{self.radio_index}_mesh.conf", "rb") as f:
                     data = f.read()
                     hash_obj = hashlib.sha256(data)
                     hash_hex = hash_obj.hexdigest()
-                with open("/opt/mesh.conf_hash", "w") as f_hash:
+                with open(f"/opt/{self.radio_index}_mesh.conf_hash", "w") as f_hash:
                     f_hash.write(hash_hex)
             except:
                 self.logger.error("Error writing hash file!")
@@ -235,7 +235,7 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
     def __radio_down(self) -> (str, str):
 
         for process in ["/opt/S9011sNatsMesh", "/opt/S90APoint"]:
-            ret = subprocess.run([process, "stop"],
+            ret = subprocess.run([process, "stop", "id" + self.radio_index],
                                  shell=False, check=True, capture_output=True)
             if ret.returncode != 0:
                 self.logger.error("Failed to deactivate radio")
@@ -250,7 +250,7 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
     def __radio_up(self) -> (str, str):
 
         for process in ["/opt/S9011sNatsMesh", "/opt/S90APoint"]:
-            ret = subprocess.run([process, "start"],
+            ret = subprocess.run([process, "start", "id" + self.radio_index],
                                  shell=False, check=True,
                                  capture_output=True)
             if ret.returncode != 0:
@@ -271,7 +271,7 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
             return "FAIL", "Failed to enable visualisation"
 
         self.logger.debug("Visualisation enabled")
-        self.comms_status.is_visualisation_active = True
+        self.comms_status[int(self.radio_index)].is_visualisation_active = True
         return "OK", "Visualisation enabled"
 
     def __disable_visualisation(self, cc) -> (str, str):
@@ -283,7 +283,7 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
             return "FAIL", "Failed to disable visualisation"
 
         self.logger.debug("Visualisation disabled")
-        self.comms_status.is_visualisation_active = False
+        self.comms_status[int(self.radio_index)].is_visualisation_active = False
         return "OK", "Visualisation disabled"
 
     def __read_log_file(self, filename) -> bytes:
@@ -328,14 +328,14 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
         file_b64 = b'None'
         try:
             files = ConfigFiles()
-            self.comms_status.refresh_status()
+            self.comms_status[int(self.radio_index)].refresh_status()
             if param == files.WPA:
-                if_name = self.comms_status.mesh_interface_name
+                if_name = self.comms_status[int(self.radio_index)].mesh_interface_name
                 if if_name:
                     file_b64 = self.__read_log_file(
                         f"/var/run/wpa_supplicant-11s_{if_name}.conf")
             elif param == files.HOSTAPD:
-                if_name = self.comms_status.ap_interface_name
+                if_name = self.comms_status[int(self.radio_index)].ap_interface_name
                 if if_name:
                     file_b64 = self.__read_log_file(
                         f"/var/run/hostapd-{if_name}.conf")
@@ -355,11 +355,14 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
         identity_dict = {}
         try:
             files = ConfigFiles()
-            self.comms_status.refresh_status()
+            self.comms_status[0].refresh_status()
+            self.comms_status[1].refresh_status()
+            self.comms_status[2].refresh_status()
 
             with open(files.IDENTITY, "rb") as f:
                 identity = f.read()
             identity_dict["identity"] = identity.decode().strip()
+            # todo hardcoded interface name
             identity_dict["nats_url"] = f"nats://{ni.ifaddresses('br-lan')[ni.AF_INET][0]['addr']}:4222"
 
         except:
