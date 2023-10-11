@@ -536,9 +536,6 @@ main () {
   _mesh_vif="${INDEX}_MESH_VIF"
   wifidev="${!_mesh_vif}"
 
-  #_phy="${INDEX}_PHY"
-  #phyname="${!_phy}"
-
   find_phy_interface "$wifidev"
   phyname=$retval_phy
 

@@ -6,17 +6,19 @@ import threading
 import copy
 import hashlib
 import os
+import logging
 from .comms_common import STATUS
 
-
-class CommsStatus: # pylint: disable=too-many-instance-attributes
+class CommsStatus:  # pylint: disable=too-many-instance-attributes
     """
     Maintains mesh and radio statuses
     """
+
     class WpaStatus:
         """
         Maintains wpa_supplicant status
         """
+
         def __init__(self):
             self.interface: str = ""
             self.bssid: str = ""
@@ -58,7 +60,7 @@ class CommsStatus: # pylint: disable=too-many-instance-attributes
                     self.pairwise_cipher == other.pairwise_cipher and \
                     self.group_cipher == other.group_cipher and \
                     self.key_mgmt == other.key_mgmt and \
-                    self.wpa_state == other.wpa_state and\
+                    self.wpa_state == other.wpa_state and \
                     self.address == other.address and \
                     self.uuid == other.uuid
             return False
@@ -67,6 +69,7 @@ class CommsStatus: # pylint: disable=too-many-instance-attributes
         """
         Maintains hostapd status
         """
+
         def __init__(self):
             self.interface: str = ""
             self.state: str = "DISABLED"
@@ -99,8 +102,8 @@ class CommsStatus: # pylint: disable=too-many-instance-attributes
                     self.ssid == other.ssid
             return False
 
-    def __init__(self, logger, index):
-        self.__index = index
+    def __init__(self, logger: logging, index: int):
+        self.__index: int = index
         self.__lock = threading.Lock()
         self.__thread_running: bool = False
         self.__logger = logger
@@ -116,7 +119,14 @@ class CommsStatus: # pylint: disable=too-many-instance-attributes
         self.__is_visualisation_active: bool = False
         self.__is_hash_file: bool = False
         self.__is_ap_radio_on: bool = False
+        self.__settings = None
         # Refresh status
+
+    def settings(self, value):
+        """
+        Set mesh settings
+        """
+        self.__settings = value
         self.__update_status()
 
     @property
@@ -210,7 +220,7 @@ class CommsStatus: # pylint: disable=too-many-instance-attributes
 
         return "OK", "Current status read"
 
-    def __update_status(self): # pylint: disable=too-many-branches
+    def __update_status(self):  # pylint: disable=too-many-branches
         """
         Get mesh configuration status and wpa_supplicant
         status and update internal states accordingly.
@@ -287,14 +297,17 @@ class CommsStatus: # pylint: disable=too-many-instance-attributes
         # Unlock thread
         self.__lock.release()
 
-    @staticmethod
-    def __get_wpa_supplicant_pid() -> str:
+    def __get_wpa_supplicant_pid(self) -> str:
         """
         Get wpa_supplicant process ID.
         """
         # Run commands in pieces
         ps_command = ["ps", "ax"]
-        grep_command = ["grep", "-E", r"wpa_supplicant\-11s"]
+        try:
+            grep_command = ["grep", "-E",
+                            f"[w]pa_supplicant-11s_id{str(self.__index)}_{self.__settings.mesh_vif[self.__index]}.conf"]
+        except IndexError:
+            return ""
         awk_command = ["awk", '{print $1}']
 
         ps_process = subprocess.Popen(ps_command, stdout=subprocess.PIPE)
@@ -313,7 +326,7 @@ class CommsStatus: # pylint: disable=too-many-instance-attributes
         """
         Get wpa_supplicant states via wpa_cli tool.
         """
-        wpa_cli_command = ["wpa_cli", "status"]
+        wpa_cli_command = ["wpa_cli", "-i", f"{self.__settings.mesh_vif[self.__index]}" "status"]
         proc = subprocess.Popen(wpa_cli_command,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = proc.communicate()
@@ -431,9 +444,9 @@ class CommsStatus: # pylint: disable=too-many-instance-attributes
         Checks whether mission config file exists and does it
         match with hash file of previously applied settings.
         """
-        config_file_path = "/opt/mesh.conf"
-        pending_config_file_path = "/opt/mesh_stored.conf"
-        hash_file_path = "/opt/mesh.conf_hash"
+        config_file_path = f"/opt/{str(self.__index)}_mesh.conf"
+        pending_config_file_path = f"/opt/{str(self.__index)}_mesh_stored.conf"
+        hash_file_path = f"/opt/{str(self.__index)}_mesh.conf_hash"
         old_mesh_cfg_status = self.__mesh_cfg_status
         old_is_mission_cfg = self.__is_mission_cfg
         try:

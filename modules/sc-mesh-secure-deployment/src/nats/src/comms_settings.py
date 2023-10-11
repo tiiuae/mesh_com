@@ -5,6 +5,7 @@ import json
 from shlex import quote
 import logging
 import re
+import os
 
 try:
     import comms_common as comms
@@ -48,6 +49,8 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.csa_state: int = 0  # 0: not started, 1: stored, 2: triggered
         self.csa_count: int = 0  # number of CSA triggered
         self.device_amount: str = "0"  # number of devices to trigger CSA from nats message
+        ret, info = self.__load_settings()
+        self.logger.debug("load settings: %s, %s", ret, info)
 
     def validate_mesh_settings(self, index: int) -> (str, str):
         """
@@ -156,7 +159,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                     comms.STATUS.mesh_cfg_not_stored
                 self.logger.error("save settings failed: %s, %s", ret, info)
             else:
-                ret, info = self.__save_settings(path, file)
+                ret, info = self.__save_settings(path, file, index)
                 self.logger.debug("save settings: %s, %s", ret, info)
                 self.csa_state = 1
                 self.csa_count = 0
@@ -179,7 +182,6 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         """
         try:
             parameters_set = json.loads(msg)
-            print(parameters_set)
             self.msversion = "nats"
             self.api_version = int(parameters_set["api_version"])
             self.role = quote(str(parameters_set["role"]))
@@ -253,7 +255,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write(f"id{str(index)}_MESH_VIF={quote(self.mesh_vif[index])}\n")
                 mesh_conf.write(f"id{str(index)}_PHY={quote(self.phy[index])}\n")
                 mesh_conf.write(f"id{str(index)}_BATMAN_IFACE={quote(self.batman_iface[index])}\n")
-                mesh_conf.write(f"BRIDGE=\"{self.bridge}\"\n")
+                mesh_conf.write(f"BRIDGE={self.bridge}\n")
 
         except:
             self.comms_status[index].mesh_cfg_status = \
@@ -265,46 +267,56 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.logger.debug("%s written", f"{str(index)}_{file}")
         return "OK", "Mesh configuration stored"
 
-    def __read_configs(self, mesh_conf_lines):
+    def __read_configs(self, mesh_conf_lines) -> None:
         pattern: str = r'(\w+)=(.*?)(?:\s*#.*)?$'
         # Find all key-value pairs in the text
         matches = re.findall(pattern, mesh_conf_lines, re.MULTILINE)
         for match in matches:
-            print(f"{match[0]}={match[1]}")
-            if match[0] == "MODE":
-                self.mode = match[1]
-            elif match[0] == "IP":
-                self.ip_address = match[1]
-            elif match[0] == "MASK":
-                self.subnet = match[1]
-            elif match[0] == "MAC":
-                self.ap_mac = match[1]
-            elif match[0] == "KEY":
-                self.key = match[1]
-            elif match[0] == "ESSID":
-                self.ssid = match[1]
-            elif match[0] == "FREQ":
-                self.frequency = match[1]
-            elif match[0] == "FREQ_MCC":
-                self.frequency_mcc = match[1]
-            elif match[0] == "TXPOWER":
-                self.tx_power = match[1]
-            elif match[0] == "COUNTRY":
-                self.country = match[1]
-            elif match[0] == "ROUTING":
-                self.routing = match[1]
-            elif match[0] == "ROLE":
-                self.role = match[1]
-            elif match[0] == "PRIORITY":
-                self.priority = match[1]
-            elif match[0] == "MESH_VIF":
-                self.mesh_vif = match[1]
-            elif match[0] == "PHY":
-                self.phy = match[1]
-            elif match[0] == "MSVERSION":
-                self.msversion = match[1]
-            else:
-                self.logger.debug("unknown config parameter: %s", match[0])
+            if "id" in match[0]:
+                index = int(match[0].split("_")[0].replace("id", ""))
+                name_parts = match[0].split("_")[1:]
+                name = "_".join(name_parts)
+                if name == "MODE":
+                    self.mode.append(match[1])
+                elif name == "IP":
+                    self.ip_address.append(match[1])
+                elif name == "MASK":
+                    self.subnet.append(match[1])
+                elif name == "MAC":
+                    self.ap_mac.append(match[1])
+                elif name == "KEY":
+                    self.key.append(match[1])
+                elif name == "ESSID":
+                    self.ssid.append(match[1])
+                elif name == "FREQ":
+                    self.frequency.append(match[1])
+                elif name == "FREQ_MCC":
+                    self.frequency_mcc.append(match[1])
+                elif name == "TXPOWER":
+                    self.tx_power.append(match[1])
+                elif name == "COUNTRY":
+                    self.country.append(match[1])
+                elif name == "ROUTING":
+                    self.routing.append(match[1])
+                elif name == "PRIORITY":
+                    self.priority.append(match[1])
+                elif name == "MESH_VIF":
+                    self.mesh_vif.append(match[1])
+                elif name == "PHY":
+                    self.phy.append(match[1])
+                elif name == "BATMAN_IFACE":
+                    self.batman_iface.append(match[1])
+                else:
+                    self.logger.error("unknown config parameter: %s", name)
+            else:  # global config without index
+                if match[0] == "MSVERSION":
+                    self.msversion = match[1]
+                elif match[0] == "BRIDGE":
+                    self.bridge = match[1]
+                elif match[0] == "ROLE":
+                    self.role = match[1]
+                else:
+                    pass #self.logger.error("unknown config parameter: %s", match[0])
 
     def __load_settings(self) -> (str, str):
         """
@@ -312,18 +324,22 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         return: OK, FAIL
         """
         config_file_path: str = "/opt/mesh_default.conf"
-        mission_config_file_path: str = "/opt/mesh.conf"
 
         try:
-            with open(mission_config_file_path, "r", encoding="utf-8") as mesh_conf:
-                mesh_conf_lines = mesh_conf.read()
-                self.__read_configs(mesh_conf_lines)
-        except FileNotFoundError:
-            try:
-                with open(config_file_path, "r", encoding="utf-8") as mesh_conf:
-                    mesh_conf_lines = mesh_conf.read()
-                    self.__read_configs(mesh_conf_lines)
-            except FileNotFoundError:
-                self.logger.error("not able to read mesh config files")
-                return "FAIL", "not able to read mesh config files"
+            for index in range(0, len(self.comms_status)):
+                file = f"/opt/{str(index)}_mesh.conf"
+                if os.path.exists(file):
+                    self.logger.debug("mesh config file %s found", file)
+                    with open(file, "r", encoding="utf-8") as mesh_conf:
+                        mesh_conf_lines = mesh_conf.read()
+                        self.__read_configs(mesh_conf_lines)
+                else:
+                    self.logger.debug("mesh config file %s not found, loading default", file)
+                    if index == 0:
+                        with open(config_file_path, "r", encoding="utf-8") as mesh_conf:
+                            mesh_conf_lines = mesh_conf.read()
+                            self.__read_configs(mesh_conf_lines)
+        except:
+            self.logger.error("not able to read mesh config files")
+            return "FAIL", "not able to read mesh config files"
         return "OK", "Mesh configuration loaded"

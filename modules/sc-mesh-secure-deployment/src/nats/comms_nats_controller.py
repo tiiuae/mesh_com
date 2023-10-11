@@ -93,11 +93,15 @@ class CommsController:  # pylint: disable=too-few-public-methods
 
         self.comms_status = []
         #TODO how many radios?
-        self.comms_status.append(comms_status.CommsStatus(self.main_logger.getChild("status 0")))
-        self.comms_status.append(comms_status.CommsStatus(self.main_logger.getChild("status 1")))
-        self.comms_status.append(comms_status.CommsStatus(self.main_logger.getChild("status 2")))
+        for i in range(0, 3):
+            self.comms_status.append(comms_status.CommsStatus(self.main_logger.getChild(f"status {str(i)}"), i))
+
         self.settings = comms_settings.CommsSettings(self.comms_status,
                                                      self.main_logger.getChild("settings"))
+
+        for cstat in self.comms_status:
+            cstat.settings(self.settings)
+
         self.command = comms_command.Command(server, port, self.comms_status,
                                              self.main_logger.getChild("command"))
         self.telemetry = MeshTelemetry(self.interval, self.main_logger.getChild("telemetry"))
@@ -215,29 +219,15 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
             await handle_settings_csa_post(ret)
         else:
             # Update status info
-            # TODO how many radios?
-            cc.comms_status[0].refresh_status()
-            cc.comms_status[1].refresh_status()
-            cc.comms_status[2].refresh_status()
+            _ = [item.refresh_status() for item in cc.comms_status]
+
             response = {'status': ret, 'info': info,
-                        'mesh_status': [cc.comms_status[0].mesh_status,
-                                        cc.comms_status[1].mesh_status,
-                                        cc.comms_status[2].mesh_status],
-                        'mesh_cfg_status': [cc.comms_status[0].mesh_cfg_status,
-                                            cc.comms_status[1].mesh_cfg_status,
-                                            cc.comms_status[2].mesh_cfg_status],
-                        'visualisation_active': [cc.comms_status[0].is_visualisation_active,
-                                                 cc.comms_status[1].is_visualisation_active,
-                                                 cc.comms_status[2].is_visualisation_active],
-                        'mesh_radio_on': [cc.comms_status[0].is_mesh_radio_on,
-                                          cc.comms_status[1].is_mesh_radio_on,
-                                          cc.comms_status[2].is_mesh_radio_on],
-                        'ap_radio_on': [cc.comms_status[0].is_ap_radio_on,
-                                        cc.comms_status[1].is_ap_radio_on,
-                                        cc.comms_status[2].is_ap_radio_on],
-                        'security_status': [cc.comms_status[0].security_status,
-                                            cc.comms_status[1].security_status,
-                                            cc.comms_status[2].security_status]
+                        'mesh_status': [item.mesh_status for item in cc.comms_status],
+                        'mesh_cfg_status': [item.mesh_cfg_status for item in cc.comms_status],
+                        'visualisation_active': [item.is_visualisation_active for item in cc.comms_status],
+                        'mesh_radio_on': [item.is_mesh_radio_on for item in cc.comms_status],
+                        'ap_radio_on': [item.is_ap_radio_on for item in cc.comms_status],
+                        'security_status': [item.security_status for item in cc.comms_status]
                         }
 
             if resp != "":
