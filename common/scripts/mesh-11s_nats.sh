@@ -109,6 +109,26 @@ calculate_wifi_channel() {
     fi
 }
 
+find_phy_interface() {
+  # Argument:
+  # $1 = Wi-Fi interface name
+
+  # Return value: retval_phy as global
+
+  echo "Find PHY interface for Wi-Fi interface: $1"
+  echo
+  phy_names=$(ls /sys/class/ieee80211/)
+
+  for phy in $phy_names; do
+    if [ -d "/sys/class/ieee80211/$phy/device/net/$1" ]; then
+      retval_phy=$phy
+      break
+    else
+      retval_phy=""
+    fi
+  done
+}
+
 mode_execute() {
   # parameters:
   # $1 = mode
@@ -440,7 +460,7 @@ main () {
 
   source /opt/mesh-helper.sh
   # sources mesh configuration
-  source_configuration
+  source_configuration "${2:2}"
 
   # Modes: mesh, ap+mesh_scc, ap+mesh_mcc, halow
   # mesh 1.0 with NATS communication setup
@@ -516,8 +536,11 @@ main () {
   _mesh_vif="${INDEX}_MESH_VIF"
   wifidev="${!_mesh_vif}"
 
-  _phy="${INDEX}_PHY"
-  phyname="${!_phy}"
+  #_phy="${INDEX}_PHY"
+  #phyname="${!_phy}"
+
+  find_phy_interface "$wifidev"
+  phyname=$retval_phy
 
   _priority="${INDEX}_PRIORITY"
   priority="${!_priority}"

@@ -18,35 +18,35 @@ class CommsStatus: # pylint: disable=too-many-instance-attributes
         Maintains wpa_supplicant status
         """
         def __init__(self):
-            self.interface = ""
-            self.bssid = ""
-            self.freq = ""
-            self.ssid = ""
-            self.id = ""
-            self.mode = ""
-            self.pairwise_cipher = "UNKNOWN"
-            self.group_cipher = "UNKNOWN"
-            self.key_mgmt = "UNKNOWN"
-            self.wpa_state = "UNKNOWN"
-            self.address = ""
-            self.uuid = ""
+            self.interface: str = ""
+            self.bssid: str = ""
+            self.freq: str = ""
+            self.ssid: str = ""
+            self.id: str = ""
+            self.mode: str = ""
+            self.pairwise_cipher: str = "UNKNOWN"
+            self.group_cipher: str = "UNKNOWN"
+            self.key_mgmt: str = "UNKNOWN"
+            self.wpa_state: str = "UNKNOWN"
+            self.address: str = ""
+            self.uuid: str = ""
 
         def reset(self):
             """
             Reset wpa_supplicant status
             """
-            self.interface = ""
-            self.bssid = ""
-            self.freq = ""
-            self.ssid = ""
-            self.id = ""
-            self.mode = ""
-            self.pairwise_cipher = "UNKNOWN"
-            self.group_cipher = "UNKNOWN"
-            self.key_mgmt = "UNKNOWN"
-            self.wpa_state = "INTERFACE_DISABLED"
-            self.address = ""
-            self.uuid = ""
+            self.interface: str = ""
+            self.bssid: str = ""
+            self.freq: str = ""
+            self.ssid: str = ""
+            self.id: str = ""
+            self.mode: str = ""
+            self.pairwise_cipher: str = "UNKNOWN"
+            self.group_cipher: str = "UNKNOWN"
+            self.key_mgmt: str = "UNKNOWN"
+            self.wpa_state: str = "INTERFACE_DISABLED"
+            self.address: str = ""
+            self.uuid: str = ""
 
         def __eq__(self, other):
             if isinstance(other, CommsStatus.WpaStatus):
@@ -68,25 +68,25 @@ class CommsStatus: # pylint: disable=too-many-instance-attributes
         Maintains hostapd status
         """
         def __init__(self):
-            self.interface = ""
-            self.state = "DISABLED"
-            self.phy = ""
-            self.freq = ""
-            self.channel = ""
-            self.beacon_int = ""
-            self.ssid = ""
+            self.interface: str = ""
+            self.state: str = "DISABLED"
+            self.phy: str = ""
+            self.freq: str = ""
+            self.channel: str = ""
+            self.beacon_int: str = ""
+            self.ssid: str = ""
 
         def reset(self):
             """
             Reset hostapd status
             """
-            self.interface = ""
-            self.state = "DISABLED"
-            self.phy = ""
-            self.freq = ""
-            self.channel = ""
-            self.beacon_int = ""
-            self.ssid = ""
+            self.interface: str = ""
+            self.state: str = "DISABLED"
+            self.phy: str = ""
+            self.freq: str = ""
+            self.channel: str = ""
+            self.beacon_int: str = ""
+            self.ssid: str = ""
 
         def __eq__(self, other):
             if isinstance(other, CommsStatus.HostapdStatus):
@@ -99,48 +99,49 @@ class CommsStatus: # pylint: disable=too-many-instance-attributes
                     self.ssid == other.ssid
             return False
 
-    def __init__(self, logger):
+    def __init__(self, logger, index):
+        self.__index = index
         self.__lock = threading.Lock()
-        self.__thread_running = False
+        self.__thread_running: bool = False
         self.__logger = logger
         self.__wpa_status = self.WpaStatus()
         self.__old_wpa_status = copy.copy(self.__wpa_status)
         self.__hostapd_status = self.HostapdStatus()
         self.__old_hostapd_status = copy.copy(self.__hostapd_status)
-        self.__mesh_status = STATUS.no_status
-        self.__mesh_cfg_status = STATUS.mesh_default
-        self.__security_status = STATUS.security_non_provisioned
-        self.__is_mission_cfg = False  # True when mission cfg has been applied
-        self.__is_mesh_radio_on = True  # True since mesh is started via initd
-        self.__is_visualisation_active = False
-        self.__is_hash_file = False
-        self.__is_ap_radio_on = False
+        self.__mesh_status: str = STATUS.no_status
+        self.__mesh_cfg_status: str = STATUS.mesh_default
+        self.__security_status: str = STATUS.security_non_provisioned
+        self.__is_mission_cfg: bool = False  # True when mission cfg has been applied
+        self.__is_mesh_radio_on: bool = True  # True since mesh is started via initd
+        self.__is_visualisation_active: bool = False
+        self.__is_hash_file: bool = False
+        self.__is_ap_radio_on: bool = False
         # Refresh status
         self.__update_status()
 
     @property
-    def security_status(self):
+    def security_status(self) -> str:
         """
         Get security status
         """
         return self.__security_status
 
     @property
-    def mesh_status(self):
+    def mesh_status(self) -> str:
         """
         Get mesh status
         """
         return self.__mesh_status
 
     @property
-    def mesh_cfg_status(self):
+    def mesh_cfg_status(self) -> str:
         """
         Get mesh configuration status
         """
         return self.__mesh_cfg_status
 
     @mesh_cfg_status.setter
-    def mesh_cfg_status(self, status: STATUS):
+    def mesh_cfg_status(self, status: str):
         """
         Set mesh configuration status
         """
