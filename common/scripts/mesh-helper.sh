@@ -45,7 +45,7 @@ EOF
 
 generate_br_lan_ip() {
   local mesh_if_mac
-  mesh_if_mac="$(ip -brief link | grep "$MESH_VIF" | awk '{print $3; exit}')"
+  mesh_if_mac="$(ip -brief link | grep "$id0_MESH_VIF" | awk '{print $3; exit}')"
   local ip_random
   ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
   br_lan_ip="192.168.1."$((16#$ip_random))

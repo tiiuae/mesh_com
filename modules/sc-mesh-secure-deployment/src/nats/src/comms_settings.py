@@ -49,8 +49,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.csa_state: int = 0  # 0: not started, 1: stored, 2: triggered
         self.csa_count: int = 0  # number of CSA triggered
         self.device_amount: str = "0"  # number of devices to trigger CSA from nats message
-        ret, info = self.__load_settings()
-        self.logger.debug("load settings: %s, %s", ret, info)
+        # TODO: check can we do this
+        # ret, info = self.__load_settings()
+        # self.logger.debug("load settings: %s, %s", ret, info)
 
     def validate_mesh_settings(self, index: int) -> (str, str):
         """
