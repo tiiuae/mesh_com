@@ -31,7 +31,7 @@ async def main():
             },
             {
                 "radio_index": "1",
-                "ssid": "test_mesh",
+                "ssid": "test_mesh2",
                 "key": "1234567890",
                 "ap_mac": "00:11:22:33:44:55",
                 "country": "FI",
@@ -44,11 +44,11 @@ async def main():
                 "tx_power": "5",
                 "mode": "mesh",
                 "mesh_vif": "wlp1s2",
-                "phy": "phy1",
+                "phy": "phy2",
                 "batman_iface": "bat0",
             },
         ],
-        "bridge": "br-lan bat0 lan1"
+        "bridge": "br-lan bat0 eth1 lan1"
     }
 
     cmd = json.dumps(cmd_dict)
@@ -56,7 +56,7 @@ async def main():
         f"comms.settings.{config.MODULE_IDENTITY}", cmd.encode(), timeout=2
     )
     parameters = json.loads(rep.data)
-    print(parameters)
+    print(json.dumps(parameters, indent=2))
 
     await nc.close()
     exit(0)

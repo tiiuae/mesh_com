@@ -229,7 +229,7 @@ EOF
   "mesh")
 
       cat <<EOF >/var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf
-ctrl_interface=DIR=/var/run/wpa_supplicant
+ctrl_interface=DIR=/var/run/wpa_supplicant_$INDEX
 # use 'ap_scan=2' on all devices connected to the network
 # this is unnecessary if you only want the network to be created when no other networks..
 ap_scan=1
@@ -321,7 +321,7 @@ EOF
       iptables -A FORWARD --in-interface "$batman_iface" -j ACCEPT
       iptables --table nat -A POSTROUTING --out-interface "$br_lan_ip" -j MASQUERADE
 
-      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
+      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
       ;;
   "ap+mesh_mcc")
       wait_for_intf "$bridge_name"

@@ -91,33 +91,24 @@ class CommsController:  # pylint: disable=too-few-public-methods
         console_handler.setFormatter(log_formatter)
         self.main_logger.addHandler(console_handler)
 
-        self.comms_status = []
+        self.c_status = []
         #TODO how many radios?
         for i in range(0, 3):
-            self.comms_status.append(comms_status.CommsStatus(self.main_logger.getChild(f"status {str(i)}"), i))
+            self.c_status.append(comms_status.CommsStatus(self.main_logger.getChild(f"status {str(i)}"), i))
 
-        self.settings = comms_settings.CommsSettings(self.comms_status,
+        self.settings = comms_settings.CommsSettings(self.c_status,
                                                      self.main_logger.getChild("settings"))
 
-        for cstat in self.comms_status:
-            cstat.settings(self.settings)
+        for cstat in self.c_status:
+            if cstat.index < len(self.settings.mesh_vif):
+                cstat.wifi_interface = self.settings.mesh_vif[cstat.index]
 
-        self.command = comms_command.Command(server, port, self.comms_status,
+        self.command = comms_command.Command(server, port, self.c_status,
                                              self.main_logger.getChild("command"))
         self.telemetry = MeshTelemetry(self.interval, self.main_logger.getChild("telemetry"))
 
         # logger for this module and derived from main logger
         self.logger = self.main_logger.getChild("controller")
-
-
-class CommsCsa:  # pylint: disable=too-few-public-methods
-    """
-    Comms CSA class to storage settings for CSA for a state change
-    """
-
-    def __init__(self):
-        self.delay = "0"
-        self.ack_sent = False
 
 
 # pylint: disable=too-many-arguments, too-many-locals, too-many-statements
@@ -127,7 +118,6 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
     """
     cc = CommsController(server, port, interval)
     nats_client = NATS()
-    csac = CommsCsa()
 
     status, _, identity_dict = cc.command.get_identity()
 
@@ -178,23 +168,6 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
                                   disconnected_cb=disconnected_cb,
                                   max_reconnect_attempts=-1)
 
-    async def handle_settings_csa_post(ret):
-        if ret == "OK":
-            ret = "ACK"
-        elif ret == "TRIGGER":
-            cmd = json.dumps({"api_version": 1, "cmd": "APPLY"})
-            cc.command.handle_command(cmd, cc, True, csac.delay)
-        elif ret == "COUNT":
-            ret = "COUNT"  # not to send ACK/NACK
-        else:
-            ret = "NACK"
-
-        if ret in ("ACK", "NACK") and csac.ack_sent is False:
-            response = {'status': ret}
-            cc.logger.debug("publish response: %s", str(response))
-            await nats_client.publish("comms.settings_csa",
-                                      json.dumps(response).encode("utf-8"))
-            csac.ack_sent = True
 
     async def message_handler(message):
         # reply = message.reply
@@ -205,39 +178,30 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
 
         if subject == f"comms.settings.{identity}":
             ret, info = cc.settings.handle_mesh_settings(data)
-        elif subject == "comms.settings_csa":
-            ret, info, delay = cc.settings.handle_mesh_settings_csa(data)
-            csac.delay = delay
-            csac.ack_sent = "status" in data
-
-        elif subject == f"comms.command.{identity}" or subject == "comms.identity":
+        elif subject in (f"comms.command.{identity}", "comms.identity"):
             ret, info, resp = cc.command.handle_command(data, cc)
         elif subject == f"comms.status.{identity}":
             ret, info = "OK", "Returning current status"
 
-        if subject == "comms.settings_csa":
-            await handle_settings_csa_post(ret)
-        else:
-            # Update status info
-            _ = [item.refresh_status() for item in cc.comms_status]
+        # Update status info
+        _ = [item.refresh_status() for item in cc.c_status]
 
-            response = {'status': ret, 'info': info,
-                        'mesh_status': [item.mesh_status for item in cc.comms_status],
-                        'mesh_cfg_status': [item.mesh_cfg_status for item in cc.comms_status],
-                        'visualisation_active': [item.is_visualisation_active for item in cc.comms_status],
-                        'mesh_radio_on': [item.is_mesh_radio_on for item in cc.comms_status],
-                        'ap_radio_on': [item.is_ap_radio_on for item in cc.comms_status],
-                        'security_status': [item.security_status for item in cc.comms_status]
-                        }
+        response = {'status': ret, 'info': info,
+                    'mesh_status': [item.mesh_status for item in cc.c_status],
+                    'mesh_cfg_status': [item.mesh_cfg_status for item in cc.c_status],
+                    'visualisation_active': [item.is_visualisation_active for item in cc.c_status],
+                    'mesh_radio_on': [item.is_mesh_radio_on for item in cc.c_status],
+                    'ap_radio_on': [item.is_ap_radio_on for item in cc.c_status],
+                    'security_status': [item.security_status for item in cc.c_status]
+                    }
 
-            if resp != "":
-                response['data'] = resp
+        if resp != "":
+            response['data'] = resp
 
-            cc.logger.debug("Sending response: %s", str(response)[:1000])
-            await message.respond(json.dumps(response).encode("utf-8"))
+        cc.logger.debug("Sending response: %s", str(response)[:1000])
+        await message.respond(json.dumps(response).encode("utf-8"))
 
     await nats_client.subscribe(f"comms.settings.{identity}", cb=message_handler)
-    await nats_client.subscribe("comms.settings_csa", cb=message_handler)
     await nats_client.subscribe(f"comms.command.{identity}", cb=message_handler)
     await nats_client.subscribe("comms.identity", cb=message_handler)
     await nats_client.subscribe(f"comms.status.{identity}", cb=message_handler)

@@ -103,7 +103,8 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
             return False
 
     def __init__(self, logger: logging, index: int):
-        self.__index: int = index
+        self.index: int = index
+        self.wifi_interface: str = ""
         self.__lock = threading.Lock()
         self.__thread_running: bool = False
         self.__logger = logger
@@ -119,14 +120,7 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
         self.__is_visualisation_active: bool = False
         self.__is_hash_file: bool = False
         self.__is_ap_radio_on: bool = False
-        self.__settings = None
         # Refresh status
-
-    def settings(self, value):
-        """
-        Set mesh settings
-        """
-        self.__settings = value
         self.__update_status()
 
     @property
@@ -305,7 +299,7 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
         ps_command = ["ps", "ax"]
         try:
             grep_command = ["grep", "-E",
-                            f"[w]pa_supplicant-11s_id{str(self.__index)}_{self.__settings.mesh_vif[self.__index]}.conf"]
+                            f"[w]pa_supplicant-11s_id{str(self.index)}_{self.wifi_interface}.conf"]
         except IndexError:
             return ""
         awk_command = ["awk", '{print $1}']
@@ -326,7 +320,7 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
         """
         Get wpa_supplicant states via wpa_cli tool.
         """
-        wpa_cli_command = ["wpa_cli", "-i", f"{self.__settings.mesh_vif[self.__index]}" "status"]
+        wpa_cli_command = ["wpa_cli", "-p", f"/var/run/wpa_supplicant_id{str(self.index)}/", "status"]
         proc = subprocess.Popen(wpa_cli_command,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = proc.communicate()
@@ -444,9 +438,9 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
         Checks whether mission config file exists and does it
         match with hash file of previously applied settings.
         """
-        config_file_path = f"/opt/{str(self.__index)}_mesh.conf"
-        pending_config_file_path = f"/opt/{str(self.__index)}_mesh_stored.conf"
-        hash_file_path = f"/opt/{str(self.__index)}_mesh.conf_hash"
+        config_file_path = f"/opt/{str(self.index)}_mesh.conf"
+        pending_config_file_path = f"/opt/{str(self.index)}_mesh_stored.conf"
+        hash_file_path = f"/opt/{str(self.index)}_mesh.conf_hash"
         old_mesh_cfg_status = self.__mesh_cfg_status
         old_is_mission_cfg = self.__is_mission_cfg
         try:

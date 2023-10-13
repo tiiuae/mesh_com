@@ -22,11 +22,12 @@ else
   generate_br_lan_ip
 
   echo "starting 11s mesh service"
+  # todo for loop range 0..3
   /opt/S9011sNatsMesh start id0
-  if [ -f "opt/1_mesh.conf" ]; then
+  if [ -f "/opt/1_mesh.conf" ]; then
     /opt/S9011sNatsMesh start id1
   fi
-  if [ -f "opt/2_mesh.conf" ]; then
+  if [ -f "/opt/2_mesh.conf" ]; then
     /opt/S9011sNatsMesh start id2
   fi
 

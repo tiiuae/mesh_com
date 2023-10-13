@@ -46,12 +46,10 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.msversion: str = ""
         self.delay:str = ""    # delay for channel change
         self.comms_status = comms_status
-        self.csa_state: int = 0  # 0: not started, 1: stored, 2: triggered
-        self.csa_count: int = 0  # number of CSA triggered
-        self.device_amount: str = "0"  # number of devices to trigger CSA from nats message
         # TODO: check can we do this
-        # ret, info = self.__load_settings()
-        # self.logger.debug("load settings: %s, %s", ret, info)
+        self.default_mesh = True
+        ret, info = self.__load_settings()
+        self.logger.debug("load settings: %s, %s", ret, info)
 
     def validate_mesh_settings(self, index: int) -> (str, str):
         """
@@ -123,59 +121,6 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
 
         return "OK", "Mesh settings OK"
 
-    def handle_mesh_settings_csa(self, msg: str, path="/opt",
-                             file="mesh_stored.conf") -> (str, str, str):
-        """
-        Handle mesh settings
-        """
-        # TODO: check implementation
-        try:
-            parameters = json.loads(msg)
-            if "status" in parameters and self.csa_state == 1:
-                self.csa_count = self.csa_count + 1
-                if self.csa_count >= int(self.device_amount):
-                    self.csa_state = 2
-                    self.logger.debug(f"Trigger channel switch to {self.frequency}")
-                    return "TRIGGER", "Channel switch triggered", self.delay
-                return "COUNT", "Channel switch count", self.delay
-
-            self.csa_state = 0
-            ret, info = self.__load_settings()
-            self.logger.debug("load settings: %s, %s", ret, info)
-
-            #self.api_version = int(parameters["api_version"])
-            self.frequency, self.delay, self.device_amount= map(quote,
-                                                                (str(parameters["frequency"]),
-                                                                 str(parameters["delay"]),
-                                                                 str(parameters["amount"])))
-
-            if validation.validate_delay(self.delay) and validation.validate_frequency(int(self.frequency)):
-                ret, info  = "OK", "CSA settings OK"
-            else:
-                ret, info = "FAIL", "Invalid delay or frequency"
-
-            self.logger.debug(" settings validation: %s, %s", ret, info)
-            if ret == "FAIL":
-                self.comms_status.mesh_cfg_status = \
-                    comms.STATUS.mesh_cfg_not_stored
-                self.logger.error("save settings failed: %s, %s", ret, info)
-            else:
-                ret, info = self.__save_settings(path, file, index)
-                self.logger.debug("save settings: %s, %s", ret, info)
-                self.csa_state = 1
-                self.csa_count = 0
-
-                return ret, info, self.delay
-
-        except (json.decoder.JSONDecodeError, KeyError,
-                TypeError, AttributeError) as error:
-            self.comms_status.mesh_cfg_status = \
-                comms.STATUS.mesh_cfg_not_stored
-            ret, info = "FAIL", "JSON format not correct" + str(error)
-            self.logger.error("csa settings validation: %s, %s", ret, info)
-
-        return ret, info, self.delay
-
     def handle_mesh_settings(self, msg: str, path="/opt",
                              file="mesh_stored.conf") -> (str, str):
         """
@@ -183,9 +128,28 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         """
         try:
             parameters_set = json.loads(msg)
+
             self.msversion = "nats"
             self.api_version = int(parameters_set["api_version"])
             self.role = quote(str(parameters_set["role"]))
+
+            if self.default_mesh:
+                self.radio_index = []
+                self.ssid = []
+                self.key = []
+                self.ap_mac = []
+                self.country = []
+                self.frequency = []
+                self.frequency_mcc = []
+                self.ip_address = []
+                self.subnet = []
+                self.tx_power = []
+                self.mode = []
+                self.routing = []
+                self.priority = []
+                self.mesh_vif = []
+                self.phy = []
+                self.batman_iface = []
 
             for parameters in parameters_set["radios"]:
                 self.radio_index.append(int(parameters["radio_index"]))
@@ -207,8 +171,6 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
 
             self.bridge = quote(str(parameters_set["bridge"]))
 
-            ret, info = "FAIL", "Before validation"
-
             for index in self.radio_index:
                 self.logger.debug("Mesh settings validation index: %s", str(index))
                 ret, info = self.validate_mesh_settings(index)
@@ -221,6 +183,8 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 else:
                     ret, info = self.__save_settings(path, file, index)
                     self.logger.debug("save settings index %s: %s, %s", str(index), ret, info)
+
+            self.default_mesh = False
 
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
@@ -330,16 +294,20 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             for index in range(0, len(self.comms_status)):
                 file = f"/opt/{str(index)}_mesh.conf"
                 if os.path.exists(file):
+                    self.default_mesh = False
                     self.logger.debug("mesh config file %s found", file)
                     with open(file, "r", encoding="utf-8") as mesh_conf:
                         mesh_conf_lines = mesh_conf.read()
                         self.__read_configs(mesh_conf_lines)
                 else:
-                    self.logger.debug("mesh config file %s not found, loading default", file)
                     if index == 0:
+                        self.default_mesh = True
+                        self.logger.debug("mesh config file %s not found, loading default", file)
                         with open(config_file_path, "r", encoding="utf-8") as mesh_conf:
                             mesh_conf_lines = mesh_conf.read()
                             self.__read_configs(mesh_conf_lines)
+                    else:
+                        self.logger.debug("index not supported for default: %s", index)
         except:
             self.logger.error("not able to read mesh config files")
             return "FAIL", "not able to read mesh config files"
