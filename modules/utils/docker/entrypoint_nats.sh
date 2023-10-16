@@ -3,7 +3,7 @@
 source /opt/mesh-helper.sh
 
 # sources mesh configuration and sets start_opts
-source_configuration "id0"
+source_configuration "0"
 
 if [ "$MSVERSION" != "nats" ]; then
   if [ -f "/usr/local/bin/entrypoint.sh" ]; then

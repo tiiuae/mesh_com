@@ -170,7 +170,7 @@ def validate_mode(mode: str) -> bool:
     Validates a given wifi mode.
     Returns True if the mode is valid, False otherwise.
     """
-    if mode in ("mesh", "ap+mesh_scc", "ap+mesh_mcc"):
+    if mode in ("mesh", "ap+mesh_scc", "ap+mesh_mcc", "halow"):
         return True
     return False
 
@@ -265,7 +265,7 @@ def validate_mesh_vif(mesh_vif: str) -> bool:
     Returns True if the mesh vif is valid, False otherwise.
     """
     # todo add more checks
-    if mesh_vif.startswith("wl"):
+    if mesh_vif.startswith("wl") or mesh_vif.startswith("halow"):
         return True
     return False
 

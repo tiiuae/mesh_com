@@ -133,27 +133,22 @@ mode_execute() {
   # parameters:
   # $1 = mode
   case "$mode" in
-    "halow")  # TODO: implement, currently copy of "mesh"
+    "halow")
       cat <<EOF >/var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf
-ctrl_interface=DIR=/var/run/wpa_supplicant
-# use 'ap_scan=2' on all devices connected to the network
-# this is unnecessary if you only want the network to be created when no other networks..
+ctrl_interface=DIR=/var/run/wpa_supplicant_"$INDEX"
 ap_scan=1
 country=$cc
-p2p_disabled=1
 mesh_max_inactivity=50
+p2p_disabled=1
 network={
-    ssid="$ssid"
-    bssid=$mac
-    mode=5
-    frequency=$freq
-    psk="$psk"
-    key_mgmt=SAE
-    ieee80211w=2
-    beacon_int=1000
-    mesh_fwding=0
-    # 11b rates dropped (for better performance)
-    mesh_basic_rates=60 90 120 180 240 360 480 540
+        ssid="$ssid"
+        bssid=$mac
+        mode=5
+        ieee80211w=2
+        frequency=$freq
+        key_mgmt=SAE
+        psk="$psk"
+        mesh_fwding=0
 }
 EOF
 
@@ -168,22 +163,34 @@ EOF
 
       echo "$wifidev down.."
       iw dev "$wifidev" del
-      iw phy "$phyname" interface add "$wifidev" type mp
 
-      echo "Longer range tweak.."
-      if [ "$priority" == "long_range" ]; then
-        iw phy "$phyname" set distance 8000
-      elif [ "$priority" == "low_latency" ]; then
-        iw phy "$phyname" set distance 0
-      else
-        iw phy "$phyname" set distance 1000
+      modprobe mac80211
+
+      # Radio spi bus number
+      BUSNO=$(for i in /sys/class/spi_master/*/; do
+      if [ -e "$i/device" ] && [ "$(basename "$(readlink "$i/device")")" == "spi-ft232h.0" ]; then
+        echo "${i//[^0-9]/}"
+      fi
+      done)
+
+      iw reg set "$cc"
+      insmod /lib/modules/"$KERNEL_VERSION"/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat spi_bus_num="$BUSNO" spi_polling_interval=3 hifspeed=20000000 spi_gpio_irq=-1 power_save=0 sw_enc=1
+
+      # Bring up halow interface
+      echo "$wifidev up.."
+      ifconfig "$wifidev" up
+
+      # Check the return code of halow bring up
+      if [ $? -eq 255 ]; then
+        # If return code is 255, reload the nrc.ko module
+        rmmod nrc.ko
+        insmod /lib/modules/"$KERNEL_VERSION"/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat spi_bus_num="$BUSNO" spi_polling_interval=3 hifspeed=20000000 spi_gpio_irq=-1 power_save=0 sw_enc=1
       fi
 
       echo "$wifidev create 11s.."
-      ifconfig "$wifidev" mtu 1560
+      ifconfig "$wifidev" mtu 1460
 
-      echo "$wifidev up.."
-      ip link set "$wifidev" up
+      sleep 1
 
       if [ "$routing_algo" == "batman-adv" ]; then
         batctl if add "$wifidev"
@@ -196,21 +203,21 @@ EOF
         echo
         ifconfig "$batman_iface"
 
-        sleep 3
-
         # for visualisation
         (alfred -i "$batman_iface" -m)&
         echo "started alfred"
-        (batadv-vis -i "$batman_iface" -s)&
-        echo "started batadv-vis"
+
+        if ps aux | grep -q "[b]atadv-vis -i $batman_iface -s"; then
+          echo "batadv-vis is already running."
+        else
+          (batadv-vis -i "$batman_iface" -s) &
+          echo "batadv-vis started."
+        fi
       elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
         # Enable debug level as necessary
         (olsrd -i "$wifidev" -d 0)&
       fi
-
-      # Radio parameters
-      iw dev "$wifidev" set txpower limit "$txpwr"00
 
       add_network_intf_to_bridge "$bridge_name" "$bridge_interfaces"
       ifconfig "$bridge_name" "$br_lan_ip" netmask "$nmask"
@@ -224,7 +231,22 @@ EOF
       iptables -A FORWARD --in-interface "$_mesh_vif" -j ACCEPT
       iptables --table nat -A POSTROUTING --out-interface "$br_lan_ip" -j MASQUERADE
 
-      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf -D nl80211 -C /var/run/wpa_supplicant/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
+      sleep 5
+
+      # Radio parameters
+      echo "set radio parameters"
+      # /usr/local/bin/cli_app set txpwr fixed 23
+
+      echo "Longer range tweak.."
+      #if [ "$priority" == "long_range" ]; then
+        # /usr/local/bin/cli_app ...
+      #elif [ "$priority" == "low_latency" ]; then
+        # /usr/local/bin/cli_app ...
+      #else
+        # /usr/local/bin/cli_app ...
+      #fi
+
+      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
       ;;
   "mesh")
 
@@ -298,8 +320,13 @@ EOF
         # for visualisation
         (alfred -i "$batman_iface" -m)&
         echo "started alfred"
-        (batadv-vis -i "$batman_iface" -s)&
-        echo "started batadv-vis"
+        if ps aux | grep -q "[b]atadv-vis -i $batman_iface -s"; then
+          echo "batadv-vis is already running."
+        else
+          (batadv-vis -i "$batman_iface" -s) &
+          echo "batadv-vis started."
+        fi
+
       elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
         # Enable debug level as necessary
@@ -456,11 +483,18 @@ EOF
 ### MAIN ######################################################################
 main () {
   # $1 = mode
-  # $2 = index
+  # $2 = index number
 
   source /opt/mesh-helper.sh
+
+  echo "index=$2 mode=$1"
+  INDEX=$2
+
   # sources mesh configuration
-  source_configuration "${2:2}"
+  source_configuration "${INDEX:2}"
+
+  # linux kernel release
+  KERNEL_VERSION=$(uname -r)
 
   # Modes: mesh, ap+mesh_scc, ap+mesh_mcc, halow
   # mesh 1.0 with NATS communication setup
@@ -490,9 +524,6 @@ main () {
   find_ethernet_port
   # to get eth_port warning free
   eth_port=$eth_port
-
-  echo "index=$2 mode=$1"
-  INDEX=$2
 
   # default mesh handling and power off radio
   if [ "$1" == "mesh" ]; then
@@ -561,7 +592,14 @@ main () {
   # e.g. BRIDGE=br-mesh eth0 eth1 lan1
   bridge_name=$(echo "$BRIDGE" | cut -d' ' -f1)
   bridge_interfaces=$(echo "$BRIDGE" | cut -d' ' -f2-)
-  brctl addbr "$bridge_name" 2>/dev/null
+
+  if brctl show "$bridge_name" &>/dev/null; then
+    echo "Bridge $bridge_name already exists."
+  else
+    # Create the bridge if it doesn't exist
+    brctl addbr "$bridge_name" 2>/dev/null
+    echo "Bridge $bridge_name created."
+  fi
 
   calculate_network_address "$br_lan_ip" "$nmask"
 
