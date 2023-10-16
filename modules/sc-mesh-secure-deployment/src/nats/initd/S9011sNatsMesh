@@ -45,10 +45,10 @@ start() {
 }
 stop() {
     printf 'Stopping %s: ' "$DAEMON"
-    NEW_PID=$(ps ax | grep -E 'wpa_supplicant\-11s' | awk {'print $1'})
-    kill -9 $NEW_PID
-    rm -fr /var/run/wpa_supplicant/* 2>/dev/null
-    ifconfig "$MESH_VIF" down 2>/dev/null
+    kill -9 "$(cat "$PIDFILE")"
+    kill -9 "$(ps ax | grep -E "wpa_supplicant\-11s_$RADIO_INDEX" | awk {'print $1'})"
+    rm -fr /var/run/wpa_supplicant_"${RADIO_INDEX}" 2>/dev/null
+    ifconfig "${!_WIFI}" down 2>/dev/null
     start-stop-daemon -K -o -q -p "$PIDFILE"
     status=$?
     if [ "$status" -eq 0 ]; then
