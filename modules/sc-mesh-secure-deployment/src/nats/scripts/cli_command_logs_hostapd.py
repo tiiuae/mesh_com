@@ -9,7 +9,7 @@ async def main():
     # Connect to NATS!
     nc = await client.connect_nats()
 
-    cmd_dict = {"api_version": 1, "cmd": "LOGS", "param": "HOSTAPD"}
+    cmd_dict = {"api_version": 1, "cmd": "LOGS", "param": "HOSTAPD", "radio_index": "0"}
     cmd = json.dumps(cmd_dict)
     rep = await nc.request(f"comms.command.{config.MODULE_IDENTITY}",
                            cmd.encode(),

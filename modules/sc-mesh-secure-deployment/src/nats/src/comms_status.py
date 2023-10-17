@@ -301,6 +301,7 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
             grep_command = ["grep", "-E",
                             f"[w]pa_supplicant-11s_id{str(self.index)}_{self.wifi_interface}.conf"]
         except IndexError:
+            self.__logger.error("IndexError: wifi_interface=%s index=%s", self.wifi_interface, str(self.index))
             return ""
         awk_command = ["awk", '{print $1}']
 
@@ -313,7 +314,9 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
         # Wait for completion and store the output
         output, error = awk_process.communicate()
         if error:
-            raise RuntimeError("Error getting wpa_supplicant PID: {}".format(error))
+            raise RuntimeError(f"Error getting wpa_supplicant PID: {error}")
+
+        self.__logger.debug("wpa_supplicant PID: %s", output.decode().strip())
         return output.decode()
 
     def __get_wpa_cli_status(self):

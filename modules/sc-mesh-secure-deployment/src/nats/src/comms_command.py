@@ -25,8 +25,8 @@ class LogFiles:  # pylint: disable=too-few-public-methods
 
     # Log files
     CONTROLLER_LOG = "/opt/comms_controller.log"
-    WPA_LOG = "/var/log/wpa_supplicant_11s.log"
-    HOSTAPD_LOG = "/var/log/hostapd.log"
+    WPA_LOG = "/var/log/wpa_supplicant_11s" # e.g. _id0.log
+    HOSTAPD_LOG = "/var/log/hostapd"        # e.g. _id0.log
     DMESG_CMD = "dmesg"
 
 
@@ -292,9 +292,9 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
         try:
             files = LogFiles()
             if param == files.WPA:
-                file_b64 = self.__read_log_file(files.WPA_LOG)
+                file_b64 = self.__read_log_file(files.WPA_LOG + "_id" + self.radio_index + ".log")
             elif param == files.HOSTAPD:
-                file_b64 = self.__read_log_file(files.HOSTAPD_LOG)
+                file_b64 = self.__read_log_file(files.HOSTAPD_LOG + "_id" + self.radio_index + ".log")
             elif param == files.CONTROLLER:
                 file_b64 = self.__read_log_file(files.CONTROLLER_LOG)
             elif param == files.DMESG:
@@ -322,12 +322,12 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
                 if_name = self.comms_status[int(self.radio_index)].mesh_interface_name
                 if if_name:
                     file_b64 = self.__read_log_file(
-                        f"/var/run/wpa_supplicant-11s_{if_name}.conf")
+                        f"/var/run/wpa_supplicant-11s_id{self.radio_index}_{if_name}.conf")
             elif param == files.HOSTAPD:
                 if_name = self.comms_status[int(self.radio_index)].ap_interface_name
                 if if_name:
                     file_b64 = self.__read_log_file(
-                        f"/var/run/hostapd-{if_name}.conf")
+                        f"/var/run/hostapd-{self.radio_index}_{if_name}.conf")
             else:
                 return "FAIL", "Parameter not supported", None
 

@@ -3,7 +3,6 @@ import client
 import json
 import config
 
-
 async def main():
     # Connect to NATS!
     nc = await client.connect_nats()
@@ -47,24 +46,24 @@ async def main():
                 "phy": "phy2",
                 "batman_iface": "bat0",
             },
-            {
-                "radio_index": "2",
-                "ssid": "test_mesh3",
-                "key": "1234567890",
-                "ap_mac": "00:11:22:33:44:55",
-                "country": "US",
-                "frequency": "5190",
-                "frequency_mcc": "2412",
-                "routing": "batman-adv",
-                "priority": "long_range",
-                "ip": "192.168.1.2",
-                "subnet": "255.255.255.0",
-                "tx_power": "5",
-                "mode": "halow",
-                "mesh_vif": "halow1",
-                "phy": "phy2",
-                "batman_iface": "bat0",
-            },
+            # {
+            #     "radio_index": "2",
+            #     "ssid": "test_mesh3",
+            #     "key": "1234567890",
+            #     "ap_mac": "00:11:22:33:44:55",
+            #     "country": "US",
+            #     "frequency": "5190",
+            #     "frequency_mcc": "2412",
+            #     "routing": "batman-adv",
+            #     "priority": "long_range",
+            #     "ip": "192.168.1.2",
+            #     "subnet": "255.255.255.0",
+            #     "tx_power": "5",
+            #     "mode": "halow",
+            #     "mesh_vif": "halow1",
+            #     "phy": "phy2",
+            #     "batman_iface": "bat0",
+            # },
         ],
         "bridge": "br-lan bat0 eth1 lan1"
     }

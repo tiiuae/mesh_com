@@ -46,7 +46,7 @@ start() {
 stop() {
     printf 'Stopping %s: ' "$DAEMON"
     # shellcheck disable=SC2009 #pgrep is not available
-    NEW_PID=$(ps ax | grep -E '[h]ostapd' | awk {'print $1'})
+    NEW_PID=$(ps ax | grep -E "[h]ostapd-$RADIO_INDEX" | awk {'print $1'})
     kill -9 "$NEW_PID"
     start-stop-daemon -K -o -q -p "$PIDFILE"
     rm -fr /var/run/hostapd/* 2>/dev/null
