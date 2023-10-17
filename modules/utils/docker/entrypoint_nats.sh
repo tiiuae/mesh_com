@@ -31,9 +31,14 @@ else
     /opt/S9011sNatsMesh start id2
   fi
 
-
   echo "starting AP service"
   /opt/S90APoint start id0
+  if [ -f "/opt/1_mesh.conf" ]; then
+    /opt/S90APoint start id1
+  fi
+  if [ -f "/opt/2_mesh.conf" ]; then
+    /opt/S90APoint start id2
+  fi
 
   echo "wait for bridge to be up..."
   while ! (ifconfig | grep -e "$br_lan_ip") > /dev/null; do

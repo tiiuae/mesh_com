@@ -13,7 +13,7 @@
 source /opt/mesh-helper.sh
 # sources mesh configuration
 
-RADIO_INDEX=$2   # $1: index of the mesh.conf file to be used e.g. "id0"
+RADIO_INDEX=$2   # $2: index of the mesh.conf file to be used e.g. "id0"
 
 source_configuration "${RADIO_INDEX:2}"
 
@@ -29,17 +29,17 @@ LOG_FILE=/opt/mesh_11s_${RADIO_INDEX}_${!_WIFI}.log
 
 start() {
     printf 'Starting %s: ' "$DAEMON"
-    if [ "${!_MODE}" == "mesh" ] || [ "${!_MODE}" == "halow" ]; then
-      start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON ${!_MODE} $RADIO_INDEX > $LOG_FILE 2>&1"
-      status=$?
-      if [ "$status" -eq 0 ]; then
-          echo "OK"
-      else
-          echo "FAIL"
-      fi
+    if [ "${!_MODE}" == "ap+mesh_scc" ] || [ "${!_MODE}" == "ap+mesh_mcc" ]; then
+      mode=mesh
     else
-      echo "mesh/halow not starting..."
-      return 0
+      mode=${!_MODE}
+    fi
+    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON $mode $RADIO_INDEX > $LOG_FILE 2>&1"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        echo "OK"
+    else
+        echo "FAIL"
     fi
     return "$status"
 }
