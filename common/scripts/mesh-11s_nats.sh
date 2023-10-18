@@ -173,9 +173,6 @@ EOF
         mesh_kill "[o]lsrd -i $wifidev -d 0"
       fi
 
-      echo "$wifidev down.."
-      iw dev "$wifidev" del
-
       modprobe mac80211
 
       # Radio spi bus number
@@ -185,19 +182,29 @@ EOF
       fi
       done)
 
-      iw reg set "$cc"
-      insmod /lib/modules/"$KERNEL_VERSION"/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat spi_bus_num="$BUSNO" spi_polling_interval=3 hifspeed=20000000 spi_gpio_irq=-1 power_save=0 sw_enc=1
+      # remove nrc module before init
+      rmmod nrc.ko
 
-      # Bring up halow interface
-      echo "$wifidev up.."
-      ifconfig "$wifidev" up
+      # set initial country code
+      logger "country code set($wifidev): $cc"
+      iw reg set "$cc"
 
       # Check the return code of halow bring up
-      if [ $? -eq 255 ]; then
-        # If return code is 255, reload the nrc.ko module
-        rmmod nrc.ko
-        insmod /lib/modules/"$KERNEL_VERSION"/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat spi_bus_num="$BUSNO" spi_polling_interval=3 hifspeed=20000000 spi_gpio_irq=-1 power_save=0 sw_enc=1
-      fi
+      while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        logger "nrc module load retry count: $RETRY_COUNT"
+        insmod /lib/modules/"$KERNEL_VERSION"/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat spi_bus_num="$BUSNO" spi_polling_interval=3 hifspeed=20000000 spi_gpio_irq=-1 power_save=0 sw_enc=0
+        sleep 2
+        # Bring up halow interface
+        echo "$wifidev up.."
+        ifconfig "$wifidev" up
+        if [ $? -eq 255 ]; then
+          echo "Failed to init HaLow. (Attempt $((RETRY_COUNT + 1)))"
+          rmmod nrc.ko
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+        else
+          break
+        fi
+      done
 
       echo "$wifidev create 11s.."
       ifconfig "$wifidev" mtu 1460
