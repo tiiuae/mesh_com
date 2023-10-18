@@ -18,6 +18,11 @@ else
       generate_identity_id
   fi
 
+  # Do not continue in case halow init has not finished
+  while ps aux | grep [i]nit_halow > /dev/null; do
+      sleep 1
+  done
+
   echo "set bridge ip"
   generate_br_lan_ip
 

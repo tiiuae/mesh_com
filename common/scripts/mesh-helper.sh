@@ -26,7 +26,7 @@ __get_cpu_serial_number() {
 # this function generates the identity id from the mac address and the cpu serial number
 generate_identity_id() {
   # Split the input into an array of interface names
-  IFS=' ' read -ra interface_array <<< "wlp1s0 eth0 wlan0 wlan1"
+  IFS=' ' read -ra interface_array <<< "wlp1s0 wlp2s0 wlp3s0 halow1 eth0 wlan0 wlan1"
 
   mac_address=$(__get_mac_address "${interface_array[@]}")
   cpu_serial_number=$(__get_cpu_serial_number)
@@ -46,6 +46,10 @@ EOF
 generate_br_lan_ip() {
   local mesh_if_mac
   mesh_if_mac="$(ip -brief link | grep "${id0_MESH_VIF}" | awk '{print $3; exit}')"
+  if [ -z "$mesh_if_mac" ]; then
+      echo "generate_br_lan_ip: MAC not found for id0_MESH_VIF! Configuration error?" > /dev/kmsg
+      mesh_if_mac="$(ip -brief link | grep "eth0" | awk '{print $3; exit}')"
+  fi
   local ip_random
   ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
   br_lan_ip="192.168.1."$((16#$ip_random))
