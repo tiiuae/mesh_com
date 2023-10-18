@@ -299,9 +299,9 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
         ps_command = ["ps", "ax"]
         try:
             grep_command = ["grep", "-E",
-                            f"[w]pa_supplicant-11s_id{str(self.index)}_{self.wifi_interface}.conf"]
+                            f"[w]pa_supplicant-11s_id{str(self.index)}.conf"]
         except IndexError:
-            self.__logger.error("IndexError: wifi_interface=%s index=%s", self.wifi_interface, str(self.index))
+            self.__logger.error("IndexError: index=%s", str(self.index))
             return ""
         awk_command = ["awk", '{print $1}']
 
