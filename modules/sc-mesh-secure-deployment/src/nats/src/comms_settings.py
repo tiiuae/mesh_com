@@ -47,7 +47,6 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.delay:str = ""    # delay for channel change
         self.comms_status = comms_status
         # TODO: check can we do this
-        self.default_mesh = True
         ret, info = self.__load_settings()
         self.logger.debug("load settings: %s, %s", ret, info)
 
@@ -121,6 +120,27 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
 
         return "OK", "Mesh settings OK"
 
+    def __clean_all_settings(self) -> None:
+        """
+        Clean all settings
+        """
+        self.radio_index = []
+        self.ssid = []
+        self.key = []
+        self.ap_mac = []
+        self.country = []
+        self.frequency = []
+        self.frequency_mcc = []
+        self.ip_address = []
+        self.subnet = []
+        self.tx_power = []
+        self.mode = []
+        self.routing = []
+        self.priority = []
+        self.mesh_vif = []
+        self.phy = []
+        self.batman_iface = []
+
     def handle_mesh_settings(self, msg: str, path="/opt",
                              file="mesh_stored.conf") -> (str, str):
         """
@@ -133,23 +153,10 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             self.api_version = int(parameters_set["api_version"])
             self.role = quote(str(parameters_set["role"]))
 
-            if self.default_mesh:
-                self.radio_index = []
-                self.ssid = []
-                self.key = []
-                self.ap_mac = []
-                self.country = []
-                self.frequency = []
-                self.frequency_mcc = []
-                self.ip_address = []
-                self.subnet = []
-                self.tx_power = []
-                self.mode = []
-                self.routing = []
-                self.priority = []
-                self.mesh_vif = []
-                self.phy = []
-                self.batman_iface = []
+            self.__clean_all_settings()
+
+            # sort radios by index
+            parameters_set["radios"] = sorted(parameters_set["radios"], key=lambda k: k.get('radio_index', 0))
 
             for parameters in parameters_set["radios"]:
                 self.radio_index.append(int(parameters["radio_index"]))
@@ -183,8 +190,6 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 else:
                     ret, info = self.__save_settings(path, file, index)
                     self.logger.debug("save settings index %s: %s, %s", str(index), ret, info)
-
-            self.default_mesh = False
 
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
@@ -294,14 +299,12 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             for index in range(0, len(self.comms_status)):
                 file = f"/opt/{str(index)}_mesh.conf"
                 if os.path.exists(file):
-                    self.default_mesh = False
                     self.logger.debug("mesh config file %s found", file)
                     with open(file, "r", encoding="utf-8") as mesh_conf:
                         mesh_conf_lines = mesh_conf.read()
                         self.__read_configs(mesh_conf_lines)
                 else:
                     if index == 0:
-                        self.default_mesh = True
                         self.logger.debug("mesh config file %s not found, loading default", file)
                         with open(config_file_path, "r", encoding="utf-8") as mesh_conf:
                             mesh_conf_lines = mesh_conf.read()

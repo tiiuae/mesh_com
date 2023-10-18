@@ -21,8 +21,8 @@ DAEMON="mesh-11s_nats.sh"
 DIR="/opt/"
 _WIFI="${RADIO_INDEX}_MESH_VIF"
 _MODE="${RADIO_INDEX}_MODE"
-PIDFILE="/var/run/${DAEMON}_${RADIO_INDEX}_${!_WIFI}.pid"
-LOG_FILE=/opt/mesh_11s_${RADIO_INDEX}_${!_WIFI}.log
+PIDFILE="/var/run/${DAEMON}_${RADIO_INDEX}.pid"
+LOG_FILE=/opt/mesh_11s_${RADIO_INDEX}.log
 
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"

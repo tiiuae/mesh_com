@@ -50,6 +50,18 @@ add_network_intf_to_bridge() {
   done
 }
 
+fix_iface_mac_addresses() {
+      #Create static mac addr for Batman if
+      eth0_mac="$(ip -brief link | grep eth0 | awk '{print $3; exit}')"
+      batif_mac="00:00:$(echo "$eth0_mac" | cut -b 7-17)"
+      ifconfig "$batman_iface" down
+      ifconfig "$batman_iface" hw ether "$batif_mac"
+      ifconfig "$batman_iface" up
+      ifconfig "$bridge_name" down
+      ifconfig "$bridge_name" hw ether "$eth0_mac"
+      ifconfig "$bridge_name" up
+}
+
 calculate_network_address() {
   # with ip 192.168.1.2 and mask 255.255.255.0 --> network=192.168.1.0
   _IP_ADDRESS=$1
@@ -134,7 +146,7 @@ mode_execute() {
   # $1 = mode
   case "$mode" in
     "halow")
-      cat <<EOF >/var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf
+      cat <<EOF >/var/run/wpa_supplicant-11s_"$INDEX".conf
 ctrl_interface=DIR=/var/run/wpa_supplicant_"$INDEX"
 ap_scan=1
 country=$cc
@@ -195,6 +207,8 @@ EOF
       if [ "$routing_algo" == "batman-adv" ]; then
         batctl if add "$wifidev"
         echo "$batman_iface up.."
+        # Create static mac addr for Batman if and br-lan
+        fix_iface_mac_addresses
         ifconfig "$batman_iface" up
         echo "$batman_iface ip address.."
         ifconfig "$batman_iface" "$ipaddr" netmask "$nmask"
@@ -246,11 +260,11 @@ EOF
         # /usr/local/bin/cli_app ...
       #fi
 
-      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
+      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
       ;;
   "mesh")
 
-      cat <<EOF >/var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf
+      cat <<EOF >/var/run/wpa_supplicant-11s_"$INDEX".conf
 ctrl_interface=DIR=/var/run/wpa_supplicant_$INDEX
 # use 'ap_scan=2' on all devices connected to the network
 # this is unnecessary if you only want the network to be created when no other networks..
@@ -307,6 +321,8 @@ EOF
       if [ "$routing_algo" == "batman-adv" ]; then
         batctl if add "$wifidev"
         echo "$batman_iface up.."
+        # Create static mac addr for Batman if and br-lan
+        fix_iface_mac_addresses
         ifconfig "$batman_iface" up
         echo "$batman_iface ip address.."
         ifconfig "$batman_iface" "$ipaddr" netmask "$nmask"
@@ -348,7 +364,7 @@ EOF
       iptables -A FORWARD --in-interface "$batman_iface" -j ACCEPT
       iptables --table nat -A POSTROUTING --out-interface "$br_lan_ip" -j MASQUERADE
 
-      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX"_"$wifidev".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
+      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
       ;;
   "ap+mesh_mcc")
       wait_for_intf "$bridge_name"
@@ -360,7 +376,7 @@ EOF
       ifconfig "$ifname_ap" up
 
       # AP hostapd config
-      cat <<EOF >/var/run/hostapd-"$INDEX"_"$ifname_ap".conf
+      cat <<EOF >/var/run/hostapd-"$INDEX".conf
 country_code=$cc
 interface=$ifname_ap
 ssid=$ssid
@@ -395,6 +411,8 @@ EOF
       ifconfig "$bridge_name" up
       echo
       ifconfig "$bridge_name"
+      # Create static mac addr for Batman if and br-lan
+      fix_iface_mac_addresses
       # Add forwading rules from AP to "$batman_iface" interface
       iptables -P FORWARD ACCEPT
       route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
@@ -402,7 +420,7 @@ EOF
       iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
 
       # Start AP
-      /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX"_"$ifname_ap".conf -f /tmp/hostapd_"$INDEX".log
+      /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX".conf -f /tmp/hostapd_"$INDEX".log
       ;;
   "ap+mesh_scc")
       wait_for_intf "$bridge_name"
@@ -415,10 +433,8 @@ EOF
       # RPi activity led config
       echo "phy0tx" > /sys/class/leds/led0/trigger
 
-      #Create static mac addr for Batman if
-      eth0_mac="$(ip -brief link | grep eth0 | awk '{print $3; exit}')"
-      batif_mac="00:00:$(echo "$eth0_mac" | cut -b 7-17)"
-      ifconfig "$batman_iface" hw ether "$batif_mac"
+      #Create static mac addr for Batman if and br-lan
+      fix_iface_mac_addresses
 
       # Radio parameters
       iw dev "$wifidev" set txpower limit "$txpwr"00
@@ -433,7 +449,7 @@ EOF
       calculate_wifi_channel "$freq"
 
       # AP hostapd config
-      cat <<EOF >/var/run/hostapd-"$INDEX"_"$ifname_ap".conf
+      cat <<EOF >/var/run/hostapd-"$INDEX".conf
 ctrl_interface=/var/run/hostapd
 interface=$ifname_ap
 hw_mode=$retval_band
@@ -472,7 +488,7 @@ EOF
       ip addr flush dev "$batman_iface"
 
       # Start AP
-      /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX"_"$ifname_ap".conf  -f /tmp/hostapd_"$INDEX".log
+      /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX".conf  -f /tmp/hostapd_"$INDEX".log
       ;;
   *)
       exit 1
@@ -491,6 +507,7 @@ main () {
   INDEX=$2
 
   # sources mesh configuration
+  source_configuration "0"
   source_configuration "${INDEX:2}"
 
   # linux kernel release

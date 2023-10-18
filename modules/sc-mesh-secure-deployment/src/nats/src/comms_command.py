@@ -125,9 +125,9 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
         Returns:
             tuple: (str, str)
         """
-        config_file_path = "/opt/mesh.conf"
-        hash_file_path = "/opt/mesh.conf_hash"
-        pending_config_file_path = "/opt/mesh_stored.conf"
+        config_file_path = f"/opt/{self.radio_index}_mesh.conf"
+        hash_file_path = f"/opt/{self.radio_index}_mesh.conf_hash"
+        pending_config_file_path = f"/opt/{self.radio_index}_mesh_stored.conf"
 
         if os.path.exists(config_file_path):
             try:
@@ -151,7 +151,7 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
 
         for process in ["/opt/S9011sNatsMesh", "/opt/S90APoint", "/opt/S90nats_discovery"]:
             # Restart mesh with default settings
-            ret = subprocess.run([process, "restart"],
+            ret = subprocess.run([process, "restart", "id" + self.radio_index],
                                  shell=False, check=True, capture_output=True)
             if ret.returncode != 0:
                 self.logger.error("Default mesh starting failed ")
@@ -319,15 +319,11 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
             files = ConfigFiles()
             self.comms_status[int(self.radio_index)].refresh_status()
             if param == files.WPA:
-                if_name = self.comms_status[int(self.radio_index)].mesh_interface_name
-                if if_name:
-                    file_b64 = self.__read_log_file(
-                        f"/var/run/wpa_supplicant-11s_id{self.radio_index}_{if_name}.conf")
+                file_b64 = self.__read_log_file(
+                    f"/var/run/wpa_supplicant-11s_id{self.radio_index}.conf")
             elif param == files.HOSTAPD:
-                if_name = self.comms_status[int(self.radio_index)].ap_interface_name
-                if if_name:
-                    file_b64 = self.__read_log_file(
-                        f"/var/run/hostapd-{self.radio_index}_{if_name}.conf")
+                file_b64 = self.__read_log_file(
+                    f"/var/run/hostapd-{self.radio_index}.conf")
             else:
                 return "FAIL", "Parameter not supported", None
 
@@ -335,10 +331,7 @@ class Command:  # pylint: disable=too-few-public-methods, too-many-instance-attr
             return "FAIL", "Not able to get config file", None
 
         self.logger.debug("__get_configs done")
-        if not if_name:
-            return "FAIL", f"{param}, interface not active", None
-        else:
-            return "OK", f"{param}", file_b64.decode()
+        return "OK", f"{param}", file_b64.decode()
 
     def get_identity(self) -> (str, str, dict):
         identity_dict = {}

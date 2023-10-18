@@ -24,13 +24,12 @@ async def run(loop):
         subject = msg.subject
         reply = msg.reply
         data = json.loads(msg.data.decode())
-        print("Received a message on '{subject} {reply}': {data}".format(
-          subject=subject, reply=reply, data=data))
+        print(f"Received a message on '{subject} {reply}': {data}")
 
     try:
-        await client.connect(nc, reconnected_cb=reconnected_cb,
+        await client.connect(nc, recon_cb=reconnected_cb,
                              closed_cb=closed_cb,
-                             max_reconnect_attempts=-1)
+                             max_recon_attempts=-1)
     except Exception as e:
         print(e)
 
