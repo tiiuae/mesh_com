@@ -1,12 +1,13 @@
 import subprocess
+import threading
+
 import netifaces
-import os
-import re
 import sys
 import time
 import numpy as np
 import util
 from options import Options
+from log_config import logger
 
 
 def is_interface_up(interface) -> bool:
@@ -32,66 +33,34 @@ def switch_frequency(args) -> None:
     # Initialize switch frequency variables
     starting_frequency = str(util.map_channel_to_freq(args.starting_channel))
 
-    print(f"Moving to {starting_frequency} MHz ...\n") if args.debug else None
     while not switch_successful:
         try:
-            # Run commands
-            cmd_rmv_ip = "ifconfig " + args.mesh_interface + " 0"
-            cmd_interface_down = "ifconfig " + args.mesh_interface + " down"
-            util.run_command(cmd_rmv_ip, 'Failed to set interface 0')
-            util.run_command(cmd_interface_down, 'Failed to set interface down')
-
-            # If wpa_supplicant is running, kill it before restarting
-            if util.is_process_running('wpa_supplicant'):
-                util.run_command('killall wpa_supplicant', 'Failed to kill wpa_supplicant')
-                time.sleep(10)
-
-            # Remove mesh interface file to avoid errors when reinitializing interface
-            interface_file = '/var/run/wpa_supplicant/' + args.mesh_interface
-            if os.path.exists(interface_file):
-                os.remove(interface_file)
-
-            # Read and check wpa supplicant config
-            conf = util.read_file('/var/run/wpa_supplicant-11s.conf', 'Failed to read wpa supplicant config')
-            if conf is None:
-                print("Error: wpa supplicant config is None. Aborting.") if args.debug else None
-                return
-
-            # Edit wpa supplicant config with new mesh freq
-            conf = re.sub(r'frequency=\d*', f'frequency={starting_frequency}', conf)
-
-            # Write edited config back to file
-            util.write_file('/var/run/wpa_supplicant-11s.conf', conf, 'Failed to write wpa supplicant config')
-
-            # Restart wpa supplicant
-            cmd_restart_supplicant = 'wpa_supplicant -Dnl80211 -i' + args.mesh_interface + ' -c /var/run/wpa_supplicant-11s.conf -B'
-            util.run_command(cmd_restart_supplicant, 'Failed to restart wpa supplicant')
-            time.sleep(4)
-            util.run_command('iw dev', 'Failed to run iw dev')
+            # Execute switch frequency function
+            util.switch_frequency(starting_frequency)
 
             # Validate outcome of switch frequency process
             mesh_freq = util.get_mesh_freq()
             if mesh_freq != int(starting_frequency):
                 if num_switch_freq_retries < max_retries:
-                    print("Frequency switch unsuccessful... retrying") if args.debug else None
+                    logger.info("Frequency switch unsuccessful... retrying")
                     num_switch_freq_retries += 1
                     time.sleep(1)
                     continue
                 else:
-                    print("Error: Cannot set node to starting frequency. Maximum retries reached.") if args.debug else None
+                    logger.info("Cannot set node to starting frequency. Maximum retries reached.")
                     sys.exit(1)
             else:
-                print("Frequency switch successful") if args.debug else None
+                logger.info("Frequency switch successful")
                 switch_successful = True
 
         except Exception as e:
-            print(f"An error occurred: {str(e)}") if args.debug else None
+            logger.error(f"{str(e)}")
             if num_switch_freq_retries < max_retries:
-                print("Retrying after error...") if args.debug else None
+                logger.info("Retrying...")
                 num_switch_freq_retries += 1
                 time.sleep(1)  # Adjust sleep duration if needed
             else:
-                print("Error: Cannot set node to starting frequency. Maximum retries reached.") if args.debug else None
+                logger.info("Cannot set node to starting frequency. Maximum retries reached.")
                 sys.exit(1)
 
 
@@ -110,10 +79,10 @@ def check_osf_connectivity(args) -> None:
             break
         except subprocess.CalledProcessError:
             number_retries += 1
-            print(f"Ping failed... retry {number_retries}") if args.debug else None
+            logger.info(f"Ping failed... retry {number_retries}")
 
         if number_retries == max_retries:
-            print("Server unreachable") if args.debug else None
+            logger.info("Server unreachable")
             sys.exit(1)
 
 
@@ -126,14 +95,46 @@ def setup_osf_interface(args: Options) -> None:
     interface_status: bool = is_interface_up(args.osf_interface)
     if not interface_status:
         try:
-            setup_osf_interface_command = 'start_tunslip6.sh /dev/nrf0 ' + args.osf_interface
+            setup_osf_interface_command = ["start_tunslip6.sh", "/dev/nrf0", f"{args.osf_interface}"]
             util.run_command(setup_osf_interface_command, "Failed to set up OSF interface")
         except Exception as e:
-            print(f"OSF interface failed: {e}") if args.debug else None
+            logger.error(f"OSF interface failed: {e}")
             sys.exit(1)
 
 
-def start_jamming_scripts(args, osf_ipv6_address):
+def start_server(args) -> None:
+    """
+    Start jamming server script.
+
+    param args: Configuration options.
+    """
+    # Define server file name
+    server_file = "jamming_server_fsm.py"
+    # Kill any running instance of server file before starting it
+    if util.is_process_running(server_file):
+        util.kill_process_by_pid(server_file)
+    # Start jamming server script
+    logger.info(f"Started {server_file}")
+    util.run_command(["python", f"{server_file}"], 'Failed to run jamming_server_fsm file')
+
+
+def start_client(args) -> None:
+    """
+    Start jamming client script.
+
+    param args: Configuration options.
+    """
+    # Define client file name
+    client_file = "jamming_client_fsm.py"
+    # Kill any running instance of server file before starting it
+    if util.is_process_running(client_file):
+        util.kill_process_by_pid(client_file)
+    # Start jamming client script
+    logger.info(f"Started {client_file}")
+    util.run_command(["python", f"{client_file}"], 'Failed to run jamming_client_fsm file')
+
+
+def start_jamming_scripts(args, osf_ipv6_address) -> None:
     """
     Start jamming-related scripts based on configuration.
 
@@ -141,40 +142,49 @@ def start_jamming_scripts(args, osf_ipv6_address):
     param osf_ipv6_address: IPv6 address associated with the OSF interface.
     """
     # Compare jamming_osf_orchestrator with osf_ipv6_address
-    if args.jamming_osf_orchestrator == osf_ipv6_address:
-        # Execute server.py
-        print("5. jamming_server_fsm.py") if args.debug else None
-        with open('jamming_server_fsm.log', 'w') as log_file:
-            subprocess.Popen(['python', 'jamming_server_fsm.py'], stdout=log_file, stderr=subprocess.STDOUT)
-        print("6. jamming_client_fsm.py") if args.debug else None
-        util.run_command('python jamming_client_fsm.py', 'Failed to run jamming_client_fsm file')
-    else:
-        # Execute client.py
-        print("5. jamming_client_fsm.py") if args.debug else None
-        util.run_command('python jamming_client_fsm.py', 'Failed to run jamming_client_fsm file')
+    try:
+        if args.jamming_osf_orchestrator == osf_ipv6_address:
+            server_thread = threading.Thread(target=start_server, args=(args,))
+            client_thread = threading.Thread(target=start_client, args=(args,))
 
+            # Start server and client scripts
+            server_thread.start()
+            client_thread.start()
+
+            # Wait for the threads to finish
+            server_thread.join()
+            client_thread.join()
+        else:
+            # Start client script
+            client_thread = threading.Thread(target=start_client, args=(args,))
+            client_thread.start()
+            client_thread.join()
+    except Exception as e:
+        logger.info(f"Error starting jamming server/client scripts: {e}")
+        raise Exception(e)
 
 def main():
+    # Create Options instance
     args = Options()
 
     # Set up tun0 interface for OSF
-    print("1. set up tun0 osf interface") if args.debug else None
+    logger.info("1. Set up tun0 osf interface")
     setup_osf_interface(args)
 
     # Switch to starting frequency
-    print("2. switch to starting frequency") if args.debug else None
+    logger.info("2. Switch to starting frequency")
     mesh_freq = util.get_mesh_freq()
     if mesh_freq == np.nan or util.map_channel_to_freq(args.starting_channel) != mesh_freq:
         switch_frequency(args)
 
     # Get the IPv6 address of the tun0 interface
-    print("3. get ipv6 of tun0") if args.debug else None
+    logger.info("3. Get ipv6 of tun0")
     osf_ipv6_address = util.get_ipv6_addr(args.osf_interface)
     if osf_ipv6_address is None:
         raise ValueError("IPv6 address of the tun0 interface is not available.")
 
     # If the current node is a client, check ipv6 connectivity with server
-    print("4. check connectivity") if args.debug else None
+    logger.info("4. Check connectivity")
     if args.jamming_osf_orchestrator != osf_ipv6_address:
         check_osf_connectivity(args)
 

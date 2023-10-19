@@ -1,5 +1,4 @@
 import json
-import os
 import sys
 from typing import Optional, Tuple
 
@@ -10,6 +9,7 @@ from transforms import resize
 from options import Options
 from util import FEATS_ATH10K
 args = Options()
+
 
 class Preprocessor:
     def __init__(self, input_length: int = 128, col_mean_std_path: Optional[str] = args.col_mean_std_path) -> None:

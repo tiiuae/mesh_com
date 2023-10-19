@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 from options import Options, VALID_CHANNELS
 from util import map_freq_to_channel
+from log_config import logger
 
 
 class ChannelQualityEstimator:
@@ -39,7 +40,7 @@ class ChannelQualityEstimator:
         except FileNotFoundError:
             raise FileNotFoundError("Model file not found")
         except Exception as e:
-            print(f"Exception error in loading pretrained model: {e}") if self.args.debug else None
+            logger.info(f"Exception error in loading pretrained model: {e}")
 
     def _forward(self, feat_array: np.ndarray) -> np.ndarray:
         """
@@ -84,7 +85,7 @@ class ChannelQualityEstimator:
 
         return channel_quality
 
-    def check_arrays(self, feat_array: np.ndarray, frequencies: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def _check_arrays(self, feat_array: np.ndarray, frequencies: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
         Check if numpy arrays contain NaN values or contain inf values.
 
@@ -126,7 +127,7 @@ class ChannelQualityEstimator:
         :return: A tuple containing the estimated channel quality scores (1D NumPy array) and the class probabilities
         (2D NumPy array).
         """
-        feat_array, frequencies = self.check_arrays(feat_array, frequencies)
+        feat_array, frequencies = self._check_arrays(feat_array, frequencies)
 
         # Check if feat_array and frequencies arrays are empty
         if feat_array.size == 0 or frequencies.size == 0:

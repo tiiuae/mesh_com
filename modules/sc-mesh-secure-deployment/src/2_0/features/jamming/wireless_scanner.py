@@ -1,11 +1,12 @@
 import math
 import re
-
 import pandas as pd
 
 from options import Options
+from options import VALID_CHANNELS
 from spectral_manager import Spectral
 import util
+from log_config import logger
 
 
 class WirelessScanner:
@@ -26,7 +27,7 @@ class WirelessScanner:
             frequencies_list = [util.map_channel_to_freq(channel) for channel in self.args.channels5]
             frequencies = ' '.join(str(freq) for freq in frequencies_list if freq != current_freq)
         else:
-            print("Error: Scan band can should be 5.0GHz.") if self.args.debug else None
+            logger.info("Error: Scan band can should be 5.0GHz.")
             frequencies = ''
 
         return frequencies
@@ -54,10 +55,9 @@ class WirelessScanner:
                 jammed_frequency_data = scan[scan['freq1'] == jammed_frequency]
                 curr_freq_data = jammed_frequency_data.copy()
                 curr_freq_data['freq1'] = current_freq
-                # Convert the 'freq1' column in curr_freq_data to int64
                 curr_freq_data['freq1'] = curr_freq_data['freq1'].astype('int64')
             else:
-                print("Frequency not found in the file path.") if self.args.debug else None
+                logger.info("Frequency not found in the file path.")
         else:
             curr_freq_data = scan.copy()
             # Filter for current mesh frequency rows
@@ -97,22 +97,38 @@ class WirelessScanner:
         :param frequencies: A string of frequencies to scan.
         :return full_scan: A pandas DataFrame containing the spectral scan performed for the passed frequencies.
         """
-        # Remove any present binary dump files
+        # Scan binary dump file
         bin_file = "/tmp/data"
-        cmd_clear_binary_file = f"rm {bin_file}"
-        clear_binary_file_error_message = f"Failed to run {bin_file}"
-        util.run_command(cmd_clear_binary_file, clear_binary_file_error_message)
+
+        # Validate that passed frequencies list contains valid frequencies, if not, filter invalid
+        try:
+            freq_list = [int(freq) for freq in frequencies.split(' ')]
+            channel_list = [util.map_freq_to_channel(freq) for freq in freq_list]
+            if not all(channel in VALID_CHANNELS for channel in channel_list):
+                # Filter out invalid frequencies
+                valid_channel_list = [channel for channel in channel_list if channel in VALID_CHANNELS]
+                freq_list = [util.map_channel_to_freq(freq) for freq in valid_channel_list]
+                frequencies = ' '.join(map(str, freq_list))
+        except Exception as e:
+            logger.error(f"{e}")
+            return pd.DataFrame()
 
         try:
+            # Get driver
             driver: str = self.spec.get_driver()
+            # Initialize scan
             self.spec.initialize_scan(driver)
+            # Execute scan
             self.spec.execute_scan(frequencies, driver, bin_file)
+            # Read binary dump file
             self.spec.read(bin_file)
+            # Create scan dataframe
             scan = self.spec.create_dataframe(driver)
-            print("scan: ", scan) if self.args.debug else None
+            logger.info(f"Scan: {scan}")
 
-            # Check if the scan is valid, if it is, then return it
-            if self.is_valid_scan(scan):
+            # Check if the scan is valid, if it is, return it
+            valid_scan = self.validate_scan(frequencies, scan)
+            if not valid_scan.empty:
                 if self.args.debug:
                     curr_freq = util.get_mesh_freq()
                     curr_freq_data = self.get_current_freq_sample_data()
@@ -122,16 +138,25 @@ class WirelessScanner:
                 else:
                     return scan
         except Exception as e:
-            print(f"Error in scan {e}: ") if self.args.debug else None
+            logger.info(f"Error in scan {e}")
 
-    def is_valid_scan(self, scan: pd.DataFrame) -> bool:
+    def validate_scan(self, freqs: str, scan: pd.DataFrame) -> pd.DataFrame:
         """
-        Check if the given scan is valid based on whether it is empty or not.
+        Return valid scan based on the minimum number of rows per frequency.
 
+        :param freqs: A string of space-separated frequencies to validate (e.g., '5180 5200 5220').
         :param scan: A pandas DataFrame containing the spectral scan for each passed frequency.
-        :return: A boolean indicating whether the scan is valid or not.
+
+        :return: Scan after filtering for min number of rows.
         """
         if scan.empty:
-            return False
+            return scan
         else:
-            return True
+            # For each freq, check min number of scan samples met
+            freq_list = [int(freq) for freq in freqs.split()]
+            for freq in freq_list:
+                freq_scan = scan[scan['freq1'] == freq]
+                if len(freq_scan) < self.args.min_rows:
+                    # Remove all rows with freq1 equal to the specific freq
+                    scan = scan[scan['freq1'] != freq]
+            return scan

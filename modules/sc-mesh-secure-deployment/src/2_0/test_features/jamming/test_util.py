@@ -11,7 +11,7 @@ import pytest
 import add_syspath
 from options import Options
 from util import load_sample_data, get_mesh_freq, run_command, map_channel_to_freq, map_freq_to_channel, get_frequency_quality, get_ipv6_addr, read_file, write_file, \
-    is_process_running
+    is_process_running, kill_process_by_pid
 
 
 class TestCodeUnderTest:
@@ -105,20 +105,9 @@ class TestCodeUnderTest:
 
     #  Error occurred while executing shell command in run_command function
     def test_error_occurred_while_executing_shell_command(self, mocker):
-        # Declare the args variable
-        args = Options()
-
-        # Mock the subprocess.call function to raise an exception
-        mocker.patch('subprocess.call', side_effect=Exception('Error executing shell command'))
-
-        # Set args.debug = False specifically for the load_sample_data() function
-        with mock.patch.object(args, "debug", True):
-            # Call the run_command function and assert that it raises an exception
-            with pytest.raises(Exception, match='Error occurred:.*'):
-                run_command('command', 'Error message')
-
-        # Reset the mock
-        subprocess.call.reset_mock()
+        # Call the run_command function and assert that it raises an exception
+        with pytest.raises(Exception):
+            run_command('command', 'Error message')
 
     #  Error occurred while reading a file in read_file function
     def test_error_occurred_while_reading_file(self, mocker):
@@ -180,6 +169,20 @@ class TestCodeUnderTest:
 
         # Assert that the correct result is returned
         assert result is True
+
+    #  Check if a process with a given name is running
+    def test_successfully_kill_process_by_pid(self, mocker):
+        # Mock the get_pid_by_process_name function to return a valid PID
+        mocker.patch('util.get_pid_by_process_name', return_value=1234)
+
+        # Mock the subprocess.check_output function to avoid actually killing the process
+        mocker.patch('subprocess.check_output')
+
+        # Call the kill_process_by_pid function
+        kill_process_by_pid('process_name')
+
+        # Assert that the subprocess.check_output function was called with the correct arguments
+        subprocess.check_output.assert_called_once_with(['kill', '1234'])
 
     #  Get the frequency quality information for all frequencies even if some frequencies have errors
     def test_get_frequency_quality_with_errors(self, mocker):

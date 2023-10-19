@@ -6,6 +6,8 @@ import unittest
 from unittest.mock import MagicMock, patch
 from contextlib import contextmanager
 
+import pytest
+
 import add_syspath
 from jamming_client_fsm import JammingDetectionClient, ClientEvent, ClientState, ClientFSM
 from options import Options
@@ -153,36 +155,28 @@ class TestCodeUnderTest:
     def test_receive_message_unknown_action_id(self, mocker):
         # Action ID set to unknown int ID 5180 (same as freq value)
         args = Options()
-        args.debug = True
 
-        # Set args.debug = True specifically for the load_sample_data() function
-        with patch.object(args, "debug", True):
+        # Create a mock for the decode method
+        recv_mock = unittest.mock.Mock(return_value=b'28:\x83\xa4a_id\xcd\x14n_id\xa7fd01::1\xa4freq\xcd\x14<,')
 
-            # Create a mock for the decode method
-            recv_mock = unittest.mock.Mock(return_value=b'28:\x83\xa4a_id\xcd\x14n_id\xa7fd01::1\xa4freq\xcd\x14<,')
+        # Create a mock for the socket.recv method
+        decode_mock = unittest.mock.Mock(return_value=b'\x83\xa4a_id\xcd\x14n_id\xa7fd01::1\xa4freq\xcd\x14<')
 
-            # Create a mock for the socket.recv method
-            decode_mock = unittest.mock.Mock(return_value=b'\x83\xa4a_id\xcd\x14n_id\xa7fd01::1\xa4freq\xcd\x14<')
+        # Patch the socket.recv method to use the recv_mock
+        mocker.patch('socket.socket.recv', recv_mock)
 
-            # Create a mock for the print function to capture the printed output
-            print_mock = unittest.mock.Mock()
+        # Patch the decode method to use the mock
+        mocker.patch('jamming_client_fsm.decode', decode_mock)
 
-            # Patch the socket.recv method to use the recv_mock
-            mocker.patch('socket.socket.recv', recv_mock)
+        # Create an instance of the JammingDetectionClient
+        client = JammingDetectionClient('node_id', '::1', 1234)
+        client.args = args
 
-            # Patch the decode method to use the mock
-            mocker.patch('jamming_client_fsm.decode', decode_mock)
+        # Set running to True to start the loop
+        client.running = True
 
-            # Patch the print function to use the print_mock
-            mocker.patch('builtins.print', print_mock)
-
-            # Create an instance of the JammingDetectionClient
-            client = JammingDetectionClient('node_id', '::1', 1234)
-            client.args = args
-
-            # Set running to True to start the loop
-            client.running = True
-
+        # Create a mock for the logger.error function
+        with patch('jamming_client_fsm.logger.error') as error_mock:
             # Create a thread to run client.receive_messages()
             receive_thread = threading.Thread(target=client.receive_messages)
 
@@ -190,27 +184,19 @@ class TestCodeUnderTest:
             receive_thread.start()
 
             # Sleep for some time to allow the loop to execute (if needed)
-            time.sleep(1)
+            time.sleep(0.1)
 
-            # Set running to false to exit the loop
+            # Set running to False to exit the loop
             client.running = False
 
             # Wait for the thread to complete
             receive_thread.join()
 
+            # Assert that logger.error was called with the expected message
+            error_mock.assert_called_with("Error in received message: int is not allowed for map key when strict_map_key=True")
+
         # Assert that no state transition occurred
         assert client.fsm.state == ClientState.IDLE
-
-        # Assert that the print_mock was called with a message containing "Failed to decode netstring:"
-        print_mock.assert_called_with(unittest.mock.ANY)
-
-        def assert_print_called_with_expected_message(var):
-            message = var[0]
-            assert "Error in received message:" in message
-
-        # Assert that for an unknown action id, the error message was returned
-        print_mock.assert_called_with(unittest.mock.ANY)
-        assert_print_called_with_expected_message(print_mock.call_args_list[0][0])
 
     #  The client receives a message with the action ID for estimation_request and triggers the EXT_DATA_REQUEST event.
     def test_receive_message_estimation_request(self, mocker):

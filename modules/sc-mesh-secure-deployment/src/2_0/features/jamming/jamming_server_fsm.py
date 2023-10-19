@@ -1,4 +1,3 @@
-import logging
 import msgpack
 import signal
 import socket
@@ -13,7 +12,7 @@ from netstring import encode, decode
 
 from options import Options
 from util import get_mesh_freq, map_freq_to_channel
-from feature_server import FeatureClientTwin, FeatureServer
+from log_config import logger
 
 action_to_id = {
     "jamming_alert": 0,
@@ -85,15 +84,15 @@ class ServerFSM:
         key = (self.state, event)
         if key in self.transitions:
             next_state, action = self.transitions[key]
-            logging.info(f'{self.state} -> {next_state}') if self.args.debug else None
+            logger.info(f'{self.state} -> {next_state}')
             self.state = next_state
             if action:
                 action(event)
         else:
-            logging.info(f"No transition found for event '{event}' in state '{self.state}'") if self.args.debug else None
+            logger.info(f"No transition found for event '{event}' in state '{self.state}'")
 
 
-class JammingServer(FeatureServer):
+class JammingServer:
     def __init__(self, host: str, port: int):
         """
         Initializes the JammingServer object.
@@ -102,7 +101,6 @@ class JammingServer(FeatureServer):
         :param port: The port number to bind the orchestrator/server to.
         """
         # Initialize server objects and attributes
-        super().__init__(host, port)
         self.running = False
         self.fsm = ServerFSM(self)
         self.host = host
@@ -110,7 +108,7 @@ class JammingServer(FeatureServer):
         self.serversocket = None
         self.clients: List[JammingClientTwin] = []
         self.args = Options()
-        logging.info("initialized server") if self.args.debug else None
+        logger.info("Initialized server")
 
         # Create threads for server operations
         self.run_server_fsm_thread = threading.Thread(target=self.run_server_fsm)
@@ -131,22 +129,21 @@ class JammingServer(FeatureServer):
         """
         try:
             self.running = True
-            logging.info("started server") if self.args.debug else None
             self.serversocket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
             self.serversocket.bind((self.host, self.port))
             self.serversocket.listen(10)
-            logging.info("server started and listening") if self.args.debug else None
+            logger.info("Server started and listening")
             self.run_server_fsm_thread.start()
             signal.signal(signal.SIGINT, self.signal_handler)
 
             while self.running:
                 c_socket, c_address = self.serversocket.accept()
                 client = JammingClientTwin(c_socket, c_address, self.clients, self.host)
-                logging.info(f'New connection {client}') if self.args.debug else None
+                logger.info(f'New connection {client}')
                 self.clients.append(client)
 
         except ConnectionError as e:
-            print(f"Connection error: {e}")
+            logger.info(f"Connection error: {e}")
 
     def signal_handler(self, sig: signal.Signals, frame) -> None:
         """
@@ -155,13 +152,13 @@ class JammingServer(FeatureServer):
         :param sig: The signal received by the handler.
         :param frame: The current execution frame.
         """
-        logging.info("Attempting to close threads.") if self.args.debug else None
+        logger.info("Attempting to close threads.")
         if self.clients:
             for client in self.clients:
-                logging.info(f"joining {client.address}") if self.args.debug else None
+                logger.info(f"Joining {client.address}")
                 client.stop()
 
-            logging.info("threads successfully closed") if self.args.debug else None
+            logger.info("Threads successfully closed")
             sys.exit(0)
 
         self.stop()
@@ -195,7 +192,7 @@ class JammingServer(FeatureServer):
                         self.fsm.trigger(ServerEvent.PERIODIC_TARGET_FREQ_BROADCAST)
                 time.sleep(1)
             except Exception as e:
-                logging.info(f"Exception in run_server_fsm: {e}") if self.args.debug else None
+                logger.info(f"Exception in run_server_fsm: {e}")
 
     def check_jam_alert(self) -> None:
         """
@@ -218,7 +215,7 @@ class JammingServer(FeatureServer):
                 netstring_data = encode(serialized_data)
                 client.socket.sendall(netstring_data)
             except BrokenPipeError:
-                logging.info("Broken pipe error, client disconnected:", client.address) if self.args.debug else None
+                logger.info("Broken pipe error, client disconnected:", client.address)
                 self.clients.remove(client)
 
     def check_jammed_frequency(self, trigger_event) -> None:
@@ -231,12 +228,12 @@ class JammingServer(FeatureServer):
             jam_alert_message = client.jam_alert_message
             if jam_alert_message:
                 if self.target_frequency == jam_alert_message['freq']:
-                    logging.info("-- VALID JAM ALERT") if self.args.debug else None
+                    logger.info("-- VALID JAM ALERT")
                     self.fsm.trigger(ServerEvent.VALID_JAM_ALERT)
                     return
 
         # If there is no valid jam alert, then we move back to IDLE
-        logging.info("-- INVALID JAM ALERT") if self.args.debug else None
+        logger.info("-- INVALID JAM ALERT")
         self.fsm.trigger(ServerEvent.INVALID_JAM_ALERT)
 
     def broadcast_target_freq(self, trigger_event) -> None:
@@ -251,7 +248,7 @@ class JammingServer(FeatureServer):
             self.send_data_clients(target_freq_data)
             self.fsm.trigger(ServerEvent.BROADCAST_COMPLETE)
         except Exception as e:
-            logging.info(f"Broadcast target frequency error: {e}") if self.args.debug else None
+            logger.info(f"Broadcast target frequency error: {e}")
 
     def request_spectrum_data(self, trigger_event) -> None:
         """
@@ -266,7 +263,7 @@ class JammingServer(FeatureServer):
             self.last_requested_spectrum_data = time.time()
             self.fsm.trigger(ServerEvent.SENT_SPECTRUM_DATA_REQUEST)
         except Exception as e:
-            logging.info(f"Error executing request_spectrum_data: {e}") if self.args.debug else None
+            logger.info(f"Error executing request_spectrum_data: {e}")
 
     def gathering_spectrum_data(self, trigger_event) -> None:
         """
@@ -281,13 +278,13 @@ class JammingServer(FeatureServer):
             current_time = time.time()
             all_data_gathered = self.check_all_spectrum_data_gathered()
             if all_data_gathered:
-                logging.info("-- ALL CLIENTS SENT DATA") if self.args.debug else None
+                logger.info("-- ALL CLIENTS SENT DATA")
                 self.fsm.trigger(ServerEvent.GATHERED_ALL_SPECTRUM_DATA)
                 break
             time.sleep(1)
 
         if not all_data_gathered:
-            logging.info("-- DATA GATHERING TIME EXPIRED") if self.args.debug else None
+            logger.info("-- DATA GATHERING TIME EXPIRED")
             self.fsm.trigger(ServerEvent.SPECTRUM_DATA_GATHERING_EXPIRED)
 
     def check_all_spectrum_data_gathered(self) -> bool:
@@ -323,21 +320,21 @@ class JammingServer(FeatureServer):
             # Count the occurrences of each frequency in the client_estimates list
             freq_counts = Counter(client_estimates.values())
             most_voted_freqs = freq_counts.most_common()
-            logging.info(f"most_voted_freqs: {most_voted_freqs}") if self.args.debug else None
+            logger.info(f"most_voted_freqs: {most_voted_freqs}")
             orchestrator_best_freq = client_estimates.get(self.host)
             most_voted_freq, most_voted_freq_count = most_voted_freqs[0]
 
             # If most voted frequency count is equal to 1, get the orchestrator client's frequency estimation
             if most_voted_freq_count == 1:
                 if orchestrator_best_freq is not None:
-                    logging.info(f"-- Orchestrator estimation {orchestrator_best_freq}") if self.args.debug else None
+                    logger.info(f"-- Orchestrator estimation {orchestrator_best_freq}")
                     switch_to_frequency = orchestrator_best_freq
                 # else get the estimation from other client
                 else:
                     switch_to_frequency = most_voted_freq
             # If we have more than one vote, get most voted frequency
             else:
-                logging.info(f"-- Most voted freq (Votes: {most_voted_freq_count})") if self.args.debug else None
+                logger.info(f"-- Most voted freq (Votes: {most_voted_freq_count})")
                 switch_to_frequency = most_voted_freq
 
             # Check decision outcome
@@ -347,7 +344,7 @@ class JammingServer(FeatureServer):
                 self.target_frequency = switch_to_frequency
                 self.fsm.trigger(ServerEvent.NEW_TARGET_FREQUENCY)
         else:
-            logging.info("No estimates sent") if self.args.debug else None
+            logger.info("No estimates sent")
             time.sleep(3)
             self.fsm.trigger(ServerEvent.NO_ESTIMATES_SENT)
 
@@ -366,7 +363,7 @@ class JammingServer(FeatureServer):
                     freq = client.estimation_report_message.get("freq")
                     if map_freq_to_channel(freq) in self.args.channels5:
                         client_estimates[client_ip] = freq
-        logging.info(f"client_estimates: {client_estimates}") if self.args.debug else None
+        logger.info(f"client_estimates: {client_estimates}")
         return client_estimates
 
     def send_switch_frequency_message(self, trigger_event) -> None:
@@ -387,20 +384,25 @@ class JammingServer(FeatureServer):
         :param trigger_event: The event that triggered the reset.
         """
         self.healing_process_id = str(uuid.uuid4())  # Generate a new ID at the end of the healing process
-        logging.info("-- NEW HEALING ID") if self.args.debug else None
+        logger.info("-- NEW HEALING ID")
         for client in self.clients:
             client.reset()
         self.fsm.trigger(ServerEvent.RESET_COMPLETE)
 
 
-class JammingClientTwin(FeatureClientTwin):
+class JammingClientTwin(threading.Thread):
     def __init__(self, socket: socket.socket, address: Tuple[str, int], clients: List["JammingClientTwin"], host: str) -> None:
+        threading.Thread.__init__(self)
+        self.socket = socket
+        self.address = address
+        self.clients = clients
+        self.host = host
         self.running: bool = True
         self.args = Options()
         self.jam_alert_message: Dict = {}
         self.estimation_report_message: Dict = {}
         self.listen_thread = threading.Thread(target=self.receive_messages)
-        super().__init__(socket, address, clients, host)
+        self.start()
 
     def run(self) -> None:
         """
@@ -418,11 +420,11 @@ class JammingClientTwin(FeatureClientTwin):
                 try:
                     data = decode(self.socket.recv(1024))
                     if not data:
-                        logging.info("No data... break") if self.args.debug else None
+                        logger.info("No data... break")
                         break
                 except Exception as e:
                     # Handle netstring decoding errors
-                    logging.info(f"Failed to decode netstring: {e}") if self.args.debug else None
+                    logger.info(f"Failed to decode netstring: {e}")
                     break
 
                 # Deserialize the MessagePack message
@@ -430,7 +432,7 @@ class JammingClientTwin(FeatureClientTwin):
                     unpacked_data = msgpack.unpackb(data, raw=False)
                     action_id: int = unpacked_data.get("a_id")
                     action_str: str = id_to_action.get(action_id)
-                    logging.info(f"Received message: {unpacked_data}") if self.args.debug else None
+                    logger.info(f"Received message: {unpacked_data}")
 
                     # Jam Alert received from client
                     if action_str == "jamming_alert":
@@ -441,15 +443,15 @@ class JammingClientTwin(FeatureClientTwin):
                         self.estimation_report_message = unpacked_data
 
                 except msgpack.UnpackException as e:
-                    logging.info(f"Failed to decode MessagePack: {e}") if self.args.debug else None
+                    logger.info(f"Failed to decode MessagePack: {e}")
                     continue
 
                 except Exception as e:
-                    logging.info(f"Error in received message: {e}") if self.args.debug else None
+                    logger.info(f"Error in received message: {e}")
                     continue
 
             except ConnectionResetError:
-                logging.info("Connection forcibly closed by the remote host") if self.args.debug else None
+                logger.info("Connection forcibly closed by the remote host")
                 break
 
     def reset(self):

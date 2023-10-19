@@ -1,4 +1,7 @@
+import os
+
 import pandas as pd
+import pytest
 from unittest.mock import Mock
 
 import add_syspath
@@ -85,27 +88,50 @@ class TestCodeUnderTest:
         mocker.patch.object(wireless_scanner.spec, 'execute_scan')
         mocker.patch.object(wireless_scanner.spec, 'read')
         mocker.patch.object(wireless_scanner.spec, 'create_dataframe', return_value=expected_result)
-        mocker.patch.object(wireless_scanner, 'is_valid_scan', return_value=True)
+        mocker.patch.object(wireless_scanner, 'validate_scan', return_value=expected_result)
         mocker.patch('pandas.concat', return_value=expected_result)
 
         scan = wireless_scanner.scan(frequencies)
-        print("scan returned: ", scan)
 
         pd.testing.assert_frame_equal(scan, expected_result)
 
+    # Check if invalid frequencies variable passed exception is raised
+    def test_scan_invalid_frequencies(self, mocker):
+        wireless_scanner = WirelessScanner()
+
+        # Call the execute_scan() method with invalid frequencies
+        scan = wireless_scanner.scan("invalid_frequencies")
+
+        assert scan.empty
+
     #  Check if the given scan is valid based on the minimum number of rows per frequency
-    def test_is_valid_scan(self):
+    def test_validate_scan_valid_num_rows(self):
+        freqs = "5200 5220"
         data = [5200, 5200, 5220, 5220]
         scan = pd.DataFrame(data, columns=['freq1'])
 
         wireless_scanner = WirelessScanner()
+        wireless_scanner.args.min_rows = 2
 
-        is_valid = wireless_scanner.is_valid_scan(scan)
+        returned_scan = wireless_scanner.validate_scan(freqs, scan)
 
-        assert is_valid == True
+        assert not returned_scan.empty
+
+    #  Check if the given scan is invalid based on the minimum number of rows per frequency
+    def test_validate_scan_invalid_num_rows(self):
+        freqs = "5200 5220"
+        data = [5200, 5200, 5220, 5220]
+        scan = pd.DataFrame(data, columns=['freq1'])
+
+        wireless_scanner = WirelessScanner()
+        wireless_scanner.args.min_rows = 16
+
+        returned_scan = wireless_scanner.validate_scan(freqs, scan)
+
+        assert returned_scan.empty
 
     #  Error message when scan_band is not 5.0GHz
-    def test_get_band_frequencies_invalid_scan_band(self, capsys, mocker):
+    def test_get_band_frequencies_invalid_scan_band(self, mocker):
         current_freq: int = 5180
         scan_band = "3GHz"
 
@@ -114,13 +140,10 @@ class TestCodeUnderTest:
 
         frequencies = wireless_scanner.get_band_frequencies(current_freq, scan_band)
 
-        captured = capsys.readouterr()
-        assert "Error: Scan band can should be 5.0GHz" in captured.out
-
         assert frequencies == ''
 
     #  Frequency not found in the file path
-    def test_get_current_freq_sample_data_frequency_not_found(self, capsys, mocker):
+    def test_get_current_freq_sample_data_frequency_not_found(self, mocker):
         current_freq: int = 5200
         message = "Jamming data sample/jamming/jamming_freq5200.csv"
         scan = pd.DataFrame({'freq1': [5200, 5200, 5200], 'noise': [1, 2, 3], 'max_magnitude': [1, 2, 3], 'total_gain_db': [1, 2, 3], 'base_pwr_db': [1, 2, 3], 'rssi': [1, 2, 3],
@@ -138,8 +161,6 @@ class TestCodeUnderTest:
         # Call get_current_freq_sample_data function
         curr_freq_data = wireless_scanner.get_current_freq_sample_data()
 
-        captured = capsys.readouterr()
-        assert "Frequency not found in the file path." in captured.out
         assert curr_freq_data.empty == True
 
     #  When jamming file selected, filter for the jammed frequency rows, replace their freq1 value with current mesh frequency value
@@ -158,14 +179,15 @@ class TestCodeUnderTest:
         pd.testing.assert_frame_equal(curr_freq_data, expected_result)
 
     #  When scan is invalid, return False
-    def test_is_valid_scan_invalid_scan(self):
+    def test_valid_scan_invalid_scan(self):
+        frequencies = '5180'
         scan = pd.DataFrame()
 
         wireless_scanner = WirelessScanner()
 
-        is_valid = wireless_scanner.is_valid_scan(scan)
+        returned_scan = wireless_scanner.validate_scan(frequencies, scan)
 
-        assert is_valid == False
+        assert returned_scan.empty
 
     #  Concatenate current frequency data with filtered scan dataframe
     def test_low_latency_scan(self, mocker):
@@ -175,11 +197,11 @@ class TestCodeUnderTest:
         mocker.patch('util.get_mesh_freq', return_value=current_freq)
         mocker.patch.object(wireless_scanner, 'args')
         mocker.patch.object(wireless_scanner, 'scan')
-        mocker.patch.object(wireless_scanner, 'is_valid_scan')
+        mocker.patch.object(wireless_scanner, 'validate_scan')
 
         wireless_scanner.args.debug = False
         wireless_scanner.scan.return_value = pd.DataFrame({'freq1': [5180, 5180], 'data': [3, 4]})
-        wireless_scanner.is_valid_scan.return_value = True
+        wireless_scanner.validate_scan.return_value = pd.DataFrame({'freq1': [5180, 5180], 'data': [3, 4]})
 
         expected_result = pd.DataFrame({'freq1': [5180, 5180], 'data': [3, 4]})
 
