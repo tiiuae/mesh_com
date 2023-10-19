@@ -1,6 +1,4 @@
-import os
-import re
-import subprocess
+import socket
 import sys
 import threading
 import time
@@ -12,12 +10,12 @@ import numpy as np
 import pandas as pd
 from netstring import encode, decode
 
-from channel_quality_estimator import ChannelQualityEstimator
+from channel_quality_est import ChannelQualityEstimator
 from options import Options
 from preprocessor import Preprocessor
-from util import get_frequency_quality, get_mesh_freq, run_command, read_file, write_file, is_process_running, get_ipv6_addr
+from util import get_frequency_quality, get_mesh_freq, get_ipv6_addr, switch_frequency, kill_process_by_pid
 from wireless_scanner import WirelessScanner
-from feature_client import FeatureClient
+from log_config import logger
 
 action_to_id = {
     "jamming_alert": 0,
@@ -149,20 +147,22 @@ class ClientFSM:
     def _process_event(self, event: ClientEvent) -> None:
         """Internal function to process the given event"""
         key = (self.state, event)
-        print() if self.args.debug else None
         if key in self.transitions:
             next_state, action = self.transitions[key]
-            print(f'\n{self.state} -> {next_state}') if self.args.debug else None
+            logger.info(f'{self.state} -> {next_state}')
             self.state = next_state
             if action:
                 action(event)
         else:
-            print(f"No transition found for event '{event}' in state '{self.state}'") if self.args.debug else None
+            logger.info(f"No transition found for event '{event}' in state '{self.state}'")
 
 
-class JammingDetectionClient(FeatureClient):
+class JammingDetectionClient(threading.Thread):
     def __init__(self, node_id: str, host: str, port: int) -> None:
-        super().__init__(node_id, host, port)
+        super().__init__()
+        self.node_id = node_id
+        self.host = host
+        self.port = port
 
         # Initialize server objects
         self.fsm = ClientFSM(self)
@@ -172,12 +172,12 @@ class JammingDetectionClient(FeatureClient):
         self.estimator = ChannelQualityEstimator()
 
         # Internal variables
+        self.socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         self.current_frequency: int = get_mesh_freq()
-        self.valid_scan_data: bool = False
+        self.healing_process_id: str = None
         self.target_frequency: int = np.nan
-        self.freq_quality: dict = {}
         self.best_freq: int = np.nan
-        self.healing_process_id: str = ''
+        self.freq_quality: dict = {}
 
         # Time for periodic events' variables (in seconds)
         self.time_last_scan: float = 0
@@ -209,7 +209,7 @@ class JammingDetectionClient(FeatureClient):
                 break
             except ConnectionRefusedError:
                 number_retries += 1
-                print(f"OSF server connection failed... retry #{number_retries}") if self.args.debug else None
+                logger.error(f"OSF server connection failed... retry #{number_retries}")
 
             if number_retries == max_retries:
                 sys.exit("OSF Server unreachable")
@@ -230,7 +230,7 @@ class JammingDetectionClient(FeatureClient):
                 # Sleep for a short duration before checking conditions again
                 time.sleep(0.1)
             except Exception as e:
-                print(f"Exception in run: {e}") if self.args.debug else None
+                logger.error(f"Exception in run: {e}")
 
     def receive_messages(self) -> None:
         """
@@ -242,11 +242,11 @@ class JammingDetectionClient(FeatureClient):
                 try:
                     data = decode(self.socket.recv(1024))
                     if not data:
-                        print("No data... break") if self.args.debug else None
+                        logger.info("No data...")
                         break
                 except Exception as e:
                     # Handle netstring decoding errors
-                    print(f"Failed to decode netstring: {e}") if self.args.debug else None
+                    logger.error(f"Failed to decode netstring: {e}")
                     break
 
                 # Deserialize the MessagePack message
@@ -254,7 +254,7 @@ class JammingDetectionClient(FeatureClient):
                     unpacked_data = msgpack.unpackb(data, raw=False)
                     action_id: int = unpacked_data.get("a_id")
                     action_str: str = id_to_action.get(action_id)
-                    print(f"Received message: {unpacked_data}") if self.args.debug else None
+                    logger.info(f"Received message: {unpacked_data}")
 
                     # Handle frequency estimation request
                     if action_str == "estimation_request":
@@ -276,15 +276,15 @@ class JammingDetectionClient(FeatureClient):
                             self.fsm.trigger(ClientEvent.EXT_SWITCH_EVENT)
 
                 except msgpack.UnpackException as e:
-                    print(f"Failed to decode MessagePack: {e}") if self.args.debug else None
+                    logger.error(f"Failed to decode MessagePack: {e}")
                     continue
 
                 except Exception as e:
-                    print(f"Error in received message: {e}") if self.args.debug else None
+                    logger.error(f"Error in received message: {e}")
                     continue
 
             except ConnectionResetError:
-                print("Connection forcibly closed by the remote host") if self.args.debug else None
+                logger.error("Connection forcibly closed by the remote host")
                 break
 
     def performing_scan(self, trigger_event) -> None:
@@ -294,7 +294,7 @@ class JammingDetectionClient(FeatureClient):
         :param trigger_event: ClientEvent that triggered the execution of the performing_scan function.
         :return: A dataframe of the spectral scan performed.
         """
-        print('\nPerforming Scan...\n') if self.args.debug else None
+        logger.info('Performing Scan...')
         scan: pd.DataFrame = pd.DataFrame()
 
         if self.fsm.state == ClientState.LOW_LATENCY_SCAN:
@@ -316,10 +316,10 @@ class JammingDetectionClient(FeatureClient):
         # After scan report data to CH
         if self.fsm.state == ClientState.LOW_LATENCY_SCAN:
             if jamming_detected:
-                print('-- Detection JAMMING') if self.args.debug else None
+                logger.info('Detection JAMMING')
                 self.fsm.trigger(ClientEvent.JAM_DETECTED)
             else:
-                print('-- Detection NORMAL') if self.args.debug else None
+                logger.info('Detection NORMAL')
                 self.fsm.trigger(ClientEvent.NO_JAM_DETECTED)
         elif self.fsm.state == ClientState.HIGH_LATENCY_SCAN:
             self.fsm.trigger(ClientEvent.HIGH_LATENCY_SCAN_PERFORMED)
@@ -343,7 +343,7 @@ class JammingDetectionClient(FeatureClient):
         :param trigger_event: ClientEvent that triggered the execution of this function.
         """
         # Send scan data
-        print("Reporting Spectrum Quality...") if self.args.debug else None
+        logger.info("Reporting Spectrum Quality...")
         action_id: int = action_to_id["estimation_report"]
         data = {'a_id': action_id, 'n_id': self.node_id, 'freq': self.best_freq, 'qual': self.freq_quality, 'h_id': self.healing_process_id}
         self.send_messages(data)
@@ -359,9 +359,9 @@ class JammingDetectionClient(FeatureClient):
             serialized_data = msgpack.packb(data)
             netstring_data = encode(serialized_data)
             self.socket.send(netstring_data)
-            print(f"Sent {data}") if self.args.debug else None
+            logger.info(f"Sent {data}")
         except ConnectionRefusedError:
-            print("Error: Connection refused by the server. Check if the server is running and reachable.") if self.args.debug else None
+            logger.error("Connection refused by the server. Check if the server is running and reachable.")
 
     def switch_frequency(self, trigger_event) -> None:
         """
@@ -369,57 +369,21 @@ class JammingDetectionClient(FeatureClient):
 
         :param trigger_event: ClientEvent that triggered the execution of this function.
         """
-        # Initialize switch frequency variables
-
-        print(f"Switching to {self.target_frequency} MHz ...\n") if self.args.debug else None
         try:
-            # Run commands
-            cmd_rmv_ip = "ifconfig " + self.args.mesh_interface + " 0"
-            cmd_interface_down = "ifconfig " + self.args.mesh_interface + " down"
-            run_command(cmd_rmv_ip, 'Failed to set ifconfig wlp1s0 0')
-            run_command(cmd_interface_down, 'Failed to set ifconfig wlp1s0 down')
-
-            # If wpa_supplicant is running, kill it before restarting
-            if is_process_running('wpa_supplicant'):
-                run_command('killall wpa_supplicant', 'Failed to kill wpa_supplicant')
-                time.sleep(10)
-
-            # Remove mesh interface file to avoid errors when reinitialize interface
-            interface_file = '/var/run/wpa_supplicant/' + self.args.mesh_interface
-            if os.path.exists(interface_file):
-                os.remove(interface_file)
-
-            # Read and check wpa supplicant config
-            conf = read_file('/var/run/wpa_supplicant-11s.conf', 'Failed to read wpa supplicant config')
-            if conf is None:
-                print("Error: wpa supplicant config is None. Aborting.") if self.args.debug else None
-                return
-
-            # Edit wpa supplicant config with new mesh freq
-            new_mesh_frequency = "frequency=" + str(self.target_frequency)
-            conf_updated = re.sub(r'frequency=\d*', new_mesh_frequency, conf)
-
-            # Write edited config back to file
-            write_file('/var/run/wpa_supplicant-11s.conf', conf_updated, 'Failed to write wpa supplicant config')
-
-            # Restart wpa supplicant
-            cmd_restart_supplicant = 'wpa_supplicant -Dnl80211 -i' + self.args.mesh_interface + ' -c /var/run/wpa_supplicant-11s.conf -B'
-            run_command(cmd_restart_supplicant, 'Failed to restart wpa supplicant')
-            time.sleep(4)
-            subprocess.call('iw dev', shell=True)
+            switch_frequency(str(self.target_frequency))
 
             # Validate outcome of switch frequency process
             self.current_frequency = get_mesh_freq()
 
             if self.current_frequency != self.target_frequency:
-                print("Frequency switch unsuccessful") if self.args.debug else None
+                logger.info("Frequency switch unsuccessful")
                 self.fsm.trigger(ClientEvent.SWITCH_UNSUCCESSFUL)
             else:
-                print("Frequency switch successful") if self.args.debug else None
+                logger.info("Frequency switch successful")
                 self.fsm.trigger(ClientEvent.SWITCHED)
 
         except Exception as e:
-            print(f"Switching frequency error occurred: {str(e)}") if self.args.debug else None
+            logger.error(f"Switching frequency error occurred: {str(e)}")
             self.fsm.trigger(ClientEvent.SWITCH_UNSUCCESSFUL)
 
     def recovering_switch_error(self, trigger_event) -> None:
@@ -447,7 +411,6 @@ class JammingDetectionClient(FeatureClient):
         """
         self.time_last_scan = 0
         self.time_last_switch = 0
-        self.valid_scan_data = False
         self.fsm.event_queue.reset()
         self.fsm.trigger(ClientEvent.RESET_COMPLETE)
 
@@ -489,9 +452,9 @@ def main():
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("Attempting to stop the clients.") if args.debug else None
+        logger.info("Attempting to stop the clients.")
         client.stop()
-        print("Clients successfully stopped.") if args.debug else None
+        logger.info("Clients successfully stopped.")
 
 
 if __name__ == '__main__':

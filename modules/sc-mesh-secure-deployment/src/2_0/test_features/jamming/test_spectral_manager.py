@@ -160,6 +160,7 @@ class TestCodeUnderTest:
 
         # Assert that os.popen was called
         assert driver == expected_value
+
     #  Test that the correct driver is returned
     def test_get_driver_with_invalid_driver(self, mocker):
         # Mock the necessary dependencies
@@ -212,23 +213,6 @@ class TestCodeUnderTest:
         # Assert that the dataframe has the expected columns and values
         assert dataframe.columns.tolist() == ["freq1", "noise", "max_magnitude", "total_gain_db", "base_pwr_db", "rssi", "relpwr_db", "avgpwr_db"]
         assert dataframe.values.tolist() == [[1, 2, 3, 4, 5, 6, 7, 8], [9, 10, 11, 12, 13, 14, 15, 16]]
-
-    def test_execute_scan_invalid_frequencies(self, mocker):
-        # Mock the Options class
-        mocker.patch('options.Options')
-
-        # Create a Spectral object
-        spectral = Spectral()
-
-        bin_file = "scan.bin"
-
-        # Call the execute_scan() method with invalid frequencies
-        with pytest.raises(ValueError):
-            spectral.execute_scan("invalid_frequencies", "ath10k", bin_file)
-
-        # Delete the empty.bin file
-        if os.path.exists(bin_file):
-            os.remove(bin_file)
 
     def test_open_nonexistent_binary_file(self, mocker):
         # Mock the Options class

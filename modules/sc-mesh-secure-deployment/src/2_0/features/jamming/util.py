@@ -1,15 +1,18 @@
+import os
 import pathlib
 import random
 import re
 import subprocess
+import time
 from enum import Enum
 from typing import Tuple
 
 import netifaces
 import numpy as np
 import pandas as pd
-
 from options import Options
+from log_config import logger
+
 args = Options()
 
 CH_TO_FREQ = {1: 2412, 2: 2417, 3: 2422, 4: 2427, 5: 2432, 6: 2437, 7: 2442, 8: 2447, 9: 2452, 10: 2457, 11: 2462,
@@ -72,14 +75,14 @@ def get_mesh_freq() -> int:
         # Check if mesh interface is up and get freq
         for interface_list in iw_interfaces:
             try:
-                if "mesh" in interface_list:
+                if "mesh" in interface_list and "channel" in interface_list:
                     channel_index = interface_list.index("channel") + 2
                     mesh_freq = int(re.sub("[^0-9]", "", interface_list[channel_index]).split()[0])
                     break
             except Exception as e:
-                print(f"Get mesh freq exception: {e}") if args.debug else None
+                logger.error(f"Get mesh freq exception: {e}")
     except Exception as e:
-        print(f"Get mesh freq exception: {e}") if args.debug else None
+        logger.error(f"Get mesh freq exception: {e}")
 
     return mesh_freq
 
@@ -102,6 +105,50 @@ def map_freq_to_channel(freq: int) -> int:
     :return: The frequency.
     """
     return FREQ_TO_CH[freq]
+
+
+def switch_frequency(frequency: str) -> None:
+    """
+    Change the mesh frequency to the starting frequency.
+    """
+    logger.info(f"Moving to {frequency} MHz ...")
+
+    # Run commands
+    cmd_rmv_ip = ["ifconfig", f"{args.mesh_interface}", "0"]
+    cmd_interface_down = ["ifconfig", f"{args.mesh_interface}", "down"]
+    run_command(cmd_rmv_ip, 'Failed to set interface 0')
+    run_command(cmd_interface_down, 'Failed to set interface down')
+
+    # If wpa_supplicant is running, kill it before restarting
+    if is_process_running('wpa_supplicant'):
+        kill_process_by_pid('wpa_supplicant')
+        time.sleep(10)
+
+    # Remove mesh interface file to avoid errors when reinitializing interface
+    interface_file = '/var/run/wpa_supplicant/' + args.mesh_interface
+    if os.path.exists(interface_file):
+        os.remove(interface_file)
+
+    # Read and check wpa supplicant config
+    conf = read_file('/var/run/wpa_supplicant-11s.conf', 'Failed to read wpa supplicant config')
+    if conf is None:
+        logger.info("wpa supplicant config is None. Aborting.")
+        return
+
+    # Edit wpa supplicant config with new mesh freq
+    conf = re.sub(r'frequency=\d*', f'frequency={frequency}', conf)
+
+    # Write edited config back to file
+    write_file('/var/run/wpa_supplicant-11s.conf', conf, 'Failed to write wpa supplicant config')
+
+    # Restart wpa_supplicant
+    cmd_restart_supplicant = ["wpa_supplicant", "-Dnl80211", f"-i{args.mesh_interface}", "-c", "/var/run/wpa_supplicant-11s.conf", "-B"]
+    run_command(cmd_restart_supplicant, 'Failed to restart wpa supplicant')
+    time.sleep(4)
+
+    # Check mesh frequency switch output
+    cmd_iw_dev = ["iw", "dev"]
+    run_command(cmd_iw_dev, 'Failed to run iw dev')
 
 
 def load_sample_data(args: Options = Options()) -> Tuple[str, pd.DataFrame]:
@@ -128,7 +175,7 @@ def load_sample_data(args: Options = Options()) -> Tuple[str, pd.DataFrame]:
 
     # load the data into a pandas DataFrame
     data = pd.read_csv(path)
-    print(f"Sampled {sample_type} data") if args.debug else None
+    logger.info(f"Sampled {sample_type} data")
     return message, data
 
 
@@ -162,12 +209,11 @@ def get_frequency_quality(freq_quality: np.ndarray, probs: np.ndarray, frequenci
             pred = 'jamming'
             jamming_detected = True
 
-        print(freq, freq_quality[i], np.argmax(probs[i]), pred) if args.debug else None
+        logger.info(f"{freq} {freq_quality[i]} {np.argmax(probs[i])} {pred}")
 
     return jamming_detected, freq_quality_dict
 
 
-# Frequency switch related functions
 def run_command(command, error_message) -> None:
     """
     Execute a shell command and check for success.
@@ -175,15 +221,18 @@ def run_command(command, error_message) -> None:
     param command: The shell command to execute.
     param error_message: Error message to display if the command fails.
 
-    return: True if the command was successful, False otherwise.
+    return: The PID of the process.
     """
     try:
-        if args.debug:
-            subprocess.call(command, shell=True)
-        else:
-            subprocess.call(command, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+        # Run the command, redirecting both stdout and stderr to the log file
+        with open(args.log_file, 'a') as subprocess_output:
+            # Redirect the output to the log file
+            return_code = subprocess.call(command, shell=False, stdout=subprocess_output, stderr=subprocess_output)
+
+        if return_code != 0:
+            logger.error(f"Command failed with return code {return_code}")
     except Exception as e:
-        error_message = f"Error occurred: {error_message}"
+        logger.error(f"{error_message}. Error: {e}")
         raise Exception(error_message) from e
 
 
@@ -200,7 +249,7 @@ def read_file(filename, error_message):
         with open(filename, 'r') as f:
             return f.read()
     except Exception as e:
-        print(f"Error occurred while reading {filename}: {error_message}. Exception: {str(e)}") if args.debug else None
+        logger.error(f"Error occurred while reading {filename}: {error_message}. Exception: {e}")
         return None
 
 
@@ -216,10 +265,10 @@ def write_file(filename, content, error_message) -> None:
         with open(filename, 'w') as f:
             f.write(content)
     except Exception as e:
-        print(f"Error occurred while writing {filename}: {error_message}. Exception: {str(e)}") if args.debug else None
+        logger.error(f"Error occurred while writing {filename}: {error_message}. Exception: {e}")
 
 
-def is_process_running(process_name):
+def is_process_running(process_name: str) -> bool:
     """
     Check if a process with a given name is currently running.
 
@@ -228,11 +277,54 @@ def is_process_running(process_name):
     return: True if the process is running, False otherwise.
     """
     try:
-        process_list = subprocess.check_output(['ps', 'aux']).decode('utf-8').split('\n')
-        for process in process_list:
-            if process_name in process:
+        ps_output = subprocess.check_output(['ps', 'aux']).decode('utf-8')
+        if process_name in ps_output:
+            if process_name == 'wpa_supplicant':
+                if args.mesh_interface in ps_output:
+                    return True
+            else:
                 return True
+        else:
+            return False
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error occurred while checking process: {e}")
         return False
-    except Exception as e:
-        print(f"Error occurred while checking process: {str(e)}") if args.debug else None
-        return False
+
+
+def get_pid_by_process_name(process_name: str) -> int:
+    """
+    Get the Process ID (PID) of a process by its name.
+
+    param: The name of the process to search for.
+
+    return: The PID of the process if found, or 0 if the process is not found.
+    """
+    try:
+        # List processes and filter by name
+        ps_output = subprocess.check_output(['ps', 'aux'], text=True)
+        for line in ps_output.split('\n'):
+            if process_name in line:
+                if process_name == 'wpa_supplicant':
+                    if args.mesh_interface in line:
+                        pid = int(line.split()[0])
+                        return pid
+                else:
+                    pid = int(line.split()[0])
+                    return pid
+        return 0  # Process not found
+    except subprocess.CalledProcessError:
+        return 0
+
+
+def kill_process_by_pid(process_name: str) -> None:
+    """
+    Attempt to kill a process by its name.
+
+    param: The name of the process to be killed.
+    """
+    # Retrieve the Process ID (PID) of the specified process
+    pid = get_pid_by_process_name(process_name)
+    try:
+        subprocess.check_output(['kill', str(pid)])
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to kill process: {e}")  # Failed to kill the process

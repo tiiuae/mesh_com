@@ -5,11 +5,13 @@ import struct
 import subprocess
 import sys
 import time
+from typing import BinaryIO
 
 import pandas as pd
 
-from options import Options, VALID_CHANNELS
-from util import run_command, map_freq_to_channel
+from options import Options
+from util import run_command
+from log_config import logger
 
 HEADER_SIZE = 3
 TYPE1_PACKET_SIZE = 17 + 56
@@ -22,9 +24,6 @@ class Spectral:
     def __init__(self):
         self.VALUES = dict()
         self.args = Options()
-
-    def get_values(self) -> dict:
-        return self.VALUES
 
     def get_driver(self) -> str:
         """
@@ -42,15 +41,15 @@ class Spectral:
         Initialize spectral scan.
         """
         if driver == "ath10k":
-            try:
-                os.path.exists("/sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl")
-            except Exception:
-                print("Err: No spectral_scan_ctl file") if self.args.debug else None
+            output_file = "/sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
 
-            cmd_background = "echo background > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
-            cmd_trigger = "echo trigger > /sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
-            run_command(cmd_background, 'Failed to run cmd_background')
-            run_command(cmd_trigger, 'Failed to run cmd_trigger')
+            cmd_background = ["echo", "background"]
+            with open(output_file, "w") as file:
+                subprocess.call(cmd_background, stdout=file, stderr=subprocess.PIPE, shell=False)
+
+            cmd_trigger = ["echo", "trigger"]
+            with open(output_file, "w") as file:
+                subprocess.call(cmd_trigger, stdout=file, stderr=subprocess.PIPE, shell=False)
         else:
             raise Exception(f"Invalid driver: {driver}")
 
@@ -61,29 +60,44 @@ class Spectral:
         param interface: A string of the interface to use to perform the spectral scan.
         param frequencies: A string of the frequencies to scan.
         """
-        # Validate that passed frequencies list is valid
-        freq_list = [int(freq) for freq in frequencies.split(' ')]
-        channel_list = [map_freq_to_channel(freq) for freq in freq_list]
-        if not all(channel in VALID_CHANNELS for channel in channel_list):
-            raise ValueError(f"Invalid frequencies: {frequencies}")
+        # Activate and enable scan interface and execute scan
+        interface_up = ["ip", "link", "set", "dev", f"{self.args.scan_interface}", "up"]
+        do_scan_cmd = ["iw", "dev", f"{self.args.scan_interface}", "scan", "freq"]
+        # Split the frequencies string into a list of individual elements
+        frequencies_list = frequencies.split()
+        do_scan_cmd.extend(frequencies_list)
 
-        # Execute scan
-        do_scan_cmd = f"iw dev {self.args.scan_interface} scan freq {frequencies} flush"
-        interface_up = f"ip link set dev {self.args.scan_interface} up"  # activate and enable the interface
-
+        # Execute scan using wireless scan interface
         max_retries = 10
         for _ in range(max_retries):
             try:
-                subprocess.call(interface_up, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
-                subprocess.call(do_scan_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+                subprocess.call(interface_up, shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+                subprocess.call(do_scan_cmd, shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
                 break
             except Exception:
                 time.sleep(0.1)
 
-        cmd_disable = f"echo disable > /sys/kernel/debug/ieee80211/phy0/{driver}/spectral_scan_ctl"
-        cmd_dump = f"cat /sys/kernel/debug/ieee80211/phy0/{driver}/spectral_scan0 > {bin_file}"
-        run_command(cmd_disable, 'Failed to run cmd_disable')
-        run_command(cmd_dump, 'Failed to run cmd_dump')
+        # Check binary scan dump file exists
+        if not os.path.exists(bin_file):
+            cmd_create_bin_file = ["touch", f"{bin_file}"]
+            run_command(cmd_create_bin_file, "Error creating scan binary dump file")
+
+        # Pass command to stop spectral scan
+        cmd_disable = ["echo", "disable"]
+        spectral_scan_ctl_file = f"/sys/kernel/debug/ieee80211/phy0/{driver}/spectral_scan_ctl"
+        try:
+            with open(spectral_scan_ctl_file, "w") as file:
+                subprocess.call(cmd_disable, stdout=file, stderr=subprocess.PIPE, shell=False)
+        except subprocess.CalledProcessError as e:
+            print(f"Error: {e}")
+
+        # Dump scan output in spectral_scan0 to scan binary file
+        cmd_dump = ["cat", f"/sys/kernel/debug/ieee80211/phy0/{driver}/spectral_scan0"]
+        try:
+            with open(bin_file, "wb") as output_file:
+                subprocess.call(cmd_dump, stdout=output_file, stderr=subprocess.PIPE, shell=False)
+        except subprocess.CalledProcessError as e:
+            print(f"Error: {e}")
 
     def read(self, bin_file) -> None:
         """
@@ -104,7 +118,7 @@ class Spectral:
                 if not ((stype == 1 and slen == TYPE1_PACKET_SIZE) or
                         (stype == 2 and slen == TYPE2_PACKET_SIZE) or
                         (stype == 3 and slen == TYPE3_PACKET_SIZE)):
-                    print("skip malformed packet") if self.args.debug else None
+                    logger.info("skip malformed packet")
                     break
                 # 20 MHz
                 if stype == 1:
@@ -184,7 +198,7 @@ class Spectral:
                     elif chantype == 3:  # NL80211_CHAN_HT40PLUS
                         freq += 10
                     else:
-                        print("got unknown chantype: %d" % chantype) if self.args.debug else None
+                        logger.info(f"got unknown chantype: {chantype}")
                         raise
 
                     first_sc = freq - SC_WIDE * (sc_total / 2 + 0.5)
@@ -215,11 +229,11 @@ class Spectral:
                     self.VALUES[count] = (freq1, noise, max_mag, gain_db, base_pwr_db, rssi, relpwr_db, avgpwr_db)
                     count = count + 1
         except FileNotFoundError:
-            print("File not found. Make sure the file exists.") if self.args.debug else None
+            logger.error("File not found. Make sure the file exists.")
         except PermissionError:
-            print("Permission error. Check if you have the necessary permissions to access the file.") if self.args.debug else None
+            logger.error("Permission error. Check if you have the necessary permissions to access the file.")
         except Exception as e:
-            print(f"An error occurred: {str(e)}") if self.args.debug else None
+            logger.error(f"{e}")
 
     def create_dataframe(self, driver) -> pd.DataFrame:
         """
@@ -240,18 +254,23 @@ class Spectral:
         return spectral_capture_df
 
     @staticmethod
-    def file_close(file_pointer):
-        """Close the spectral binary dump file."""
+    def file_close(file_pointer: BinaryIO) -> None:
+        """
+        Close the spectral binary dump file.
+
+        param: Typed version of the return of open() in binary mode
+        """
         file_pointer.close()
 
     @staticmethod
-    def file_open(fn="data"):
+    def file_open(file_path: str) -> BinaryIO:
         """
         Open spectral binary dump file.
 
         param: The name of the binary dump file.
+        return: Typed version of the return of open() in binary mode
         """
-        if not os.path.exists(fn):
+        if not os.path.exists(file_path):
             raise FileNotFoundError("File not found.")
         else:
-            return open(fn, 'rb')
+            return open(file_path, 'rb')
