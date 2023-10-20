@@ -28,6 +28,14 @@ LOG_FILE=/opt/mesh_11s_${RADIO_INDEX}.log
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
 
 start() {
+
+    while [ -f "/var/run/nats.pid" ]; do
+	    random_number=$(( (RANDOM % 5) + 1 ))
+      sleep $random_number
+    done
+
+    echo $$ > /var/run/nats.pid
+
     printf 'Starting %s: ' "$DAEMON"
     if [ "${!_MODE}" == "ap+mesh_scc" ] || [ "${!_MODE}" == "ap+mesh_mcc" ]; then
       mode=mesh
@@ -41,6 +49,9 @@ start() {
     else
         echo "FAIL"
     fi
+
+    rm /var/run/nats.pid
+
     return "$status"
 }
 stop() {

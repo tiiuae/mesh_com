@@ -51,9 +51,16 @@ add_network_intf_to_bridge() {
 }
 
 fix_iface_mac_addresses() {
+      # handles the case when the mac address of the batman interface the same as the eth0.
+      # For batman interface, the mac address is set to 00:0Y:XX:XX:XX:XX by utilizing eth0 mac address.
+      # from 00:0Y:XX:XX:XX:XX Y is the batman interface index
+
+      # batman interface is bat0, take the last char for the numbering
+      batman_iface_index="$(echo "$batman_iface" | cut -b 4)"
+
       #Create static mac addr for Batman if
       eth0_mac="$(ip -brief link | grep eth0 | awk '{print $3; exit}')"
-      batif_mac="00:00:$(echo "$eth0_mac" | cut -b 7-17)"
+      batif_mac="00:0${batman_iface_index}:$(echo "$eth0_mac" | cut -b 7-17)"
       ifconfig "$batman_iface" down
       ifconfig "$batman_iface" hw ether "$batif_mac"
       ifconfig "$batman_iface" up
@@ -165,10 +172,7 @@ network={
 EOF
 
       if [ "$routing_algo" == "batman-adv" ]; then
-        mesh_kill "[a]lfred -i $batman_iface -m"
-        mesh_kill "[b]atadv-vis -i $batman_iface -s"
-        rm -f /var/run/alfred.sock
-        #Check if batman_adv is built-in module
+        echo "batman-adv"
       elif [ "$routing_algo" == "olsr" ]; then
         mesh_kill "[o]lsrd -i $wifidev -d 0"
       fi
@@ -214,8 +218,6 @@ EOF
       if [ "$routing_algo" == "batman-adv" ]; then
         batctl if add "$wifidev"
         echo "$batman_iface up.."
-        # Create static mac addr for Batman if and br-lan
-        fix_iface_mac_addresses
         ifconfig "$batman_iface" up
         echo "$batman_iface ip address.."
         ifconfig "$batman_iface" "$ipaddr" netmask "$nmask"
@@ -224,16 +226,6 @@ EOF
         echo
         ifconfig "$batman_iface"
 
-        # for visualisation
-        (alfred -i "$batman_iface" -m)&
-        echo "started alfred"
-
-        if ps aux | grep -q "[b]atadv-vis -i $batman_iface -s"; then
-          echo "batadv-vis is already running."
-        else
-          (batadv-vis -i "$batman_iface" -s) &
-          echo "batadv-vis started."
-        fi
       elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
         # Enable debug level as necessary
@@ -245,6 +237,25 @@ EOF
       ifconfig "$bridge_name" up
       echo
       ifconfig "$bridge_name"
+
+      if [ "$routing_algo" == "batman-adv" ]; then
+        sleep 3
+        # for visualisation
+        if ps aux | grep -q "[a]lfred -i $bridge_name -m"; then
+          echo "alfred is already running."
+        else
+          (alfred -i "$bridge_name" -m)&
+          echo "started alfred"
+        fi
+
+        if ps aux | grep -q "[b]atadv-vis -i $batman_iface -s"; then
+          echo "batadv-vis is already running."
+        else
+          (batadv-vis -i "$batman_iface" -s) &
+          echo "batadv-vis started."
+        fi
+      fi
+
       # Add forwarding rules from AP to "$batman_iface" interface
       iptables -P FORWARD ACCEPT
       route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
@@ -295,10 +306,7 @@ network={
 EOF
 
       if [ "$routing_algo" == "batman-adv" ]; then
-        mesh_kill "[a]lfred -i $batman_iface -m"
-        mesh_kill "[b]atadv-vis -i $batman_iface -s"
-        rm -f /var/run/alfred.sock
-        #Check if batman_adv is built-in module
+        echo "batman-adv"
         if [[ -d "/sys/module/batman_adv" ]]; then
           modprobe batman-adv
         fi
@@ -328,8 +336,6 @@ EOF
       if [ "$routing_algo" == "batman-adv" ]; then
         batctl if add "$wifidev"
         echo "$batman_iface up.."
-        # Create static mac addr for Batman if and br-lan
-        fix_iface_mac_addresses
         ifconfig "$batman_iface" up
         echo "$batman_iface ip address.."
         ifconfig "$batman_iface" "$ipaddr" netmask "$nmask"
@@ -337,18 +343,6 @@ EOF
         ifconfig "$batman_iface" mtu 1460
         echo
         ifconfig "$batman_iface"
-
-        sleep 3
-
-        # for visualisation
-        (alfred -i "$batman_iface" -m)&
-        echo "started alfred"
-        if ps aux | grep -q "[b]atadv-vis -i $batman_iface -s"; then
-          echo "batadv-vis is already running."
-        else
-          (batadv-vis -i "$batman_iface" -s) &
-          echo "batadv-vis started."
-        fi
 
       elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
@@ -364,6 +358,25 @@ EOF
       ifconfig "$bridge_name" up
       echo
       ifconfig "$bridge_name"
+
+      if [ "$routing_algo" == "batman-adv" ]; then
+        sleep 3
+        # for visualisation
+        if ps aux | grep -q "[a]lfred -i $bridge_name -m"; then
+          echo "alfred is already running."
+        else
+          (alfred -i "$bridge_name" -m)&
+          echo "started alfred"
+        fi
+
+        if ps aux | grep -q "[b]atadv-vis -i $batman_iface -s"; then
+          echo "batadv-vis is already running."
+        else
+          (batadv-vis -i "$batman_iface" -s) &
+          echo "batadv-vis started."
+        fi
+      fi
+
       # Add forwarding rules from AP to "$batman_iface" interface
       iptables -P FORWARD ACCEPT
       route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
@@ -626,7 +639,6 @@ main () {
   fi
 
   calculate_network_address "$br_lan_ip" "$nmask"
-
   mode_execute "$mode"
 }
 
