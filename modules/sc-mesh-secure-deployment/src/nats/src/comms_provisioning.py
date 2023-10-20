@@ -136,7 +136,7 @@ class CommsProvisioning:
         client_certificate = self.__hsm_ctrl.get_certificate(self.__auth_key_id, self.__auth_key_label)
         server_certificate = self.__hsm_ctrl.get_certificate(self.__auth_key_id, self.__server_cert_label)
 
-        if datetime.now() < self.__reference_date:
+        if datetime.now() < self.__reference_date and client_certificate is not None:
             # Use client certificate to set system time
             self.__update_system_time(client_certificate.validity_start)
 
