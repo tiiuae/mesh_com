@@ -38,6 +38,10 @@ add_network_intf_to_bridge() {
   _bridge_name=$1
   _interfaces=$2
 
+  _lan1=0
+  if [[ "$_interfaces" == *"lan1"* ]]; then
+    _lan1=1
+  fi
   # Loop through the interface names and add them to the bridge if available
   for _interface in $_interfaces; do
     # Check if the interface exists
@@ -48,6 +52,11 @@ add_network_intf_to_bridge() {
       echo "Interface $_interface not found. Skipping."
     fi
   done
+
+  if [ "$_lan1" -eq 1 ]; then
+    # Add lan1 to bridge
+    brctl delif "$_bridge_name" eth0 2>/dev/null
+  fi
 }
 
 fix_iface_mac_addresses() {
@@ -237,17 +246,11 @@ EOF
       ifconfig "$bridge_name" up
       echo
       ifconfig "$bridge_name"
+      fix_iface_mac_addresses
 
       if [ "$routing_algo" == "batman-adv" ]; then
         sleep 3
         # for visualisation
-        if ps aux | grep -q "[a]lfred -i $bridge_name -m"; then
-          echo "alfred is already running."
-        else
-          (alfred -i "$bridge_name" -m)&
-          echo "started alfred"
-        fi
-
         if ps aux | grep -q "[b]atadv-vis -i $batman_iface -s"; then
           echo "batadv-vis is already running."
         else
@@ -358,17 +361,11 @@ EOF
       ifconfig "$bridge_name" up
       echo
       ifconfig "$bridge_name"
+      fix_iface_mac_addresses
 
       if [ "$routing_algo" == "batman-adv" ]; then
         sleep 3
         # for visualisation
-        if ps aux | grep -q "[a]lfred -i $bridge_name -m"; then
-          echo "alfred is already running."
-        else
-          (alfred -i "$bridge_name" -m)&
-          echo "started alfred"
-        fi
-
         if ps aux | grep -q "[b]atadv-vis -i $batman_iface -s"; then
           echo "batadv-vis is already running."
         else

@@ -250,14 +250,14 @@ def validate_radio_index(radio_index: str) -> bool:
     except (ValueError, TypeError, AttributeError):
         return False
 
-def validate_phy(phy: str) -> bool:
-    """
-    Validates a given phy.
-    Returns True if the phy is valid, False otherwise.
-    """
-    if "phy" in phy and int(phy.replace("phy", "")) >= 0:
-        return True
-    return False
+# def validate_phy(phy: str) -> bool:
+#     """
+#     Validates a given phy.
+#     Returns True if the phy is valid, False otherwise.
+#     """
+#     if "phy" in phy and int(phy.replace("phy", "")) >= 0:
+#         return True
+#     return False
 
 def validate_mesh_vif(mesh_vif: str) -> bool:
     """

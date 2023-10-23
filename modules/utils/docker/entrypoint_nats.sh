@@ -50,6 +50,10 @@ else
     sleep 1
   done
 
+  sleep 3
+
+  /opt/S90Alfred start
+
   echo "starting provisioning agent"
   # blocks execution until provisioning is done or timeout (30s)
   # IP address and port are passed as arguments and hardcoded. TODO: mDNS

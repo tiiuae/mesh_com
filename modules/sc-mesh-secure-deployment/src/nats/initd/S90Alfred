@@ -1,0 +1,70 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          S90Alfred
+# Short-Description: alfred
+# Description:       Starts alfred to provide visualization data
+### END INIT INFO
+
+DAEMON="alfred"
+DIR="/usr/bin/"
+PIDFILE="/var/run/$DAEMON.pid"
+# shellcheck source=/dev/null
+[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
+LOG_FILE=/opt/alfred.log
+
+source /opt/mesh-helper.sh
+# sources mesh configuration
+source_configuration "id0"
+bridge_name=$(echo "$BRIDGE" | cut -d' ' -f1)
+
+ARGS="-i $bridge_name -m"
+
+wait_for_bridge() {
+  while [ ! -d "/sys/class/net/$bridge_name" ]; do
+    sleep 1
+  done
+}
+
+start() {
+    echo "$ARGS"
+    printf 'Starting %s: ' "$DAEMON"
+    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON \
+          $ARGS > $LOG_FILE 2>&1"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+stop() {
+    printf 'Stopping %s: ' "$DAEMON"
+    start-stop-daemon -K -q -p "$PIDFILE"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        rm -f "$PIDFILE"
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+restart() {
+    stop
+    sleep 1
+    start
+}
+case "$1" in
+    start|stop|restart)
+        "$1";;
+    reload)
+        # Restart, since there is no true "reload" feature.
+        restart;;
+    *)
+        echo "Usage: $0 {start|stop|restart|reload}"
+        exit 1
+esac
+
+exit 0
+

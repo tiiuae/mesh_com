@@ -40,7 +40,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.priority = []
         self.role: str = ""
         self.mesh_vif = []
-        self.phy = []
+        # self.phy = []
         self.batman_iface = []
         self.bridge: str = ""
         self.msversion: str = ""
@@ -110,9 +110,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             return "FAIL", "Invalid mesh vif"
         self.logger.debug("validate mesh settings mesh vif ok")
 
-        if validation.validate_phy(self.phy[index]) is False:
-            return "FAIL", "Invalid phy"
-        self.logger.debug("validate mesh settings phy ok")
+        # if validation.validate_phy(self.phy[index]) is False:
+        #     return "FAIL", "Invalid phy"
+        # self.logger.debug("validate mesh settings phy ok")
 
         if validation.validate_batman_iface(self.batman_iface[index]) is False:
             return "FAIL", "Invalid batman iface"
@@ -138,7 +138,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.routing = []
         self.priority = []
         self.mesh_vif = []
-        self.phy = []
+        # self.phy = []
         self.batman_iface = []
 
     def handle_mesh_settings(self, msg: str, path="/opt",
@@ -173,7 +173,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 self.routing.append(quote(str(parameters["routing"])))
                 self.priority.append(quote(str(parameters["priority"])))
                 self.mesh_vif.append(quote(str(parameters["mesh_vif"])))
-                self.phy.append(quote(str(parameters["phy"])))
+                # self.phy.append(quote(str(parameters["phy"])))
                 self.batman_iface.append(quote(str(parameters["batman_iface"])))
 
             self.bridge = quote(str(parameters_set["bridge"]))
@@ -223,7 +223,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write(f"id{str(index)}_ROUTING={quote(self.routing[index])}\n")
                 mesh_conf.write(f"id{str(index)}_PRIORITY={quote(self.priority[index])}\n")
                 mesh_conf.write(f"id{str(index)}_MESH_VIF={quote(self.mesh_vif[index])}\n")
-                mesh_conf.write(f"id{str(index)}_PHY={quote(self.phy[index])}\n")
+                # mesh_conf.write(f"id{str(index)}_PHY={quote(self.phy[index])}\n")
                 mesh_conf.write(f"id{str(index)}_BATMAN_IFACE={quote(self.batman_iface[index])}\n")
                 mesh_conf.write(f"BRIDGE={self.bridge}\n")
 
@@ -272,8 +272,8 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                     self.priority.append(match[1])
                 elif name == "MESH_VIF":
                     self.mesh_vif.append(match[1])
-                elif name == "PHY":
-                    self.phy.append(match[1])
+                # elif name == "PHY":
+                #     self.phy.append(match[1])
                 elif name == "BATMAN_IFACE":
                     self.batman_iface.append(match[1])
                 else:

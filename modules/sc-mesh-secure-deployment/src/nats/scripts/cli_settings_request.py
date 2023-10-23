@@ -25,7 +25,6 @@ async def main():
                 "tx_power": "15",
                 "mode": "mesh",  # ap+mesh_scc, mesh, halow
                 "mesh_vif": "wlp2s0",
-                "phy": "phy2",  # TODO: NOT_USED
                 "batman_iface": "bat0",
             },
             {
@@ -43,7 +42,6 @@ async def main():
                 "tx_power": "15",
                 "mode": "mesh",  # ap+mesh_scc, mesh, halow
                 "mesh_vif": "wlp3s0",  # this needs to be correct
-                "phy": "phy0",  # TODO: NOT_USED
                 "batman_iface": "bat0",
             },
             {
@@ -61,11 +59,10 @@ async def main():
                 "tx_power": "30",
                 "mode": "halow",  # ap+mesh_scc, mesh, halow
                 "mesh_vif": "halow1",
-                "phy": "phy2",  # TODO: NOT_USED
                 "batman_iface": "bat0",
             },
         ],
-        "bridge": "br-lan bat0 eth1 lan1"
+        "bridge": "br-lan bat0 eth1 lan1 eth0 usb0"
     }
 
     cmd = json.dumps(cmd_dict)

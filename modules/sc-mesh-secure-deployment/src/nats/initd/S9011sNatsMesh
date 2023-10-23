@@ -24,17 +24,23 @@ _MODE="${RADIO_INDEX}_MODE"
 PIDFILE="/var/run/${DAEMON}_${RADIO_INDEX}.pid"
 LOG_FILE=/opt/mesh_11s_${RADIO_INDEX}.log
 
+SYNC_LOCK="/var/run/mesh_start.lock"
+
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
 
 start() {
-
-    while [ -f "/var/run/nats.pid" ]; do
-	    random_number=$(( (RANDOM % 5) + 1 ))
-      sleep $random_number
-    done
-
-    echo $$ > /var/run/nats.pid
+    if mkdir $SYNC_LOCK 2>/dev/null; then
+       echo "I have a lock $RADIO_INDEX PID $$"
+    else
+       echo "Instance is already running. Waiting..."
+       # Wait for the lock directory to be removed, indicating the previous instance finished
+       while [ -d "$SYNC_LOCK" ]; do
+         sleep $(( (RANDOM % 5) + 1 ))
+       done
+       mkdir "$SYNC_LOCK"
+       echo "I have a lock $$"
+    fi
 
     printf 'Starting %s: ' "$DAEMON"
     if [ "${!_MODE}" == "ap+mesh_scc" ] || [ "${!_MODE}" == "ap+mesh_mcc" ]; then
@@ -50,7 +56,7 @@ start() {
         echo "FAIL"
     fi
 
-    rm /var/run/nats.pid
+    rmdir "$SYNC_LOCK"
 
     return "$status"
 }
