@@ -162,6 +162,8 @@ mode_execute() {
   # $1 = mode
   case "$mode" in
     "halow")
+      MAX_RETRIES=5
+      RETRY_COUNT=0
       cat <<EOF >/var/run/wpa_supplicant-11s_"$INDEX".conf
 ctrl_interface=DIR=/var/run/wpa_supplicant_"$INDEX"
 ap_scan=1
