@@ -220,9 +220,12 @@ def validate_role(role: str) -> bool:
     Validates a given role.
     Returns True if the role is valid, False otherwise.
     """
-    if role in ("drone", "sleeve", "gcs"):
-        return True
-    return False
+    try:
+        if role in ("drone", "sleeve", "gcs"):
+            return True
+        return False
+    except (ValueError, TypeError, AttributeError):
+        return False
 
 def validate_delay(delay: str) -> bool:
     """
@@ -265,15 +268,21 @@ def validate_mesh_vif(mesh_vif: str) -> bool:
     Returns True if the mesh vif is valid, False otherwise.
     """
     # todo add more checks
-    if mesh_vif.startswith("wl") or mesh_vif.startswith("halow"):
-        return True
-    return False
+    try:
+        if mesh_vif.startswith("wl") or mesh_vif.startswith("halow"):
+            return True
+        return False
+    except (ValueError, TypeError, AttributeError):
+        return False
 
 def validate_batman_iface(batman_iface: str) -> bool:
     """
     Validates a given batman iface.
     Returns True if the batman iface is valid, False otherwise.
     """
-    if "bat" in batman_iface and int(batman_iface.replace("bat", "")) >= 0:
-        return True
-    return False
+    try:
+        if "bat" in batman_iface and int(batman_iface.replace("bat", "")) >= 0:
+            return True
+        return False
+    except (ValueError, TypeError, AttributeError):
+        return False

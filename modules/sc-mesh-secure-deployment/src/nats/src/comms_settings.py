@@ -146,6 +146,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         """
         Handle mesh settings
         """
+
+        _index = 0
+
         try:
             parameters_set = json.loads(msg)
 
@@ -179,6 +182,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             self.bridge = quote(str(parameters_set["bridge"]))
 
             for index in self.radio_index:
+                _index = index
                 self.logger.debug("Mesh settings validation index: %s", str(index))
                 ret, info = self.validate_mesh_settings(index)
 
@@ -193,9 +197,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
 
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
-            self.comms_status.mesh_cfg_status = \
+            self.comms_status[_index].mesh_cfg_status = \
                 comms.STATUS.mesh_cfg_not_stored
-            ret, _ = "FAIL", self.comms_status.mesh_cfg_status
+            ret, _ = "FAIL", self.comms_status[_index].mesh_cfg_status
             info = "JSON format not correct" + str(error)
             self.logger.error("Mesh settings validation: %s, %s", ret, info)
 
