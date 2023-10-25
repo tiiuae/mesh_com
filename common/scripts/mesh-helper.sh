@@ -43,19 +43,25 @@ EOF
   fi
 }
 
-generate_br_lan_ip() {
+generate_bridge_ip() {
   local mesh_if_mac
+
+  bridge_name=$(echo "$BRIDGE" | cut -d' ' -f1)
+
   mesh_if_mac="$(ip -brief link | grep "${id0_MESH_VIF}" | awk '{print $3; exit}')"
   if [ -z "$mesh_if_mac" ]; then
-      echo "generate_br_lan_ip: MAC not found for id0_MESH_VIF! Configuration error?" > /dev/kmsg
+      echo "generate_bridge_ip: MAC not found for id0_MESH_VIF! Configuration error?" > /dev/kmsg
       mesh_if_mac="$(ip -brief link | grep "eth0" | awk '{print $3; exit}')"
   fi
   local ip_random
   ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
-  br_lan_ip="192.168.1."$((16#$ip_random))
+  bridge_ip="192.168.1."$((16#$ip_random))
+
+  # legacy support
+  br_lan_ip=$bridge_ip
 
   cat > /etc/radvd.conf <<- EOF
-interface br-lan {
+interface $bridge_name {
   AdvSendAdvert on;
   MinRtrAdvInterval 3;
   MaxRtrAdvInterval 10;

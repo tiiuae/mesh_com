@@ -124,22 +124,22 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         """
         Clean all settings
         """
-        self.radio_index = []
-        self.ssid = []
-        self.key = []
-        self.ap_mac = []
-        self.country = []
-        self.frequency = []
-        self.frequency_mcc = []
-        self.ip_address = []
-        self.subnet = []
-        self.tx_power = []
-        self.mode = []
-        self.routing = []
-        self.priority = []
-        self.mesh_vif = []
+        self.radio_index: [int, ...] = []
+        self.ssid: [str, ...] = []
+        self.key: [str, ...] = []
+        self.ap_mac: [str, ...] = []
+        self.country: [str, ...] = []
+        self.frequency: [str, ...] = []
+        self.frequency_mcc: [str, ...] = []
+        self.ip_address: [str, ...] = []
+        self.subnet: [str, ...] = []
+        self.tx_power: [str, ...] = []
+        self.mode: [str, ...] = []
+        self.routing: [str, ...] = []
+        self.priority: [str, ...] = []
+        self.mesh_vif: [str, ...] = []
         # self.phy = []
-        self.batman_iface = []
+        self.batman_iface: [str, ...] = []
 
     def handle_mesh_settings(self, msg: str, path="/opt",
                              file="mesh_stored.conf") -> (str, str):
@@ -190,10 +190,19 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 if ret == "FAIL":
                     self.comms_status[index].mesh_cfg_status = \
                         comms.STATUS.mesh_cfg_not_stored
-                    self.logger.error("save settings failed: %s, %s", ret, info)
-                else:
-                    ret, info = self.__save_settings(path, file, index)
-                    self.logger.debug("save settings index %s: %s, %s", str(index), ret, info)
+                    self.logger.error("Settings validation failed: %s, %s, id %s", ret, info, str(index))
+                    _, _ = self.__load_settings() # to restore cleaned settings
+                    return ret, info + ", id " + str(index)
+
+            # separate loop to avoid saving if validation fails
+            for index in self.radio_index:
+                ret, info = self.__save_settings(path, file, index)
+                self.logger.debug("save settings index %s: %s, %s", str(index), ret, info)
+                if ret == "FAIL":
+                    self.comms_status[index].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
+                    self.logger.error("save settings failed: %s, %s, id %s", ret, info, str(index))
+                    _, _ = self.__load_settings()  # to restore cleaned settings
+                    return ret, info + ", id " + str(index)
 
         except (json.decoder.JSONDecodeError, KeyError,
                 TypeError, AttributeError) as error:
@@ -298,6 +307,8 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         return: OK, FAIL
         """
         config_file_path: str = "/opt/mesh_default.conf"
+
+        self.__clean_all_settings()
 
         try:
             for index in range(0, len(self.comms_status)):

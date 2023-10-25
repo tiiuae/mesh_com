@@ -24,7 +24,7 @@ else
   done
 
   echo "set bridge ip"
-  generate_br_lan_ip
+  generate_bridge_ip
 
   echo "starting 11s mesh service"
   # todo for loop range 0..3
@@ -46,7 +46,7 @@ else
   fi
 
   echo "wait for bridge to be up..."
-  while ! (ifconfig | grep -e "$br_lan_ip") > /dev/null; do
+  while ! (ifconfig | grep -e "$bridge_ip") > /dev/null; do
     sleep 1
   done
 

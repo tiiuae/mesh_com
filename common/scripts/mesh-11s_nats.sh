@@ -244,7 +244,7 @@ EOF
       fi
 
       add_network_intf_to_bridge "$bridge_name" "$bridge_interfaces"
-      ifconfig "$bridge_name" "$br_lan_ip" netmask "$nmask"
+      ifconfig "$bridge_name" "$bridge_ip" netmask "$nmask"
       ifconfig "$bridge_name" up
       echo
       ifconfig "$bridge_name"
@@ -264,9 +264,9 @@ EOF
       # Add forwarding rules from AP to "$batman_iface" interface
       iptables -P FORWARD ACCEPT
       route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
-      route add -net "$network" gw "$br_lan_ip" netmask "$nmask" dev "$bridge_name"
+      route add -net "$network" gw "$bridge_ip" netmask "$nmask" dev "$bridge_name"
       iptables -A FORWARD --in-interface "$_mesh_vif" -j ACCEPT
-      iptables --table nat -A POSTROUTING --out-interface "$br_lan_ip" -j MASQUERADE
+      iptables --table nat -A POSTROUTING --out-interface "$bridge_ip" -j MASQUERADE
 
       sleep 5
 
@@ -359,7 +359,7 @@ EOF
       iw dev "$wifidev" set txpower limit "$txpwr"00
 
       add_network_intf_to_bridge "$bridge_name" "$bridge_interfaces"
-      ifconfig "$bridge_name" "$br_lan_ip" netmask "$nmask"
+      ifconfig "$bridge_name" "$bridge_ip" netmask "$nmask"
       ifconfig "$bridge_name" up
       echo
       ifconfig "$bridge_name"
@@ -379,9 +379,9 @@ EOF
       # Add forwarding rules from AP to "$batman_iface" interface
       iptables -P FORWARD ACCEPT
       route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
-      route add -net "$network" gw "$br_lan_ip" netmask "$nmask" dev "$bridge_name"
+      route add -net "$network" gw "$bridge_ip" netmask "$nmask" dev "$bridge_name"
       iptables -A FORWARD --in-interface "$batman_iface" -j ACCEPT
-      iptables --table nat -A POSTROUTING --out-interface "$br_lan_ip" -j MASQUERADE
+      iptables --table nat -A POSTROUTING --out-interface "$bridge_ip" -j MASQUERADE
 
       wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
       ;;
@@ -426,7 +426,7 @@ EOF
             ifconfig "$bridge_name" down
             iptables -A FORWARD --in-interface "$batman_iface" -j ACCEPT
       fi
-      ifconfig "$bridge_name" "$br_lan_ip" netmask "$nmask"
+      ifconfig "$bridge_name" "$bridge_ip" netmask "$nmask"
       ifconfig "$bridge_name" up
       echo
       ifconfig "$bridge_name"
@@ -435,7 +435,7 @@ EOF
       # Add forwading rules from AP to "$batman_iface" interface
       iptables -P FORWARD ACCEPT
       route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
-      route add -net "$network" gw "$br_lan_ip" netmask "$nmask" dev "$bridge_name"
+      route add -net "$network" gw "$bridge_ip" netmask "$nmask" dev "$bridge_name"
       iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
 
       # Start AP
@@ -553,9 +553,9 @@ main () {
   #  id0_PRIORITY=long_range
   #  BRIDGE="br-mesh eth1 eth0 lan1"
   #  ROLE=drone
-  generate_br_lan_ip
-  # to get br_lan_ip warning free
-  br_lan_ip=$br_lan_ip
+  generate_bridge_ip
+  # to get bridge_ip warning free
+  bridge_ip=$bridge_ip
 
   find_ethernet_port
   # to get eth_port warning free
@@ -637,7 +637,7 @@ main () {
     echo "Bridge $bridge_name created."
   fi
 
-  calculate_network_address "$br_lan_ip" "$nmask"
+  calculate_network_address "$bridge_ip" "$nmask"
   mode_execute "$mode"
 }
 
