@@ -139,4 +139,3 @@ else
 fi
 
 radvd -C /etc/radvd.conf -d 0
-

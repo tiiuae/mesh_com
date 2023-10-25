@@ -1,7 +1,6 @@
 
 #! /bin/bash
 
-
 create_dhcpd_config()
 {
   SUBNET="$1"
@@ -22,7 +21,7 @@ EOF
 
 create_olsrd_config()
 {
-  wifidev="$1"
+  WIFI_INTERFACE="$1"
   SUBNET="$2"
   cat > /etc/olsrd/olsrd.conf <<- EOF
   LinkQualityFishEye   0
@@ -48,7 +47,7 @@ EOF
 
 create_olsrd_config6()
 {
-  wifidev="$1"
+  WIFI_INTERFACE="$1"
   IPV6_PREFIX="$2"
   cat > /etc/olsrd/olsrd6.conf <<- EOF
   LinkQualityFishEye   0
