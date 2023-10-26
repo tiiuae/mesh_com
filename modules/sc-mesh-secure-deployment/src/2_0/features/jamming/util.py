@@ -130,19 +130,20 @@ def switch_frequency(frequency: str) -> None:
         os.remove(interface_file)
 
     # Read and check wpa supplicant config
-    conf = read_file('/var/run/wpa_supplicant-11s.conf', 'Failed to read wpa supplicant config')
+    wpa_supplicant_conf = '/var/run/wpa_supplicant-11s_wlp1s0.conf'
+    conf = read_file(wpa_supplicant_conf, 'Failed to read wpa supplicant config')
     if conf is None:
         logger.info("wpa supplicant config is None. Aborting.")
         return
 
     # Edit wpa supplicant config with new mesh freq
-    conf = re.sub(r'frequency=\d*', f'frequency={frequency}', conf)
+    edited_conf = re.sub(r'frequency=\d*', f'frequency={frequency}', conf)
 
     # Write edited config back to file
-    write_file('/var/run/wpa_supplicant-11s.conf', conf, 'Failed to write wpa supplicant config')
+    write_file(wpa_supplicant_conf, edited_conf, 'Failed to write wpa supplicant config')
 
     # Restart wpa_supplicant
-    cmd_restart_supplicant = ["wpa_supplicant", "-Dnl80211", f"-i{args.mesh_interface}", "-c", "/var/run/wpa_supplicant-11s.conf", "-B"]
+    cmd_restart_supplicant = ["wpa_supplicant", "-Dnl80211", f"-i{args.mesh_interface}", "-c", wpa_supplicant_conf, "-B"]
     run_command(cmd_restart_supplicant, 'Failed to restart wpa supplicant')
     time.sleep(4)
 
@@ -220,8 +221,6 @@ def run_command(command, error_message) -> None:
 
     param command: The shell command to execute.
     param error_message: Error message to display if the command fails.
-
-    return: The PID of the process.
     """
     try:
         # Run the command, redirecting both stdout and stderr to the log file
