@@ -49,19 +49,6 @@ generate_br_lan_ip() {
   local ip_random
   ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
   br_lan_ip="192.168.1."$((16#$ip_random))
-
-
-  cat > /etc/radvd.conf <<- EOF
-interface br-lan {
-  AdvSendAdvert on;
-  MinRtrAdvInterval 3;
-  MaxRtrAdvInterval 10;
-  prefix 2001:db8:1234:5678::/64 {
-      AdvOnLink on;
-      AdvAutonomous on;
-  };
-};
-EOF
 }
 
 source_configuration() {

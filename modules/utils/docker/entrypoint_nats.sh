@@ -48,10 +48,6 @@ else
   echo "starting nats server"
   /opt/S90nats_server start
 
-  echo "starting radvd & socat"
-  radvd -C /etc/radvd.conf  # TODO: for some reason init.d is not working
-  /opt/S90socat start  # socat is used to provide IPv6 NATS IF
-
   echo "starting comms services"
   /opt/S90comms_controller start
 
