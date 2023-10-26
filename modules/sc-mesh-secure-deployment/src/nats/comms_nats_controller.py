@@ -39,10 +39,10 @@ class MeshTelemetry:
 
         :return: mesh visualisation
         """
-        return f"[{self.batman_visual.latest_topology}," \
-               f"{self.batman.latest_stat}]". \
-            replace(": ", ":"). \
-            replace(", ", ",")
+        return (
+            f"[{self.batman_visual.latest_topology},"
+            f"{self.batman.latest_stat}]".replace(": ", ":").replace(", ", ",")
+        )
 
     def run(self):
         """
@@ -86,26 +86,35 @@ class CommsController:  # pylint: disable=too-few-public-methods
         self.main_logger = logging.getLogger("comms")
         self.main_logger.setLevel(logging.DEBUG)
         log_formatter = logging.Formatter(
-            fmt='%(asctime)s :: %(name)-18s :: %(levelname)-8s :: %(message)s')
+            fmt="%(asctime)s :: %(name)-18s :: %(levelname)-8s :: %(message)s"
+        )
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(log_formatter)
         self.main_logger.addHandler(console_handler)
 
         self.c_status = []
-        #TODO how many radios?
+        # TODO how many radios?
         for i in range(0, 3):
-            self.c_status.append(comms_status.CommsStatus(self.main_logger.getChild(f"status {str(i)}"), i))
+            self.c_status.append(
+                comms_status.CommsStatus(
+                    self.main_logger.getChild(f"status {str(i)}"), i
+                )
+            )
 
-        self.settings = comms_settings.CommsSettings(self.c_status,
-                                                     self.main_logger.getChild("settings"))
+        self.settings = comms_settings.CommsSettings(
+            self.c_status, self.main_logger.getChild("settings")
+        )
 
         for cstat in self.c_status:
             if cstat.index < len(self.settings.mesh_vif):
                 cstat.wifi_interface = self.settings.mesh_vif[cstat.index]
 
-        self.command = comms_command.Command(server, port, self.c_status,
-                                             self.main_logger.getChild("command"))
-        self.telemetry = MeshTelemetry(self.interval, self.main_logger.getChild("telemetry"))
+        self.command = comms_command.Command(
+            server, port, self.c_status, self.main_logger.getChild("command")
+        )
+        self.telemetry = MeshTelemetry(
+            self.interval, self.main_logger.getChild("telemetry")
+        )
 
         # logger for this module and derived from main logger
         self.logger = self.main_logger.getChild("controller")
@@ -139,9 +148,10 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
         asyncio.create_task(nats_client.close())
         asyncio.create_task(stop())
 
-    for sig in ('SIGINT', 'SIGTERM'):
-        asyncio.get_running_loop().add_signal_handler(getattr(signal, sig),
-                                                      signal_handler)
+    for sig in ("SIGINT", "SIGTERM"):
+        asyncio.get_running_loop().add_signal_handler(
+            getattr(signal, sig), signal_handler
+        )
 
     async def disconnected_cb():
         cc.logger.debug("Got disconnected...")
@@ -157,17 +167,20 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
 
     # Connect to NATS server with TLS enabled if ssl_context is provided
     if ssl_context:
-        await nats_client.connect(f"tls://{server}:{port}",
-                                  tls=ssl_context,
-                                  reconnected_cb=reconnected_cb,
-                                  disconnected_cb=disconnected_cb,
-                                  max_reconnect_attempts=-1)
+        await nats_client.connect(
+            f"tls://{server}:{port}",
+            tls=ssl_context,
+            reconnected_cb=reconnected_cb,
+            disconnected_cb=disconnected_cb,
+            max_reconnect_attempts=-1,
+        )
     else:
-        await nats_client.connect(f"nats://{server}:{port}",
-                                  reconnected_cb=reconnected_cb,
-                                  disconnected_cb=disconnected_cb,
-                                  max_reconnect_attempts=-1)
-
+        await nats_client.connect(
+            f"nats://{server}:{port}",
+            reconnected_cb=reconnected_cb,
+            disconnected_cb=disconnected_cb,
+            max_reconnect_attempts=-1,
+        )
 
     async def message_handler(message):
         # reply = message.reply
@@ -178,6 +191,13 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
 
         if subject == f"comms.settings.{identity}":
             ret, info = cc.settings.handle_mesh_settings(data)
+        elif subject == f"comms.channel_change.{identity}":
+            ret, info, _index = cc.settings.handle_mesh_settings_channel_change(data)
+            if ret == "TRIGGER":
+                cmd = json.dumps(
+                    {"api_version": 1, "cmd": "APPLY", "radio_index": f"{_index}"}
+                )
+                ret, info, resp = cc.command.handle_command(cmd, cc)
         elif subject in (f"comms.command.{identity}", "comms.identity"):
             ret, info, resp = cc.command.handle_command(data, cc)
         elif subject == f"comms.status.{identity}":
@@ -186,22 +206,27 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
         # Update status info
         _ = [item.refresh_status() for item in cc.c_status]
 
-        response = {'status': ret, 'info': info,
-                    'mesh_status': [item.mesh_status for item in cc.c_status],
-                    'mesh_cfg_status': [item.mesh_cfg_status for item in cc.c_status],
-                    'visualisation_active': [item.is_visualisation_active for item in cc.c_status],
-                    'mesh_radio_on': [item.is_mesh_radio_on for item in cc.c_status],
-                    'ap_radio_on': [item.is_ap_radio_on for item in cc.c_status],
-                    'security_status': [item.security_status for item in cc.c_status]
-                    }
+        response = {
+            "status": ret,
+            "info": info,
+            "mesh_status": [item.mesh_status for item in cc.c_status],
+            "mesh_cfg_status": [item.mesh_cfg_status for item in cc.c_status],
+            "visualisation_active": [
+                item.is_visualisation_active for item in cc.c_status
+            ],
+            "mesh_radio_on": [item.is_mesh_radio_on for item in cc.c_status],
+            "ap_radio_on": [item.is_ap_radio_on for item in cc.c_status],
+            "security_status": [item.security_status for item in cc.c_status],
+        }
 
         if resp != "":
-            response['data'] = resp
+            response["data"] = resp
 
         cc.logger.debug("Sending response: %s", str(response)[:1000])
         await message.respond(json.dumps(response).encode("utf-8"))
 
     await nats_client.subscribe(f"comms.settings.{identity}", cb=message_handler)
+    await nats_client.subscribe(f"comms.channel_change.{identity}", cb=message_handler)
     await nats_client.subscribe(f"comms.command.{identity}", cb=message_handler)
     await nats_client.subscribe("comms.identity", cb=message_handler)
     await nats_client.subscribe(f"comms.status.{identity}", cb=message_handler)
@@ -218,16 +243,15 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000):
             cc.logger.error("Error:", e)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Mesh Settings')
-    parser.add_argument('-s', '--server', help='Server IP', required=True)
-    parser.add_argument('-p', '--port', help='Server port', required=True)
-    parser.add_argument('-k', '--keyfile', help='TLS keyfile', required=False)
-    parser.add_argument('-c', '--certfile', help='TLS certfile', required=False)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Mesh Settings")
+    parser.add_argument("-s", "--server", help="Server IP", required=True)
+    parser.add_argument("-p", "--port", help="Server port", required=True)
+    parser.add_argument("-k", "--keyfile", help="TLS keyfile", required=False)
+    parser.add_argument("-c", "--certfile", help="TLS certfile", required=False)
     args = parser.parse_args()
 
     loop = asyncio.new_event_loop()
-    loop.run_until_complete(main(args.server, args.port,
-                                 args.keyfile, args.certfile))
+    loop.run_until_complete(main(args.server, args.port, args.keyfile, args.certfile))
     loop.run_forever()
     loop.close()

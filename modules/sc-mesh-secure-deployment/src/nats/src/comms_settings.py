@@ -141,6 +141,51 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         # self.phy = []
         self.batman_iface: [str, ...] = []
 
+
+
+    def handle_mesh_settings_channel_change(self, msg: str, path="/opt",
+                             file="mesh_stored.conf") -> (str, str, str):
+        """
+        Handle mesh settings
+        """
+        try:
+            parameters = json.loads(msg)
+
+            ret, info = self.__load_settings()
+            self.logger.debug("load settings: %s, %s", ret, info)
+
+            freq, radio_index = map(quote, (str(parameters["frequency"]),
+                                            str(parameters["radio_index"])))
+
+            if (validation.validate_radio_index(radio_index) and
+                    validation.validate_frequency(int(freq))):
+                self.frequency[int(radio_index)] = freq
+                ret, info  = "TRIGGER", "Channel change settings OK"
+            else:
+                ret, info = "FAIL", f"Invalid radio_index or frequency index {radio_index}"
+
+            self.logger.debug(" settings validation: %s, %s", ret, info)
+
+            if ret == "FAIL":
+                self.comms_status[int(radio_index)].mesh_cfg_status = \
+                    comms.STATUS.mesh_cfg_not_stored
+                self.logger.error("save settings failed: %s, %s", ret, info)
+            else:
+                ret, info = self.__save_settings(path, file, int(radio_index))
+                if ret == "OK":
+                    ret = "TRIGGER"
+                self.logger.debug("save settings for channel change: %s, %s", ret, info)
+                return ret, info, str(radio_index)
+
+        except (json.decoder.JSONDecodeError, KeyError,
+                TypeError, AttributeError) as error:
+            self.comms_status.mesh_cfg_status = \
+                comms.STATUS.mesh_cfg_not_stored
+            ret, info = "FAIL", "JSON format not correct" + str(error)
+            self.logger.error("csa settings validation: %s, %s", ret, info)
+
+        return ret, info, "-1"
+
     def handle_mesh_settings(self, msg: str, path="/opt",
                              file="mesh_stored.conf") -> (str, str):
         """
