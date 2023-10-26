@@ -274,6 +274,9 @@ EOF
       echo "set radio parameters"
       # /usr/local/bin/cli_app set txpwr fixed 23
 
+      # Batman parameters
+      batctl "$wifidev" hop_penalty 30
+
       echo "Longer range tweak.."
       #if [ "$priority" == "long_range" ]; then
         # /usr/local/bin/cli_app ...
