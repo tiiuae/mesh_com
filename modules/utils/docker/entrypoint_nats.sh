@@ -70,9 +70,6 @@ else
   echo "starting nats server"
   /opt/S90nats_server start
 
-  echo "starting radvd"
-  #radvd -C /etc/radvd.conf  # TODO: for some reason init.d is not working
-
   echo "starting comms services"
   /opt/S90comms_controller start
 

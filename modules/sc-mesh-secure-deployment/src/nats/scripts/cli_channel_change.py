@@ -6,7 +6,7 @@ import config
 async def main():
     # Connect to NATS!
     nc = await client.connect_nats()
-    cmd_dict = {"frequency": "2412", "radio_index": "0"}
+    cmd_dict = {"frequency": "2452", "radio_index": "1"}
     cmd = json.dumps(cmd_dict)
     rep = await nc.request(f"comms.channel_change.{config.MODULE_IDENTITY}", cmd.encode(), timeout=10)
     print(f"Published to comms.channel_change: {cmd}")

@@ -44,7 +44,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.batman_iface = []
         self.bridge: str = ""
         self.msversion: str = ""
-        self.delay:str = ""    # delay for channel change
+        self.delay: str = ""  # delay for channel change
         self.comms_status = comms_status
         # TODO: check can we do this
         ret, info = self.__load_settings()
@@ -141,10 +141,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         # self.phy = []
         self.batman_iface: [str, ...] = []
 
-
-
-    def handle_mesh_settings_channel_change(self, msg: str, path="/opt",
-                             file="mesh_stored.conf") -> (str, str, str):
+    def handle_mesh_settings_channel_change(
+        self, msg: str, path="/opt", file="mesh_stored.conf"
+    ) -> (str, str, str):
         """
         Handle mesh settings
         """
@@ -154,21 +153,27 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             ret, info = self.__load_settings()
             self.logger.debug("load settings: %s, %s", ret, info)
 
-            freq, radio_index = map(quote, (str(parameters["frequency"]),
-                                            str(parameters["radio_index"])))
+            freq, radio_index = map(
+                quote, (str(parameters["frequency"]), str(parameters["radio_index"]))
+            )
 
-            if (validation.validate_radio_index(radio_index) and
-                    validation.validate_frequency(int(freq))):
+            if validation.validate_radio_index(
+                radio_index
+            ) and validation.validate_frequency(int(freq)):
                 self.frequency[int(radio_index)] = freq
-                ret, info  = "TRIGGER", "Channel change settings OK"
+                ret, info = "TRIGGER", "Channel change settings OK"
             else:
-                ret, info = "FAIL", f"Invalid radio_index or frequency index {radio_index}"
+                ret, info = (
+                    "FAIL",
+                    f"Invalid radio_index or frequency index {radio_index}",
+                )
 
             self.logger.debug(" settings validation: %s, %s", ret, info)
 
             if ret == "FAIL":
-                self.comms_status[int(radio_index)].mesh_cfg_status = \
-                    comms.STATUS.mesh_cfg_not_stored
+                self.comms_status[
+                    int(radio_index)
+                ].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
                 self.logger.error("save settings failed: %s, %s", ret, info)
             else:
                 ret, info = self.__save_settings(path, file, int(radio_index))
@@ -177,23 +182,30 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 self.logger.debug("save settings for channel change: %s, %s", ret, info)
                 return ret, info, str(radio_index)
 
-        except (json.decoder.JSONDecodeError, KeyError,
-                TypeError, AttributeError) as error:
-            self.comms_status.mesh_cfg_status = \
-                comms.STATUS.mesh_cfg_not_stored
+        except (
+            json.decoder.JSONDecodeError,
+            KeyError,
+            TypeError,
+            AttributeError,
+        ) as error:
+            try:
+                radio_index
+            except NameError:
+                radio_index = 0
+            self.comms_status[
+                radio_index
+            ].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
             ret, info = "FAIL", "JSON format not correct" + str(error)
             self.logger.error("csa settings validation: %s, %s", ret, info)
 
         return ret, info, "-1"
 
-    def handle_mesh_settings(self, msg: str, path="/opt",
-                             file="mesh_stored.conf") -> (str, str):
+    def handle_mesh_settings(
+        self, msg: str, path="/opt", file="mesh_stored.conf"
+    ) -> (str, str):
         """
         Handle mesh settings
         """
-
-        _index = 0
-
         try:
             parameters_set = json.loads(msg)
 
@@ -204,7 +216,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             self.__clean_all_settings()
 
             # sort radios by index
-            parameters_set["radios"] = sorted(parameters_set["radios"], key=lambda k: k.get('radio_index', 0))
+            parameters_set["radios"] = sorted(
+                parameters_set["radios"], key=lambda k: k.get("radio_index", 0)
+            )
 
             for parameters in parameters_set["radios"]:
                 self.radio_index.append(int(parameters["radio_index"]))
@@ -227,33 +241,53 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             self.bridge = quote(str(parameters_set["bridge"]))
 
             for index in self.radio_index:
-                _index = index
                 self.logger.debug("Mesh settings validation index: %s", str(index))
                 ret, info = self.validate_mesh_settings(index)
 
-                self.logger.debug("Mesh settings validation id %s: %s, %s", str(index), ret, info)
+                self.logger.debug(
+                    "Mesh settings validation id %s: %s, %s", str(index), ret, info
+                )
                 if ret == "FAIL":
-                    self.comms_status[index].mesh_cfg_status = \
-                        comms.STATUS.mesh_cfg_not_stored
-                    self.logger.error("Settings validation failed: %s, %s, id %s", ret, info, str(index))
-                    _, _ = self.__load_settings() # to restore cleaned settings
+                    self.comms_status[
+                        index
+                    ].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
+                    self.logger.error(
+                        "Settings validation failed: %s, %s, id %s",
+                        ret,
+                        info,
+                        str(index),
+                    )
+                    _, _ = self.__load_settings()  # to restore cleaned settings
                     return ret, info + ", id " + str(index)
 
             # separate loop to avoid saving if validation fails
             for index in self.radio_index:
                 ret, info = self.__save_settings(path, file, index)
-                self.logger.debug("save settings index %s: %s, %s", str(index), ret, info)
+                self.logger.debug(
+                    "save settings index %s: %s, %s", str(index), ret, info
+                )
                 if ret == "FAIL":
-                    self.comms_status[index].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
-                    self.logger.error("save settings failed: %s, %s, id %s", ret, info, str(index))
+                    self.comms_status[
+                        index
+                    ].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
+                    self.logger.error(
+                        "save settings failed: %s, %s, id %s", ret, info, str(index)
+                    )
                     _, _ = self.__load_settings()  # to restore cleaned settings
                     return ret, info + ", id " + str(index)
 
-        except (json.decoder.JSONDecodeError, KeyError,
-                TypeError, AttributeError) as error:
-            self.comms_status[_index].mesh_cfg_status = \
-                comms.STATUS.mesh_cfg_not_stored
-            ret, _ = "FAIL", self.comms_status[_index].mesh_cfg_status
+        except (
+            json.decoder.JSONDecodeError,
+            KeyError,
+            TypeError,
+            AttributeError,
+        ) as error:
+            try:
+                index
+            except NameError:
+                index = 0
+            self.comms_status[index].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
+            ret, _ = "FAIL", self.comms_status[index].mesh_cfg_status
             info = "JSON format not correct" + str(error)
             self.logger.error("Mesh settings validation: %s, %s", ret, info)
 
@@ -264,7 +298,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         Save mesh settings
         """
         try:
-            with open(f"{path}/{str(index)}_{file}", "w", encoding="utf-8") as mesh_conf:
+            with open(
+                f"{path}/{str(index)}_{file}", "w", encoding="utf-8"
+            ) as mesh_conf:
                 # not currently in json mesh_settings
                 mesh_conf.write(f"ROLE={quote(self.role)}\n")
                 mesh_conf.write(f"MSVERSION={quote(self.msversion)}\n")
@@ -275,19 +311,32 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write(f"id{str(index)}_KEY={quote(self.key[index])}\n")
                 mesh_conf.write(f"id{str(index)}_ESSID={quote(self.ssid[index])}\n")
                 mesh_conf.write(f"id{str(index)}_FREQ={quote(self.frequency[index])}\n")
-                mesh_conf.write(f"id{str(index)}_FREQ_MCC={quote(self.frequency_mcc[index])}\n")
-                mesh_conf.write(f"id{str(index)}_TXPOWER={quote(self.tx_power[index])}\n")
-                mesh_conf.write(f"id{str(index)}_COUNTRY={quote(self.country[index]).upper()}\n")
-                mesh_conf.write(f"id{str(index)}_ROUTING={quote(self.routing[index])}\n")
-                mesh_conf.write(f"id{str(index)}_PRIORITY={quote(self.priority[index])}\n")
-                mesh_conf.write(f"id{str(index)}_MESH_VIF={quote(self.mesh_vif[index])}\n")
+                mesh_conf.write(
+                    f"id{str(index)}_FREQ_MCC={quote(self.frequency_mcc[index])}\n"
+                )
+                mesh_conf.write(
+                    f"id{str(index)}_TXPOWER={quote(self.tx_power[index])}\n"
+                )
+                mesh_conf.write(
+                    f"id{str(index)}_COUNTRY={quote(self.country[index]).upper()}\n"
+                )
+                mesh_conf.write(
+                    f"id{str(index)}_ROUTING={quote(self.routing[index])}\n"
+                )
+                mesh_conf.write(
+                    f"id{str(index)}_PRIORITY={quote(self.priority[index])}\n"
+                )
+                mesh_conf.write(
+                    f"id{str(index)}_MESH_VIF={quote(self.mesh_vif[index])}\n"
+                )
                 # mesh_conf.write(f"id{str(index)}_PHY={quote(self.phy[index])}\n")
-                mesh_conf.write(f"id{str(index)}_BATMAN_IFACE={quote(self.batman_iface[index])}\n")
+                mesh_conf.write(
+                    f"id{str(index)}_BATMAN_IFACE={quote(self.batman_iface[index])}\n"
+                )
                 mesh_conf.write(f"BRIDGE={self.bridge}\n")
 
         except:
-            self.comms_status[index].mesh_cfg_status = \
-                comms.STATUS.mesh_cfg_not_stored
+            self.comms_status[index].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
             self.logger.error("not able to write new %s", f"{str(index)}_{file}")
             return "FAIL", "not able to write new mesh.conf"
 
@@ -296,7 +345,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         return "OK", "Mesh configuration stored"
 
     def __read_configs(self, mesh_conf_lines) -> None:
-        pattern: str = r'(\w+)=(.*?)(?:\s*#.*)?$'
+        pattern: str = r"(\w+)=(.*?)(?:\s*#.*)?$"
         # Find all key-value pairs in the text
         matches = re.findall(pattern, mesh_conf_lines, re.MULTILINE)
         for match in matches:
@@ -344,7 +393,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 elif match[0] == "ROLE":
                     self.role = match[1]
                 else:
-                    pass #self.logger.error("unknown config parameter: %s", match[0])
+                    pass  # self.logger.error("unknown config parameter: %s", match[0])
 
     def __load_settings(self) -> (str, str):
         """
@@ -365,7 +414,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                         self.__read_configs(mesh_conf_lines)
                 else:
                     if index == 0:
-                        self.logger.debug("mesh config file %s not found, loading default", file)
+                        self.logger.debug(
+                            "mesh config file %s not found, loading default", file
+                        )
                         with open(config_file_path, "r", encoding="utf-8") as mesh_conf:
                             mesh_conf_lines = mesh_conf.read()
                             self.__read_configs(mesh_conf_lines)
