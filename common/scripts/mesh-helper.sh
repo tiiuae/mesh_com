@@ -59,18 +59,6 @@ generate_bridge_ip() {
 
   # legacy support
   br_lan_ip=$bridge_ip
-
-  cat > /etc/radvd.conf <<- EOF
-interface $bridge_name {
-  AdvSendAdvert on;
-  MinRtrAdvInterval 3;
-  MaxRtrAdvInterval 10;
-  prefix 2001:db8:1234:5678::/64 {
-      AdvOnLink on;
-      AdvAutonomous on;
-  };
-};
-EOF
 }
 
 source_configuration() {
