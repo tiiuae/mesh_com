@@ -50,16 +50,6 @@ calculate_wifi_channel()
     fi
 }
 
-create_ap_config()
-{
-cat <<EOF > ap.conf
-network={
-ssid="WirelessLab"
-psk="ssrcdemo"
-}
-EOF
-}
-
 # mcc_settings
 echo "Running mcc_settings"
 # Create bridge br-lan
