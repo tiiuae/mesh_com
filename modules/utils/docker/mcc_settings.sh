@@ -60,7 +60,6 @@ psk="ssrcdemo"
 EOF
 }
 
-
 # mcc_settings
 echo "Running mcc_settings"
 # Create bridge br-lan

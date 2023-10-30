@@ -1,0 +1,65 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          S90comms_controller
+# Short-Description: Comms nats client
+# Description:       Starts comms controller NATS node
+### END INIT INFO
+
+DAEMON="comms_nats_controller.py"
+DIR="/opt/nats/"
+PIDFILE="/var/run/$DAEMON.pid"
+# shellcheck source=/dev/null
+[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
+LOG_FILE=/opt/comms_controller.log
+
+KEY_FILE="/etc/ssl/private/comms_auth_private_key.pem"
+CERT_FILE="/etc/ssl/certs/comms_auth_cert.pem"
+
+if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
+  ARGS="-s 0.0.0.0 -p 4222 -k $KEY_FILE -c $CERT_FILE"
+else
+  ARGS="-s 0.0.0.0 -p 4222"
+fi
+start() {
+    echo "$ARGS"
+    printf 'Starting %s: ' "$DAEMON"
+    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec python $DIR$DAEMON \
+          $ARGS > $LOG_FILE 2>&1"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+stop() {
+    printf 'Stopping %s: ' "$DAEMON"
+    start-stop-daemon -K -q -p "$PIDFILE"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        rm -f "$PIDFILE"
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+restart() {
+    stop
+    sleep 1
+    start
+}
+case "$1" in
+    start|stop|restart)
+        "$1";;
+    reload)
+        # Restart, since there is no true "reload" feature.
+        restart;;
+    *)
+        echo "Usage: $0 {start|stop|restart|reload}"
+        exit 1
+esac
+
+exit 0
+

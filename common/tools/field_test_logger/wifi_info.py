@@ -1,12 +1,9 @@
 import subprocess
 import re
 
-EXPECTED_INTERFACE = "wlp1s0"
-
-
 class WifiInfo:
 
-    def __init__(self, interval):
+    def __init__(self, interval, interface, batman_interface):
         self.__neighbors = ""
         self.__originators = ""
         self.__channel = ""
@@ -20,12 +17,14 @@ class WifiInfo:
         self.__old_rx_bytes = 0
         self.__old_tx_bytes = 0
         self.__interval_seconds = interval
+        self.__interface = interface
+        self.__batman_interface = batman_interface
 
     # ----------------------------------------
 
     def get_mac_addr(self):
         try:
-            with open(f"/sys/class/net/{EXPECTED_INTERFACE}/address", 'r') as f:
+            with open(f"/sys/class/net/{self.__interface}/address", 'r') as f:
                 value = f.readline()
                 return value.strip()
         except:
@@ -111,7 +110,7 @@ class WifiInfo:
                 phyname = line.rstrip()
 
             # Correct interface is wlp1s0
-            if f"Interface {EXPECTED_INTERFACE}" in line:
+            if f"Interface {self.__interface}" in line:
                 interface_ok = True
                 # Capture correct phyname for later usage
                 __phyname = phyname.replace('#', '')
@@ -131,7 +130,7 @@ class WifiInfo:
         self.__txpower = txpower
 
     def __update_mcs_and_rssi(self):
-        iw_cmd = ['iw', 'dev', f"{EXPECTED_INTERFACE}", 'station', 'dump']
+        iw_cmd = ['iw', 'dev', f"{self.__interface}", 'station', 'dump']
         iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
         out = iw_proc.communicate()[0].decode().rstrip()
 
@@ -162,7 +161,7 @@ class WifiInfo:
                 self.__stations[station_mac] = [rssi, tx_mcs, rx_mcs]
 
     def __update_noise(self):
-        iw_cmd = ['iw', 'dev', f"{EXPECTED_INTERFACE}", 'survey', 'dump']
+        iw_cmd = ['iw', 'dev', f"{self.__interface}", 'survey', 'dump']
         iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
         out = iw_proc.communicate()[0].decode().rstrip()
 
@@ -216,7 +215,7 @@ class WifiInfo:
         tx_bytes = 0
 
         for line in lines:
-            if EXPECTED_INTERFACE in line:
+            if self.__interface in line:
                 parts = line.split()
                 rx_bytes = int(parts[1]) - self.__old_rx_bytes
                 tx_bytes = int(parts[9]) - self.__old_tx_bytes
@@ -232,7 +231,7 @@ class WifiInfo:
         #print(f"tx throughput: {self.tx_throughput}")
 
     def __update_batman_neighbors(self):
-        batctl_cmd = ['batctl', 'n', '-n', '-H']
+        batctl_cmd = ['batctl', 'meshif', self.__batman_interface, 'n', '-n', '-H']
 
         batctl_proc = subprocess.Popen(batctl_cmd,
                                        stdout=subprocess.PIPE)
@@ -253,7 +252,7 @@ class WifiInfo:
         #print(self.neighbors)
 
     def __update_batman_originators(self):
-        batctl_cmd = ['batctl', 'o', '-n', '-H']
+        batctl_cmd = ['batctl', 'meshif', self.__batman_interface, 'o', '-n', '-H']
 
         batctl_proc = subprocess.Popen(batctl_cmd,
                                        stdout=subprocess.PIPE)
