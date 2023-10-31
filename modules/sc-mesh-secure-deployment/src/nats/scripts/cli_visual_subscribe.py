@@ -29,7 +29,7 @@ async def run(loop):
     try:
         await client.connect(nc, recon_cb=reconnected_cb,
                              closed_cb=closed_cb,
-                             max_recon_attempts=-1)
+                             max_reconnection_attempts=-1)
     except Exception as e:
         print(e)
 

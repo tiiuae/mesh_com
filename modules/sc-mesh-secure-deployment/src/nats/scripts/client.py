@@ -27,7 +27,7 @@ async def connect_nats():
     return nats_client
 
 
-async def connect(nats_client: Client, recon_cb=None, closed_cb=None, max_recon_attempts=None):
+async def connect(nats_client: Client, recon_cb=None, closed_cb=None, max_reconnection_attempts=None):
     if os.path.exists(client_cert) and \
        os.path.exists(key) and \
        os.path.exists(ca_cert):
@@ -40,12 +40,12 @@ async def connect(nats_client: Client, recon_cb=None, closed_cb=None, max_recon_
                                   tls=ssl_context,
                                   reconnected_cb=recon_cb,
                                   closed_cb=closed_cb,
-                                  max_reconnect_attempts=max_recon_attempts)
+                                  max_reconnect_attempts=max_reconnection_attempts)
 
     else:
         await nats_client.connect(f"{config.MODULE_IP}:{config.MODULE_PORT}",
                                   reconnected_cb=recon_cb,
                                   closed_cb=closed_cb,
-                                  max_reconnect_attempts=max_recon_attempts)
+                                  max_reconnect_attempts=max_reconnection_attempts)
 
     return None
