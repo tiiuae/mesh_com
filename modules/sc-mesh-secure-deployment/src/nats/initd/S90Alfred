@@ -1,36 +1,34 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          S90nats_discovery
-# Short-Description: Comms nats discovery
-# Description:       Starts comms nats discovery
+# Provides:          S90Alfred
+# Short-Description: alfred
+# Description:       Starts alfred to provide visualization data
 ### END INIT INFO
 
-DAEMON="comms_nats_discovery.py"
-DIR="/opt/nats/"
+DAEMON="alfred"
+DIR="/usr/bin/"
 PIDFILE="/var/run/$DAEMON.pid"
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-LOG_FILE=/opt/comms_discovery.log
+LOG_FILE=/opt/alfred.log
 
 source /opt/mesh-helper.sh
-# for ROLE
-source_configuration "0"
+# sources mesh configuration
+source_configuration "id0"
+bridge_name=$(echo "$BRIDGE" | cut -d' ' -f1)
 
-KEY_FILE="/etc/ssl/private/comms_auth_private_key.pem"
-CERT_FILE="/etc/ssl/certs/comms_auth_cert.pem"
-SERVER_CERT_FILE="/etc/ssl/certs/comms_server_cert.pem"
-CA="/etc/ssl/certs/root-ca.cert.pem"
+ARGS="-i $bridge_name -m"
 
-if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
-  ARGS="--role $ROLE -k $KEY_FILE -c $CERT_FILE -s $SERVER_CERT_FILE -a $CA"
-else
-  ARGS="--role $ROLE"
-fi
+wait_for_bridge() {
+  while [ ! -d "/sys/class/net/$bridge_name" ]; do
+    sleep 1
+  done
+}
 
 start() {
     echo "$ARGS"
     printf 'Starting %s: ' "$DAEMON"
-    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec python $DIR$DAEMON \
+    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON \
           $ARGS > $LOG_FILE 2>&1"
     status=$?
     if [ "$status" -eq 0 ]; then
