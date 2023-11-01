@@ -63,14 +63,15 @@ generate_bridge_ip() {
 
 source_configuration() {
   # $1: index of the mesh.conf file to be used
+  CONFIGURATION_INDEX=$1
 
-  if [ -f "/opt/${1}_mesh.conf" ]; then
+  if [ -f "/opt/${CONFIGURATION_INDEX}_mesh.conf" ]; then
     # Calculate hash for mesh.conf file
-    hash=$(sha256sum /opt/"${1}"_mesh.conf | awk '{print $1}')
+    hash=$(sha256sum /opt/"${CONFIGURATION_INDEX}"_mesh.conf | awk '{print $1}')
     # Compare calculated hash with the one created when setting has been applied
-    if diff <(printf %s "$hash") /opt/"${1}"_mesh.conf_hash; then
+    if diff <(printf %s "$hash") /opt/"${CONFIGURATION_INDEX}"_mesh.conf_hash; then
       # shellcheck disable=SC1090
-      source /opt/"${1}"_mesh.conf
+      source /opt/"${CONFIGURATION_INDEX}"_mesh.conf
     else
       # Revert to default mesh
       if [ -f "/opt/mesh_default.conf" ]; then
