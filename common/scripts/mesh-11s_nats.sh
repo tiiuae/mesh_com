@@ -556,7 +556,7 @@ main () {
   #  id0_PRIORITY=long_range
   #  BRIDGE="br-mesh eth1 eth0 lan1"
   #  ROLE=drone
-  generate_bridge_ip
+  generate_lan_bridge_ip
   # to get bridge_ip warning free
   bridge_ip=$bridge_ip
 

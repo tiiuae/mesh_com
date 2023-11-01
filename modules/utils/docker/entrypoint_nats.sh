@@ -24,7 +24,7 @@ else
   done
 
   echo "set bridge ip"
-  generate_bridge_ip
+  generate_lan_bridge_ip
 
   echo "starting 11s mesh service"
   # todo for loop range 0..3

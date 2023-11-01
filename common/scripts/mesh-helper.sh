@@ -43,14 +43,14 @@ EOF
   fi
 }
 
-generate_bridge_ip() {
+generate_lan_bridge_ip() {
   local mesh_if_mac
 
   bridge_name=$(echo "$BRIDGE" | cut -d' ' -f1)
 
   mesh_if_mac=$(cat /sys/class/net/"$id0_MESH_VIF"/address)
   if [ -z "$mesh_if_mac" ]; then
-      echo "generate_bridge_ip: MAC not found for id0_MESH_VIF! Configuration error?" > /dev/kmsg
+      echo "generate_lan_bridge_ip: MAC not found for id0_MESH_VIF! Configuration error?" > /dev/kmsg
       mesh_if_mac="$(cat /sys/class/net/eth0/address)"
   fi
   local ip_random
