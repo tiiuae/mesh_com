@@ -38,8 +38,9 @@ add_network_intf_to_bridge() {
   _bridge_name=$1
   _interfaces=$2
 
+  # detect devices where managed switch is available
   _lan1=0
-  if [[ "$_interfaces" == *"lan1"* ]]; then
+  if ip link show lan1 &> /dev/null; then
     _lan1=1
   fi
   # Loop through the interface names and add them to the bridge if available
