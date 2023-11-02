@@ -286,3 +286,14 @@ def validate_batman_iface(batman_iface: str) -> bool:
         return False
     except (ValueError, TypeError, AttributeError):
         return False
+def validate_mptcp(mptcp: str) -> bool:
+    """
+    Validates a given mptcp.
+    Returns True if the mptcp is valid, False otherwise.
+    """
+    try:
+        if mptcp in ("enable", "disable"):
+            return True
+        return False
+    except (ValueError, TypeError, AttributeError):
+        return False

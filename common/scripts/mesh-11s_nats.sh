@@ -615,6 +615,9 @@ main () {
   _batman_iface="${INDEX}_BATMAN_IFACE"
   batman_iface="${!_batman_iface}"
 
+  _mptcp="${INDEX}_MPTCP"
+  mptcp="${!_mptcp}"        # enable disable
+
   # shellcheck disable=SC2153
   # shellcheck disable=SC2034
   # this is for the future use

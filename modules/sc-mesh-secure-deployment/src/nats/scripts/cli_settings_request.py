@@ -3,6 +3,7 @@ import client
 import json
 import config
 
+
 async def main():
     # Connect to NATS!
     nc = await client.connect_nats()
@@ -19,6 +20,7 @@ async def main():
                 "frequency": "2412",
                 "frequency_mcc": "2412",  # multiradio not supporting
                 "routing": "batman-adv",
+                "mptcp": "disable",          # MPTCP support feature flag, enable/disable
                 "priority": "long_range",
                 "ip": "10.20.15.3",
                 "subnet": "255.255.255.0",
@@ -36,6 +38,7 @@ async def main():
                 "frequency": "5220",
                 "frequency_mcc": "2412",  # multiradio not supporting
                 "routing": "batman-adv",
+                "mptcp": "disable",          # MPTCP support feature flag, enable/disable
                 "priority": "long_range",
                 "ip": "10.20.15.3",
                 "subnet": "255.255.255.0",
@@ -53,6 +56,7 @@ async def main():
                 "frequency": "5190",
                 "frequency_mcc": "2412",  # multiradio not supporting
                 "routing": "batman-adv",
+                "mptcp": "disable",          # MPTCP support feature flag, enable/disable
                 "priority": "long_range",
                 "ip": "10.20.15.3",
                 "subnet": "255.255.255.0",
@@ -62,7 +66,7 @@ async def main():
                 "batman_iface": "bat0",
             },
         ],
-        "bridge": "br-lan bat0 eth1 lan1 eth0 usb0"
+        "bridge": "br-lan bat0 eth1 lan1 eth0 usb0",
     }
 
     cmd = json.dumps(cmd_dict)
