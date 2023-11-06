@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 import numpy as np
-from SP_CRA_script import PHYCRA  # Replace 'phycra_module' with the actual module name where PHYCRA is defined
+from SP_CRA_v7 import PHYCRA  
 
 @pytest.fixture
 def phycra_instance():

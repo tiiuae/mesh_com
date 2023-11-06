@@ -2,8 +2,6 @@ import pytest
 import socket
 from unittest.mock import patch, MagicMock, mock_open
 from SP_CRA_v7 import PHYCRA
-
-# Ensure NumPy is imported
 import numpy as np
 
 @pytest.fixture
