@@ -17,7 +17,7 @@ RADIO_INDEX=$2   # $2: index of the mesh.conf file to be used e.g. "id0"
 
 source_configuration "${RADIO_INDEX:2}"
 
-DAEMON="mesh-11s_nats.sh"
+DAEMON="mesh-11s_nats"
 DIR="/opt/"
 _WIFI="${RADIO_INDEX}_MESH_VIF"
 _MODE="${RADIO_INDEX}_MODE"
