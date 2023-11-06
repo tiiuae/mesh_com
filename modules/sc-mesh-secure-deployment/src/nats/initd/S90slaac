@@ -1,0 +1,64 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          S90slaac
+# Should-Start:      $syslog
+# Should-Stop:       $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: start S90slaac during boot time
+# Description:       slaac damon
+### END INIT INFO
+
+source /opt/mesh-helper.sh
+
+INTERFACE=$2 
+
+DAEMON="slaac"
+DIR="/opt/"
+PIDFILE="/var/run/${DAEMON}.pid"
+LOG_FILE=/opt/slaac.log
+
+[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
+
+start() {
+
+    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON $INTERFACE > $LOG_FILE 2>&1"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+
+    return "$status"
+}
+stop() {
+    printf 'Stopping %s: ' "$DAEMON"
+    kill -9 "$(cat "$PIDFILE")"
+    start-stop-daemon -K -o -q -p "$PIDFILE"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        rm -f "$PIDFILE"
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+restart() {
+    stop
+    sleep 1
+    start
+}
+case "$1" in
+    start|stop|restart)
+        "$1";;
+    reload)
+        # Restart, since there is no true "reload" feature.
+        restart;;
+    *)
+        echo "Usage: $0 {start|stop|restart|reload}"
+        exit 1
+esac
+
+exit 0

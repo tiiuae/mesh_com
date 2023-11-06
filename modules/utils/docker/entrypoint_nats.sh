@@ -36,6 +36,9 @@ else
     /opt/S9011sNatsMesh start id2
   fi
 
+  echo "configuring slaac"
+  /opt/S90slaac start br-lan
+
   echo "starting AP service"
   /opt/S90APoint start id0
   if [ -f "/opt/1_mesh.conf" ]; then
