@@ -1,7 +1,7 @@
 import threading
 import time
 import psutil
-from SP_CRA_script import PHYCRA  # SP_CRA_v12 is the main script/implementation
+from SP_CRA_v7 import PHYCRA  # SP_CRA_v7 is the main script/implementation
 
 class PerformanceTest:
     def __init__(self, num_clients):
@@ -32,12 +32,10 @@ class PerformanceTest:
         self.network_usage_end = psutil.net_io_counters()
         self.end_time = time.time()
         monitor_thread.join()
-        
         self.phycra_instance.stop_event.set()
         self.phycra_instance.server_thread.join()
         self.phycra_instance.listen_thread.join()
         self.phycra_instance.broadcast_thread.join()
-        
         self.display_results()
 
     def simulate_client(self):
@@ -54,7 +52,6 @@ class PerformanceTest:
         avg_memory_usage = sum(self.memory_usage) / len(self.memory_usage)
         sent_bytes = self.network_usage_end.bytes_sent - self.network_usage_start.bytes_sent
         recv_bytes = self.network_usage_end.bytes_recv - self.network_usage_start.bytes_recv
-        
         print(f"Total time for {self.num_clients} clients: {total_time:.2f} seconds")
         print(f"Average time per client: {total_time / self.num_clients:.2f} seconds")
         print(f"Average CPU usage during the test: {avg_cpu_usage:.2f}%")
@@ -63,7 +60,7 @@ class PerformanceTest:
         print(f"Total data received: {recv_bytes} bytes")
 
 if __name__ == "__main__":
-    num_clients = 10  # Change this to the number of simulated clients you want
+    num_clients = 10  # Change this to the number of simulated clients to be tested
     performance_test = PerformanceTest(num_clients)
     performance_test.run_test()
 

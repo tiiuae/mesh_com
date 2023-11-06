@@ -1,7 +1,7 @@
 import pytest
 import socket
 from unittest.mock import MagicMock, patch, call
-from SP_CRA_script import PHYCRA  # Replace with the correct import path for your PHYCRA class
+from SP_CRA_v7 import PHYCRA  
 
 @pytest.fixture
 def phycra_instance():
@@ -35,6 +35,5 @@ def test_replay_attack_prevention(phycra_instance):
         phycra_instance.handle_client(conn, addr)
         conn.send.assert_not_called()  # Assuming it shouldn't send anything if replay attack detected
 
-# ... other tests ...
 
 
