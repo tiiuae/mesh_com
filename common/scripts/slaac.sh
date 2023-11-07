@@ -47,6 +47,10 @@ CCDD=`echo "$MAC_ADDRESS" | cut -d ':' -f 3,4 | tr -d ':'`
 EEFF=`echo "$MAC_ADDRESS" | cut -d ':' -f 5,6 | tr -d ':'`
 
 # Construct the IPv6 SLAAC prefix using the MAC address segments
+# TODO:
+# fd1d:8a65:4c32:e330::/64 let's say for WiFi QoS-OLSR
+# fdbd:5175:25cd:bbf3::/64 let's say for HaLow QoS-OLSR
+# fd2e:868e:e806:a27a::/64 let's say for all-radios batman-adv
 IPV6_SLAAC_PREFIX="fdff:$AABB:$CCDD:$EEFF"
 echo "Generated IPv6 SLAAC prefix: $IPV6_SLAAC_PREFIX"
 
@@ -102,7 +106,7 @@ else
 fi
 
 # Define the radvd PID file path for the given interface
-RADVD_PID_FILE="/run/radvd@$INTERFACE.pid"
+RADVD_PID_FILE="/var/run/radvd@$INTERFACE.pid"
 
 # Start the radvd daemon with the specified configuration and options
 echo "Starting radvd daemon..."
