@@ -50,12 +50,22 @@ generate_lan_bridge_ip() {
 
   mesh_if_mac=$(cat /sys/class/net/"$id0_MESH_VIF"/address)
   if [ -z "$mesh_if_mac" ]; then
-      echo "generate_lan_bridge_ip: MAC not found for id0_MESH_VIF! Configuration error?" > /dev/kmsg
-      mesh_if_mac="$(cat /sys/class/net/eth0/address)"
+     echo "generate_lan_bridge_ip: MAC not found for id0_MESH_VIF! Configuration error?" > /dev/kmsg
+    mesh_if_mac="$(cat /sys/class/net/eth0/address)"
   fi
   local ip_random
   ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
   bridge_ip="192.168.1."$((16#$ip_random))
+
+  # configure slaac
+  if [ -f /opt/slaac.sh ]; then
+    echo "Configuring SLAAC on $BRIDGE..."
+    source /opt/slaac.sh
+    /opt/slaac.sh $BRIDGE
+  else
+    echo "Error: slaac.sh does not exist."
+    exit 1
+  fi
 
   # legacy support
   br_lan_ip=$bridge_ip

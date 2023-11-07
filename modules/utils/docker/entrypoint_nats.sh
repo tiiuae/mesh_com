@@ -50,9 +50,6 @@ else
     sleep 1
   done
 
-  echo "configuring slaac for bridge"
-  /opt/S90slaac start $BRIDGE
-
   sleep 3
 
   /opt/S90Alfred start
