@@ -36,9 +36,6 @@ else
     /opt/S9011sNatsMesh start id2
   fi
 
-  echo "configuring slaac"
-  /opt/S90slaac start br-lan
-
   echo "starting AP service"
   /opt/S90APoint start id0
   if [ -f "/opt/1_mesh.conf" ]; then
@@ -52,6 +49,9 @@ else
   while ! (ifconfig | grep -e "$bridge_ip") > /dev/null; do
     sleep 1
   done
+
+  echo "configuring slaac for bridge"
+  /opt/S90slaac start $BRIDGE
 
   sleep 3
 
