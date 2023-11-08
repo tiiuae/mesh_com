@@ -106,13 +106,13 @@ class PHYCRA:
             mac_address = mac_address_bytes.decode(self.FORMAT)
             # Authenticate the client based on the index and MAC address received
             if rx_index == index:
-               print("PASS: Authentication successful")
-               logging.info("Authentication successful for %s", addr)
-               self.log_authentication(addr[0], mac_address, "Success")
+                print("PASS: Authentication successful")
+                logging.info("Authentication successful for %s", addr)
+                self.log_authentication(addr[0], mac_address, "Success")
             else:
-               print('FAIL: Authentication failed')
-               logging.warning("Authentication failed for %s", addr)
-               self.log_authentication(addr[0], mac_address, "Access denied")
+                print('FAIL: Authentication failed')
+                logging.warning("Authentication failed for %s", addr)
+                self.log_authentication(addr[0], mac_address, "Access denied")
 
             print("\nUpdated Table:")
             self.display_table()
