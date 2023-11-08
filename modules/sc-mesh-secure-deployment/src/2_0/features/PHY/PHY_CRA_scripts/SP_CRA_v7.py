@@ -2,19 +2,24 @@ import socket
 import threading
 import random
 import pickle
-from mat4py import loadmat
 import time
 import logging
 import numpy as np
 import os
 from getmac import get_mac_address
+from mat4py import loadmat
 
 class PHYCRA:
     def __init__(self):
-        logging.basicConfig(level=logging.INFO, filename='server_log.txt', filemode='w',
+        log_filename = '/tmp/server_log.txt'  # Set the log file location to /tmp/
+
+        # Clear the server log at the start of each session
+        if os.path.exists(log_filename):
+            os.remove(log_filename)
+
+        logging.basicConfig(level=logging.INFO, filename=log_filename, filemode='w',
                             format='%(asctime)s - %(levelname)s - %(message)s')
         logging.info("Server initialized")
-        
         # Server setup
         try:
             DataServer = loadmat('ACF_Table.mat')
@@ -35,11 +40,6 @@ class PHYCRA:
             logging.info("Client setup completed successfully")
         except Exception as e:
             logging.error("Error during client setup: %s", e)
-        
-        # Clear the server log at the start of each session
-        if os.path.exists("server_log.txt"):
-            os.remove("server_log.txt")
-
         # Create an event to signal when 5 minutes have passed
         self.stop_event = threading.Event()
 
@@ -59,13 +59,15 @@ class PHYCRA:
         timer = threading.Timer(60, self.stop_event.set)
         timer.start()
         logging.info("Server shutdown timer started")
-
+        
     # SERVER FUNCTIONS
+
     def log_authentication(self, node_ip, mac_address, result):
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         log_entry = f"{timestamp}\t{node_ip}\t{mac_address}\t{result}\n"
         with open("server_log.txt", "a") as log_file:
             log_file.write(log_entry)
+            
 
     def display_table(self):
         logging.info("Displaying authentication table")
@@ -79,36 +81,46 @@ class PHYCRA:
                 print(formatted_line)
         print("+---------------------+---------------+-------------------+---------------------------+")
 
+
     def handle_client(self, conn, addr):
-        logging.info(f"Connection request received from {addr}")
-        print(f"Connection request received from {addr}")
+        """
+           Handles the client connection, sends a challenge (ACF value),
+           and verifies the response from the client to authenticate.
+           It also logs the authentication result.
+        """
         try:
+            # Sending a random ACF value as a challenge to the client
             index = random.randint(0, len(self.acf) - 1)
             acf_tx = pickle.dumps(self.acf[index])
-            conn.send(acf_tx)
-            
-            # Receive and convert rx_index to int
-            rx_index_length = int.from_bytes(conn.recv(2), 'big')
-            rx_index = int(conn.recv(rx_index_length).decode(self.FORMAT))
-            
-            # Then receive MAC address
-            mac_address_length = int.from_bytes(conn.recv(2), 'big')
-            mac_address = conn.recv(mac_address_length).decode(self.FORMAT)
-            
+            conn.sendall(acf_tx)
+            # Receive and verify the index from the client
+            rx_index_length_bytes = conn.recv(2)
+            rx_index_length = int.from_bytes(rx_index_length_bytes, 'big')
+            rx_index_bytes = conn.recv(rx_index_length)
+            rx_index = int(rx_index_bytes.decode(self.FORMAT))
+
+            # Then receive the MAC address from the client
+            mac_address_length_bytes = conn.recv(2)
+            mac_address_length = int.from_bytes(mac_address_length_bytes, 'big')
+            mac_address_bytes = conn.recv(mac_address_length)
+            mac_address = mac_address_bytes.decode(self.FORMAT)
+            # Authenticate the client based on the index and MAC address received
             if rx_index == index:
-                print("PASS")
-                logging.info("Authentication successful for %s", addr)
-                self.log_authentication(addr[0], mac_address, "Success")
+               print("PASS: Authentication successful")
+               logging.info("Authentication successful for %s", addr)
+               self.log_authentication(addr[0], mac_address, "Success")
             else:
-                print('FAIL')
-                logging.warning("Authentication failed for %s", addr)
-                self.log_authentication(addr[0], mac_address, "Access denied")
+               print('FAIL: Authentication failed')
+               logging.warning("Authentication failed for %s", addr)
+               self.log_authentication(addr[0], mac_address, "Access denied")
+
             print("\nUpdated Table:")
             self.display_table()
         except Exception as e:
             logging.error("Error during client handling: %s", e)
         finally:
             conn.close()
+
 
     def server_start(self):
         try:
@@ -138,6 +150,7 @@ class PHYCRA:
             self.server.close()
             logging.info("Server shutdown")
 
+
     def broadcast_status(self):
         try:
             broadcast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -152,27 +165,42 @@ class PHYCRA:
             broadcast_sock.close()
             logging.info("Broadcast stopped")
 
+    
     # CLIENT FUNCTIONS
 
     def get_mac_address(self):
         return get_mac_address()
+    
 
     def connect_to_server(self, server_ip):
+        """
+        Connects to the server, receives a challenge (ACF value),
+        calculates the index of the received ACF value in the local acf_client table,
+        sends back this index and the MAC address to the server for authentication.
+        """
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect((server_ip, self.PORT))
+            # Receive the ACF challenge from the server
             acf_rx = pickle.loads(client.recv(4096))
+            # Calculate the index of the received ACF
             index = str(np.where((self.acf_client == acf_rx).all(axis=1))[0][0])
-            client.send(len(index).to_bytes(2, 'big'))  # Send length of rx_index first
-            client.send(index.encode(self.FORMAT))  # Send rx_index
+            # Send the calculated index back to the server
+            index_bytes = index.encode(self.FORMAT)
+            client.sendall(len(index_bytes).to_bytes(2, 'big'))  # Send length of rx_index first
+            client.sendall(index_bytes)  # Send rx_index
+          # Retrieve the local MAC address and send it to the server
             mac_address = self.get_mac_address()
-            client.send(len(mac_address).to_bytes(2, 'big'))  # Send length of MAC address
-            client.send(mac_address.encode(self.FORMAT))  # Then send MAC address
+            mac_address_bytes = mac_address.encode(self.FORMAT)
+            client.sendall(len(mac_address_bytes).to_bytes(2, 'big'))  # Send length of MAC address first
+            client.sendall(mac_address_bytes)  # Then send MAC address
+            logging.info("Successfully sent index and MAC address to the server")
         except Exception as e:
             logging.error("Error during connection to server: %s", e)
         finally:
             client.close()
-
+    
+    
     def listen_for_broadcast(self):
         try:
             self.listen_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -191,6 +219,7 @@ class PHYCRA:
         finally:
             self.listen_sock.close()
             logging.info("Stopped listening for broadcasts")
+
 
     # Common Functions
     def get_server_ip(self):
@@ -211,4 +240,3 @@ if __name__ == "__main__":
     phycra_instance.server_thread.join()
     phycra_instance.listen_thread.join()
     phycra_instance.broadcast_thread.join()
-
