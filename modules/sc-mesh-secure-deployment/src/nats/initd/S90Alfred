@@ -1,19 +1,29 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          S90socat
-# Short-Description: socat
-# Description:       Starts socat to provive IPv6 NATS IF
+# Provides:          S90Alfred
+# Short-Description: alfred
+# Description:       Starts alfred to provide visualization data
 ### END INIT INFO
 
-DAEMON="socat"
+DAEMON="alfred"
 DIR="/usr/bin/"
 PIDFILE="/var/run/$DAEMON.pid"
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-LOG_FILE=/opt/socat.log
+LOG_FILE=/opt/alfred.log
 
-ip=$(ifconfig br-lan | awk '/inet / {print $2}')
-ARGS="TCP6-LISTEN:6222,fork,reuseaddr TCP4:$ip:4222"
+source /opt/mesh-helper.sh
+# sources mesh configuration
+source_configuration "id0"
+bridge_name=$(echo "$BRIDGE" | cut -d' ' -f1)
+
+ARGS="-i $bridge_name -m"
+
+wait_for_bridge() {
+  while [ ! -d "/sys/class/net/$bridge_name" ]; do
+    sleep 1
+  done
+}
 
 start() {
     echo "$ARGS"
