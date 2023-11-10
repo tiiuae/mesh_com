@@ -46,7 +46,7 @@ EOF
 generate_lan_bridge_ip() {
   local mesh_if_mac
 
-  bridge_name=$(echo "$BRIDGE" | cut -d' ' -f1)
+  bridge_name=$(echo "$bridge" | cut -d' ' -f1)
 
   mesh_if_mac=$(cat /sys/class/net/"$id0_MESH_VIF"/address)
   if [ -z "$mesh_if_mac" ]; then
