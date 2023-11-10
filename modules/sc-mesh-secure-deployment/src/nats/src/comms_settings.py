@@ -40,9 +40,10 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.priority = []
         self.role: str = ""
         self.mesh_vif = []
+        self.mptcp = []
         # self.phy = []
         self.batman_iface = []
-        self.bridge: str = ""
+        self.bridge = []
         self.msversion: str = ""
         self.delay: str = ""  # delay for channel change
         self.comms_status = comms_status
@@ -110,6 +111,10 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             return "FAIL", "Invalid mesh vif"
         self.logger.debug("validate mesh settings mesh vif ok")
 
+        if validation.validate_mptcp(self.mptcp[index]) is False:
+            return "FAIL", "Invalid mptcp value"
+        self.logger.debug("validate mesh settings mptcp ok")
+
         # if validation.validate_phy(self.phy[index]) is False:
         #     return "FAIL", "Invalid phy"
         # self.logger.debug("validate mesh settings phy ok")
@@ -138,8 +143,10 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.routing: [str, ...] = []
         self.priority: [str, ...] = []
         self.mesh_vif: [str, ...] = []
+        self.mptcp: [str, ...] = []
         # self.phy = []
         self.batman_iface: [str, ...] = []
+        self.bridge: [str, ...] = []
 
     def handle_mesh_settings_channel_change(
         self, msg: str, path="/opt", file="mesh_stored.conf"
@@ -235,10 +242,10 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 self.routing.append(quote(str(parameters["routing"])))
                 self.priority.append(quote(str(parameters["priority"])))
                 self.mesh_vif.append(quote(str(parameters["mesh_vif"])))
+                self.mptcp.append(quote(str(parameters["mptcp"])))
                 # self.phy.append(quote(str(parameters["phy"])))
                 self.batman_iface.append(quote(str(parameters["batman_iface"])))
-
-            self.bridge = quote(str(parameters_set["bridge"]))
+                self.bridge.append(str(parameters["bridge"]))
 
             for index in self.radio_index:
                 self.logger.debug("Mesh settings validation index: %s", str(index))
@@ -329,11 +336,12 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write(
                     f"id{str(index)}_MESH_VIF={quote(self.mesh_vif[index])}\n"
                 )
+                mesh_conf.write(f"id{str(index)}_MPTCP={quote(self.mptcp[index])}\n")
                 # mesh_conf.write(f"id{str(index)}_PHY={quote(self.phy[index])}\n")
                 mesh_conf.write(
                     f"id{str(index)}_BATMAN_IFACE={quote(self.batman_iface[index])}\n"
                 )
-                mesh_conf.write(f"BRIDGE={self.bridge}\n")
+                mesh_conf.write(f"id{str(index)}_BRIDGE={quote(self.bridge[index])}\n")
 
         except:
             self.comms_status[index].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
@@ -379,17 +387,19 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                     self.priority.append(match[1])
                 elif name == "MESH_VIF":
                     self.mesh_vif.append(match[1])
+                elif name == "MPTCP":
+                    self.mptcp.append(match[1])
                 # elif name == "PHY":
                 #     self.phy.append(match[1])
                 elif name == "BATMAN_IFACE":
                     self.batman_iface.append(match[1])
+                elif name == "BRIDGE":
+                    self.bridge.append(match[1])
                 else:
                     self.logger.error("unknown config parameter: %s", name)
             else:  # global config without index
                 if match[0] == "MSVERSION":
                     self.msversion = match[1]
-                elif match[0] == "BRIDGE":
-                    self.bridge = match[1]
                 elif match[0] == "ROLE":
                     self.role = match[1]
                 else:

@@ -19,6 +19,7 @@ async def main():
                 "frequency": "2412",
                 "frequency_mcc": "2412",  # multiradio not supporting
                 "routing": "batman-adv",
+                "mptcp": "disable",
                 "priority": "long_range",
                 "ip": "10.20.15.3",
                 "subnet": "255.255.255.0",
@@ -26,6 +27,7 @@ async def main():
                 "mode": "mesh",  # ap+mesh_scc, mesh, halow
                 "mesh_vif": "wlp2s0",
                 "batman_iface": "bat0",
+                "bridge": "br-lan bat0 eth1 lan1 eth0 usb0",
             },
             {
                 "radio_index": "1",
@@ -36,6 +38,7 @@ async def main():
                 "frequency": "5220",
                 "frequency_mcc": "2412",  # multiradio not supporting
                 "routing": "batman-adv",
+                "mptcp": "disable",
                 "priority": "long_range",
                 "ip": "10.20.15.3",
                 "subnet": "255.255.255.0",
@@ -43,6 +46,7 @@ async def main():
                 "mode": "mesh",  # ap+mesh_scc, mesh, halow
                 "mesh_vif": "wlp3s0",  # this needs to be correct
                 "batman_iface": "bat0",
+                "bridge": "br-lan bat0 eth1 lan1 eth0 usb0",
             },
             {
                 "radio_index": "2",
@@ -53,6 +57,7 @@ async def main():
                 "frequency": "5190",
                 "frequency_mcc": "2412",  # multiradio not supporting
                 "routing": "batman-adv",
+                "mptcp": "disable",
                 "priority": "long_range",
                 "ip": "10.20.15.3",
                 "subnet": "255.255.255.0",
@@ -60,9 +65,10 @@ async def main():
                 "mode": "halow",  # ap+mesh_scc, mesh, halow
                 "mesh_vif": "halow1",
                 "batman_iface": "bat0",
+                "bridge": "br-lan bat0 eth1 lan1 eth0 usb0",
             },
         ],
-        "bridge": "br-lan bat0 eth1 lan1 eth0 usb0"
+       
     }
 
     cmd = json.dumps(cmd_dict)
