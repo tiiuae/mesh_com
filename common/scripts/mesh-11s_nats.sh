@@ -619,7 +619,7 @@ main () {
   batman_iface="${!_batman_iface}"
 
   _mptcp="${INDEX}_MPTCP"
-  mptcp="${!_mptcp}"        # enable disable
+  mptcp="${!_mptcp}"
 
   _bridge="${INDEX}_BRIDGE"
   bridge="${!_bridge}"

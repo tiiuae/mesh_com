@@ -20,11 +20,7 @@ async def main():
                 "frequency": "2412",
                 "frequency_mcc": "2412",  # multiradio not supporting
                 "routing": "batman-adv",
-<<<<<<< HEAD
                 "mptcp": "disable",          # MPTCP support feature flag, enable/disable
-=======
-                "mptcp": "disable",
->>>>>>> Include comms.setting support for MPTCP
                 "priority": "long_range",
                 "ip": "10.20.15.3",
                 "subnet": "255.255.255.0",
@@ -43,11 +39,7 @@ async def main():
                 "frequency": "5220",
                 "frequency_mcc": "2412",  # multiradio not supporting
                 "routing": "batman-adv",
-<<<<<<< HEAD
                 "mptcp": "disable",          # MPTCP support feature flag, enable/disable
-=======
-                "mptcp": "disable",
->>>>>>> Include comms.setting support for MPTCP
                 "priority": "long_range",
                 "ip": "10.20.15.3",
                 "subnet": "255.255.255.0",
@@ -66,11 +58,7 @@ async def main():
                 "frequency": "5190",
                 "frequency_mcc": "2412",  # multiradio not supporting
                 "routing": "batman-adv",
-<<<<<<< HEAD
                 "mptcp": "disable",          # MPTCP support feature flag, enable/disable
-=======
-                "mptcp": "disable",
->>>>>>> Include comms.setting support for MPTCP
                 "priority": "long_range",
                 "ip": "10.20.15.3",
                 "subnet": "255.255.255.0",
@@ -81,11 +69,6 @@ async def main():
                 "bridge": "br-lan bat0 eth1 lan1 eth0 usb0",
             },
         ],
-<<<<<<< HEAD
-        "bridge": "br-lan bat0 eth1 lan1 eth0 usb0",
-=======
-       
->>>>>>> Include comms.setting support for MPTCP
     }
 
     cmd = json.dumps(cmd_dict)

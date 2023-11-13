@@ -297,4 +297,3 @@ def validate_mptcp(mptcp: str) -> bool:
         return False
     except (ValueError, TypeError, AttributeError):
         return False
-
