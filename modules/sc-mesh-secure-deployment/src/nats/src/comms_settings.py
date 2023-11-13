@@ -25,23 +25,24 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
     def __init__(self, comms_status: [cs.CommsStatus, ...], logger):
         self.logger: logging = logger
         self.api_version: int = 1
-        self.radio_index = []
-        self.ssid = []
-        self.key = []
-        self.ap_mac = []
-        self.country = []
-        self.frequency = []
-        self.frequency_mcc = []
-        self.ip_address = []
-        self.subnet = []
-        self.tx_power = []
-        self.mode = []
-        self.routing = []
-        self.priority = []
+        self.radio_index: [int, ...] = []
+        self.ssid: [str, ...] = []
+        self.key: [str, ...] = []
+        self.ap_mac: [str, ...] = []
+        self.country: [str, ...] = []
+        self.frequency: [str, ...] = []
+        self.frequency_mcc: [str, ...] = []
+        self.ip_address: [str, ...] = []
+        self.subnet: [str, ...] = []
+        self.tx_power: [str, ...] = []
+        self.mode: [str, ...] = []
+        self.routing: [str, ...] = []
+        self.priority: [str, ...] = []
         self.role: str = ""
-        self.mesh_vif = []
+        self.mesh_vif: [str, ...] = []
+        self.mptcp: [str, ...] = []
         # self.phy = []
-        self.batman_iface = []
+        self.batman_iface: [str, ...] = []
         self.bridge: str = ""
         self.msversion: str = ""
         self.delay: str = ""  # delay for channel change
@@ -110,6 +111,10 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             return "FAIL", "Invalid mesh vif"
         self.logger.debug("validate mesh settings mesh vif ok")
 
+        if validation.validate_mptcp(self.mptcp[index]) is False:
+            return "FAIL", "Invalid mptcp value"
+        self.logger.debug("validate mesh settings mptcp ok")
+
         # if validation.validate_phy(self.phy[index]) is False:
         #     return "FAIL", "Invalid phy"
         # self.logger.debug("validate mesh settings phy ok")
@@ -138,6 +143,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.routing: [str, ...] = []
         self.priority: [str, ...] = []
         self.mesh_vif: [str, ...] = []
+        self.mptcp: [str, ...] = []
         # self.phy = []
         self.batman_iface: [str, ...] = []
 
@@ -235,6 +241,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 self.routing.append(quote(str(parameters["routing"])))
                 self.priority.append(quote(str(parameters["priority"])))
                 self.mesh_vif.append(quote(str(parameters["mesh_vif"])))
+                self.mptcp.append(quote(str(parameters["mptcp"])))
                 # self.phy.append(quote(str(parameters["phy"])))
                 self.batman_iface.append(quote(str(parameters["batman_iface"])))
 
@@ -329,6 +336,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write(
                     f"id{str(index)}_MESH_VIF={quote(self.mesh_vif[index])}\n"
                 )
+                mesh_conf.write(f"id{str(index)}_MPTCP={quote(self.mptcp[index])}\n")
                 # mesh_conf.write(f"id{str(index)}_PHY={quote(self.phy[index])}\n")
                 mesh_conf.write(
                     f"id{str(index)}_BATMAN_IFACE={quote(self.batman_iface[index])}\n"
@@ -379,6 +387,8 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                     self.priority.append(match[1])
                 elif name == "MESH_VIF":
                     self.mesh_vif.append(match[1])
+                elif name == "MPTCP":
+                    self.mptcp.append(match[1])
                 # elif name == "PHY":
                 #     self.phy.append(match[1])
                 elif name == "BATMAN_IFACE":
