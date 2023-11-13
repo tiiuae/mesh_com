@@ -10,7 +10,7 @@ from tools.custom_logger import CustomLogger
 
 logger_instance = CustomLogger("macsec")
 class Macsec:
-    def __init__(self, level="lower", interface="wlp1s0", macsec_encryption="off"):
+    def __init__(self, level, interface, macsec_encryption):
         self.level = level # Macsec level: "lower" or "upper"
         self.interface = interface
         self.available_ports = set(range(1, 2**16)) # 1 to 2^16-1

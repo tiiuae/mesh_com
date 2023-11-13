@@ -7,7 +7,7 @@ from macsec.macsec import Macsec
 
 @pytest.fixture
 def macsec_instance():
-    return Macsec()
+    return Macsec(level="lower", interface="wlp1s0", macsec_encryption="off")
 
 def test_set_macsec_tx(macsec_instance):
     client_mac = "aa:bb:cc:dd:ee:ff"
@@ -59,7 +59,7 @@ def test_assign_unique_port(macsec_instance):
 
 
 def test_release_port(macsec_instance):
-    macsec_instance = Macsec()
+    macsec_instance = Macsec(level="lower", interface="wlp1s0", macsec_encryption="off")
     client_mac = "aa:bb:cc:dd:ee:ff"
     assigned_port = macsec_instance.assign_unique_port(client_mac)
     macsec_instance.release_port(client_mac)
@@ -69,7 +69,7 @@ def test_release_port(macsec_instance):
 
 
 def test_release_port_error(macsec_instance):
-    macsec_instance = Macsec()
+    macsec_instance = Macsec(level="lower", interface="wlp1s0", macsec_encryption="off")
     with pytest.raises(ValueError, match=r"Client .* is not in the list of used ports."):
         macsec_instance.release_port("00:11:22:33:44:55")
 
