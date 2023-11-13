@@ -19,18 +19,16 @@ BEACON_TIME = 10
 MAX_CONSECUTIVE_NOT_RECEIVED = 2
 MULTICAST_ADDRESS = 'ff02::1'
 TIMEOUT = 3 * BEACON_TIME
-BRIDGE = False # TODO: During migration to mesh_com, get it from /opt/mesh.conf
 logger_instance = CustomLogger("mutAuth")
 
 class mutAuth():
-    def __init__(self, in_queue, level, meshiface, port, batman_interface, shutdown_event, batman_setup_event):
+    def __init__(self, in_queue, level, meshiface, port, batman_interface, path_to_certificate,  shutdown_event, batman_setup_event, lan_bridge_flag=False):
         self.level = level
         self.meshiface = meshiface
         self.mymac = get_mac_addr(self.meshiface)
         self.ipAddress = mac_to_ipv6(self.mymac)
         self.port = port
-        self.CERT_PATH = f'{path_to_cbma_dir}/cert_generation/certificates'  # Change this to the actual path of your certificates
-        self.wpa_supplicant_ctrl_path = f"/var/run/wpa_supplicant/{self.meshiface}"
+        self.CERT_PATH = path_to_certificate # Absolute path to certificates
         self.in_queue = in_queue
         self.logger = logger_instance.get_logger()
         self.multicast_handler = MulticastHandler(self.in_queue, MULTICAST_ADDRESS, self.port, self.meshiface)
@@ -46,6 +44,7 @@ class mutAuth():
         self.maximum_num_failed_attempts = 3 # Maximum number of failed attempts for mutual authentication (can be changed)
         self.batman_interface = batman_interface
         self.batman_setup_event = batman_setup_event
+        self.lan_bridge_flag = lan_bridge_flag
 
     def check_mesh(self):
         if not is_wpa_supplicant_running():
@@ -174,7 +173,8 @@ class mutAuth():
             add_interface_to_batman(interface_to_add=bridge_interface, batman_interface=self.batman_interface)
         if not is_interface_up(self.batman_interface): # Turn batman interface up if not up already
             self.batman(self.batman_interface)
-            if self.level == "upper" and BRIDGE:
+            if self.level == "upper" and self.lan_bridge_flag:
+                # TODO: configure from mesh_default.conf?
                 # Add bat1 and ethernet interface to br-lan to connect external devices
                 bridge_interface = "br-lan"
                 if not is_interface_up(bridge_interface):

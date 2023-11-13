@@ -18,7 +18,7 @@ class MulticastHandler:
         self.queue = qeue
         self.multicast_group = multicast_group
         self.port = port
-        self.interface = interface # Multicast interface. Set as wlp1s0: in case of TLS for lower macsec, bat0: in case of TLS for upper macsec
+        self.interface = interface # Multicast interface. Set as radio name: in case of TLS for lower macsec, lower batman interface: in case of TLS for upper macsec
         self.logger = logger_instance.get_logger()
         self.excluded = [get_mac_addr(interface), f'{get_mac_addr(interface)}_server']
 
@@ -75,7 +75,6 @@ class MulticastHandler:
 
 
 def main():
-    message = get_mac_addr("wlp1s0")
     parser = argparse.ArgumentParser(description="IPv6 Multicast Sender/Receiver")
     parser.add_argument('--mode', choices=['send', 'receive', 'both'], required=True, help='Run mode: send, receive, or both')
     parser.add_argument('--address', default='ff02::1', help='Multicast IPv6 address (default: ff02::1)')
@@ -86,6 +85,7 @@ def main():
     queue = Queue()
 
     multicast_handler = MulticastHandler(queue, args.address, args.port, args.interface)
+    message = get_mac_addr(args.interface)
 
     if args.mode == 'receive':
         multicast_handler.receive_multicast()
