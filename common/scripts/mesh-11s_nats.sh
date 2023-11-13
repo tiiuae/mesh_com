@@ -198,6 +198,13 @@ EOF
       fi
       done)
 
+      # /usr/local/bin/init_halow.sh will take care of the firmware copy to /lib/firmware
+      if [ "$BUSNO" -gt 0 ]; then
+          command="insmod /lib/modules/$KERNEL_VERSION/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat spi_bus_num=$BUSNO spi_polling_interval=3 hifspeed=20000000 spi_gpio_irq=-1 power_save=0 sw_enc=0"
+      else
+          command="insmod /lib/modules/$KERNEL_VERSION/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat hifspeed=20000000 power_save=0 sw_enc=1 spi_bus_num=0 spi_gpio_irq=5"
+      fi
+
       # remove nrc module before init
       rmmod nrc.ko
 
@@ -205,10 +212,9 @@ EOF
       logger "country code set($wifidev): $cc"
       iw reg set "$cc"
 
-      # Check the return code of halow bring up
       while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
         logger "nrc module load retry count: $RETRY_COUNT"
-        insmod /lib/modules/"$KERNEL_VERSION"/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat spi_bus_num="$BUSNO" spi_polling_interval=3 hifspeed=20000000 spi_gpio_irq=-1 power_save=0 sw_enc=0
+        $command
         sleep 2
         # Bring up halow interface
         echo "$wifidev up.."
