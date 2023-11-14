@@ -74,9 +74,11 @@ fix_iface_mac_addresses() {
       ifconfig "$batman_iface" down
       ifconfig "$batman_iface" hw ether "$batif_mac"
       ifconfig "$batman_iface" up
-      ifconfig "$bridge_name" down
-      ifconfig "$bridge_name" hw ether "$eth0_mac"
-      ifconfig "$bridge_name" up
+      if [[ -n $bridge_name ]]; then
+        ifconfig "$bridge_name" down
+        ifconfig "$bridge_name" hw ether "$eth0_mac"
+        ifconfig "$bridge_name" up
+      fi
 }
 
 calculate_network_address() {
@@ -234,7 +236,7 @@ EOF
       sleep 1
 
       if [ "$routing_algo" == "batman-adv" ]; then
-        batctl if add "$wifidev"
+        batctl meshif $batman_iface if add "$wifidev"
         echo "$batman_iface up.."
         ifconfig "$batman_iface" up
         echo "$batman_iface ip address.."
@@ -243,19 +245,27 @@ EOF
         ifconfig "$batman_iface" mtu 1460
         echo
         ifconfig "$batman_iface"
+        if [[ -n $bridge_name ]]; then
+            add_network_intf_to_bridge "$bridge_name" "$bridge_interfaces"
+            ifconfig "$bridge_name" "$bridge_ip" netmask "$nmask"
+            ifconfig "$bridge_name" up
+            echo
+            ifconfig "$bridge_name"
+            # Add forwarding rules from AP to "$batman_iface" interface
+            iptables -P FORWARD ACCEPT
+            route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
+            route add -net "$network" gw "$bridge_ip" netmask "$nmask" dev "$bridge_name"
+            iptables -A FORWARD --in-interface "$_mesh_vif" -j ACCEPT
+            iptables --table nat -A POSTROUTING --out-interface "$bridge_ip" -j MASQUERADE
+            sleep 5
+        fi
+        fix_iface_mac_addresses
 
       elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
         # Enable debug level as necessary
         (olsrd -i "$wifidev" -d 0)&
       fi
-
-      add_network_intf_to_bridge "$bridge_name" "$bridge_interfaces"
-      ifconfig "$bridge_name" "$bridge_ip" netmask "$nmask"
-      ifconfig "$bridge_name" up
-      echo
-      ifconfig "$bridge_name"
-      fix_iface_mac_addresses
 
       if [ "$routing_algo" == "batman-adv" ]; then
         sleep 3
@@ -267,15 +277,6 @@ EOF
           echo "batadv-vis started."
         fi
       fi
-
-      # Add forwarding rules from AP to "$batman_iface" interface
-      iptables -P FORWARD ACCEPT
-      route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
-      route add -net "$network" gw "$bridge_ip" netmask "$nmask" dev "$bridge_name"
-      iptables -A FORWARD --in-interface "$_mesh_vif" -j ACCEPT
-      iptables --table nat -A POSTROUTING --out-interface "$bridge_ip" -j MASQUERADE
-
-      sleep 5
 
       # Radio parameters
       echo "set radio parameters"
@@ -349,7 +350,7 @@ EOF
       ip link set "$wifidev" up
 
       if [ "$routing_algo" == "batman-adv" ]; then
-        batctl if add "$wifidev"
+        batctl meshif $batman_iface if add "$wifidev"
         echo "$batman_iface up.."
         ifconfig "$batman_iface" up
         echo "$batman_iface ip address.."
@@ -358,7 +359,21 @@ EOF
         ifconfig "$batman_iface" mtu 1460
         echo
         ifconfig "$batman_iface"
-
+        if [[ -n $bridge_name ]]; then
+            add_network_intf_to_bridge "$bridge_name" "$bridge_interfaces"
+            ifconfig "$bridge_name" "$bridge_ip" netmask "$nmask"
+            ifconfig "$bridge_name" up
+            echo
+            ifconfig "$bridge_name"
+            # Add forwarding rules from AP to "$batman_iface" interface
+            iptables -P FORWARD ACCEPT
+            route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
+            route add -net "$network" gw "$bridge_ip" netmask "$nmask" dev "$bridge_name"
+            iptables -A FORWARD --in-interface "$_mesh_vif" -j ACCEPT
+            iptables --table nat -A POSTROUTING --out-interface "$bridge_ip" -j MASQUERADE
+            sleep 5
+        fi
+        fix_iface_mac_addresses
       elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
         # Enable debug level as necessary
@@ -367,13 +382,6 @@ EOF
 
       # Radio parameters
       iw dev "$wifidev" set txpower limit "$txpwr"00
-
-      add_network_intf_to_bridge "$bridge_name" "$bridge_interfaces"
-      ifconfig "$bridge_name" "$bridge_ip" netmask "$nmask"
-      ifconfig "$bridge_name" up
-      echo
-      ifconfig "$bridge_name"
-      fix_iface_mac_addresses
 
       if [ "$routing_algo" == "batman-adv" ]; then
         sleep 3
@@ -385,14 +393,6 @@ EOF
           echo "batadv-vis started."
         fi
       fi
-
-      # Add forwarding rules from AP to "$batman_iface" interface
-      iptables -P FORWARD ACCEPT
-      route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
-      route add -net "$network" gw "$bridge_ip" netmask "$nmask" dev "$bridge_name"
-      iptables -A FORWARD --in-interface "$batman_iface" -j ACCEPT
-      iptables --table nat -A POSTROUTING --out-interface "$bridge_ip" -j MASQUERADE
-
       wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
       ;;
   "ap+mesh_mcc")
@@ -563,10 +563,6 @@ main () {
   #  id0_PRIORITY=long_range
   #  BRIDGE="br-mesh eth1 eth0 lan1"
   #  ROLE=drone
-  generate_lan_bridge_ip
-  # to get bridge_ip warning free
-  bridge_ip=$bridge_ip
-
   find_ethernet_port
   # to get eth_port warning free
   eth_port=$eth_port
@@ -623,7 +619,10 @@ main () {
   batman_iface="${!_batman_iface}"
 
   _mptcp="${INDEX}_MPTCP"
-  mptcp="${!_mptcp}"        # enable disable
+  mptcp="${!_mptcp}"
+
+  _bridge="${INDEX}_BRIDGE"
+  bridge="${!_bridge}"
 
   # shellcheck disable=SC2153
   # shellcheck disable=SC2034
@@ -639,8 +638,8 @@ main () {
   fi
 
   # e.g. BRIDGE=br-mesh eth0 eth1 lan1
-  bridge_name=$(echo "$BRIDGE" | cut -d' ' -f1)
-  bridge_interfaces=$(echo "$BRIDGE" | cut -d' ' -f2-)
+  bridge_name=$(echo "$bridge" | cut -d' ' -f1)
+  bridge_interfaces=$(echo "$bridge" | cut -d' ' -f2-)
 
   if brctl show "$bridge_name" &>/dev/null; then
     echo "Bridge $bridge_name already exists."
@@ -649,9 +648,29 @@ main () {
     brctl addbr "$bridge_name" 2>/dev/null
     echo "Bridge $bridge_name created."
   fi
-
-  calculate_network_address "$bridge_ip" "$nmask"
+  if [[ -n "$bridge_name" ]]; then
+      generate_lan_bridge_ip
+      # to get bridge_ip warning free
+      bridge_ip=$bridge_ip
+      calculate_network_address "$bridge_ip" "$nmask"
+  fi
+  if [ $mptcp == "enable" ]; then
+    echo "MPTCP enabled"
+    if ! [ -f /var/run/mptcp.conf ]; then
+        echo "SUBFLOWS=0" > /var/run/mptcp.conf
+    fi
+    if [[ -n $bridge_name ]]; then
+        source /var/run/mptcp.conf
+        echo "BRIDGE_IFACE=${bridge_name}" >> /var/run/mptcp.conf
+    else
+          source /opt/mptcp.conf
+          sed -i "s/$SUBFLOWS/$((SUBFLOWS + 1))/" /var/run/mptcp.conf
+          source /var/run/mptcp.conf
+          echo "INTERFACE_${SUBFLOWS}=${batman_iface}" >> /var/run/mptcp.conf
+    fi
+  fi
   mode_execute "$mode"
+
 }
 
 main "$@"
