@@ -38,6 +38,7 @@ class MulticastHandler:
 
         with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.setsockopt(socket.SOL_SOCKET, 25, str(self.interface + '\0').encode('utf-8'))  # Bind socket to interface
 
             # Bind to the wildcard address and desired port
             sock.bind(('::', self.port))
@@ -51,15 +52,6 @@ class MulticastHandler:
 
             # Add the membership to the socket
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
-            """
-        with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as sock:
-            sock.bind(('', self.port))
-
-            group = socket.inet_pton(socket.AF_INET6, self.multicast_group)
-            mreq = group + struct.pack('@I', 0)
-            #mreq = group + socket.if_nametoindex(self.interface).to_bytes(4,byteorder='little')
-            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
-            """
 
             self.logger.info(f"Listening for messages on {self.multicast_group}:{self.port}...")
             while True:
