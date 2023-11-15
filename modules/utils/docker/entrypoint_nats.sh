@@ -73,6 +73,10 @@ else
   echo "starting comms services"
   /opt/S90comms_controller start
 
+  echo "starting mptcp"
+  if [ -f "/var/run/mptcp.conf" ]; then
+    /opt/S90mptcp start
+  fi
   # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"
 fi
