@@ -1,0 +1,73 @@
+#!/bin/bash
+source /var/run/mptcp.conf
+### MPTCP  ###
+INTERFACE_0=$BRIDGE_IFACE
+for (( i=0; i<=$SUBFLOWS; i++ ))
+do
+   iface=INTERFACE_$i
+   IP=$(ifconfig ${!iface} | grep 'inet' | cut -d: -f2 | awk '{print $2}')
+   NM=$(ifconfig ${!iface} | grep 'netmask' | cut -d: -f2 | awk '{print $4}')
+   IFS=. read -r i1 i2 i3 i4 <<< $IP
+   IFS=. read -r m1 m2 m3 m4 <<< $NM
+   NP=$(printf "%d.%d.%d.%d\n" "$((i1 & m1))" "$((i2 & m2))" "$((i3 & m3))" "$((i4 & m4))")
+   MASK=$(ip addr show ${!iface} | grep 'inet'| cut -d: -f2 | awk '{print $2}' | awk -F "/" '{print $2}')
+
+   ip rule add from $IP table $((i+1))
+   ip route add $NP/$MASK dev ${!iface} scope link table $((i+1))
+
+   ip mptcp endpoint add $IP signal
+
+   if [[ $i == 0 ]]; then
+   	BR_NP=$NP
+        BR_MASK=$MASK
+   fi
+
+done
+echo $BR_NP
+echo $BR_MASK
+ip mptcp limits set subflow $SUBFLOWS add_addr_accepted $SUBFLOWS
+
+BR_PHY=$(brctl show | grep $BRIDGE_IFACE | awk -F " " '{printf $4}')
+iptables -A FORWARD ! -p tcp -m physdev --physdev-in $BR_PHY -j ACCEPT
+
+### PROXY ###
+###iptables ss-redir rules###
+iptables -t nat -N SSREDIR
+
+iptables -t nat -A PREROUTING -p tcp -j SSREDIR
+
+iptables -t nat -A SSREDIR -p tcp -d 127.0.0.0/8 -j RETURN
+iptables -t nat -A SSREDIR -p tcp -d 10.0.0.0/8 -j RETURN
+
+iptables -t nat -A SSREDIR -p tcp -s $BR_NP/$BR_MASK -j REDIRECT --to-ports 1080
+
+SERVER_IP = 192.168.1.20
+cat <<EOF > /var/run/ss-redir.json
+{
+    "server" : [$SERVER_IP],
+    "server_port" : 8388,
+    "local_address" : "0.0.0.0",
+    "local_port" : 1080,
+    "password" : "mptcp",
+    "timeout" : 300,
+    "method" : "aes-256-cfb",
+}
+EOF
+
+cat <<EOF > /var/run/ss-server.json
+{
+    "server" : ["[::0]", "0.0.0.0"],
+    "server_port" : 8388,
+    "local_port" : 1080,
+    "password" : "mptcp",
+    "timeout" : 300,
+    "method" : "aes-256-cfb",
+}
+EOF
+mptcpize run ss-redir -c /var/run/ss-redir.json &
+mptcpize run ss-server -c /var/run/ss-server.json &
+
+
+
+
+
