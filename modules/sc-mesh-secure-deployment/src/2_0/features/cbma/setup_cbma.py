@@ -7,6 +7,15 @@ shutdown_event = threading.Event()
 file_dir = os.path.dirname(__file__) # Path to dir containing this script
 
 def cbma(level, interface_name, port, batman_interface, path_to_certificate, wpa_supplicant_control_path = None):
+    '''
+    level: MACSec/ CBMA level. lower or upper
+    interface_name: Name of the interface
+    port: Port number for mutual authentication and multicast. Can use 15001 for lower level and 15002 for upper level
+    batman_interface: Batman interface name. bat0 for lower level, bat1 for upper level
+    path_to_certificate: Path to folder containing certificates
+    wpa_supplicant_control_path: Path to wpa supplicant control (if any)
+    '''
+
     wait_for_interface_to_be_up(interface_name)  # Wait for interface to be up, if not already
     in_queue = queue.Queue()  # Queue to store wpa peer connected messages/ multicast messages on interface for cbma
     mua = mutAuth(in_queue, level=level, meshiface=interface_name, port=port,
