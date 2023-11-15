@@ -73,6 +73,11 @@ else
   echo "starting comms services"
   /opt/S90comms_controller start
 
+  # Install python package "torch"
+  echo "installing packages"
+  chmod +x /opt/mesh_com/modules/utils/package/install_dependencies.sh
+  /opt/mesh_com/modules/utils/package/install_dependencies.sh
+
   # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"
 fi
