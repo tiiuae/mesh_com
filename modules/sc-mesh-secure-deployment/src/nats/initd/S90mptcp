@@ -1,0 +1,62 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          S90mptcp
+# Short-Description: start S90mptcp after S9011sNatsMesh if mptcp enabled
+# Description:       daemon for configuring mptcp routing rules and starting proxy services
+### END INIT INFO
+
+DAEMON="mptcp.sh"
+DIR="/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/mptcp/"
+PIDFILE="/var/run/${DAEMON}.pid"
+# shellcheck source=/dev/null
+[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
+LOG_FILE=/opt/mptcp.log
+
+start() {
+    printf 'Starting %s: ' "$DAEMON"
+
+    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON > $LOG_FILE 2>&1"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+stop() {
+    printf 'Stopping %s: ' "$DAEMON"
+    source /var/run/mptcp.conf
+    for (( i=0; i<=$SUBFLOWS; i++ )) do
+    while ip rule delete from 0/0 to 0/0 table $((i+1)) 2>/dev/null; do true; done
+    done
+    ip mptcp endpoint flush
+    BR_PHY=$(brctl show | grep $BRIDGE_IFACE | awk -F " " '{printf $4}')
+    iptables -D FORWARD ! -p tcp -m physdev --physdev-in $BR_PHY -j ACCEPT
+    kill -9 "$(ps ax | grep -E "ss-redir" | awk 'NR==1{print $1'})"
+    rm -fr /var/run/ss-redir.json 2>/dev/null
+    kill -9 "$(ps ax | grep -E "ss-server" | awk 'NR==1{print $1'})"
+    rm -fr /var/run/ss-server.json 2>/dev/null
+    rm -fr /var/run/mptcp.conf 2>/dev/null
+    iptables -t nat -F
+
+    start-stop-daemon -K -o -q -p "$PIDFILE"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        rm -f "$PIDFILE"
+        echo "OK"
+    else
+        echo "FAIL"
+    fi
+    return "$status"
+}
+
+case "$1" in
+    start|stop)
+        "$1";;
+    *)
+        echo "Usage: $0 {start|stop}"
+        exit 1
+esac
+
+exit 0
