@@ -663,7 +663,7 @@ main () {
         source /var/run/mptcp.conf
         echo "BRIDGE_IFACE=${bridge_name}" >> /var/run/mptcp.conf
     else
-          source /opt/mptcp.conf
+          source /var/run/mptcp.conf
           sed -i "s/$SUBFLOWS/$((SUBFLOWS + 1))/" /var/run/mptcp.conf
           source /var/run/mptcp.conf
           echo "INTERFACE_${SUBFLOWS}=${batman_iface}" >> /var/run/mptcp.conf
