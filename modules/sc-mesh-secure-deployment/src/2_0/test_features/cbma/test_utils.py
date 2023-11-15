@@ -122,6 +122,19 @@ def test_interface_not_present():
         assert not is_interface_up('bat0')
         mock_subprocess.assert_called_once_with(['ifconfig', 'bat0'], stderr=subprocess.DEVNULL)
 
+def test_wait_for_interface_to_be_up_success_after_tries():
+    mock_interface_up_side_effect = [False, False, True]  # 2 failures followed by a success
+    with patch('tools.utils.is_interface_up', side_effect=mock_interface_up_side_effect, autospec=True) as mock_is_interface_up, \
+         patch('tools.utils.logger.info', autospec=True) as mock_logger_info, \
+         patch('tools.utils.time.sleep', autospec=True) as mock_sleep:
+
+        wait_for_interface_to_be_up("bat0")
+
+        # Verify is_interface_pingable was called 3 times
+        assert mock_is_interface_up.call_count == 3
+        # Verify sleep was called twice
+        mock_sleep.assert_has_calls([call(1), call(1)])
+
 def test_xor_bytes_without_padding():
     result = xor_bytes(b'\x01\x02\x03', b'\x11\x01\x01', 3)
     assert result == b'\x10\x03\x02'

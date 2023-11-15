@@ -22,7 +22,7 @@ TIMEOUT = 3 * BEACON_TIME
 logger_instance = CustomLogger("mutAuth")
 
 class mutAuth():
-    def __init__(self, in_queue, level, meshiface, port, batman_interface, path_to_certificate,  shutdown_event, batman_setup_event, lan_bridge_flag=False):
+    def __init__(self, in_queue, level, meshiface, port, batman_interface, path_to_certificate,  shutdown_event, lan_bridge_flag=False):
         self.level = level
         self.meshiface = meshiface
         self.mymac = get_mac_addr(self.meshiface)
@@ -43,7 +43,6 @@ class mutAuth():
         self.connected_peers_status_lock = threading.Lock()
         self.maximum_num_failed_attempts = 3 # Maximum number of failed attempts for mutual authentication (can be changed)
         self.batman_interface = batman_interface
-        self.batman_setup_event = batman_setup_event
         self.lan_bridge_flag = lan_bridge_flag
 
     def check_mesh(self):
@@ -179,10 +178,6 @@ class mutAuth():
                 bridge_interface = "br-lan"
                 if not is_interface_up(bridge_interface):
                     self.setup_bridge_over_batman(bridge_interface)
-        if not self.batman_setup_event.is_set():
-            # Set batman setup event to signal that batman has been setup
-            # Used to trigger mtls for upper macsec
-            self.batman_setup_event.set()
 
     def setup_bridge_over_batman(self, bridge_interface):
         # TODO: Need to make it compatible with bridge_settings in mesh_com (This is just for quick test)

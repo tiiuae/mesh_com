@@ -261,6 +261,15 @@ def is_interface_up(interface_name):
     except subprocess.CalledProcessError:
         return False
 
+def wait_for_interface_to_be_up(interface_name):
+    waiting_message_printed = False
+    while not is_interface_up(interface_name):
+        # Waiting till interface is up
+        if not waiting_message_printed:
+            logger.info(f'Waiting for {interface_name} to be up..')
+            waiting_message_printed = True
+        time.sleep(1)
+
 def xor_bytes(byte1, byte2, byte_size=32):
     # Trim the bytes if they are longer than byte_size
     if len(byte1) > byte_size:

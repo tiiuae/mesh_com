@@ -16,6 +16,7 @@ if ip link show bat0 &> /dev/null; then
   # Delete the batman interface "bat0" if it exists
   echo "Deleting batman interface bat0..."
   ip link set bat0 down
+  batctl meshif bat0 interface destroy
 
 
   echo "Batman interface bat0 deleted."
