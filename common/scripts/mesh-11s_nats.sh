@@ -318,6 +318,8 @@ network={
     mesh_fwding=0
     # 11b rates dropped (for better performance)
     mesh_basic_rates=60 90 120 180 240 360 480 540
+    disable_vht=1
+    disable_ht40=1
 }
 EOF
 
