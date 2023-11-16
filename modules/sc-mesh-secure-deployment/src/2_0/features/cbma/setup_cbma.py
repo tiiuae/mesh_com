@@ -6,20 +6,21 @@ shutdown_event = threading.Event()
 
 file_dir = os.path.dirname(__file__) # Path to dir containing this script
 
-def cbma(level, interface_name, port, batman_interface, path_to_certificate, wpa_supplicant_control_path = None):
+def cbma(level, interface_name, port, batman_interface, path_to_certificate, path_to_ca, wpa_supplicant_control_path = None):
     '''
     level: MACSec/ CBMA level. lower or upper
     interface_name: Name of the interface
     port: Port number for mutual authentication and multicast. Can use 15001 for lower level and 15002 for upper level
     batman_interface: Batman interface name. bat0 for lower level, bat1 for upper level
     path_to_certificate: Path to folder containing certificates
+    path_to_ca: Path to ca certificate
     wpa_supplicant_control_path: Path to wpa supplicant control (if any)
     '''
 
     wait_for_interface_to_be_up(interface_name)  # Wait for interface to be up, if not already
     in_queue = queue.Queue()  # Queue to store wpa peer connected messages/ multicast messages on interface for cbma
     mua = mutAuth(in_queue, level=level, meshiface=interface_name, port=port,
-                  batman_interface=batman_interface, path_to_certificate=path_to_certificate, shutdown_event=shutdown_event)
+                  batman_interface=batman_interface, path_to_certificate=path_to_certificate, path_to_ca=path_to_ca, shutdown_event=shutdown_event)
     # Wait for wireless interface to be pingable before starting mtls server, multicast
     wait_for_interface_to_be_pingable(mua.meshiface, mua.ipAddress)
     # Start server to facilitate client auth requests, monitor ongoing auths and start client request if there is a new peer/ server baecon
@@ -38,6 +39,7 @@ def cbma(level, interface_name, port, batman_interface, path_to_certificate, wpa
     monitor_thread.start()
     # Send periodic multicasts
     mua.sender_thread.start()
+    return mua
 
 
 
@@ -51,13 +53,27 @@ def main():
 
     # Start cbma lower for each interface/ radio
     # For example, for wlp1s0:
-    cbma(level="lower", interface_name="wlp1s0", port=15001, batman_interface="bat0", path_to_certificate=f'{file_dir}/cert_generation/certificates', wpa_supplicant_control_path='/var/run/wpa_supplicant_id0/wlp1s0')
+    mua_wlp1s0 = cbma(level="lower",
+         interface_name="wlp1s0",
+         port=15001,
+         batman_interface="bat0",
+         path_to_certificate=f'{file_dir}/cert_generation/certificates', # Certificates are stored as macsec_{MAC address without :}.crt and keys are stored as macsec_{MAC address without :}.key
+         path_to_ca=f'{file_dir}/cert_generation/certificates/ca.crt',
+         wpa_supplicant_control_path='/var/run/wpa_supplicant_id0/wlp1s0'
+         )
     # Repeat the same by changing the interface_name and wpa_supplicant_control_path (if any) for other interfaces/ radios. The port number can be reused for the lower level
 
 
     # Start cbma upper for bat0
     # This only needs to be called once
-    cbma(level="upper", interface_name="bat0", port=15002, batman_interface="bat1", path_to_certificate=f'{file_dir}/cert_generation/certificates')
+    # path_to_certificates and path_to_ca can be changed as required
+    mua_bat0 = cbma(level="upper",
+         interface_name="bat0",
+         port=15002,
+         batman_interface="bat1",
+         path_to_certificate=f'{file_dir}/cert_generation/certificates',
+         path_to_ca=f'{file_dir}/cert_generation/certificates/ca.crt'
+         )
 
 if __name__ == "__main__":
     main()

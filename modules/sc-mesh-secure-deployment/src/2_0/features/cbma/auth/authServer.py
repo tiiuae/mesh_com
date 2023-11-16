@@ -15,13 +15,13 @@ logger = logger_instance.get_logger()
 
 
 class AuthServer:
-    def __init__(self, interface, ip_address, port, cert_path, mua):
+    def __init__(self, interface, ip_address, port, cert_path, ca_path, mua):
         threading.Thread.__init__(self)
         self.running = True
         self.ipAddress = ip_address
         self.port = port
         self.CERT_PATH = cert_path
-        self.ca = f'{self.CERT_PATH}/ca.crt'
+        self.ca = ca_path
         self.interface = interface
         self.mymac = get_mac_addr(self.interface)
         # Create the SSL context here and set it as an instance variable
@@ -29,8 +29,8 @@ class AuthServer:
         self.context.verify_mode = ssl.CERT_REQUIRED
         self.context.load_verify_locations(glob.glob(self.ca)[0])
         self.context.load_cert_chain(
-            certfile=glob.glob(f'{self.CERT_PATH}/macsec*.crt')[0],
-            keyfile=glob.glob(f'{self.CERT_PATH}/macsec*.key')[0],
+            certfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.crt")[0],
+            keyfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.key")[0],
         )
         self.client_auth_results = {}
         self.active_sockets = {}

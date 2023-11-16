@@ -22,13 +22,14 @@ TIMEOUT = 3 * BEACON_TIME
 logger_instance = CustomLogger("mutAuth")
 
 class mutAuth():
-    def __init__(self, in_queue, level, meshiface, port, batman_interface, path_to_certificate,  shutdown_event, lan_bridge_flag=False):
+    def __init__(self, in_queue, level, meshiface, port, batman_interface, path_to_certificate, path_to_ca, shutdown_event, lan_bridge_flag=False):
         self.level = level
         self.meshiface = meshiface
         self.mymac = get_mac_addr(self.meshiface)
         self.ipAddress = mac_to_ipv6(self.mymac)
         self.port = port
-        self.CERT_PATH = path_to_certificate # Absolute path to certificates
+        self.CERT_PATH = path_to_certificate # Absolute path to certificates folder
+        self.CA_PATH = path_to_ca # Absolute path to ca certificate
         self.in_queue = in_queue
         self.logger = logger_instance.get_logger()
         self.multicast_handler = MulticastHandler(self.in_queue, MULTICAST_ADDRESS, self.port, self.meshiface)
@@ -99,13 +100,13 @@ class mutAuth():
                 self.start_auth_client(mac)
 
     def start_auth_server(self):
-        auth_server = AuthServer(self.meshiface, self.ipAddress, self.port, self.CERT_PATH, self)
+        auth_server = AuthServer(self.meshiface, self.ipAddress, self.port, self.CERT_PATH, self.CA_PATH, self)
         auth_server_thread = threading.Thread(target=auth_server.start_server)
         auth_server_thread.start()
         return auth_server_thread, auth_server
 
     def start_auth_client(self, server_mac):
-        cli = AuthClient(self.meshiface, server_mac, self.port, self.CERT_PATH, self)
+        cli = AuthClient(self.meshiface, server_mac, self.port, self.CERT_PATH, self.CA_PATH, self)
         cli.establish_connection()
 
     def auth_pass(self, secure_client_socket, client_mac):

@@ -18,14 +18,14 @@ logger_instance = CustomLogger("authClient")
 
 
 class AuthClient:
-    def __init__(self, interface, server_mac, server_port, cert_path, mua):
+    def __init__(self, interface, server_mac, server_port, cert_path, ca_path, mua):
         self.sslServerIP = mac_to_ipv6(server_mac)
         self.sslServerPort = server_port
         self.CERT_PATH = cert_path
         self.interface = interface
         self.secure_client_socket = None
         self.logger = logger_instance.get_logger()
-        self.ca = f'{self.CERT_PATH}/ca.crt'
+        self.ca = ca_path
         self.mymac = get_mac_addr(self.interface)
         self.server_mac = server_mac
         self.mua = mua
@@ -40,8 +40,8 @@ class AuthClient:
 
         context.load_verify_locations(glob.glob(self.ca)[0])
         context.load_cert_chain(
-            certfile=glob.glob(f'{self.CERT_PATH}/macsec*.crt')[0],
-            keyfile=glob.glob(f'{self.CERT_PATH}/macsec*.key')[0],
+            certfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.crt")[0],
+            keyfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.key")[0],
         )
 
         # Detect if the server IP is IPv4 or IPv6 and create a socket accordingly
