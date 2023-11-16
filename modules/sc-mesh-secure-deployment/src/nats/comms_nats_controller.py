@@ -22,6 +22,8 @@ from src import comms_status
 from src import batadvvis
 from src import batstat
 
+from src import comms_service_discovery
+
 # FMO_SUPPORTED_COMMANDS = [
 #     "GET_IDENTITY",
 #     "ENABLE_VISUALISATION",
@@ -147,17 +149,17 @@ class MdmAgent:
         """
         self.__previous_config: Optional[str] = self.__read_config_from_file()
         self.__comms_controller: CommsController = comms_controller
-        self.__interval: int = 10  # possible to update from MDM server?
-        self.__url: str = "http://172.18.8.39:5000"  # mDNS callback updates this one
+        self.__interval: int = 1  # possible to update from MDM server?
+        self.__url: str = "172.18.8.39:5000"  # mDNS callback updates this one
         self.__keyfile: str = keyfile
         self.__certificate_file: str = certificate_file
         self.__ssl_context: Optional[ssl.SSLContext] = None
         self.__config_version: int = 0
-        self.mdm_connection_status: bool = True
+        self.mdm_service_available: bool = False
         self.__device_id = "default"  # todo?
         self.__config_type = "mesh_conf"
 
-    async def mdm_server_address_cb(self, address: str, status: str) -> None:
+    def mdm_server_address_cb(self, address: str, status: bool) -> None:
         """
         Callback for MDM server address
         :param address: MDM server address
@@ -165,7 +167,7 @@ class MdmAgent:
         :return: -
         """
         self.__url = address
-        self.mdm_connection_status = status
+        self.mdm_service_available = status
 
     async def execute(self) -> None:
         """
@@ -180,7 +182,7 @@ class MdmAgent:
             )
 
         while True:
-            if self.mdm_connection_status:
+            if self.mdm_service_available:
                 await self.__loop_run_executor(executor)
             await asyncio.sleep(float(self.__interval))
 
@@ -217,13 +219,13 @@ class MdmAgent:
             if self.__ssl_context is not None:
                 self.__comms_controller.logger.debug("SSL context is not None")
                 return requests.get(
-                    f"{self.__url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
+                    f"https://{self.__url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
                     params={"device_id": self.__device_id},
                     verify=self.__ssl_context,
                     timeout=2,
                 )
             return requests.get(
-                f"{self.__url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
+                f"http://{self.__url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
                 params={"device_id": self.__device_id},
                 timeout=2,
             )  # todo for testing only
@@ -270,6 +272,7 @@ class MdmAgent:
                 )
                 self.__comms_controller.logger.debug("ret: %s info: %s", ret, info)
             self.__config_version = int(data["version"])
+            self.__interval = 10
             self.__write_config_to_file(response)
 
     @staticmethod
@@ -444,7 +447,12 @@ async def main(server, port, keyfile=None, certfile=None, interval=1000, agent="
     # separate instances needed for FMO/MDM
     if agent == "mdm":
         mdm = MdmAgent(cc, keyfile, certfile)
-        await mdm.execute()
+        monitor = comms_service_discovery.CommsServiceMonitor(
+            service_name="MDM Service",
+            service_type="_mdm._tcp.local.",
+            service_cb=mdm.mdm_server_address_cb,
+        )
+        await asyncio.gather(mdm.execute(), monitor.async_run())
     else:
         while True:
             await asyncio.sleep(float(cc.interval) / 1000.0)
