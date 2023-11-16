@@ -13,6 +13,7 @@ from typing import Optional
 from nats.aio.client import Client as NATS
 from concurrent.futures import ThreadPoolExecutor
 import requests
+from requests import Response
 
 from src import comms_settings
 from src import comms_command
@@ -135,6 +136,9 @@ class MdmAgent:
     MDM Agent
     """
 
+    GET_CONFIG = "public/config"
+    GET_DEVICE_CONFIG: str = "public/get_device_config/{config_type}"
+
     def __init__(
         self, comms_controller, keyfile: str = None, certificate_file: str = None
     ):
@@ -143,13 +147,14 @@ class MdmAgent:
         """
         self.__previous_config: Optional[str] = self.__read_config_from_file()
         self.__comms_controller: CommsController = comms_controller
-        self.__interval: int = 10
-        self.__url: str = "http://0.0.0.0:5000/config"
+        self.__interval: int = 10  # possible to update from MDM server?
+        self.__url: str = "http://0.0.0.0:5000"  # mDNS callback updates this one
         self.__keyfile: str = keyfile
         self.__certificate_file: str = certificate_file
         self.__ssl_context: Optional[ssl.SSLContext] = None
         self.__config_version: int = 0
         self.mdm_connection_status: bool = True
+        self.__device_id = "default"  # todo?
 
     async def mdm_server_address_cb(self, address: str, status: str) -> None:
         """
@@ -178,7 +183,7 @@ class MdmAgent:
                 await self.__loop_run_executor(executor)
             await asyncio.sleep(float(self.__interval))
 
-    def __http_request(self) -> requests.Response:
+    def __http_get_config(self) -> requests.Response:
         """
         HTTP request
         :return: HTTP response
@@ -186,9 +191,42 @@ class MdmAgent:
         try:
             if self.__ssl_context is not None:
                 self.__comms_controller.logger.debug("SSL context is not None")
-                return requests.get(self.__url, verify=self.__ssl_context, timeout=2)
+                return requests.get(
+                    f"{self.__url}/{MdmAgent.GET_CONFIG}",
+                    params={"device_id": self.__device_id},
+                    verify=self.__ssl_context,
+                    timeout=2,
+                )
             self.__comms_controller.logger.debug("SSL context is None")
-            return requests.get(self.__url, timeout=2)  # todo for testing only
+            return requests.get(
+                f"{self.__url}/{MdmAgent.GET_CONFIG}",
+                params={"device_id": self.__device_id},
+                timeout=2,
+            )  # todo for testing only
+        except requests.exceptions.ConnectionError as err:
+            self.__comms_controller.logger.error(
+                "HTTP request failed with error: %s", err
+            )
+            return requests.Response()
+
+    # TODO: not used yet
+    # pylint: disable=unused-argument
+    def __http_get_device_config(self, device_id: str, config_type: str) -> Response:
+        try:
+            if self.__ssl_context is not None:
+                self.__comms_controller.logger.debug("SSL context is not None")
+                return requests.get(
+                    f"{self.__url}/{self.GET_DEVICE_CONFIG}/{config_type}",
+                    params={"device_id": device_id},
+                    verify=self.__ssl_context,
+                    timeout=2,
+                )
+            return requests.get(
+                f"{self.__url}/{self.GET_DEVICE_CONFIG}/{config_type}",
+                params={"device_id": device_id},
+                timeout=2,
+            )  # todo for testing only
+
         except requests.exceptions.ConnectionError as err:
             self.__comms_controller.logger.error(
                 "HTTP request failed with error: %s", err
@@ -262,7 +300,7 @@ class MdmAgent:
         """
         # This function makes a synchronous HTTP request using ThreadPoolExecutor
         https_loop = asyncio.get_event_loop()
-        response = await https_loop.run_in_executor(executor, self.__http_request)
+        response = await https_loop.run_in_executor(executor, self.__http_get_config)
         self.__comms_controller.logger.debug(
             "HTTP Request status: %s", str(response.status_code)
         )
