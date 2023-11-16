@@ -36,15 +36,19 @@ class mutAuth():
         self.stop_event = threading.Event()
         self.sender_thread = threading.Thread(target=self._periodic_sender, args=(self.stop_event,))
         self.shutdown_event = shutdown_event  # Add this to handle graceful shutdown
+        self.batman_interface = batman_interface
         if self.level == "lower":
             self.macsec_obj = macsec.Macsec(level=self.level, interface=self.meshiface, macsec_encryption="off")  # Initialize lower macsec object
         elif self.level == "upper":
             self.macsec_obj = macsec.Macsec(level=self.level, interface=self.meshiface, macsec_encryption="on")  # Initialize upper macsec object
+            self.bridge_interface = "br-upper" # bridge for upper macsec interfaces
+            setup_bridge(self.bridge_interface)
+            add_interface_to_batman(interface_to_add=self.bridge_interface, batman_interface=self.batman_interface)
         self.connected_peers_status = {} # key = client mac address, value = [status : ("ongoing", "authenticated", "not connected"), no of failed attempts]}
         self.connected_peers_status_lock = threading.Lock()
         self.maximum_num_failed_attempts = 3 # Maximum number of failed attempts for mutual authentication (can be changed)
-        self.batman_interface = batman_interface
         self.lan_bridge_flag = lan_bridge_flag
+        self.macsec_setup_event = threading.Event()
 
     def check_mesh(self):
         if not is_wpa_supplicant_running():
@@ -156,32 +160,31 @@ class mutAuth():
 
         self.macsec_obj.set_macsec_tx(client_mac, my_macsec_key, my_port) # setup macsec tx channel
         self.macsec_obj.set_macsec_rx(client_mac, client_macsec_key, client_macsec_param['port'])  # setup macsec rx channel
-        self.setup_batman(client_mac)
+        self.add_to_batman(client_mac)
+        self.macsec_setup_event.set()
 
-    def setup_batman(self, client_mac):
+    def add_to_batman(self, client_mac):
+        # Adds macsec interface to batman
         if self.level == "lower":
+            # TODO: change this to add lower macsec interfaces to a bridge before adding to batman (need to avoid bridge loops with ebtables)
             # Add lower macsec interface to lower batman interface
             add_interface_to_batman(interface_to_add=self.macsec_obj.get_macsec_interface_name(client_mac), batman_interface=self.batman_interface)
         elif self.level == "upper":
-            bridge_interface = "br-upper"
-            if not is_interface_up(bridge_interface):
-                subprocess.run(["brctl", "addbr", bridge_interface], check=True)
-                add_interface_to_bridge(interface_to_add=self.macsec_obj.get_macsec_interface_name(client_mac), bridge_interface=bridge_interface)
-                subprocess.run(["ip", "link", "set", bridge_interface, "up"], check=True)
-            else:
-                add_interface_to_bridge(interface_to_add=self.macsec_obj.get_macsec_interface_name(client_mac), bridge_interface=bridge_interface)
-            add_interface_to_batman(interface_to_add=bridge_interface, batman_interface=self.batman_interface)
+            add_interface_to_bridge(interface_to_add=self.macsec_obj.get_macsec_interface_name(client_mac), bridge_interface=self.bridge_interface)
+
+    def setup_batman(self):
+        # Wait till a macsec interface is setup and added to batman before setting up batman interface
+        self.macsec_setup_event.wait()
         if not is_interface_up(self.batman_interface): # Turn batman interface up if not up already
             self.batman(self.batman_interface)
             if self.level == "upper" and self.lan_bridge_flag:
-                # TODO: configure from mesh_default.conf?
                 # Add bat1 and ethernet interface to br-lan to connect external devices
                 bridge_interface = "br-lan"
                 if not is_interface_up(bridge_interface):
                     self.setup_bridge_over_batman(bridge_interface)
 
     def setup_bridge_over_batman(self, bridge_interface):
-        # TODO: Need to make it compatible with bridge_settings in mesh_com (This is just for quick test)
+        # TODO: Need to configure interfaces to add to br-lan (This is just for quick test)
         subprocess.run(["brctl", "addbr", bridge_interface], check=True)
         add_interface_to_bridge(interface_to_add=self.batman_interface, bridge_interface=bridge_interface) # Add bat1 to br-lan
         add_interface_to_bridge(interface_to_add="eth1", bridge_interface=bridge_interface)  # Add eth1 to br-lan

@@ -6,8 +6,9 @@ shutdown_event = threading.Event()
 
 file_dir = os.path.dirname(__file__) # Path to dir containing this script
 
-def cbma(level, interface_name, port, batman_interface, path_to_certificate, path_to_ca, wpa_supplicant_control_path = None):
+def setup_macsec(level, interface_name, port, batman_interface, path_to_certificate, path_to_ca, wpa_supplicant_control_path = None):
     '''
+    Sets up macsec links between peers for an interface and adds the macsec interfaces to batman_interface
     level: MACSec/ CBMA level. lower or upper
     interface_name: Name of the interface
     port: Port number for mutual authentication and multicast. Can use 15001 for lower level and 15002 for upper level
@@ -44,6 +45,9 @@ def cbma(level, interface_name, port, batman_interface, path_to_certificate, pat
 
 
 def main():
+    '''
+    Example of setting up cbma for an interface
+    '''
     # Delete default bat0 and br-lan if they come up by default
     subprocess.run([f'{file_dir}/delete_default_brlan_bat0.sh'])
 
@@ -51,9 +55,9 @@ def main():
     # TODO: nft needs to be enabled on the images
     #apply_nft_rules(rules_file=f'{file_dir}/tools/firewall.nft')
 
-    # Start cbma lower for each interface/ radio
+    # Start cbma lower for each interface/ radio by calling setup_macsec(), followed by setup_batman()
     # For example, for wlp1s0:
-    mua_wlp1s0 = cbma(level="lower",
+    mua_wlp1s0 = setup_macsec(level="lower",
          interface_name="wlp1s0",
          port=15001,
          batman_interface="bat0",
@@ -61,19 +65,22 @@ def main():
          path_to_ca=f'{file_dir}/cert_generation/certificates/ca.crt',
          wpa_supplicant_control_path='/var/run/wpa_supplicant_id0/wlp1s0'
          )
+    mua_wlp1s0.setup_batman()
     # Repeat the same by changing the interface_name and wpa_supplicant_control_path (if any) for other interfaces/ radios. The port number can be reused for the lower level
+    # setup_batman will setup bat0 once (for whichever interface this is called first) by setting the mac address of bat0 same as that of the physical interface
+    # This is beacuse right now, we reuse certificates from one of the physical interfaces for upper macsec over bat0
 
-
-    # Start cbma upper for bat0
+    # Start cbma upper for bat0 by calling setup_macsec(), followed by setup_batman()
     # This only needs to be called once
     # path_to_certificates and path_to_ca can be changed as required
-    mua_bat0 = cbma(level="upper",
+    mua_bat0 = setup_macsec(level="upper",
          interface_name="bat0",
          port=15002,
          batman_interface="bat1",
          path_to_certificate=f'{file_dir}/cert_generation/certificates',
          path_to_ca=f'{file_dir}/cert_generation/certificates/ca.crt'
          )
+    mua_bat0.setup_batman()
 
 if __name__ == "__main__":
     main()

@@ -300,3 +300,12 @@ def add_interface_to_bridge(interface_to_add, bridge_interface):
         logger.info(f'Added interface {interface_to_add} to {bridge_interface}')
     except Exception as e:
         logger.error(f'Error adding interface {interface_to_add} to {bridge_interface}: {e}')
+
+def setup_bridge(bridge_interface):
+    # Set a bridge interface up
+    try:
+        subprocess.run(["brctl", "addbr", bridge_interface], check=True)
+        subprocess.run(["ip", "link", "set", bridge_interface, "up"], check=True)
+        logger.info(f'Setup bridge {bridge_interface}')
+    except Exception as e:
+        logger.error(f'Error setting up bridge {bridge_interface}: {e}')

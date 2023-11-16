@@ -68,7 +68,7 @@ def mock_glob(monkeypatch):
 
 
 def test_auth_server_handle_client(mock_dependencies, mock_socket, mock_glob, mock_logger):
-    server = AuthServer("some_interface", "127.0.0.1", 15001, "path/to/cert", MagicMock())
+    server = AuthServer("some_interface", "127.0.0.1", 15001, "path/to/cert", "path/to/cert/ca.crt", MagicMock())
 
     fake_client_connection = MagicMock()
     fake_client_address = ('::1', 12345)
@@ -79,7 +79,7 @@ def test_auth_server_handle_client(mock_dependencies, mock_socket, mock_glob, mo
 
 
 def test_auth_server_start_stop(mock_dependencies, mock_socket, mock_glob, mock_logger):
-    server = AuthServer("some_interface", "127.0.0.1", 15001, "path/to/cert", MagicMock())
+    server = AuthServer("some_interface", "127.0.0.1", 15001, "path/to/cert", "path/to/cert/ca.crt", MagicMock())
 
     # Mock accept to raise socket.timeout just once
     mock_socket['mock_sock_instance'].accept.side_effect = [socket.timeout]
@@ -99,7 +99,7 @@ def test_auth_server_start_stop(mock_dependencies, mock_socket, mock_glob, mock_
 
 
 def test_authenticate_client_verification_pass(mock_dependencies, mock_socket, mock_glob, mock_logger):
-    server = AuthServer("some_interface", '::1', 15001, "path/to/cert", MagicMock())
+    server = AuthServer("some_interface", '::1', 15001, "path/to/cert", "path/to/cert/ca.crt", MagicMock())
     fake_client_connection = MagicMock()
     fake_client_address = ('::1', 12345)
     # Mock verify_cert to return True
@@ -112,7 +112,7 @@ def test_authenticate_client_verification_pass(mock_dependencies, mock_socket, m
     server.mua.auth_fail.assert_not_called()
 
 def test_authenticate_client_verification_fail(mock_dependencies, mock_socket, mock_glob, mock_logger):
-    server = AuthServer("some_interface", '::1', 15001, "path/to/cert", MagicMock())
+    server = AuthServer("some_interface", '::1', 15001, "path/to/cert", "path/to/cert/ca.crt", MagicMock())
     fake_client_connection = MagicMock()
     fake_client_address = ('::1', 12345)
     # Mock verify_cert to return False

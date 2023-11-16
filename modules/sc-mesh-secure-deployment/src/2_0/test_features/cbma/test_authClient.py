@@ -76,7 +76,7 @@ def mock_time_sleep(monkeypatch):
 
 
 def test_auth_client_establish_connection(mock_dependencies, mock_socket, mock_glob, mock_logger):
-    client = AuthClient("some_interface", "some_server_mac", 15001, "path/to/cert", MagicMock())
+    client = AuthClient("some_interface", "some_server_mac", 15001, "path/to/cert", "path/to/cert/ca.crt", MagicMock())
 
     client.establish_connection()
 
@@ -89,7 +89,7 @@ def test_auth_client_establish_connection(mock_dependencies, mock_socket, mock_g
 
 
 def test_auth_client_connection_failure(mock_dependencies, mock_socket, mock_glob, mock_time_sleep, mock_logger):
-    client = AuthClient("some_interface", "some_server_mac", 15001, "path/to/cert", MagicMock())
+    client = AuthClient("some_interface", "some_server_mac", 15001, "path/to/cert", "path/to/cert/ca.crt", MagicMock())
 
     mock_socket['mock_sec_sock_instance'].connect.side_effect = ConnectionRefusedError()
 
@@ -99,7 +99,7 @@ def test_auth_client_connection_failure(mock_dependencies, mock_socket, mock_glo
     assert mock_socket['mock_sec_sock_instance'].connect.call_count == 5  # Max retries
 
 def test_auth_client_certificate_verification_pass(mock_dependencies, mock_socket, mock_glob, mock_logger):
-    client = AuthClient("some_interface", "some_server_mac", 15001, "path/to/cert", MagicMock())
+    client = AuthClient("some_interface", "some_server_mac", 15001, "path/to/cert", "path/to/cert/ca.crt", MagicMock())
 
     mock_dependencies['mock_verify'].return_value = True
     client.establish_connection()
@@ -109,7 +109,7 @@ def test_auth_client_certificate_verification_pass(mock_dependencies, mock_socke
     client.mua.auth_fail.assert_not_called()
 
 def test_auth_client_certificate_verification_failure(mock_dependencies, mock_socket, mock_glob, mock_logger):
-    client = AuthClient("some_interface", "some_server_mac", 15001, "path/to/cert", MagicMock())
+    client = AuthClient("some_interface", "some_server_mac", 15001, "path/to/cert", "path/to/cert/ca.crt", MagicMock())
 
     mock_dependencies['mock_verify'].return_value = False
     client.establish_connection()
