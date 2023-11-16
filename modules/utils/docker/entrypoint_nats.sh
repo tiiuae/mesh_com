@@ -74,9 +74,12 @@ else
   /opt/S90comms_controller start
 
   # Install python package "torch"
-  echo "installing packages"
-  chmod +x /opt/mesh_com/modules/utils/package/install_dependencies.sh
-  /opt/mesh_com/modules/utils/package/install_dependencies.sh
+  os_type=$(uname -s)
+  if [ "$os_type" = "Linux" ]; then
+      echo "installing packages"
+      chmod +x /opt/mesh_com/modules/utils/package/install_dependencies.sh
+      /opt/mesh_com/modules/utils/package/install_dependencies.sh
+  fi
 
   # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"
