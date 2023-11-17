@@ -73,14 +73,6 @@ else
   echo "starting comms services"
   /opt/S90comms_controller start
 
-  # Install python package "torch"
-  machine_hardware=$(uname -m)
-  if [ "$machine_hardware" = "aarch64" ]; then
-      echo "installing packages"
-      chmod +x /opt/mesh_com/modules/utils/package/install_dependencies.sh
-      /opt/mesh_com/modules/utils/package/install_dependencies.sh
-  fi
-
   # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"
 fi
