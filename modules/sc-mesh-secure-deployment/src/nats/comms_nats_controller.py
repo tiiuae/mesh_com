@@ -90,9 +90,7 @@ class CommsController:  # pylint: disable=too-few-public-methods
     Mesh network
     """
 
-    def __init__(self, server: str, port: str, interval: int = 1000):
-        self.nats_server = server
-        self.port = port
+    def __init__(self, interval: int = 1000):
         self.interval = interval
 
         # base logger for comms and which is used by all other modules
@@ -123,7 +121,7 @@ class CommsController:  # pylint: disable=too-few-public-methods
                 cstat.wifi_interface = self.settings.mesh_vif[cstat.index]
 
         self.command = comms_command.Command(
-            server, port, self.c_status, self.main_logger.getChild("command")
+            self.c_status, self.main_logger.getChild("command")
         )
         self.telemetry = MeshTelemetry(
             self.interval, self.main_logger.getChild("telemetry")
@@ -320,7 +318,7 @@ async def main_mdm(keyfile=None, certfile=None, interval=1000):
     """
     main
     """
-    cc = CommsController("local", "5000", interval)
+    cc = CommsController(interval)
 
     async def stop():
         await asyncio.sleep(1)
@@ -351,8 +349,7 @@ async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000):
     """
     main
     """
-    cc = CommsController(server, port, interval)
-
+    cc = CommsController(interval)
 
     nats_client = NATS()
     status, _, identity_dict = cc.command.get_identity()
@@ -488,11 +485,11 @@ async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Mesh Settings")
-    parser.add_argument("-s", "--server", help="Server IP", required=True)
-    parser.add_argument("-p", "--port", help="Server port", required=True)
+    parser.add_argument("-s", "--server", help="Server IP", required=False)
+    parser.add_argument("-p", "--port", help="Server port", required=False)
     parser.add_argument("-k", "--keyfile", help="TLS keyfile", required=False)
     parser.add_argument("-c", "--certfile", help="TLS certfile", required=False)
-    parser.add_argument("-a", "--agent", help="mdm or fmo", required=False)
+    parser.add_argument("-a", "--agent", help="mdm or fmo", required=False, default="fmo")
     args = parser.parse_args()
 
     loop = asyncio.new_event_loop()

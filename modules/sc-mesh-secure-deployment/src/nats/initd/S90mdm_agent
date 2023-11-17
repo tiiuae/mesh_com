@@ -1,8 +1,8 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          S90comms_controller
-# Short-Description: Comms nats client
-# Description:       Starts comms controller NATS node
+# Provides:          S90mdm_agent
+# Short-Description: MDM client
+# Description:       Starts comms controller as MDM client
 ### END INIT INFO
 
 DAEMON="comms_nats_controller.py"
@@ -10,15 +10,15 @@ DIR="/opt/nats/"
 PIDFILE="/var/run/$DAEMON.pid"
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-LOG_FILE=/opt/comms_controller.log
+LOG_FILE=/opt/mdm_agent.log
 
-KEY_FILE="/etc/ssl/private/comms_auth_private_key.pem"
-CERT_FILE="/etc/ssl/certs/comms_auth_cert.pem"
+KEY_FILE="/etc/ssl/private/csl1.local.key"
+CERT_FILE="/etc/ssl/certs/ca.key"
 
 if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
-  ARGS="-k $KEY_FILE -c $CERT_FILE --agent fmo"
+  ARGS="-k $KEY_FILE -c $CERT_FILE --agent mdm"
 else
-  ARGS="--agent fmo"
+  ARGS="--agent mdm"
 fi
 start() {
     echo "$ARGS"
