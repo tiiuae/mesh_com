@@ -13,12 +13,12 @@ def test_is_ipv6():
     assert not is_ipv6("192.168.1.1")
 
 def test_mac_to_ipv6():
-    assert mac_to_ipv6("00:30:1a:4f:cf:3c") == "fe80::230:1aff:fe4f:cf3c"
-    assert mac_to_ipv6("04:f0:21:9e:6b:39") == "fe80::6f0:21ff:fe9e:6b39"
+    assert mac_to_ipv6("00:30:1a:4f:cf:3c") == "fe80::0230:1aff:fe4f:cf3c"
+    assert mac_to_ipv6("04:f0:21:9e:6b:39") == "fe80::06f0:21ff:fe9e:6b39"
 
 def test_extract_mac_from_ipv6():
     assert extract_mac_from_ipv6("fe80::230:1aff:fe4f:cf3c") == "00:30:1a:4f:cf:3c"
-    assert extract_mac_from_ipv6("fe80::6f0:21ff:fe9e:6b39") == "04:f0:21:9e:6b:39"
+    assert extract_mac_from_ipv6("fe80::06f0:21ff:fe9e:6b39") == "04:f0:21:9e:6b:39"
 
 @patch('tools.utils.subprocess.check_output')
 def test_is_wpa_supplicant_running(mock_check_output):

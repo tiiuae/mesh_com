@@ -57,7 +57,7 @@ class AuthServer:
                 logger.error(f"Unable to get the certificate from the client {client_address[0]}", exc_info=True)
                 raise CertificateNoPresentError("Unable to get the certificate from the client")
 
-            auth = verify_cert(client_cert, self.ca, client_address[0], logger)
+            auth = verify_cert(client_cert, self.ca, client_address[0], self.interface, logger)
             with self.client_auth_results_lock:
                 self.client_auth_results[client_address[0]] = auth
             if auth:

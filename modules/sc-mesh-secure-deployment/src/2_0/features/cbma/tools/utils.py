@@ -7,6 +7,7 @@ import shutil
 import queue
 import socket
 import ipaddress
+import re
 from .custom_logger import CustomLogger
 #sys.path.insert(0, '../')
 path_to_tools_dir = os.path.dirname(__file__) # Path to dir containing this script
@@ -120,7 +121,7 @@ def batman_exec(batman_interface, routing_algo):
     try:
         run_batman(batman_interface)
     except subprocess.CalledProcessError as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
 
 
 def run_batman(batman_interface):
@@ -138,6 +139,7 @@ def run_batman(batman_interface):
     # Run the ifconfig batman_interface command to show the interface information
     subprocess.run(["ifconfig", batman_interface], check=True)
 
+"""
 def mac_to_ipv6(mac_address):
     # Remove any separators from the MAC address (e.g., colons, hyphens)
     mac_address = mac_address.replace(":", "").replace("-", "").lower()
@@ -168,6 +170,39 @@ def mac_to_ipv6(mac_address):
     mac_with_fffe = ":".join([line[:3], line[3:7], line[7:11], line[11:]])
 
     return f"fe80::{mac_with_fffe}"
+"""
+
+def mac_to_ipv6(mac):
+    # Split MAC address and insert ff:fe in the middle
+    mac_parts = mac.split(":")
+    eui_64 = mac_parts[:3] + ['ff', 'fe'] + mac_parts[3:]
+
+    # Modify the 7th bit (Universal/Local bit)
+    eui_64[0] = format(int(eui_64[0], 16) ^ 0x02, '02x')
+
+    # Combine parts to form EUI-64 part of IPv6
+    eui_64_combined = "".join(eui_64)
+
+    return f"fe80::{eui_64_combined[:4]}:{eui_64_combined[4:8]}:{eui_64_combined[8:12]}:{eui_64_combined[12:16]}"
+
+def get_mac_from_ipv6(ipv6_address, interface):
+    try:
+        # Send pings to the IPv6 address to prompt an NDP exchange
+        # Increase the ping count, if needed, for better reliability
+        subprocess.run(['ping6', '-c', '1', f'{ipv6_address}%{interface}'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+
+        # Check the neighbor cache
+        output = subprocess.check_output(['ip', '-6', 'neigh', 'show', ipv6_address], text=True)
+
+        # Extract MAC address
+        mac_search = re.search(r"(([0-9a-f]{2}:){5}[0-9a-f]{2})", output, re.IGNORECASE)
+        if mac_search:
+            return mac_search.group(1)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        logger.error(f"An error occurred: {e}")
+    except re.error as re_e:
+        logger.error(f"Regex error: {re_e}")
+    return None
 
 
 def extract_mac_from_ipv6(ipv6_address): #assuming link local address

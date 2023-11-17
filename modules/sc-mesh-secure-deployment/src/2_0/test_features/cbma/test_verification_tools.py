@@ -24,14 +24,15 @@ mock_cert_obj.get_subject.return_value.CN = 'some_mac_address'
 cert = b'some_cert_data'
 ca_cert = 'path_to_ca_cert'
 IPaddress = 'some_ipv6_address'
+interface = 'interface'
 
 
 @mock.patch('tools.verification_tools._verify_certificate_chain', return_value=True)
 @mock.patch('tools.verification_tools.OpenSSL.crypto.dump_publickey', return_value=b'some_public_key_data')
 @mock.patch('tools.verification_tools.OpenSSL.crypto.load_certificate', return_value=mock_cert_obj)
-@mock.patch('tools.verification_tools.extract_mac_from_ipv6', return_value='some_mac_address')
-def test_verify_cert_success(mock_extract_mac, mock_load_certificate, mock_dump_publickey, mock_verify_chain):
-    assert verify_cert(cert, ca_cert, IPaddress, mock.Mock()) is True
+@mock.patch('tools.verification_tools.get_mac_from_ipv6', return_value='some_mac_address')
+def test_verify_cert_success(mock_get_mac, mock_load_certificate, mock_dump_publickey, mock_verify_chain):
+    assert verify_cert(cert, ca_cert, IPaddress, interface, mock.Mock()) is True
 
 
 # Sample of ca cert
@@ -80,11 +81,11 @@ def test_verify_certificate_chain_failure():
 
 
 @mock.patch('tools.verification_tools.OpenSSL.crypto.load_certificate', return_value=mock_cert_obj)
-@mock.patch('tools.verification_tools.extract_mac_from_ipv6', return_value='different_mac_address')
-def test_certificate_different_cn(mock_extract_mac, mock_load_certificate):
+@mock.patch('tools.verification_tools.get_mac_from_ipv6', return_value='different_mac_address')
+def test_certificate_different_cn(mock_get_mac, mock_load_certificate):
     with pytest.raises(CertificateDifferentCN): # Checking that exception is raised
-        validation(cert, ca_cert, IPaddress, mock.Mock())
-    assert not verify_cert(cert, ca_cert, IPaddress, mock.Mock()) # Assert that certificate verification fails
+        validation(cert, ca_cert, IPaddress, interface, mock.Mock())
+    assert not verify_cert(cert, ca_cert, IPaddress, interface, mock.Mock()) # Assert that certificate verification fails
 
 
 @mock.patch('tools.verification_tools.OpenSSL.crypto.load_certificate', return_value=mock_cert_obj)
@@ -92,8 +93,8 @@ def test_certificate_expired(mock_load_certificate):
     # Change the 'notAfter' value to a date in the past
     mock_cert_obj.get_notAfter.return_value = (current_date - datetime.timedelta(days=1)).strftime('%Y%m%d%H%M%SZ').encode()
     with pytest.raises(CertificateExpiredError): # Checking that exception is raised
-        validation(cert, ca_cert, IPaddress, mock.Mock())
-    assert not verify_cert(cert, ca_cert, IPaddress, mock.Mock()) # Assert that certificate verification fails
+        validation(cert, ca_cert, IPaddress, interface, mock.Mock())
+    assert not verify_cert(cert, ca_cert, IPaddress, interface, mock.Mock()) # Assert that certificate verification fails
 
 # Remove log directory during teardown
 import shutil

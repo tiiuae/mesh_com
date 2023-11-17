@@ -107,7 +107,7 @@ class AuthClient:
             #raise CertificateNoPresentError("Unable to get the server certificate")
             return
 
-        result['authenticated'] = verify_cert(server_cert, self.ca, self.sslServerIP, self.logger)
+        result['authenticated'] = verify_cert(server_cert, self.ca, self.sslServerIP, self.interface, self.logger)
 
         # # Safe to proceed with the communication, even if the certificate is not authenticated
         # msgReceived = secureClientSocket.recv(1024)
