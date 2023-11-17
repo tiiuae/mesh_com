@@ -75,7 +75,7 @@ else
 
   # Install python package "torch"
   machine_hardware=$(uname -m)
-  if [ "machine_hardware" = "aarch64" ]; then
+  if [ "$machine_hardware" = "aarch64" ]; then
       echo "installing packages"
       chmod +x /opt/mesh_com/modules/utils/package/install_dependencies.sh
       /opt/mesh_com/modules/utils/package/install_dependencies.sh
