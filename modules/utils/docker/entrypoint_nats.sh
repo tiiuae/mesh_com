@@ -74,8 +74,8 @@ else
   /opt/S90comms_controller start
 
   # Install python package "torch"
-  os_type=$(uname -s)
-  if [ "$os_type" = "Linux" ]; then
+  machine_hardware=$(uname -m)
+  if [ "machine_hardware" = "aarch64" ]; then
       echo "installing packages"
       chmod +x /opt/mesh_com/modules/utils/package/install_dependencies.sh
       /opt/mesh_com/modules/utils/package/install_dependencies.sh
