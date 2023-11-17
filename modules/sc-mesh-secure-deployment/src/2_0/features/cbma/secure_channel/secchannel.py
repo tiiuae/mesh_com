@@ -2,16 +2,18 @@ import queue
 import ssl
 import socket
 import json
+import threading
 from tools.custom_logger import CustomLogger
 
 logger_instance = CustomLogger("SecChannel")
 
 
 class SecMessageHandler:
-    def __init__(self, socket):
+    def __init__(self, socket, shutdown_event=threading.Event()):
         self.socket = socket
         self.logger = logger_instance.get_logger()
         self.callback = None
+        self.shutdown_event = shutdown_event
 
     def set_callback(self, callback):
         """Set the callback function to be executed when a message is received."""
@@ -50,7 +52,7 @@ class SecMessageHandler:
             self.logger.error("Socket is not SSL enabled.")
             return
         try:
-            while True:
+            while not self.shutdown_event.is_set():
                 # No need to check _is_socket_active here, rely on recv's result.
                 data = self.socket.recv(1024).decode()
                 if not data:

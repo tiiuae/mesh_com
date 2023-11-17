@@ -97,7 +97,7 @@ class AuthServer:
         self.serverSocket.settimeout(99999)  # maybe we can remove timeout since server needs to be listening throughout
         logger.info("Server listening")
 
-        while self.running:
+        while self.running and not self.mua.shutdown_event.is_set():
             try:
                 client_connection, client_address = self.serverSocket.accept()
                 threading.Thread(target=self.handle_client, args=(client_connection, client_address)).start()

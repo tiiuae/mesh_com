@@ -25,11 +25,11 @@ class WPAMonitor:
 
         return WpaCtrl(self.ctrl_path)
 
-    def start_monitoring(self, queue):
+    def start_monitoring(self, queue, shutdown_event):
         instance = self._wait_for_ctrl_interface()
         with instance as ctrl:
             ctrl.attach()
-            while True:
+            while not shutdown_event.is_set():
                 if ctrl.pending():
                     response = ctrl.recv()
                     decoded_response = response.decode().strip()

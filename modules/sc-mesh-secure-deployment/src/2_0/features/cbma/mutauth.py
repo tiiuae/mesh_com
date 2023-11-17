@@ -22,7 +22,7 @@ TIMEOUT = 3 * BEACON_TIME
 logger_instance = CustomLogger("mutAuth")
 
 class mutAuth():
-    def __init__(self, in_queue, level, meshiface, port, batman_interface, path_to_certificate, path_to_ca, shutdown_event, lan_bridge_flag=False):
+    def __init__(self, in_queue, level, meshiface, port, batman_interface, path_to_certificate, path_to_ca, macsec_encryption, shutdown_event, lan_bridge_flag=False):
         self.level = level
         self.meshiface = meshiface
         self.mymac = get_mac_addr(self.meshiface)
@@ -32,15 +32,13 @@ class mutAuth():
         self.CA_PATH = path_to_ca # Absolute path to ca certificate
         self.in_queue = in_queue
         self.logger = logger_instance.get_logger()
-        self.multicast_handler = MulticastHandler(self.in_queue, MULTICAST_ADDRESS, self.port, self.meshiface)
+        self.multicast_handler = MulticastHandler(self.in_queue, MULTICAST_ADDRESS, self.port, self.meshiface, shutdown_event)
         self.stop_event = threading.Event()
-        self.sender_thread = threading.Thread(target=self._periodic_sender, args=(self.stop_event,))
+        self.sender_thread = threading.Thread(target=self._periodic_sender, args=())
         self.shutdown_event = shutdown_event  # Add this to handle graceful shutdown
         self.batman_interface = batman_interface
-        if self.level == "lower":
-            self.macsec_obj = macsec.Macsec(level=self.level, interface=self.meshiface, macsec_encryption="off")  # Initialize lower macsec object
-        elif self.level == "upper":
-            self.macsec_obj = macsec.Macsec(level=self.level, interface=self.meshiface, macsec_encryption="on")  # Initialize upper macsec object
+        self.macsec_obj = macsec.Macsec(level=self.level, interface=self.meshiface, macsec_encryption=macsec_encryption)  # Initialize macsec object
+        if self.level == "upper":
             self.bridge_interface = "br-upper" # bridge for upper macsec interfaces
             setup_bridge(self.bridge_interface)
             add_interface_to_batman(interface_to_add=self.bridge_interface, batman_interface=self.batman_interface)
@@ -58,8 +56,8 @@ class mutAuth():
         else:
             logger.info("wpa_supplicant process is running.")
 
-    def _periodic_sender(self, stop_event):
-        while not stop_event.is_set() and not self.shutdown_event.is_set():
+    def _periodic_sender(self):
+        while not self.stop_event.is_set() and not self.shutdown_event.is_set():
             self.multicast_handler.send_multicast_message(self.mymac)
             time.sleep(BEACON_TIME)
 
@@ -131,10 +129,9 @@ class mutAuth():
             logger.error(f'Error setting up bat0: {e}')
             sys.exit(1)
 
-    @staticmethod
-    def setup_secchannel(secure_client_socket, my_macsec_param):
+    def setup_secchannel(self, secure_client_socket, my_macsec_param):
         # Establish secure channel and exchange macsec key
-        secchan = SecMessageHandler(secure_client_socket)
+        secchan = SecMessageHandler(secure_client_socket, self.shutdown_event)
         macsec_param_q = queue.Queue()  # queue to store macsec parameters: macsec_key, port from client_secchan.receive_message
         receiver_thread = threading.Thread(target=secchan.receive_message, args=(macsec_param_q,))
         receiver_thread.start()

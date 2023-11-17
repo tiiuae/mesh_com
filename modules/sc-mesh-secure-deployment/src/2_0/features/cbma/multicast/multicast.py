@@ -14,13 +14,14 @@ logger_instance = CustomLogger("multicast")
 
 
 class MulticastHandler:
-    def __init__(self, qeue, multicast_group, port, interface):
+    def __init__(self, qeue, multicast_group, port, interface, shutdown_event=threading.Event()):
         self.queue = qeue
         self.multicast_group = multicast_group
         self.port = port
         self.interface = interface # Multicast interface. Set as radio name: in case of TLS for lower macsec, lower batman interface: in case of TLS for upper macsec
         self.logger = logger_instance.get_logger()
         self.excluded = [get_mac_addr(interface), f'{get_mac_addr(interface)}_server']
+        self.shutdown_event = shutdown_event
 
     def send_multicast_message(self, data):
         with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as sock:
@@ -54,7 +55,7 @@ class MulticastHandler:
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
 
             self.logger.info(f"Listening for messages on {self.multicast_group}:{self.port}...")
-            while True:
+            while not self.shutdown_event.is_set():
                 data, address = sock.recvfrom(1024)
                 decoded_data = json.loads(data.decode())
                 if decoded_data['mac_address'] not in self.excluded:
