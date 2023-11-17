@@ -16,8 +16,12 @@ BRIDGE_SETTINGS="$MESH_FOLDER/modules/utils/docker/bridge_settings.sh" # script 
 MCC_SETTINGS="$MESH_FOLDER/modules/utils/docker/mcc_settings.sh" # script to setup mcc mode
 MESH_CONF="/opt/mesh.conf"
 
+
+QOS_OLSR_CONF="$MESH_FOLDER/modules/utils/docker/qos_olsrd_conf.sh" # script to setup qos_olsrd_cochmod +x $BRIDGE_SETTINGS
 chmod +x $BRIDGE_SETTINGS
 chmod +x $MCC_SETTINGS
+chmod +x $QOS_OLSR_CONF
+
 
 configure()
 {

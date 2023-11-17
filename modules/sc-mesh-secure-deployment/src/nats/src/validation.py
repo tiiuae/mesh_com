@@ -170,7 +170,7 @@ def validate_mode(mode: str) -> bool:
     Validates a given wifi mode.
     Returns True if the mode is valid, False otherwise.
     """
-    if mode in ("mesh", "ap+mesh_scc", "ap+mesh_mcc"):
+    if mode in ("mesh", "ap+mesh_scc", "ap+mesh_mcc", "halow"):
         return True
     return False
 
@@ -220,9 +220,12 @@ def validate_role(role: str) -> bool:
     Validates a given role.
     Returns True if the role is valid, False otherwise.
     """
-    if role in ("drone", "sleeve", "gcs"):
-        return True
-    return False
+    try:
+        if role in ("drone", "sleeve", "gcs"):
+            return True
+        return False
+    except (ValueError, TypeError, AttributeError):
+        return False
 
 def validate_delay(delay: str) -> bool:
     """
@@ -234,5 +237,63 @@ def validate_delay(delay: str) -> bool:
         if delay < 0 or delay == 0:
             return False
         return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+def validate_radio_index(radio_index: str) -> bool:
+    """
+    Validates a given radio index.
+    Returns True if the radio index is valid, False otherwise.
+    """
+    try:
+        radio_index = int(radio_index)
+        if radio_index < 0 or radio_index > 10:
+            return False
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+# def validate_phy(phy: str) -> bool:
+#     """
+#     Validates a given phy.
+#     Returns True if the phy is valid, False otherwise.
+#     """
+#     if "phy" in phy and int(phy.replace("phy", "")) >= 0:
+#         return True
+#     return False
+
+def validate_mesh_vif(mesh_vif: str) -> bool:
+    """
+    Validates a given mesh vif.
+    Returns True if the mesh vif is valid, False otherwise.
+    """
+    # todo add more checks
+    try:
+        if mesh_vif.startswith("wl") or mesh_vif.startswith("halow"):
+            return True
+        return False
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+def validate_batman_iface(batman_iface: str) -> bool:
+    """
+    Validates a given batman iface.
+    Returns True if the batman iface is valid, False otherwise.
+    """
+    try:
+        if "bat" in batman_iface and int(batman_iface.replace("bat", "")) >= 0:
+            return True
+        return False
+    except (ValueError, TypeError, AttributeError):
+        return False
+def validate_mptcp(mptcp: str) -> bool:
+    """
+    Validates a given mptcp.
+    Returns True if the mptcp is valid, False otherwise.
+    """
+    try:
+        if mptcp in ("enable", "disable"):
+            return True
+        return False
     except (ValueError, TypeError, AttributeError):
         return False

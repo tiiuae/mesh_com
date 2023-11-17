@@ -160,5 +160,86 @@ class TestValidation(unittest.TestCase):
         # routing is invalid
         self.assertFalse(validation.validate_routing(1))
 
+    def test_validate_priority(self):
+        """
+        Test cases for validate_priority(priority)
+        """
+        # priority is invalid
+        self.assertFalse(validation.validate_priority('none'))
+        # priority is valid
+        self.assertTrue(validation.validate_priority('long_range'))
+        # priority is valid
+        self.assertFalse(validation.validate_priority('high'))
+        # priority is invalid
+        self.assertFalse(validation.validate_priority('nonee'))
+        # priority is invalid
+        self.assertFalse(validation.validate_priority('long_rang'))
+        # priority is invalid
+        self.assertFalse(validation.validate_priority('hig'))
+        # priority is invalid
+        self.assertFalse(validation.validate_priority(1))
+        # priotity is valid
+        self.assertTrue(validation.validate_priority("high_throughput"))
+
+    def test_validate_radio_index(self):
+        """
+        Test cases for validate_radio_index(radio_index)
+        """
+        # radio index is valid
+        self.assertTrue(validation.validate_radio_index("0"))
+        # radio index is valid
+        self.assertTrue(validation.validate_radio_index("1"))
+        # radio index is valid
+        self.assertTrue(validation.validate_radio_index("2"))
+        # radio index is invalid
+        self.assertTrue(validation.validate_radio_index("3"))
+        # radio index is invalid
+        self.assertFalse(validation.validate_radio_index("-1"))
+        self.assertFalse(validation.validate_radio_index(-1))
+
+    def test_validate_mesh_vif(self):
+        """
+        Test cases for validate_mesh_vif(mesh_vif)
+        """
+        # mesh vif is valid
+        self.assertTrue(validation.validate_mesh_vif("wlp2s0"))
+        # mesh vif is valid
+        self.assertTrue(validation.validate_mesh_vif("wlp3s0"))
+        # mesh vif is valid
+        self.assertTrue(validation.validate_mesh_vif("halow1"))
+        # mesh vif is valid
+        self.assertTrue(validation.validate_mesh_vif("wlp2s1"))
+        # mesh vif is valid
+        self.assertTrue(validation.validate_mesh_vif("wlp3s1"))
+        # mesh vif is valid
+        self.assertTrue(validation.validate_mesh_vif("halow2"))
+        # mesh vif is invalid
+        self.assertFalse(validation.validate_mesh_vif("lan1"))
+        # mesh vif is invalid
+        self.assertFalse(validation.validate_mesh_vif("eth0"))
+        # mesh vif is invalid
+        self.assertFalse(validation.validate_mesh_vif("usb0"))
+        # mesh vif is invalid
+        self.assertFalse(validation.validate_mesh_vif(0))
+
+    def test_validate_batman_iface(self):
+        """
+        Test cases for validate_batman_iface(batman_iface)
+        """
+        # batman iface is valid
+        self.assertTrue(validation.validate_batman_iface("bat0"))
+        # batman iface is valid
+        self.assertTrue(validation.validate_batman_iface("bat1"))
+        # batman iface is valid
+        self.assertTrue(validation.validate_batman_iface("bat2"))
+        # batman iface is invalid
+        self.assertFalse(validation.validate_batman_iface("3"))
+        # batman iface is invalid
+        self.assertFalse(validation.validate_batman_iface(0))
+
+
+
+
+
 if __name__ == '__main__':
     unittest.main()

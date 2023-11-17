@@ -3,7 +3,7 @@
 source /opt/mesh-helper.sh
 
 # sources mesh configuration and sets start_opts
-source_configuration
+source_configuration "0"
 
 if [ "$MSVERSION" != "nats" ]; then
   if [ -f "/usr/local/bin/entrypoint.sh" ]; then
@@ -18,19 +18,41 @@ else
       generate_identity_id
   fi
 
+  # Do not continue in case halow init has not finished
+  while ps aux | grep [i]nit_halow > /dev/null; do
+      sleep 1
+  done
+
   echo "set bridge ip"
-  generate_br_lan_ip
+  generate_lan_bridge_ip
 
   echo "starting 11s mesh service"
-  /opt/S9011sNatsMesh start
+  # todo for loop range 0..3
+  /opt/S9011sNatsMesh start id0
+  if [ -f "/opt/1_mesh.conf" ]; then
+    /opt/S9011sNatsMesh start id1
+  fi
+  if [ -f "/opt/2_mesh.conf" ]; then
+    /opt/S9011sNatsMesh start id2
+  fi
 
   echo "starting AP service"
-  /opt/S90APoint start
+  /opt/S90APoint start id0
+  if [ -f "/opt/1_mesh.conf" ]; then
+    /opt/S90APoint start id1
+  fi
+  if [ -f "/opt/2_mesh.conf" ]; then
+    /opt/S90APoint start id2
+  fi
 
   echo "wait for bridge to be up..."
-  while ! (ifconfig | grep -e "$br_lan_ip") > /dev/null; do
+  while ! (ifconfig | grep -e "$bridge_ip") > /dev/null; do
     sleep 1
   done
+
+  sleep 3
+
+  /opt/S90Alfred start
 
   echo "starting provisioning agent"
   # blocks execution until provisioning is done or timeout (30s)
@@ -47,10 +69,6 @@ else
 
   echo "starting nats server"
   /opt/S90nats_server start
-
-  echo "starting radvd & socat"
-  radvd -C /etc/radvd.conf  # TODO: for some reason init.d is not working
-  /opt/S90socat start  # socat is used to provide IPv6 NATS IF
 
   echo "starting comms services"
   /opt/S90comms_controller start

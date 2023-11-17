@@ -13,7 +13,8 @@ PIDFILE="/var/run/$DAEMON.pid"
 LOG_FILE=/opt/comms_discovery.log
 
 source /opt/mesh-helper.sh
-source_configuration
+# for ROLE
+source_configuration "0"
 
 KEY_FILE="/etc/ssl/private/comms_auth_private_key.pem"
 CERT_FILE="/etc/ssl/certs/comms_auth_cert.pem"
