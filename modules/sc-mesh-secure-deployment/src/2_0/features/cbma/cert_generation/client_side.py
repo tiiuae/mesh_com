@@ -10,6 +10,12 @@ import os
 import time
 import glob
 import shutil
+import argparse
+
+import sys
+sys.path.insert(0, '../')
+from tools.utils import get_mac_addr
+
 
 # Constants
 REMOTE_PATH = "/tmp/request"
@@ -56,7 +62,7 @@ def are_files_received(csr_filename, path=REMOTE_PATH):
     return os.path.exists(ca_crt_path) and os.path.exists(csr_crt_path)
 
 
-def main():
+def main(interface):
     server_ip = input("Enter the server IP address: ")
     username = input("Enter your username: ")
 
@@ -64,8 +70,10 @@ def main():
         print("Error: The server is not reachable.")
         exit(1)
 
-    run_command(CSR_SCRIPT_PATH)
-    csr_filename = glob.glob("*.csr")[0]
+    #run_command(CSR_SCRIPT_PATH)
+    subprocess.run([CSR_SCRIPT_PATH, interface], check=True)
+    mac_address = get_mac_addr(interface)
+    csr_filename = glob.glob(f"macsec_{mac_address.replace(':', '')}.csr")[0]
     crt = csr_filename.split(".csr")[0]+".crt"
     upload_file_to_server(csr_filename, server_ip, username)
 
@@ -87,4 +95,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Client script to generate CSR and get it signed by CA for an interface")
+    parser.add_argument('--interface', required=True, help='Interface name: Eg. wlp1s0, halow1')
+    args = parser.parse_args()
+    main(args.interface)
