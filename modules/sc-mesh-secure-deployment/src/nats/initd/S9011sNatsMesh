@@ -10,35 +10,62 @@
 #                    automatically
 ### END INIT INFO
 
-DAEMON="mesh-11s_nats.sh"
-DIR="/opt/"
-PIDFILE="/var/run/$DAEMON.pid"
-LOG_FILE=/opt/mesh_11s.log
-
 source /opt/mesh-helper.sh
 # sources mesh configuration
-source_configuration
+
+RADIO_INDEX=$2   # $2: index of the mesh.conf file to be used e.g. "id0"
+
+source_configuration "${RADIO_INDEX:2}"
+
+DAEMON="mesh-11s_nats.sh"
+DIR="/opt/"
+_WIFI="${RADIO_INDEX}_MESH_VIF"
+_MODE="${RADIO_INDEX}_MODE"
+PIDFILE="/var/run/${DAEMON}_${RADIO_INDEX}.pid"
+LOG_FILE=/opt/mesh_11s_${RADIO_INDEX}.log
+
+SYNC_LOCK="/var/run/mesh_start.lock"
 
 # shellcheck source=/dev/null
 [ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
 
 start() {
+    if mkdir $SYNC_LOCK 2>/dev/null; then
+       echo "I have a lock $RADIO_INDEX PID $$"
+    else
+       echo "Instance is already running. Waiting..."
+       # Wait for the lock directory to be removed, indicating the previous instance finished
+       while [ -d "$SYNC_LOCK" ]; do
+         sleep $(( (RANDOM % 5) + 1 ))
+       done
+       mkdir "$SYNC_LOCK"
+       echo "I have a lock $$"
+    fi
+
     printf 'Starting %s: ' "$DAEMON"
-    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON mesh > $LOG_FILE 2>&1"
+    if [ "${!_MODE}" == "ap+mesh_scc" ] || [ "${!_MODE}" == "ap+mesh_mcc" ]; then
+      mode=mesh
+    else
+      mode=${!_MODE}
+    fi
+    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON $mode $RADIO_INDEX > $LOG_FILE 2>&1"
     status=$?
     if [ "$status" -eq 0 ]; then
         echo "OK"
     else
         echo "FAIL"
     fi
+
+    rmdir "$SYNC_LOCK"
+
     return "$status"
 }
 stop() {
     printf 'Stopping %s: ' "$DAEMON"
-    NEW_PID=$(ps ax | grep -E 'wpa_supplicant\-11s' | awk {'print $1'})
-    kill -9 $NEW_PID
-    rm -fr /var/run/wpa_supplicant/* 2>/dev/null
-    ifconfig "$MESH_VIF" down 2>/dev/null
+    kill -9 "$(cat "$PIDFILE")"
+    kill -9 "$(ps ax | grep -E "[w]pa_supplicant\-11s_$RADIO_INDEX" | awk {'print $1'})"
+    rm -fr /var/run/wpa_supplicant_"${RADIO_INDEX}" 2>/dev/null
+    ifconfig "${!_WIFI}" down 2>/dev/null
     start-stop-daemon -K -o -q -p "$PIDFILE"
     status=$?
     if [ "$status" -eq 0 ]; then

@@ -3,7 +3,7 @@
 source /opt/mesh-helper.sh
 
 # sources mesh configuration and sets start_opts
-source_configuration
+source_configuration "0"
 
 if [ "$MSVERSION" != "nats" ]; then
   if [ -f "/usr/local/bin/entrypoint.sh" ]; then
@@ -18,32 +18,47 @@ else
       generate_identity_id
   fi
 
+  # Do not continue in case halow init has not finished
+  while ps aux | grep [i]nit_halow > /dev/null; do
+      sleep 1
+  done
+
   echo "set bridge ip"
-  generate_br_lan_ip
+  generate_lan_bridge_ip
 
   echo "starting 11s mesh service"
-  /opt/S9011sNatsMesh start
+  # todo for loop range 0..3
+  /opt/S9011sNatsMesh start id0
+  if [ -f "/opt/1_mesh.conf" ]; then
+    /opt/S9011sNatsMesh start id1
+  fi
+  if [ -f "/opt/2_mesh.conf" ]; then
+    /opt/S9011sNatsMesh start id2
+  fi
 
   echo "starting AP service"
-  /opt/S90APoint start
+  /opt/S90APoint start id0
+  if [ -f "/opt/1_mesh.conf" ]; then
+    /opt/S90APoint start id1
+  fi
+  if [ -f "/opt/2_mesh.conf" ]; then
+    /opt/S90APoint start id2
+  fi
 
   echo "wait for bridge to be up..."
-  while ! (ifconfig | grep -e "$br_lan_ip") > /dev/null; do
+  while ! (ifconfig | grep -e "$bridge_ip") > /dev/null; do
     sleep 1
   done
 
+  sleep 3
+
+  /opt/S90Alfred start
+
   echo "starting provisioning agent"
-  /opt/S90provisioning_agent start
-  loop_count=0
-  while ps aux | grep [c]omms_provisioning >/dev/null; do
-    sleep 1
-    ((loop_count++))
-    if [ "$loop_count" -ge 30 ]; then
-	  echo "Stopping provisioning agent due to timeout"
-      /opt/S90provisioning_agent stop
-    fi
-  done
-  
+  # blocks execution until provisioning is done or timeout (30s)
+  # IP address and port are passed as arguments and hardcoded. TODO: mDNS
+  python /opt/nats/src/comms_provisioning.py -t 30 -s 192.168.1.254 -p 8080 -o /opt > /opt/comms_provisioning.log 2>&1
+
   echo "Start nats server and client nodes"
   /opt/S90nats_discovery start
 
@@ -54,10 +69,6 @@ else
 
   echo "starting nats server"
   /opt/S90nats_server start
-
-  echo "starting radvd & socat"
-  radvd -C /etc/radvd.conf  # TODO: for some reason init.d is not working
-  /opt/S90socat start  # socat is used to provide IPv6 NATS IF
 
   echo "starting comms services"
   /opt/S90comms_controller start
