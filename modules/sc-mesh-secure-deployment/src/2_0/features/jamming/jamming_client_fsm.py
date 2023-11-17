@@ -1,3 +1,4 @@
+import asyncio
 import socket
 import sys
 import threading
@@ -13,7 +14,7 @@ from netstring import encode, decode
 from channel_quality_est import ChannelQualityEstimator
 from options import Options
 from preprocessor import Preprocessor
-from util import get_frequency_quality, get_mesh_freq, get_ipv6_addr, switch_frequency, kill_process_by_pid
+from util import get_frequency_quality, get_mesh_freq, get_ipv6_addr, switch_frequency
 from wireless_scanner import WirelessScanner
 from log_config import logger
 
@@ -370,7 +371,9 @@ class JammingDetectionClient(threading.Thread):
         :param trigger_event: ClientEvent that triggered the execution of this function.
         """
         try:
-            switch_frequency(str(self.target_frequency))
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(switch_frequency(str(self.target_frequency)))
 
             # Validate outcome of switch frequency process
             self.current_frequency = get_mesh_freq()
@@ -385,6 +388,8 @@ class JammingDetectionClient(threading.Thread):
         except Exception as e:
             logger.error(f"Switching frequency error occurred: {str(e)}")
             self.fsm.trigger(ClientEvent.SWITCH_UNSUCCESSFUL)
+        finally:
+            loop.close()
 
     def recovering_switch_error(self, trigger_event) -> None:
         """
@@ -443,7 +448,7 @@ def main():
 
     host: str = args.jamming_osf_orchestrator
     port: int = args.port
-    node_id: str = get_ipv6_addr('tun0')
+    node_id: str = get_ipv6_addr(args.osf_interface)
 
     client = JammingDetectionClient(node_id, host, port)
     client.start()
