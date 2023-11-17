@@ -2,7 +2,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 
 # Add a rotating file handler for log rotation (max 1 MB, keep 1 backup)
-log_handler = RotatingFileHandler("jamming_avoidance.log", maxBytes=1e6, backupCount=1)
+log_handler = RotatingFileHandler("/var/log/jamming_avoidance.log", maxBytes=1e6, backupCount=1)
 log_handler.setLevel(logging.INFO)
 
 # Create a formatter for the log messages
