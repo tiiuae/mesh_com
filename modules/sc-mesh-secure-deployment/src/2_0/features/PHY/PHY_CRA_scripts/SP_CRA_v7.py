@@ -6,23 +6,35 @@ import time
 import logging
 import numpy as np
 import os
+import queue
 from getmac import get_mac_address
 from mat4py import loadmat
 
 class PHYCRA:
     def __init__(self):
-        log_filename = '/tmp/server_log.txt'  # Set the log file location to /tmp/
-
-        # Clear the server log at the start of each session
+        # Initialization code
+        log_filename = '/tmp/server_log.log'  # Log file location
+        txt_log_filename = '/tmp/server_log.txt'
+        # Clear server log at the start of each session
         if os.path.exists(log_filename):
             os.remove(log_filename)
+        if os.path.exists(txt_log_filename):
+            os.remove(txt_log_filename)
+
 
         logging.basicConfig(level=logging.INFO, filename=log_filename, filemode='w',
                             format='%(asctime)s - %(levelname)s - %(message)s')
         logging.info("Server initialized")
+
         # Server setup
+
+        # Determine the directory in which this script is located
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+
+        # Use the script's directory to construct the path to the .mat file
+        mat_file_path = os.path.join(script_dir, 'ACF_Table.mat')
         try:
-            DataServer = loadmat('ACF_Table.mat')
+            DataServer = loadmat(mat_file_path)
             self.acf = np.array(DataServer['y_C']).transpose()
             self.SERVER = self.get_server_ip()
             self.BROADCAST_PORT = 5051
@@ -35,37 +47,58 @@ class PHYCRA:
 
         # Client setup
         try:
-            DataClient = loadmat('ACF_Table.mat')
+            DataClient = loadmat(mat_file_path)
             self.acf_client = np.array(DataClient['y_C']).transpose()
             logging.info("Client setup completed successfully")
         except Exception as e:
             logging.error("Error during client setup: %s", e)
-        # Create an event to signal when 5 minutes have passed
+
+        # Initialize threads but do not start them
+        self.server_thread = None
+        self.listen_thread = None
+        self.broadcast_thread = None
+        self.results_queue = {'Pass': [], 'Fail': []}
+        #self.all_attempts = set()  # Set to track all unique attempts
+
+        # Create an event for graceful shutdown
         self.stop_event = threading.Event()
 
-        # Start server and client functionalities
+    def start(self):
+        """Starts the server and client functionalities in separate threads."""
         try:
             self.server_thread = threading.Thread(target=self.server_start)
             self.server_thread.start()
             logging.info("Server thread started")
-            time.sleep(2)
+
             self.listen_thread = threading.Thread(target=self.listen_for_broadcast)
             self.listen_thread.start()
             logging.info("Broadcast listening thread started")
         except Exception as e:
             logging.error("Error during server/client threads initialization: %s", e)
 
-        # Start a timer to stop the server and broadcasting after 5 minutes
-        timer = threading.Timer(60, self.stop_event.set)
-        timer.start()
-        logging.info("Server shutdown timer started")
-        
-    # SERVER FUNCTIONS
+    def stop(self):
+        """Stops all running threads and closes sockets."""
+        self.stop_event.set()
+
+        if self.server_thread and self.server_thread.is_alive():
+            self.server_thread.join()
+        if self.listen_thread and self.listen_thread.is_alive():
+            self.listen_thread.join()
+        if self.broadcast_thread and self.broadcast_thread.is_alive():
+            self.broadcast_thread.join()
+
+        if hasattr(self, 'server') and self.server:
+            self.server.close()
+        if hasattr(self, 'listen_sock') and self.listen_sock:
+            self.listen_sock.close()
+        logging.info("PHYCRA stopped successfully")
+
+
 
     def log_authentication(self, node_ip, mac_address, result):
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         log_entry = f"{timestamp}\t{node_ip}\t{mac_address}\t{result}\n"
-        with open("server_log.txt", "a") as log_file:
+        with open("/tmp/server_log.txt", "a") as log_file:
             log_file.write(log_entry)
             
 
@@ -74,11 +107,15 @@ class PHYCRA:
         print("+---------------------+---------------+-------------------+---------------------------+")
         print("|        Time         |     Node IP   |    MAC Address    |   Authentication Result   |")
         print("+---------------------+---------------+-------------------+---------------------------+")
-        with open("server_log.txt", "r") as log_file:
-            for line in log_file:
-                timestamp, node_ip, mac_address, result = line.strip().split("\t")
-                formatted_line = f"| {timestamp:<19} | {node_ip:<12} | {mac_address:<15} | {result:<23} |"
-                print(formatted_line)
+        log_file_path = "/tmp/server_log.txt"
+        if os.path.exists(log_file_path):
+            with open(log_file_path, "r") as log_file:
+                for line in log_file:
+                    timestamp, node_ip, mac_address, result = line.strip().split("\t")
+                    formatted_line = f"| {timestamp:<19} | {node_ip:<12} | {mac_address:<15} | {result:<23} |"
+                    print(formatted_line)
+        else:
+            print("No entries found.")
         print("+---------------------+---------------+-------------------+---------------------------+")
 
 
@@ -109,10 +146,12 @@ class PHYCRA:
                 print("PASS: Authentication successful")
                 logging.info("Authentication successful for %s", addr)
                 self.log_authentication(addr[0], mac_address, "Success")
+                self.results_queue['Pass'].append((addr[0], mac_address))
             else:
                 print('FAIL: Authentication failed')
                 logging.warning("Authentication failed for %s", addr)
                 self.log_authentication(addr[0], mac_address, "Access denied")
+                self.results_queue['Fail'].append((addr[0], mac_address))
 
             print("\nUpdated Table:")
             self.display_table()
@@ -121,7 +160,15 @@ class PHYCRA:
         finally:
             conn.close()
 
-
+    def get_result(self):
+        """
+        Retrieve and clear the latest results from the results queue.
+        """
+        current_results = {k: list(v) for k, v in self.results_queue.items()}
+        self.results_queue = {'Pass': [], 'Fail': []}  # Reset for next batch
+        return current_results
+    
+    
     def server_start(self):
         try:
             self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -158,7 +205,7 @@ class PHYCRA:
             while not self.stop_event.is_set():  # Check if the stop event is set
                 msg = "SERVER_AVAILABLE"
                 broadcast_sock.sendto(msg.encode(), ('<broadcast>', self.BROADCAST_PORT))
-                time.sleep(30)
+                time.sleep(20)
         except Exception as e:
             logging.error("Error during broadcast: %s", e)
         finally:
@@ -219,7 +266,7 @@ class PHYCRA:
         finally:
             self.listen_sock.close()
             logging.info("Stopped listening for broadcasts")
-
+    
 
     # Common Functions
     def get_server_ip(self):
@@ -233,10 +280,3 @@ class PHYCRA:
             s.close()
         return IP
 
-if __name__ == "__main__":
-    phycra_instance = PHYCRA()
-    time.sleep(60)
-    phycra_instance.stop_event.set()
-    phycra_instance.server_thread.join()
-    phycra_instance.listen_thread.join()
-    phycra_instance.broadcast_thread.join()
