@@ -51,7 +51,7 @@ class SecMessageHandler:
         if not self._is_ssl_socket():
             self.logger.error("Socket is not SSL enabled.")
             return
-        
+
         while not self.shutdown_event.is_set():
             try:
                 # No need to check _is_socket_active here, rely on recv's result.

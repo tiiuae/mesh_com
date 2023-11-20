@@ -1,20 +1,60 @@
+import multiprocessing
 import threading
 import queue
 import os
-import argparse
+import time
+
 import subprocess
+import argparse
+
+from typing import List
+
+from tools.monitoring_wpa import WPAMonitor
+from tools import utils
 
 try:
     from .mutauth import mutAuth
 except ImportError:
     from mutauth import mutAuth
-from tools.monitoring_wpa import WPAMonitor
-from tools import utils
 
 
 _shutdown_event = threading.Event()
-cbma_threads = []
 file_dir = os.path.dirname(__file__)  # Path to dir containing this script
+
+
+########### TEMPORARY - TO BE MOVED LATER ###########
+
+class ProcessManager(object):
+    def __init__(self, function) -> None:
+        self.function = function
+        self.process = None
+
+    def start(self, *args, **kwargs):
+        self.process = multiprocessing.Process(target=self.function, args=args, kwargs=kwargs, daemon=True)
+        self.process.start()
+
+    def join(self) -> None:
+        if self.process is not None and self.process.is_alive():
+            self.process.join()
+
+    def status(self) -> str:
+        if self.process is None:
+            return "Process not started"
+        if self.process.is_alive():
+            return "Process is running"
+        return "Process finished"
+
+    def terminate(self) -> None:
+        if self.process is not None and self.process.is_alive():
+            self.process.terminate()
+        else:
+            print("Process is not running")
+
+
+cbma_processes: List[ProcessManager] = []
+
+#####################################################
+
 
 
 # pylint: disable=too-many-arguments, too-many-locals
@@ -33,12 +73,13 @@ def setup_macsec(
     Sets up macsec links between peers for an interface and
     adds the macsec interfaces to batman_interface
     """
-
     utils.wait_for_interface_to_be_up(
-        interface_name, shutdown_event
+        interface_name,
+        shutdown_event
     )  # Wait for interface to be up, if not already
     if shutdown_event.is_set():
         return None
+
     # Queue to store wpa peer connected messages /
     # multicast messages on interface for cbma
     in_queue = queue.Queue()
@@ -58,6 +99,9 @@ def setup_macsec(
     utils.wait_for_interface_to_be_pingable(
         mua.meshiface, mua.ipAddress, shutdown_event
     )
+    # TODO Using sleep as in some cases the interface may never be pingable
+    # time.sleep(3)
+
     if shutdown_event.is_set():
         return None
 
@@ -85,6 +129,13 @@ def setup_macsec(
     monitor_thread.start()
     # Send periodic multicasts
     mua.sender_thread.start()
+
+    try:
+        mua.sender_thread.join()
+    except SystemExit:
+        # TODO - Gracefully handle being killed
+        print("I'm ded")
+
     return mua
 # pylint: enable=too-many-locals
 
@@ -114,7 +165,9 @@ def cbma(
     macsec_encryption: Encryption flag for macsec. "on" or "off"
     wpa_supplicant_control_path: Path to wpa supplicant control (if any)
     """
-    mutauth_obj = setup_macsec(
+
+    process = ProcessManager(setup_macsec)
+    process.start(
         level,
         interface_name,
         port,
@@ -125,14 +178,11 @@ def cbma(
         wpa_supplicant_control_path,
         shutdown_event,
     )
-    if mutauth_obj:
-        mutauth_obj.setup_batman()
-        return mutauth_obj
-    return None
+    return process
 # pylint: enable=too-many-arguments
 
 
-def main(wlan: str = "wlp1s0", eth: str = "eth1"):
+def main(wlan: str, eth: str, cert_folder: str, cert_chain: str):
     """
     Example of setting up cbma for interfaces wlp1s0, eth1
 
@@ -154,43 +204,38 @@ def main(wlan: str = "wlp1s0", eth: str = "eth1"):
     # TODO: nft needs to be enabled on the images
     # apply_nft_rules(rules_file=f'{file_dir}/tools/firewall.nft')
 
+    # TODO - This step is performed by the comms controller
+    utils.batman("bat0")
+    utils.batman("bat1")
+
     # Start cbma lower for each interface/ radio by calling cbma(),
     # which in turn calls setup_macsec(), followed by setup_batman()
     # For example, for wlp1s0:
-    cbma_wlp1s0 = threading.Thread(
-        target=cbma,
-        args=(
-            "lower",  # level
-            wlan,  # interface_name
-            15001,  # port
-            "bat0",  # batman_interface
-            f"{file_dir}/cert_generation/certificates",  # path_to_certificate
-            f"{file_dir}/cert_generation/certificates/ca.crt",  # path_to_ca
-            "off",  # macsec_encryption (can be "on" if required)
-            f"/var/run/wpa_supplicant_id0/{wlan}",  # wpa_supplicant ctrl path
-            _shutdown_event,
-        ),
+    cbma_wlp1s0 = cbma(
+        "lower", # level
+        wlan,  # interface_name
+        15001, # port
+        "bat0", # batman_interface
+        cert_folder,
+        cert_chain,
+        "off", # macsec_encryption (can be "on" if required)
+        f"/var/run/wpa_supplicant_id0/{wlan}",  # wpa_supplicant ctrl path
+        _shutdown_event
     )
-    cbma_threads.append(cbma_wlp1s0)
-    cbma_wlp1s0.start()
 
     # Similarly, for eth1
-    cbma_eth1 = threading.Thread(
-        target=cbma,
-        args=(
-            "lower",
-            eth,
-            15001,
-            "bat0",
-            f"{file_dir}/cert_generation/certificates",
-            f"{file_dir}/cert_generation/certificates/ca.crt",
-            "off",
-            None,
-            _shutdown_event,
-        ),
+    cbma_eth1 = cbma(
+        "lower",
+        eth,
+        15001,
+        "bat0",
+        cert_folder,
+        cert_chain,
+        "off",
+        None,
+        _shutdown_event
     )
-    cbma_threads.append(cbma_eth1)
-    cbma_eth1.start()
+
     # Repeat the same for other interfaces/ radios by changing the interface
     # name and wpa_supplicant_control_path (if any). The port number can be
     # reused for the lower level.
@@ -205,28 +250,30 @@ def main(wlan: str = "wlp1s0", eth: str = "eth1"):
     # path_to_certificates and path_to_ca can be changed as required
     # batman interface = bat1, port number should be different from that used
     # for lower cbma
-    cbma_bat0 = threading.Thread(
-        target=cbma,
-        args=(
-            "upper",
-            "bat0",
-            15002,
-            "bat1",
-            f"{file_dir}/cert_generation/certificates",
-            f"{file_dir}/cert_generation/certificates/ca.crt",
-            "on",
-            None,
-            _shutdown_event,
-        ),
+    cbma_bat0 = cbma(
+        "upper",
+        "bat0",
+        15002,
+        "bat1",
+        cert_folder,
+        cert_chain,
+        "on",
+        None,
+        _shutdown_event
     )
-    cbma_threads.append(cbma_bat0)
-    cbma_bat0.start()
+
+    global cbma_processes
+    cbma_processes = [cbma_wlp1s0, cbma_eth1, cbma_bat0]
+
+    cbma_bat0.join()
 
 
 def stop():
     _shutdown_event.set()
-    for cbma_thread in cbma_threads:
-        cbma_thread.join()
+
+    for p in cbma_processes:
+        p.terminate()
+
     # Delete macsec links, batman interfaces and bridges created within CBMA
     subprocess.run([f"{file_dir}/cleanup_cbma.sh"])
 
@@ -236,16 +283,38 @@ if __name__ == "__main__":
     parser.add_argument(
         "-w",
         "--wlan",
+        default="wlp1s0",
         help="Wireless interface name (wlp1s0, wlp2s0...)",
-        required=False,
+        required=False
     )
     parser.add_argument(
         "-e",
         "--eth",
+        default="eth1",
         help="Lan interface name (eth1, lan1...)",
-        required=False,
+        required=False
     )
-
+    parser.add_argument(
+        "-d",
+        "--certdir",
+        default="/opt/crypto/ecdsa/birth/filebased",
+        help="Folder where birth certs are placed",
+        required=False
+    )
+    parser.add_argument(
+        "-c",
+        "--certchain",
+        default="/opt/mspki/ecdsa/certificate_chain.crt",
+        help="Path to certificate chain",
+        required=False
+    )
     args = parser.parse_args()
 
-    main(args.wlan, args.eth)
+    try:
+        main(args.wlan, args.eth, args.certdir, args.certchain)
+    except (Exception, KeyboardInterrupt):
+        print("Whoopsie...", flush=True)
+
+        stop()
+
+        print("Exiting")

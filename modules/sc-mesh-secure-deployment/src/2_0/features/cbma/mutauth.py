@@ -85,7 +85,7 @@ class mutAuth:
         self.macsec_obj = macsec.Macsec(
             level=self.level,
             interface=self.meshiface,
-            macsec_encryption=macsec_encryption,
+            macsec_encryption=macsec_encryption
         )  # Initialize macsec object
         if self.level == "upper":
             self.bridge_interface = (
@@ -150,40 +150,24 @@ class mutAuth:
                 handle_peer_connected_thread.start()
 
     def handle_wpa_multicast_event(self, mac):
-        if mac not in self.connected_peers_status:
-            # There is no ongoing connection with peer yet
-            # Wait for random seconds to avoid race condition
-            random_wait = random.uniform(0.5, 3)
-            time.sleep(random_wait)
-            if mac not in self.connected_peers_status:
-                # Start as client
-                print("------------------client ---------------------")
+            if self.mymac > mac:
+                # I have higher mac, so I should initiate as client
                 with self.connected_peers_status_lock:
-                    self.connected_peers_status[mac] = [
-                        "ongoing",
-                        0,
-                    ]  # Update status as ongoing, num of failed attempts = 0
-                self.start_auth_client(mac)
-        elif self.connected_peers_status[mac][0] not in [
-            "ongoing",
-            "authenticated",
-        ]:
-            # If node does not have ongoing authentication or is not already
-            # authenticated or has not been blacklisted
-
-            # Wait for random seconds to avoid race condition
-            random_wait = random.uniform(0.5, 3)
-            time.sleep(random_wait)
-            if self.connected_peers_status[mac][0] not in [
-                "ongoing",
-                "authenticated",
-            ]:
-                # Start as client
-                print("------------------client ---------------------")
-                with self.connected_peers_status_lock:
-                    # Update status as ongoing, num of failed attempts
-                    # = same as before
-                    self.connected_peers_status[mac][0] = "ongoing"
+                    connected_peers_status = self.connected_peers_status
+                    if mac not in connected_peers_status:
+                        # There is no ongoing connection with peer yet
+                        # Start as client
+                        print("------------------client ---------------------")
+                        # Update status as ongoing, num of failed attempts = 0
+                        self.connected_peers_status[mac] = ["ongoing", 0]
+                    elif connected_peers_status[mac][0] not in ["ongoing", "authenticated"]:
+                        # If node does not have ongoing authentication or is not already authenticated or has not been blacklisted
+                        # Start as client
+                        print("------------------client ---------------------")
+                        # Update status as ongoing, num of failed attempts = same as before
+                        self.connected_peers_status[mac][0] = "ongoing"
+                    else:
+                        return
                 self.start_auth_client(mac)
 
     def start_auth_server(self):
@@ -229,13 +213,6 @@ class mutAuth:
             self.connected_peers_status[client_mac][
                 0
             ] = "not connected"  # Update status as not connected
-
-    def batman(self, batman_interface):
-        try:
-            batman_exec(batman_interface, "batman-adv")
-        except Exception as e:
-            self.logger.error(f"Error setting up bat0: {e}")
-            sys.exit(1)
 
     def setup_secchannel(self, secure_client_socket, my_macsec_param):
         # Establish secure channel and exchange macsec key
@@ -317,61 +294,10 @@ class mutAuth:
                 ),
                 bridge_interface=self.bridge_interface,
             )
-
-    def setup_batman(self):
-        # Wait till a macsec interface is setup and added
-        # to batman before setting up batman interface
-        while (
-            not self.macsec_setup_event.is_set()
-            and not self.shutdown_event.is_set()
-        ):
-            time.sleep(1)
-        # Exit in case shutdown event is set
-        if self.shutdown_event.is_set():
-            return
-        if not is_interface_up(
-            self.batman_interface
-        ):  # Turn batman interface up if not up already
-            self.batman(self.batman_interface)
-            if self.level == "upper" and self.lan_bridge_flag:
-                # Add bat1 and ethernet interface to br-lan
-                # to connect external devices
-                bridge_interface = "br-lan"
-                if not is_interface_up(bridge_interface):
-                    self.setup_bridge_over_batman(bridge_interface)
-
-    def setup_bridge_over_batman(self, bridge_interface):
-        # TODO: Need to configure interfaces to add to br-lan
-        # (This is just for quick test)
-        subprocess.run(["brctl", "addbr", bridge_interface], check=True)
-        add_interface_to_bridge(
-            interface_to_add=self.batman_interface,
-            bridge_interface=bridge_interface,
-        )  # Add bat1 to br-lan
-        add_interface_to_bridge(
-            interface_to_add="eth1", bridge_interface=bridge_interface
-        )  # Add eth1 to br-lan
-        self.logger.info(
-            "Setting mac address of %s to be same as %s..",
-            bridge_interface,
-            self.batman_interface,
-        )
-        subprocess.run(
-            [
-                "ip",
-                "link",
-                "set",
-                "dev",
-                bridge_interface,
-                "address",
-                get_mac_addr(self.batman_interface),
-            ],
-            check=True,
-        )
-        subprocess.run(
-            ["ip", "link", "set", bridge_interface, "up"], check=True
-        )
-        subprocess.run(["ifconfig", bridge_interface], check=True)
+            # setup_ebtables_macsec(
+            #     interface=self.macsec_obj.get_macsec_interface_name(client_mac),
+            #     mac=client_mac
+            # )
 
     def start(self):
         # ... other starting procedures

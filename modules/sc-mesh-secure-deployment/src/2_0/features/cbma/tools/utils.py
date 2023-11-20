@@ -2,6 +2,7 @@ import subprocess
 import configparser
 
 import os
+import sys
 import time
 import shutil
 
@@ -17,6 +18,78 @@ path_to_tools_dir = os.path.dirname(
 
 logger_instance = CustomLogger("utils")
 logger = logger_instance.get_logger()
+
+
+######### MOVED FROM CLASSES #############
+
+def batman(batman_interface):
+    try:
+        subprocess.run(["ip", "link", "add", "name", batman_interface, "type", "batadv"], check=True)
+
+        batman_exec(batman_interface,"batman-adv")
+    except Exception as e:
+        logger.error(f'Error setting up {batman_interface}: {e}')
+        sys.exit(1)
+
+
+def setup_batman(batman_interface):
+    # Wait till a macsec interface is setup and added
+    # to batman before setting up batman interface
+    # while (
+    #     not self.macsec_setup_event.is_set()
+    #     and not self.shutdown_event.is_set()
+    # ):
+    #     time.sleep(1)
+    # # Exit in case shutdown event is set
+    # if self.shutdown_event.is_set():
+    #     return
+
+    # Turn batman interface up if not up already
+    if not is_interface_up(batman_interface):
+        batman(batman_interface)
+
+        # TODO - This code was unreachable anyways as self.lan_bridge_flag was False by default
+        # if self.level == "upper" and self.lan_bridge_flag:
+        #     # Add bat1 and ethernet interface to br-lan to connect external devices
+        #     bridge_interface = "br-lan"
+        #     if not is_interface_up(bridge_interface):
+        #         self.setup_bridge_over_batman(batman_interface, bridge_interface)
+
+
+def setup_bridge_over_batman(batman_interface, bridge_interface):
+    # TODO: Need to configure interfaces to add to br-lan
+    # (This is just for quick test)
+    subprocess.run(["brctl", "addbr", bridge_interface], check=True)
+    add_interface_to_bridge(
+        interface_to_add=batman_interface,
+        bridge_interface=bridge_interface,
+    )  # Add bat1 to br-lan
+    add_interface_to_bridge(
+        interface_to_add="eth1", bridge_interface=bridge_interface
+    )  # Add eth1 to br-lan
+    logger.info(
+        "Setting mac address of %s to be same as %s..",
+        bridge_interface,
+        batman_interface,
+    )
+    subprocess.run(
+        [
+            "ip",
+            "link",
+            "set",
+            "dev",
+            bridge_interface,
+            "address",
+            get_mac_addr(batman_interface),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        ["ip", "link", "set", bridge_interface, "up"], check=True
+    )
+    subprocess.run(["ifconfig", bridge_interface], check=True)
+
+##########################################
 
 
 def is_wpa_supplicant_running():
@@ -98,9 +171,6 @@ def mesh_service():
                 e.returncode,
             )
             logger.error("Error output: %s", e.stderr)
-
-
-# Call the function
 
 
 def killall(interface):
@@ -249,7 +319,7 @@ def get_mac_from_ipv6(ipv6_address, interface):
         # Send pings to the IPv6 address to prompt an NDP exchange
         # Increase the ping count, if needed, for better reliability
         subprocess.run(
-            ["ping6", "-c", "1", f"{ipv6_address}%{interface}"],
+            ["ping", "-c", "1", f"{ipv6_address}%{interface}"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=5,
@@ -353,10 +423,8 @@ def is_interface_pingable(interface_name, ip_address):
             ping_output = subprocess.check_output(
                 [
                     "ping",
-                    "-c",
-                    "1",
-                    "-w",
-                    "1",
+                    "-c", "1",
+                    "-w", "1",
                     f"{ip_address}%{interface_name}",
                 ],
                 stderr=subprocess.STDOUT,
@@ -468,6 +536,23 @@ def add_interface_to_bridge(interface_to_add, bridge_interface):
         )
 
 
+def setup_ebtables_macsec(interface, mac):
+    try:
+        subprocess.run(["ebtables", "--table", "nat", "--append", "OUTPUT",
+                        "--out-interface", interface,
+                        "--destination", "ff:ff:ff:ff:ff:ff",
+                        "--jump", "dnat",
+                        "--to-destination", mac], check=True)
+        subprocess.run(["ebtables", "--table", "nat", "--append", "PREROUTING",
+                        "--in-interface", interface,
+                        "--source", mac,
+                        "--destination", get_mac_addr(interface),
+                        "--jump", "dnat",
+                        "--to-destination", "ff:ff:ff:ff:ff:ff"], check=True)
+        logger.info(f'Added ebtable rule for {mac} and {interface}')
+    except Exception as e:
+        logger.info(f'Error adding ebtable rule for {mac} and {interface}: {e}')
+
 def setup_bridge(bridge_interface):
     # Set a bridge interface up
     try:
@@ -476,5 +561,20 @@ def setup_bridge(bridge_interface):
             ["ip", "link", "set", bridge_interface, "up"], check=True
         )
         logger.info("Setup bridge %s", bridge_interface)
+        setup_ebtables_bridge(bridge_interface)
     except Exception as e:
         logger.error("Error setting up bridge %s: %s", bridge_interface, e)
+
+def setup_ebtables_bridge(bridge_interface):
+    try:
+        subprocess.run(["ebtables", "--append", "FORWARD",
+                        "--logical-in", bridge_interface,
+                        "--jump", "ACCEPT"],
+                       check=True)
+        subprocess.run(["ebtables", "--append", "FORWARD",
+                        "--logical-out", bridge_interface,
+                        "--jump", "ACCEPT"],
+                       check=True)
+        logger.info(f'Setup ebtables for {bridge_interface}')
+    except Exception as e:
+        logger.error(f'Error setting up ebtables for {bridge_interface}: {e}')
