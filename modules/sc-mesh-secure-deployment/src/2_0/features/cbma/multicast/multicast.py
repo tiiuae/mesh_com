@@ -10,6 +10,11 @@ sys.path.insert(0, '../')
 from tools.utils import get_mac_addr
 from tools.custom_logger import CustomLogger
 
+
+if not hasattr(socket, 'SO_BINDTODEVICE'):
+    # Defined in /usr/include/asm-generic/socket.h
+    socket.SO_BINDTODEVICE = 25
+
 logger_instance = CustomLogger("multicast")
 
 
@@ -39,7 +44,7 @@ class MulticastHandler:
 
         with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.setsockopt(socket.SOL_SOCKET, 25, str(self.interface + '\0').encode('utf-8'))  # Bind socket to interface
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, str(self.interface + '\0').encode('utf-8'))
 
             # Bind to the wildcard address and desired port
             sock.bind(('::', self.port))
