@@ -1,4 +1,5 @@
 PHY: true
+RSS: true
 IDS: false
 jamming: false
 
