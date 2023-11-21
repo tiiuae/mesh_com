@@ -4,6 +4,7 @@ import time
 
 # Import classes for features
 from features.PHY.PHY_CRA_scripts.SP_CRA_mainDE1 import PHYCRA
+from features.PHY.RSS_auth.F_RSS_Auth import RSS_Auth
 # from features.IDS.IDS import IDS
 # from features.jamming.jamming import Jamming
 
@@ -12,6 +13,12 @@ def launch_PHY():
     phycra = PHYCRA()
     phycra.start()
     return phycra
+
+def launch_RSS():
+    # Place holder to launch RSS
+    rss_authen = RSS_Auth()
+    rss_authen.start()
+    return rss_authen
 
 def launch_IDS():
     # Place holder to launch IDS
@@ -25,6 +32,9 @@ def launch_jamming():
 
 def stop_PHY(phycra):
     phycra.stop()
+
+def stop_RSS(rss_authn):
+    rss_authn.stop()
 
 def stop_jamming(jamming):
     jamming.stop()
@@ -57,7 +67,7 @@ def launch_decision_engine(sensors):
 
             # Place holder to call quarantine/ MBA if necessary
 
-        time.sleep(60) # Period can be adjusted
+        time.sleep(40) # Period can be adjusted
 
 
 
@@ -73,6 +83,9 @@ def initialize(feature):
     if feature == 'PHY':
         phycra = launch_PHY()
         sensors[feature] = phycra
+    if feature == 'RSS':
+        rss_authen = launch_RSS()
+        sensors[feature] = rss_authen
     if feature == 'IDS':
         ids = launch_IDS()
         sensors[feature] = ids
