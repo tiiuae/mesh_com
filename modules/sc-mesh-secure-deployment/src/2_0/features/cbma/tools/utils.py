@@ -476,5 +476,20 @@ def setup_bridge(bridge_interface):
             ["ip", "link", "set", bridge_interface, "up"], check=True
         )
         logger.info("Setup bridge %s", bridge_interface)
+        setup_ebtables_bridge(bridge_interface)
     except Exception as e:
         logger.error("Error setting up bridge %s: %s", bridge_interface, e)
+
+def setup_ebtables_bridge(bridge_interface):
+    try:
+        subprocess.run(["ebtables", "--append", "FORWARD",
+                        "--logical-in", bridge_interface,
+                        "--jump", "ACCEPT"],
+                       check=True)
+        subprocess.run(["ebtables", "--append", "FORWARD",
+                        "--logical-out", bridge_interface,
+                        "--jump", "ACCEPT"],
+                       check=True)
+        logger.info(f'Setup ebtables for {bridge_interface}')
+    except Exception as e:
+        logger.error(f'Error setting up ebtables for {bridge_interface}: {e}')
