@@ -1,5 +1,7 @@
 #!/bin/bash
 # Deletes macsec links, batman and bridges created within cbma
+ebtables -t nat -L OUTPUT | sed -n '/OUTPUT/,/^$/{/^--/p}' | xargs ebtables -t nat -D OUTPUT
+
 ip macsec show | grep ': protect on validate' | awk -F: '{print $2}' | awk '{print $1}' | xargs -I {} ip link delete {}
 
 ifconfig bat0 down

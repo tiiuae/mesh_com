@@ -336,6 +336,17 @@ def add_interface_to_bridge(interface_to_add, bridge_interface):
     except Exception as e:
         logger.error(f'Error adding interface {interface_to_add} to {bridge_interface}: {e}')
 
+def setup_ebtables_macsec(interface, mac):
+    try:
+        subprocess.run(["ebtables", "--tables", "nat", "--append", "OUTPUT",
+                        "--out-interface", interface,
+                        "--destination", "ff:ff:ff:ff:ff:ff",
+                        "--jump", "dnat",
+                        "--to-destination", mac], check=True)
+        logger.info(f'Added ebtable rule for {mac} and {interface}')
+    except Exception as e:
+        logger.info(f'Error adding ebtable rule for {mac} and {interface}: {e}')
+
 def setup_bridge(bridge_interface):
     # Set a bridge interface up
     try:
