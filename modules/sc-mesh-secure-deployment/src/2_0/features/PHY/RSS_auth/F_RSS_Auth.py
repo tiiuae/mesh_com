@@ -7,10 +7,7 @@ from tabulate import tabulate
 import os
 
 class RSS_Auth:
-    def __init__(self, start_script, mac_address_file, rssi_file):
-        self.start_script = start_script
-        self.mac_address_file = mac_address_file
-        self.rssi_file = rssi_file
+    def __init__(self):
         self.default_macs = []
         self.current_macs = []
         self.rssi_avg = []
@@ -18,6 +15,10 @@ class RSS_Auth:
         self.threshold = 4
         self.process = None
         self.results = {'Pass': [], 'Fail': []}
+        # Hardcoded script and CSV file paths
+        self.start_script = "./features/PHY/RSS_auth/F_rssi_capture.py"
+        self.mac_address_file = "/tmp/mac_addresses.csv"
+        self.rssi_file = "/tmp/output_processed.csv"
 
     def start(self):
         """Starts the RSSI capturing process in a separate thread."""
@@ -62,18 +63,17 @@ class RSS_Auth:
         except Exception as e:
             print(f"An error occurred while logging: {e}")
 
-    def load_mac_addresses(self, filename):
+    def load_mac_addresses(self):
         macs = []
-        file_path = os.path.join('./', filename)
         try:
-            with open(filename, 'r') as csv_file:
+            with open(self.mac_address_file, 'r') as csv_file:
                 reader = csv.reader(csv_file)
                 next(reader)  # Skip header
                 for row in reader:
                     if row:  # Skip empty rows
                         macs.append(row)
         except FileNotFoundError:
-            print(f"File {filename} not found.")
+            print(f"File {self.mac_address_file} not found.")
         except Exception as e:
             print(f"An error occurred: {e}")
         return macs
@@ -83,16 +83,15 @@ class RSS_Auth:
         print(f"\n{description}")
         print(tabulate(macs, headers=['MAC Addresses']))
 
-    def load_rssi_values(self, filename):
+    def load_rssi_values(self):
         rssi_values = []
-        file_path = os.path.join('./', filename)
         try:
-            with open(filename, 'r') as csv_file:
+            with open(self.rssi_file, 'r') as csv_file:
                 reader = csv.reader(csv_file)
                 for row in reader:
                     rssi_values.append(row)
         except FileNotFoundError:
-            print(f"File {filename} not found.")
+            print(f"File {self.rssi_file} not found.")
         except Exception as e:
             print(f"An error occurred: {e}")
         return rssi_values
