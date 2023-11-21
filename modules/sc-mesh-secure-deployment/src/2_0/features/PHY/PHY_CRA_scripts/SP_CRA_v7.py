@@ -44,7 +44,7 @@ class PHYCRA:
             logging.info("Server setup completed successfully")
         except Exception as e:
             logging.error("Error during server setup: %s", e)
-
+            
         # Client setup
         try:
             DataClient = loadmat(mat_file_path)
@@ -57,6 +57,7 @@ class PHYCRA:
         self.server_thread = None
         self.listen_thread = None
         self.broadcast_thread = None
+        self.debug = False  # Default value
         self.results_queue = {'Pass': [], 'Fail': []}
         #self.all_attempts = set()  # Set to track all unique attempts
 
@@ -103,20 +104,24 @@ class PHYCRA:
             
 
     def display_table(self):
-        logging.info("Displaying authentication table")
-        print("+---------------------+---------------+-------------------+---------------------------+")
-        print("|        Time         |     Node IP   |    MAC Address    |   Authentication Result   |")
-        print("+---------------------+---------------+-------------------+---------------------------+")
-        log_file_path = "/tmp/server_log.txt"
-        if os.path.exists(log_file_path):
-            with open(log_file_path, "r") as log_file:
-                for line in log_file:
-                    timestamp, node_ip, mac_address, result = line.strip().split("\t")
-                    formatted_line = f"| {timestamp:<19} | {node_ip:<12} | {mac_address:<15} | {result:<23} |"
-                    print(formatted_line)
+        if self.debug:
+            logging.info("Displaying authentication table")
+            print("+---------------------+---------------+-------------------+---------------------------+")
+            print("|        Time         |     Node IP   |    MAC Address    |   Authentication Result   |")
+            print("+---------------------+---------------+-------------------+---------------------------+")
+            log_file_path = "/tmp/server_log.txt"
+            if os.path.exists(log_file_path):
+                with open(log_file_path, "r") as log_file:
+                    for line in log_file:
+                        timestamp, node_ip, mac_address, result = line.strip().split("\t")
+                        formatted_line = f"| {timestamp:<19} | {node_ip:<12} | {mac_address:<15} | {result:<23} |"
+                        print(formatted_line)
+            else:
+                print("No entries found.")
+            print("+---------------------+---------------+-------------------+---------------------------+")
         else:
-            print("No entries found.")
-        print("+---------------------+---------------+-------------------+---------------------------+")
+            logging.info("Debug mode is off, skipping table display")
+
 
 
     def handle_client(self, conn, addr):
