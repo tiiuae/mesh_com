@@ -23,7 +23,14 @@ class Macsec:
         # Sets up macsec link and adds tx channel
         macsec_interface = self.get_macsec_interface_name(client_mac)
         try:
-            subprocess.run(["ip", "link", "add", "link", self.interface, macsec_interface, "type", "macsec", "port", str(my_port), "encrypt", self.macsec_encryption, "cipher", "gcm-aes-256"], check=True)
+            subprocess.run(["ip", "link", "add", "link", self.interface, macsec_interface,
+                            "type", "macsec",
+                            "port", str(my_port),
+                            "encrypt", self.macsec_encryption,
+                            "cipher", "gcm-aes-256",
+                            "send_sci", "off",
+                            "end_station", "on"],
+                           check=True)
             subprocess.run(["ip", "macsec", "add", macsec_interface, "tx", "sa", "0", "pn", "1", "on", "key", "01", my_macsec_key], check=True)
             subprocess.run(["ip", "link", "set", macsec_interface, "up"], check=True)
             subprocess.run(["ip", "macsec", "show"], check=True)
