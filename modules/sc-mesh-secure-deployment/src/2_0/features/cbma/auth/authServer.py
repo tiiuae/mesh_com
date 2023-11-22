@@ -15,6 +15,8 @@ logger = logger_instance.get_logger()
 
 
 class AuthServer:
+    CLIENT_TIMEOUT = 30
+
     def __init__(self, interface, ip_address, port, cert_path, ca_path, mua):
         threading.Thread.__init__(self)
         self.running = True
@@ -52,6 +54,8 @@ class AuthServer:
 
     def authenticate_client(self, client_connection, client_address, client_mac):
         secure_client_socket = self.context.wrap_socket(client_connection, server_side=True)
+        secure_client_socket.settimeout(self.CLIENT_TIMEOUT)
+
         try:
             client_cert = secure_client_socket.getpeercert(binary_form=True)
             if not client_cert:
@@ -72,8 +76,8 @@ class AuthServer:
         except Exception as e:
             logger.error(f"An error occurred while handling the client {client_address[0]}.", exc_info=True)
             self.mua.auth_fail(client_mac=client_mac)
-        # finally:
-        #     secure_client_socket.close()
+        finally:
+            secure_client_socket.close()
 
     def get_secure_socket(self, client_address):
         with self.active_sockets_lock:
@@ -95,15 +99,12 @@ class AuthServer:
             raise ValueError("Invalid IP address")
 
         self.serverSocket.listen()
-        self.serverSocket.settimeout(99999)  # maybe we can remove timeout since server needs to be listening throughout
         logger.info("Server listening")
 
         while self.running and not self.mua.shutdown_event.is_set():
             try:
                 client_connection, client_address = self.serverSocket.accept()
                 threading.Thread(target=self.handle_client, args=(client_connection, client_address)).start()
-            except socket.timeout:  # In case we add a timeout later.
-                continue
             except Exception as e:
                 if self.running:
                     logger.error("Unexpected error in server loop.", exc_info=True)
