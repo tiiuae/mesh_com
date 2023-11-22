@@ -32,13 +32,14 @@ class AuthClient:
 
     def establish_connection(self):
         # Create an SSL context
-        context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH,
+                                             cafile=glob.glob(self.ca)[0])
+        context.minimum_version = ssl.TLSVersion.TLSv1_3
         context.verify_mode = ssl.CERT_REQUIRED
 
         # Uncomment to enable Certificate Revocation List (CRL) check
         # context.verify_flags = ssl.VERIFY_CRL_CHECK_LEAF
 
-        context.load_verify_locations(glob.glob(self.ca)[0])
         context.load_cert_chain(
             certfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.crt")[0],
             keyfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.key")[0],

@@ -25,9 +25,10 @@ class AuthServer:
         self.interface = interface
         self.mymac = get_mac_addr(self.interface)
         # Create the SSL context here and set it as an instance variable
-        self.context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        self.context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH,
+                                                  cafile=glob.glob(self.ca)[0])
+        self.context.minimum_version = ssl.TLSVersion.TLSv1_3
         self.context.verify_mode = ssl.CERT_REQUIRED
-        self.context.load_verify_locations(glob.glob(self.ca)[0])
         self.context.load_cert_chain(
             certfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.crt")[0],
             keyfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.key")[0],
