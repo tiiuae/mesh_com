@@ -1,5 +1,7 @@
 import asyncio
 from typing import Optional, Callable
+
+import netifaces
 from zeroconf import ServiceStateChange, Zeroconf
 from zeroconf.asyncio import (
     AsyncServiceBrowser,
@@ -14,15 +16,41 @@ class CommsServiceMonitor:
         service_name: str,
         service_type: str,
         service_cb: Optional[Callable] = None,
+        interface: Optional[str] = None
     ) -> None:
         self.service_name = service_name
         self.service_type = service_type
         self.service_browser: Optional[AsyncServiceBrowser] = None
         self.async_zeroconf: Optional[AsyncZeroconf] = None
         self.service_callback = service_cb
+        self.interface = interface
+
+    @staticmethod
+    def get_ip_addresses(interface):
+        addresses = []
+
+        # Get all addresses for the specified interface
+        if interface in netifaces.interfaces():
+            addrs = netifaces.ifaddresses(interface)
+
+            # Get IPv4 addresses
+            if netifaces.AF_INET in addrs:
+                for addr_info in addrs[netifaces.AF_INET]:
+                    addresses.append(addr_info['addr'])
+
+            # Get IPv6 addresses
+            if netifaces.AF_INET6 in addrs:
+                for addr_info in addrs[netifaces.AF_INET6]:
+                    addresses.append(addr_info['addr'])
+
+        return addresses
 
     async def async_run(self) -> None:
-        self.async_zeroconf = AsyncZeroconf()
+        if self.interface:
+            addresses = self.get_ip_addresses(self.interface)
+            self.async_zeroconf = AsyncZeroconf(interfaces=addresses)
+        else:
+            self.async_zeroconf = AsyncZeroconf()
         self.service_browser = AsyncServiceBrowser(
             zeroconf=self.async_zeroconf.zeroconf,
             type_=self.service_type,
@@ -52,58 +80,19 @@ class CommsServiceMonitor:
             f"Service {name} of type {service_type} state changed: {state_change}"
         )
 
-        info = AsyncServiceInfo(service_type, name)
-        service_available = True
-        if state_change == ServiceStateChange.Removed:
-            service_available = False
-        await info.async_request(zeroconf, 3000)
+        if name == f"{self.service_name}.{self.service_type}":
+            info = AsyncServiceInfo(service_type, name)
+            service_available = True
+            if state_change == ServiceStateChange.Removed:
+                service_available = False
+            await info.async_request(zeroconf, 3000)
 
-        service_info = self.extract_service_info(info)
-        expected_name = name
-        if self.service_name:
-            expected_name = f"{self.service_name}.{self.service_type}"
-
-        if self.service_callback:
-            if service_info["ipv6_address"]:
-                url = f'{service_info["ipv6_address"]}:{service_info["port"]}'
-            else:
-                url = f'{service_info["ipv4_address"]}:{service_info["port"]}'
-            if service_info["name"] == expected_name:
+            if self.service_callback:
+                server = info.server
+                if server:
+                    server = server.rstrip(".")
+                url = f'{server}:{info.port}'
                 self.service_callback(url, service_available)
-
-    def extract_service_info(self, info: AsyncServiceInfo) -> dict:
-        if info:
-            ipv6_addresses = [
-                addr for addr in info.parsed_scoped_addresses() if ":" in addr
-            ]
-            ipv6_address = next(iter(ipv6_addresses), None)
-            ipv4_addresses = [
-                addr for addr in info.parsed_scoped_addresses() if "." in addr
-            ]
-            ipv4_address = next(iter(ipv4_addresses), None)
-
-            service_info = {
-                "name": info.name,
-                "ipv6_address": ipv6_address,
-                "ipv4_address": ipv4_address,
-                "port": info.port,
-                "weight": info.weight,
-                "priority": info.priority,
-                "server": info.server,
-                "properties": info.properties,
-            }
-            return service_info
-        else:
-            return {
-                "name": None,
-                "ipv6_address": None,
-                "ipv4_address": None,
-                "port": None,
-                "weight": None,
-                "priority": None,
-                "server": None,
-                "properties": None,
-            }
 
 
 if __name__ == "__main__":
@@ -116,6 +105,7 @@ if __name__ == "__main__":
         service_name="MDM Service",
         service_type="_mdm._tcp.local.",
         service_cb=service_discovery_cb,
+        #interface="br-lan"
     )
     try:
         loop.run_until_complete(runner.async_run())
