@@ -158,9 +158,11 @@ class MdmAgent:
         self.__ca: str = ca_file
         self.__config_version: int = 0
         self.mdm_service_available: bool = False
-        self.__device_id = (
-            open("/opt/identity", "r", encoding="utf-8").read().strip()
-        )  # todo?
+        try:
+            with open("/opt/identity", "r", encoding="utf-8") as f:  # todo
+                self.__device_id = f.read().strip()
+        except FileNotFoundError:
+            self.__device_id = "default"
         self.__config_type = "mesh_conf"
 
     def mdm_server_address_cb(self, address: str, status: bool) -> None:
@@ -185,53 +187,15 @@ class MdmAgent:
                 await self.__loop_run_executor(executor)
             await asyncio.sleep(float(self.__interval))
 
-    # def __http_get_config(self) -> requests.Response:
-    #     """
-    #     HTTP request
-    #     :return: HTTP response
-    #     """
-    #     try:
-    #         if self.__ssl_context is not None:
-    #             self.__comms_controller.logger.debug("SSL context is not None")
-    #             return requests.get(
-    #                 f"https://{self.__url}/{MdmAgent.GET_CONFIG}",
-    #                 params={"device_id": self.__device_id},
-    #                 verify=self.__ssl_context,
-    #                 timeout=2,
-    #             )
-    #         self.__comms_controller.logger.debug("SSL context is None")
-    #         return requests.get(
-    #             f"http://{self.__url}/{MdmAgent.GET_CONFIG}",
-    #             params={"device_id": self.__device_id},
-    #             timeout=2,
-    #         )  # todo for testing only
-    #     except requests.exceptions.ConnectionError as err:
-    #         self.__comms_controller.logger.error(
-    #             "HTTP request failed with error: %s", err
-    #         )
-    #         return requests.Response()
-
     def __http_get_device_config(self) -> requests.Response:
         try:
-            if (
-                glob(self.__ca)
-                and glob(self.__certificate_file)
-                and glob(self.__keyfile)
-            ):
-                self.__comms_controller.logger.debug("SSL context is not None")
-                return requests.get(
-                    f"https://{self.__url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
-                    params={"device_id": self.__device_id},
-                    cert=(self.__certificate_file, self.__keyfile),
-                    verify=self.__ca,
-                    timeout=2,
-                )
             return requests.get(
-                f"http://{self.__url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
+                f"https://{self.__url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
                 params={"device_id": self.__device_id},
+                cert=(self.__certificate_file, self.__keyfile),
+                verify=self.__ca,
                 timeout=2,
-            )  # todo for testing only
-
+            )
         except requests.exceptions.ConnectionError as err:
             self.__comms_controller.logger.error(
                 "HTTP request failed with error: %s", err
@@ -320,11 +284,14 @@ class MdmAgent:
             self.__handle_received_config(response)
 
 
-async def main_mdm(keyfile=None, certfile=None, interval=1000):
+async def main_mdm(keyfile=None, certfile=None, ca_file=None):
     """
     main
     """
-    cc = CommsController(interval)
+    cc = CommsController()
+
+    if keyfile is None or certfile is None or ca_file is None:
+        cc.logger.debug("Closing as no certificates provided")
 
     async def stop():
         await asyncio.sleep(1)
@@ -343,7 +310,7 @@ async def main_mdm(keyfile=None, certfile=None, interval=1000):
 
     # separate instances needed for FMO/MDM
 
-    mdm = MdmAgent(cc, keyfile, certfile)
+    mdm = MdmAgent(cc, keyfile, certfile, ca_file)
     monitor = comms_service_discovery.CommsServiceMonitor(
         service_name="MDM Service",
         service_type="_mdm._tcp.local.",
@@ -494,7 +461,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "-a", "--agent", help="mdm or fmo", required=False, default="fmo"
     )
+
     args = parser.parse_args()
+
+    # test certificates location
+    # if args.ca is None or args.certfile is None or args.keyfile is None:
+    #     args.ca = "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/ca.crt"
+    #     args.certfile = "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/issued/csl1.local.crt"
+    #     args.keyfile = "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/private/csl1.local.key"
 
     loop = asyncio.new_event_loop()
     if args.agent == "mdm":

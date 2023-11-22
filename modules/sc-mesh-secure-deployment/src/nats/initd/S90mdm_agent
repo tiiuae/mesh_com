@@ -18,9 +18,8 @@ CA_FILE="/etc/ssl/certs/ca.crt"
 
 if [ -e "$CA_FILE" ] && [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
   ARGS="-k $KEY_FILE -c $CERT_FILE -r $CA_FILE --agent mdm"
-else
-  ARGS="--agent mdm"
 fi
+
 start() {
     echo "$ARGS"
     printf 'Starting %s: ' "$DAEMON"
@@ -34,6 +33,7 @@ start() {
     fi
     return "$status"
 }
+
 stop() {
     printf 'Stopping %s: ' "$DAEMON"
     start-stop-daemon -K -q -p "$PIDFILE"
