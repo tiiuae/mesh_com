@@ -41,7 +41,7 @@ class SecMessageHandler:
             return
 
         try:
-            self.socket.send(message.encode())
+            self.socket.sendall(message.encode())
             self.logger.info(f"Sent: {message} to {self.socket.getpeername()[0]}")
         except Exception as e:
             self.logger.error(f"Error sending message to {self.socket.getpeername()[0]}.", exc_info=True)

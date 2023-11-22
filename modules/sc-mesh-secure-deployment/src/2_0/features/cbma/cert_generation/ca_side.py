@@ -75,7 +75,7 @@ def handle_client(client_socket, IPaddress):
         if "CSR uploaded " in csr_filename:
             csr_filename = csr_filename.split("CSR uploaded ")[1]
         # Acknowledge the filename
-        client_socket.send(b"Filename received")
+        client_socket.sendall(b"Filename received")
 
         # Verify the CSR filename in the monitoring directory
         full_path = os.path.join(csr_directory, csr_filename)
