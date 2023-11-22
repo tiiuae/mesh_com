@@ -39,6 +39,7 @@ start() {
       fi
     else
       echo "ap+mesh not starting..."
+      echo "S90APoint: ap+mesh not starting..." > $LOG_FILE
       return 0
     fi
     return "$status"

@@ -160,6 +160,17 @@ find_phy_interface() {
   done
 }
 
+slaac() {
+  _slaac_interfaces=$1
+  echo "SLAAC for '$_slaac_interfaces'"
+  for _slaac_interface in $_slaac_interfaces; do
+    echo "  SLAAC for '$_slaac_interface'"
+    /opt/slaac.sh $_slaac_interface
+    echo "  SLAAC for '$_slaac_interface' DONE"
+  echo "SLAAC for '$_slaac_interfaces' DONE"
+  done
+}
+
 mode_execute() {
   # parameters:
   # $1 = mode
@@ -266,6 +277,9 @@ EOF
         # Enable debug level as necessary
         (olsrd -i "$wifidev" -d 0)&
       fi
+
+      #SLAAC immediately after basic setup
+      slaac "$slaac"
 
       if [ "$routing_algo" == "batman-adv" ]; then
         sleep 3
@@ -382,6 +396,9 @@ EOF
         (olsrd -i "$wifidev" -d 0)&
       fi
 
+      #SLAAC immediately after basic setup
+      slaac "$slaac"
+
       # Radio parameters
       iw dev "$wifidev" set txpower limit "$txpwr"00
 
@@ -450,6 +467,9 @@ EOF
       route add -net "$network" gw "$bridge_ip" netmask "$nmask" dev "$bridge_name"
       iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
 
+      #SLAAC immediately after basic setup
+      slaac "$slaac"
+
       # Start AP
       /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX".conf -f /tmp/hostapd_"$INDEX".log
       ;;
@@ -517,6 +537,9 @@ EOF
       ifconfig "$bridge_name"
       iptables -P FORWARD ACCEPT
       ip addr flush dev "$batman_iface"
+
+      #SLAAC immediately after basic setup
+      slaac "$slaac"
 
       # Start AP
       /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX".conf  -f /tmp/hostapd_"$INDEX".log
@@ -625,6 +648,10 @@ main () {
 
   _bridge="${INDEX}_BRIDGE"
   bridge="${!_bridge}"
+
+  _slaac="${INDEX}_SLAAC"
+  slaac="${!_slaac}"
+  echo "SLAAC ifaces: '$slaac'"
 
   # shellcheck disable=SC2153
   # shellcheck disable=SC2034
