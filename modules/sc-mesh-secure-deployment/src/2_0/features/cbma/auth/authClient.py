@@ -91,7 +91,7 @@ class AuthClient:
                 else:
                     secureClientSocket.connect((self.sslServerIP, self.sslServerPort))
                 break  # break out of loop if connection is successful
-            except ConnectionRefusedError:
+            except:
                 retries += 1
                 if retries < MAX_RETRIES:
                     wait_time = random.uniform(MIN_WAIT_TIME, MAX_WAIT_TIME)
