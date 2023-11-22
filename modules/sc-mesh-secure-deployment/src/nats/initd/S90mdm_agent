@@ -13,10 +13,11 @@ PIDFILE="/var/run/$DAEMON.pid"
 LOG_FILE=/opt/mdm_agent.log
 
 KEY_FILE="/etc/ssl/private/csl1.local.key"
-CERT_FILE="/etc/ssl/certs/ca.key"
+CERT_FILE="/etc/ssl/certs/csl1.local.crt"
+CA_FILE="/etc/ssl/certs/ca.crt"
 
-if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
-  ARGS="-k $KEY_FILE -c $CERT_FILE --agent mdm"
+if [ -e "$CA_FILE" ] && [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
+  ARGS="-k $KEY_FILE -c $CERT_FILE -r $CA_FILE --agent mdm"
 else
   ARGS="--agent mdm"
 fi

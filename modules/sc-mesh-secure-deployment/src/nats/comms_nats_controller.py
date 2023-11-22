@@ -13,7 +13,7 @@ from typing import Optional
 from nats.aio.client import Client as NATS
 from concurrent.futures import ThreadPoolExecutor
 import requests
-from requests import Response
+from glob import glob
 
 from src import comms_settings
 from src import comms_command
@@ -137,10 +137,14 @@ class MdmAgent:
     """
 
     GET_CONFIG: str = "public/config"
-    GET_DEVICE_CONFIG: str = "public/get_device_config" # + config_type
+    GET_DEVICE_CONFIG: str = "public/get_device_config"  # + config_type
 
     def __init__(
-        self, comms_controller, keyfile: str = None, certificate_file: str = None
+        self,
+        comms_controller,
+        keyfile: str = None,
+        certificate_file: str = None,
+        ca_file: str = None,
     ):
         """
         Constructor
@@ -148,13 +152,15 @@ class MdmAgent:
         self.__previous_config: Optional[str] = self.__read_config_from_file()
         self.__comms_controller: CommsController = comms_controller
         self.__interval: int = 1  # possible to update from MDM server?
-        self.__url: str = "172.18.8.39:5000"  # mDNS callback updates this one
+        self.__url: str = "defaultmdm.local:5000"  # mDNS callback updates this one
         self.__keyfile: str = keyfile
         self.__certificate_file: str = certificate_file
-        self.__ssl_context: Optional[ssl.SSLContext] = None
+        self.__ca: str = ca_file
         self.__config_version: int = 0
         self.mdm_service_available: bool = False
-        self.__device_id = "default"  # todo?
+        self.__device_id = (
+            open("/opt/identity", "r", encoding="utf-8").read().strip()
+        )  # todo?
         self.__config_type = "mesh_conf"
 
     def mdm_server_address_cb(self, address: str, status: bool) -> None:
@@ -173,53 +179,51 @@ class MdmAgent:
         :return: -
         """
         executor = ThreadPoolExecutor(1)
-        if self.__certificate_file and self.__keyfile:
-            self.__ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            self.__ssl_context.load_cert_chain(
-                certfile=self.__certificate_file, keyfile=self.__keyfile
-            )
 
         while True:
             if self.mdm_service_available:
                 await self.__loop_run_executor(executor)
             await asyncio.sleep(float(self.__interval))
 
-    def __http_get_config(self) -> requests.Response:
-        """
-        HTTP request
-        :return: HTTP response
-        """
-        try:
-            if self.__ssl_context is not None:
-                self.__comms_controller.logger.debug("SSL context is not None")
-                return requests.get(
-                    f"{self.__url}/{MdmAgent.GET_CONFIG}",
-                    params={"device_id": self.__device_id},
-                    verify=self.__ssl_context,
-                    timeout=2,
-                )
-            self.__comms_controller.logger.debug("SSL context is None")
-            return requests.get(
-                f"{self.__url}/{MdmAgent.GET_CONFIG}",
-                params={"device_id": self.__device_id},
-                timeout=2,
-            )  # todo for testing only
-        except requests.exceptions.ConnectionError as err:
-            self.__comms_controller.logger.error(
-                "HTTP request failed with error: %s", err
-            )
-            return requests.Response()
+    # def __http_get_config(self) -> requests.Response:
+    #     """
+    #     HTTP request
+    #     :return: HTTP response
+    #     """
+    #     try:
+    #         if self.__ssl_context is not None:
+    #             self.__comms_controller.logger.debug("SSL context is not None")
+    #             return requests.get(
+    #                 f"https://{self.__url}/{MdmAgent.GET_CONFIG}",
+    #                 params={"device_id": self.__device_id},
+    #                 verify=self.__ssl_context,
+    #                 timeout=2,
+    #             )
+    #         self.__comms_controller.logger.debug("SSL context is None")
+    #         return requests.get(
+    #             f"http://{self.__url}/{MdmAgent.GET_CONFIG}",
+    #             params={"device_id": self.__device_id},
+    #             timeout=2,
+    #         )  # todo for testing only
+    #     except requests.exceptions.ConnectionError as err:
+    #         self.__comms_controller.logger.error(
+    #             "HTTP request failed with error: %s", err
+    #         )
+    #         return requests.Response()
 
-    # TODO: not used yet
-    # pylint: disable=unused-argument
     def __http_get_device_config(self) -> requests.Response:
         try:
-            if self.__ssl_context is not None:
+            if (
+                glob(self.__ca)
+                and glob(self.__certificate_file)
+                and glob(self.__keyfile)
+            ):
                 self.__comms_controller.logger.debug("SSL context is not None")
                 return requests.get(
                     f"https://{self.__url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
                     params={"device_id": self.__device_id},
-                    verify=self.__ssl_context,
+                    cert=(self.__certificate_file, self.__keyfile),
+                    verify=self.__ca,
                     timeout=2,
                 )
             return requests.get(
@@ -302,7 +306,9 @@ class MdmAgent:
         """
         # This function makes a synchronous HTTP request using ThreadPoolExecutor
         https_loop = asyncio.get_event_loop()
-        response = await https_loop.run_in_executor(executor, self.__http_get_device_config)
+        response = await https_loop.run_in_executor(
+            executor, self.__http_get_device_config
+        )
         self.__comms_controller.logger.debug(
             "HTTP Request status: %s", str(response.status_code)
         )
@@ -323,6 +329,7 @@ async def main_mdm(keyfile=None, certfile=None, interval=1000):
     async def stop():
         await asyncio.sleep(1)
         asyncio.get_running_loop().stop()
+
     def signal_handler():
         cc.logger.debug("Disconnecting...")
         asyncio.create_task(stop())
@@ -343,6 +350,7 @@ async def main_mdm(keyfile=None, certfile=None, interval=1000):
         service_cb=mdm.mdm_server_address_cb,
     )
     await asyncio.gather(mdm.execute(), monitor.async_run())
+
 
 # pylint: disable=too-many-arguments, too-many-locals, too-many-statements
 async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000):
@@ -383,7 +391,6 @@ async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000):
     async def reconnected_cb():
         cc.logger.debug("Got reconnected...")
 
-
     # Create SSL context if certfile and keyfile are provided
     ssl_context = None
     if certfile and keyfile:
@@ -419,13 +426,10 @@ async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000):
 
         command = json.loads(data)["cmd"]
 
-
         if subject == f"comms.settings.{identity}":
             ret, info = cc.settings.handle_mesh_settings(data)
         elif subject == f"comms.channel_change.{identity}":
-            ret, info, _index = cc.settings.handle_mesh_settings_channel_change(
-                data
-            )
+            ret, info, _index = cc.settings.handle_mesh_settings_channel_change(data)
             if ret == "TRIGGER":
                 cmd = json.dumps(
                     {"api_version": 1, "cmd": "APPLY", "radio_index": f"{_index}"}
@@ -458,10 +462,7 @@ async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000):
         cc.logger.debug("Sending response: %s", str(response)[:1000])
         await message.respond(json.dumps(response).encode("utf-8"))
 
-
-    await nats_client.subscribe(
-        f"comms.settings.{identity}", cb=fmo_message_handler
-    )
+    await nats_client.subscribe(f"comms.settings.{identity}", cb=fmo_message_handler)
     await nats_client.subscribe(
         f"comms.channel_change.{identity}", cb=fmo_message_handler
     )
@@ -489,14 +490,15 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--port", help="Server port", required=False)
     parser.add_argument("-k", "--keyfile", help="TLS keyfile", required=False)
     parser.add_argument("-c", "--certfile", help="TLS certfile", required=False)
-    parser.add_argument("-a", "--agent", help="mdm or fmo", required=False, default="fmo")
+    parser.add_argument("-r", "--ca", help="ca certfile", required=False)
+    parser.add_argument(
+        "-a", "--agent", help="mdm or fmo", required=False, default="fmo"
+    )
     args = parser.parse_args()
 
     loop = asyncio.new_event_loop()
     if args.agent == "mdm":
-        loop.run_until_complete(
-            main_mdm(args.keyfile, args.certfile)
-        )
+        loop.run_until_complete(main_mdm(args.keyfile, args.certfile, args.ca))
     else:
         loop.run_until_complete(
             main_fmo(args.server, args.port, args.keyfile, args.certfile)
