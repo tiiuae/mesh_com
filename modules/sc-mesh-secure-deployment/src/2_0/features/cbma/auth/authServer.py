@@ -127,17 +127,3 @@ class AuthServer:
             serverSocket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
             scope_id = socket.if_nametoindex(self.interface)
             serverSocket.bind((self.ipAddress, int(self.port), 0, scope_id))
-
-if __name__ == "__main__":
-    # IP address and the port number of the server
-    ipAddress = "127.0.0.1"
-    port = 15001
-    CERT_PATH = '../../../certificates'  # Change this to the actual path of your certificates
-
-    auth_server = AuthServer(ipAddress, port, CERT_PATH)
-    auth_server.start_server()
-
-    # Access the authentication result for a specific client
-    client_address = ("127.0.0.1", 12345)  # Replace with the actual client address you want to check
-    auth_result = auth_server.get_client_auth_result(client_address)
-    print(f"Authentication result for {client_address}: {auth_result}")
