@@ -113,16 +113,3 @@ class AuthClient:
         # # Safe to proceed with the communication, even if the certificate is not authenticated
         # msgReceived = secureClientSocket.recv(1024)
         # logger.info(f"Secure communication received from server: {msgReceived.decode()}")
-
-
-if __name__ == "__main__":
-    # IP address and the port number of the server
-    sslServerIP = "127.0.0.1"
-    sslServerPort = 15001
-    CERT_PATH = '../../../certificates'  # Change this to the actual path of your certificates
-
-    auth_client = AuthClient(sslServerIP, sslServerPort, CERT_PATH)
-    auth_client.establish_connection()
-
-
-
