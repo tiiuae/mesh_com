@@ -80,7 +80,7 @@ def main(interface):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
         client_socket.connect((server_ip, CUSTOM_PORT))
         message = f"CSR uploaded {csr_filename}".encode()
-        client_socket.send(message)
+        client_socket.sendall(message)
 
         # This will allow the server some time to process and send the files. You can adjust the sleep time if needed.
         time.sleep(10)
