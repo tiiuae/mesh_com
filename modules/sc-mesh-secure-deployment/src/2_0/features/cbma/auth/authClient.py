@@ -32,13 +32,14 @@ class AuthClient:
 
     def establish_connection(self):
         # Create an SSL context
-        context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH,
+                                             cafile=glob.glob(self.ca)[0])
+        context.minimum_version = ssl.TLSVersion.TLSv1_3
         context.verify_mode = ssl.CERT_REQUIRED
 
         # Uncomment to enable Certificate Revocation List (CRL) check
         # context.verify_flags = ssl.VERIFY_CRL_CHECK_LEAF
 
-        context.load_verify_locations(glob.glob(self.ca)[0])
         context.load_cert_chain(
             certfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.crt")[0],
             keyfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.key")[0],
@@ -90,7 +91,7 @@ class AuthClient:
                 else:
                     secureClientSocket.connect((self.sslServerIP, self.sslServerPort))
                 break  # break out of loop if connection is successful
-            except ConnectionRefusedError:
+            except:
                 retries += 1
                 if retries < MAX_RETRIES:
                     wait_time = random.uniform(MIN_WAIT_TIME, MAX_WAIT_TIME)
@@ -112,16 +113,3 @@ class AuthClient:
         # # Safe to proceed with the communication, even if the certificate is not authenticated
         # msgReceived = secureClientSocket.recv(1024)
         # logger.info(f"Secure communication received from server: {msgReceived.decode()}")
-
-
-if __name__ == "__main__":
-    # IP address and the port number of the server
-    sslServerIP = "127.0.0.1"
-    sslServerPort = 15001
-    CERT_PATH = '../../../certificates'  # Change this to the actual path of your certificates
-
-    auth_client = AuthClient(sslServerIP, sslServerPort, CERT_PATH)
-    auth_client.establish_connection()
-
-
-

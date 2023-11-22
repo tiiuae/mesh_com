@@ -168,6 +168,7 @@ class mutAuth():
             add_interface_to_batman(interface_to_add=self.macsec_obj.get_macsec_interface_name(client_mac), batman_interface=self.batman_interface)
         elif self.level == "upper":
             add_interface_to_bridge(interface_to_add=self.macsec_obj.get_macsec_interface_name(client_mac), bridge_interface=self.bridge_interface)
+            setup_ebtables_macsec(interface=self.macsec_obj.get_macsec_interface_name(client_mac), mac=client_mac)
 
     def setup_batman(self):
         # Wait till a macsec interface is setup and added to batman before setting up batman interface

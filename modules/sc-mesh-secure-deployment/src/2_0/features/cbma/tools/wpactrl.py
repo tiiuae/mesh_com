@@ -24,7 +24,7 @@ class WpaCtrl:
         self.socket.close()
 
     def request(self, cmd, msg_cb=None, reply_len=WPA_CTRL_MAX_REPLY_LEN):
-        self.socket.send(cmd)
+        self.socket.sendall(cmd)
 
         while True:
             rlist, _, _ = select.select([self.socket], [], [], 2)
