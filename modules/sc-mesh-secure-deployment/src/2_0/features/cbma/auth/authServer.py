@@ -119,5 +119,5 @@ class AuthServer:
             serverSocket.bind((self.ipAddress, int(self.port), 0, scope_id))
         if hasattr(self, "serverSocket"):
             self.serverSocket.close()
-            for sock in auth_server.active_sockets.values():
+            for sock in self.active_sockets.values():
                 sock.close()
