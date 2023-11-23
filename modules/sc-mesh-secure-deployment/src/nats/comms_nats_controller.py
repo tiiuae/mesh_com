@@ -9,11 +9,13 @@ import logging
 import threading
 import json
 from typing import Optional
+import OpenSSL.crypto
+from datetime import datetime
+import subprocess
 
 from nats.aio.client import Client as NATS
 from concurrent.futures import ThreadPoolExecutor
 import requests
-from glob import glob
 
 from src import comms_settings
 from src import comms_command
@@ -293,6 +295,28 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None):
     if keyfile is None or certfile is None or ca_file is None:
         cc.logger.debug("MDM: Closing as no certificates provided")
         return
+
+    # if system clock is reset, set it to the certificate creation time
+    if datetime.now() < datetime(2023, 9, 1):
+        # Read the certificate file
+        with open(certfile, "rb") as file:
+            cert_data = file.read()
+
+        # Load the certificate
+        cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert_data)
+
+        # Get the 'notBefore' time
+        creation_time = cert.get_notBefore()
+
+        # The time is in bytes, so decode it to a string
+        creation_time = creation_time.decode("utf-8")
+
+        new_time_str = datetime.strptime(creation_time, "%Y%m%d%H%M%SZ")
+        # Format the datetime object for the 'date' command
+        # Format: MMDDhhmmYYYY.ss
+        time_formatted = new_time_str.strftime("%Y-%m-%d %H:%M:%S")
+        subprocess.run(["date", "-s", time_formatted], check=True)
+        subprocess.run(["hwclock", "--systohc"], check=True)
 
     async def stop():
         await asyncio.sleep(1)
