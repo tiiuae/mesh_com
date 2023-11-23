@@ -16,9 +16,9 @@ KEY_FILE="/etc/ssl/private/comms_auth_private_key.pem"
 CERT_FILE="/etc/ssl/certs/comms_auth_cert.pem"
 
 if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
-  ARGS="-k $KEY_FILE -c $CERT_FILE --agent fmo"
+  ARGS="-s 0.0.0.0 -p 4222 -k $KEY_FILE -c $CERT_FILE --agent fmo"
 else
-  ARGS="--agent fmo"
+  ARGS="-s 0.0.0.0 -p 4222 --agent fmo"
 fi
 start() {
     echo "$ARGS"

@@ -291,7 +291,8 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None):
     cc = CommsController()
 
     if keyfile is None or certfile is None or ca_file is None:
-        cc.logger.debug("Closing as no certificates provided")
+        cc.logger.debug("MDM: Closing as no certificates provided")
+        return
 
     async def stop():
         await asyncio.sleep(1)
