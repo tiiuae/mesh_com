@@ -73,6 +73,9 @@ else
   echo "starting comms services"
   /opt/S90comms_controller start
 
+  echo "starting mdm agent for testing purposes"
+  /opt/S90mdm_agent start
+
   # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"
 fi
