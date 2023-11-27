@@ -13,16 +13,26 @@ if [ "$MSVERSION" != "nats" ]; then
   fi
 else
 
+  #######################################
+  # BC needs to be on Place before this #
+  #######################################
+
+  # TODO: Identity from BC or HSM?
   if [ ! -f "/opt/identity" ]; then
       echo "generates identity id"
       generate_identity_id
   fi
+
+  #######################################
+  # Initialise default radios and IF    #
+  #######################################
 
   # Do not continue in case halow init has not finished
   while ps aux | grep [i]nit_halow > /dev/null; do
       sleep 1
   done
 
+  # TODO: remove as SLAAC and CBMA?
   echo "set bridge ip"
   generate_lan_bridge_ip
 
@@ -45,6 +55,7 @@ else
     /opt/S90APoint start id2
   fi
 
+  # TODO: remove as SLAAC and CBMA?
   echo "wait for bridge to be up..."
   while ! (ifconfig | grep -e "$bridge_ip") > /dev/null; do
     sleep 1
@@ -52,29 +63,40 @@ else
 
   sleep 3
 
-  /opt/S90Alfred start
+  #######################################
+  # Enable FMO stuff                    #
+  #######################################
+  # TODO: behind FMO flags
+  # if [ "$FMO" = "true" ]; then
+    echo "starting Alfred"
+    /opt/S90Alfred start
 
-  echo "starting provisioning agent"
-  # blocks execution until provisioning is done or timeout (30s)
-  # IP address and port are passed as arguments and hardcoded. TODO: mDNS
-  python /opt/nats/src/comms_provisioning.py -t 30 -s 192.168.1.254 -p 8080 -o /opt > /opt/comms_provisioning.log 2>&1
+    echo "starting provisioning agent"
+    # blocks execution until provisioning is done or timeout (30s)
+    # IP address and port are passed as arguments and hardcoded. TODO: mDNS
+    python /opt/nats/src/comms_provisioning.py -t 30 -s 192.168.1.254 -p 8080 -o /opt > /opt/comms_provisioning.log 2>&1
 
-  echo "Start nats server and client nodes"
-  /opt/S90nats_discovery start
+    echo "Start nats server and client nodes"
+    /opt/S90nats_discovery start
 
-  echo "wait for nats.conf to be created"
-  until [ -f /var/run/nats.conf ]; do
-    sleep 1
-  done
+    echo "wait for nats.conf to be created"
+    until [ -f /var/run/nats.conf ]; do
+      sleep 1
+    done
 
-  echo "starting nats server"
-  /opt/S90nats_server start
+    echo "starting nats server"
+    /opt/S90nats_server start
 
-  echo "starting comms services"
-  /opt/S90comms_controller start
+    echo "starting comms services"
+    /opt/S90comms_controller start
+  # fi # FMO
 
-  echo "starting mdm agent for testing purposes"
-  /opt/S90mdm_agent start
+  #######################################
+  # Enable MDM stuff                    #
+  #######################################
+  # TODO: not yet enabled
+  # echo "starting mdm agent for testing purposes"
+  # /opt/S90mdm_agent start
 
   # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"
