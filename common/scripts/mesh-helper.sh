@@ -88,3 +88,12 @@ source_configuration() {
       exit 1
   fi
 }
+
+# Function to extract value from MS2.0 features YAML file
+YAML_FILE="/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features.yaml"
+
+extract_features_value() {
+    local key=$1    # key name searched
+    local file=$2
+    grep "^${key}:" "$file" | sed "s/^${key}: //"
+}
