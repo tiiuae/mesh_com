@@ -141,6 +141,9 @@ class MdmAgent:
     GET_CONFIG: str = "public/config"
     GET_DEVICE_CONFIG: str = "public/get_device_config"  # + config_type
 
+    OK_POLLING_TIME_SECONDS: int = 600
+    FAIL_POLLING_TIME_SECONDS: int = 1
+
     def __init__(
         self,
         comms_controller,
@@ -153,7 +156,7 @@ class MdmAgent:
         """
         self.__previous_config: Optional[str] = self.__read_config_from_file()
         self.__comms_controller: CommsController = comms_controller
-        self.__interval: int = 1  # possible to update from MDM server?
+        self.__interval: int = self.FAIL_POLLING_TIME_SECONDS  # possible to update from MDM server?
         self.__url: str = "defaultmdm.local:5000"  # mDNS callback updates this one
         self.__keyfile: str = keyfile
         self.__certificate_file: str = certificate_file
@@ -191,8 +194,13 @@ class MdmAgent:
 
     def __http_get_device_config(self) -> requests.Response:
         try:
+            # mDNS discovery callback updates the url and can be None
+            __https_url = self.__url
+            if "None" in __https_url:
+                return requests.Response()  # empty response
+
             return requests.get(
-                f"https://{self.__url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
+                f"https://{__https_url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
                 params={"device_id": self.__device_id},
                 cert=(self.__certificate_file, self.__keyfile),
                 verify=self.__ca,
@@ -240,7 +248,7 @@ class MdmAgent:
                 )
                 self.__comms_controller.logger.debug("ret: %s info: %s", ret, info)
             self.__config_version = int(data["version"])
-            self.__interval = 10
+            self.__interval = self.OK_POLLING_TIME_SECONDS
             self.__write_config_to_file(response)
 
     @staticmethod
@@ -281,9 +289,12 @@ class MdmAgent:
         if (
             response.status_code == 200
             and self.__previous_config != response.text.strip()
-            and response.text.strip() != ""
         ):
             self.__handle_received_config(response)
+        elif response.status_code == 200 and self.__previous_config == response.text.strip():
+            self.__interval = self.OK_POLLING_TIME_SECONDS
+        elif response.text.strip() == "" or response.status_code != 200:
+            self.__interval = self.FAIL_POLLING_TIME_SECONDS
 
 
 async def main_mdm(keyfile=None, certfile=None, ca_file=None):
