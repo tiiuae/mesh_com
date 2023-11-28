@@ -11,7 +11,7 @@ class Options:
         self.channels5: List[int] = [36, 40, 44, 48, 149, 153, 157, 161]
         self.osf_interface: str = 'tun0'
         self.scan_interface: str = 'wlp1s0'
-        self.debug: bool = True
+        self.debug: bool = False
         self.min_rows: int = 16
         self.periodic_scan: float = 60
         self.periodic_recovery_switch: float = 20
@@ -21,4 +21,3 @@ class Options:
         # Path to JSON file containing mean and std for spectral scan data normalization
         self.col_mean_std_path: str = '/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/jamming/normalization_data/cols_mean_std.json'
         self.traced_model_path: str = "/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/jamming/my_traced_model.pt"
-        self.nats_scripts_path: str = '/opt/mesh_com/modules/sc-mesh-secure-deployment/src/nats/scripts'

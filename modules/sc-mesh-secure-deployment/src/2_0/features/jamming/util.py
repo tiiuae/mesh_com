@@ -1,33 +1,40 @@
-import sys
+import os
 import pathlib
 import random
 import re
+import ssl
 import subprocess
 import asyncio
 import json
-import time
-from enum import Enum
-from typing import Tuple
-
 import netifaces
 import numpy as np
 import pandas as pd
+import nats
+from nats.aio.client import Client
+from enum import Enum
+from typing import Tuple
+
+import nats_client
+import nats_config
 from options import Options
 from log_config import logger
-
 args = Options()
 
-sys.path.append(args.nats_scripts_path)
-import client
-import config
-
+# Channel to frequency and frequency to channel mapping
 CH_TO_FREQ = {1: 2412, 2: 2417, 3: 2422, 4: 2427, 5: 2432, 6: 2437, 7: 2442, 8: 2447, 9: 2452, 10: 2457, 11: 2462,
               36: 5180, 40: 5200, 44: 5220, 48: 5240, 52: 5260, 56: 5280, 60: 5300, 64: 5320, 100: 5500, 104: 5520,
               108: 5540, 112: 5560, 116: 5580, 120: 5600, 124: 5620, 128: 5640, 132: 5660, 136: 5680, 140: 5700,
               149: 5745, 153: 5765, 157: 5785, 161: 5805}
+
 FREQ_TO_CH = {v: k for k, v in CH_TO_FREQ.items()}
 
+# Ath10k scan features
 FEATS_ATH10K = ['max_magnitude', 'total_gain_db', 'base_pwr_db', 'rssi', 'relpwr_db', 'avgpwr_db', 'snr', 'cnr', 'pn', 'ssi', 'pd', 'sinr', 'sir', 'mr', 'pr']
+
+# Certificates
+client_cert = "/etc/ssl/certs/comms_auth_cert.pem"
+key = "/etc/ssl/private/comms_auth_private_key.pem"
+ca_cert = "/etc/ssl/certs/root-ca.cert.pem"
 
 
 class Band(Enum):
@@ -120,13 +127,13 @@ async def switch_frequency(frequency: str) -> None:
     logger.info(f"Moving to {frequency} MHz ...")
 
     # Connect to NATS
-    nc = await client.connect_nats()
+    nc = await nats_client.connect_nats()
 
     cmd_dict = {"frequency": frequency, "radio_index": args.radio_index}
     cmd = json.dumps(cmd_dict)
 
     try:
-        await nc.request(f"comms.channel_change.{config.MODULE_IDENTITY}", cmd.encode(), timeout=10)
+        await nc.request(f"comms.channel_change.{nats_config.MODULE_IDENTITY}", cmd.encode(), timeout=10)
         logger.info(f"Published to comms.channel_change: {cmd}")
         await asyncio.sleep(15)
     except Exception as e:
