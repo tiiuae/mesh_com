@@ -1,3 +1,4 @@
+import json
 import subprocess
 import threading
 
@@ -9,6 +10,7 @@ import os
 import asyncio
 import numpy as np
 import util
+import nats_client
 import options
 from options import Options
 from log_config import logger
@@ -172,38 +174,33 @@ def start_jamming_scripts(args, osf_ipv6_address) -> None:
         raise Exception(e)
 
 
-def get_device_identity(args) -> None:
+async def get_device_identity() -> None:
     """
     Request device identity
     """
-    # Store the current working directory
-    current_directory = os.getcwd()
-
     try:
-        # Change the directory to the scripts_path
-        os.chdir(args.nats_scripts_path)
+        # Connect to NATS!
+        nc = await nats_client.connect_nats()
 
-        # Define the commands to execute
-        command = ["python", "_cli_command_get_identity.py"]
+        cmd_dict = {"api_version": 1, "cmd": "GET_IDENTITY"}
+        cmd = json.dumps(cmd_dict)
+        rep = await nc.request("comms.identity",
+                               cmd.encode(),
+                               timeout=2)
+        logger.error(rep.data)
 
-        # Execute the command
-        max_retries = 3
+        parameters = json.loads(rep.data.decode())
+        print(json.dumps(parameters, indent=2))
 
-        for retry_count in range(max_retries):
-            try:
-                subprocess.run(command, check=True)
-                break  # Break if successful
-            except subprocess.CalledProcessError as e:
-                if retry_count < max_retries - 1:
-                    logger.error(f"Retrying _cli_command_get_identity.py...")
-                    time.sleep(2)
-                else:
-                    logger.error(f"Error executing command {command}: {e}")
-                    exit(0)
-
-    finally:
-        # Change back to the original directory after executing the commands
-        os.chdir(current_directory)
+        if "identity" in parameters["data"]:
+            with open("identity.py", "w") as f:
+                f.write(f"MODULE_IDENTITY=\"{parameters['data']['identity']}\"\n")
+        else:
+            logger.error("No identity received!")
+        await nc.close()
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error get_device_identity")
+        time.sleep(2)
 
 
 def validate_configuration(args) -> bool:
@@ -260,8 +257,8 @@ async def main():
 
     # Get device identity
     logger.info("1. Get device identity")
-    get_device_identity(args)
-    await asyncio.sleep(3)
+    await get_device_identity()
+    await get_device_identity()
 
     # Switch to starting frequency
     logger.info("2. Switch to starting frequency")
