@@ -8,13 +8,16 @@ import argparse
 import logging
 import threading
 import json
+import re
+import base64
 from typing import Optional
-import OpenSSL.crypto
 from datetime import datetime
 import subprocess
-
-from nats.aio.client import Client as NATS
 from concurrent.futures import ThreadPoolExecutor
+import OpenSSL.crypto
+
+
+from nats.aio.client import Client as nats
 import requests
 
 from src import comms_settings
@@ -39,8 +42,8 @@ class MeshTelemetry:
     """
 
     def __init__(self, loop_interval: int = 1000, logger: logging.Logger = None):
-        self.t1 = None
-        self.t2 = None
+        self.thread_visual = None
+        self.thread_stats = None
         # milliseconds to seconds
         self.interval = float(loop_interval / 1000.0)
         self.logger = logger
@@ -65,10 +68,10 @@ class MeshTelemetry:
 
         :return: -
         """
-        self.t1 = threading.Thread(target=self.batman_visual.run)  # create thread
-        self.t1.start()  # start thread
-        self.t2 = threading.Thread(target=self.batman.run)  # create thread
-        self.t2.start()  # start thread
+        self.thread_visual = threading.Thread(target=self.batman_visual.run)  # create thread
+        self.thread_visual.start()  # start thread
+        self.thread_stats = threading.Thread(target=self.batman.run)  # create thread
+        self.thread_stats.start()  # start thread
         self.visualisation_enabled = True  # publisher enabled
 
     def stop(self):
@@ -80,10 +83,10 @@ class MeshTelemetry:
         self.visualisation_enabled = False  # publisher disabled
         if self.batman_visual.thread_running:
             self.batman_visual.thread_running = False  # thread loop disabled
-            self.t1.join()  # wait for thread to finish
+            self.thread_visual.join()  # wait for thread to finish
         if self.batman.thread_running:
             self.batman.thread_running = False  # thread loop disabled
-            self.t2.join()  # wait for thread to finish
+            self.thread_stats.join()  # wait for thread to finish
 
 
 # pylint: disable=too-many-instance-attributes
@@ -143,6 +146,7 @@ class MdmAgent:
 
     OK_POLLING_TIME_SECONDS: int = 600
     FAIL_POLLING_TIME_SECONDS: int = 1
+    YAML_FILE: str = "/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features.yaml"
 
     def __init__(
         self,
@@ -156,7 +160,9 @@ class MdmAgent:
         """
         self.__previous_config: Optional[str] = self.__read_config_from_file()
         self.__comms_controller: CommsController = comms_controller
-        self.__interval: int = self.FAIL_POLLING_TIME_SECONDS  # possible to update from MDM server?
+        self.__interval: int = (
+            self.FAIL_POLLING_TIME_SECONDS
+        )  # possible to update from MDM server?
         self.__url: str = "defaultmdm.local:5000"  # mDNS callback updates this one
         self.__keyfile: str = keyfile
         self.__certificate_file: str = certificate_file
@@ -193,6 +199,10 @@ class MdmAgent:
             await asyncio.sleep(float(self.__interval))
 
     def __http_get_device_config(self) -> requests.Response:
+        """
+        HTTP get device config
+        :return: HTTP response
+        """
         try:
             # mDNS discovery callback updates the url and can be None
             __https_url = self.__url
@@ -212,25 +222,39 @@ class MdmAgent:
             )
             return requests.Response()
 
-    def __handle_received_config(self, response: requests.Response) -> None:
+    @staticmethod
+    def __is_base64(string_to_check: str) -> bool:
         """
-        Handle received config
-        :param response: HTTP response
-        :return: -
+        Check if string is base64 encoded
+        :param string_to_check: string to check
+        :return: True if base64 encoded
         """
+        try:
+            # Check if the string is a valid base64 format
+            if not re.match("^[A-Za-z0-9+/]+[=]{0,2}$", string_to_check):
+                return False
 
-        self.__comms_controller.logger.debug(
-            f"HTTP Request Response: {response.text.strip()} {str(response.status_code).strip()}"
-        )
-        self.__previous_config = response.text.strip()
+            # Attempt to decode
+            _ = base64.b64decode(string_to_check, validate=True)
+            return True
+        except (re.error, __import__("binascii").Error):
+            return False
 
-        data = json.loads(response.text)
+    def __action_radio_configuration(self, response: requests.Response) -> str:
+        """
+        Take radio configuration into use
+        :param response: https response
+        :return: status
+        """
+        config = json.loads(response.text)
+
         ret, info = self.__comms_controller.settings.handle_mesh_settings(
-            json.dumps(data["payload"])
+            json.dumps(config["payload"])
         )
+
         self.__comms_controller.logger.debug("ret: %s info: %s", ret, info)
         if ret == "OK":
-            for radio in data["payload"]["radios"]:
+            for radio in config["payload"]["radios"]:
                 # Extract the radio_index
                 index_number = radio["radio_index"]
 
@@ -247,9 +271,100 @@ class MdmAgent:
                     cmd, self.__comms_controller
                 )
                 self.__comms_controller.logger.debug("ret: %s info: %s", ret, info)
-            self.__config_version = int(data["version"])
-            self.__interval = self.OK_POLLING_TIME_SECONDS
-            self.__write_config_to_file(response)
+
+            if ret == "OK":
+                self.__config_version = int(config["version"])
+                self.__interval = self.OK_POLLING_TIME_SECONDS
+                self.__write_config_to_file(response)  # TODO: remove certs from config
+        else:
+            self.__interval = self.FAIL_POLLING_TIME_SECONDS
+
+        return ret
+
+    def __action_feature_yaml(self, config: dict) -> str:
+        """
+        Take feature.yaml into use
+        :param config: config dict
+        :return: status
+        """
+        # check if features field exists
+
+        try:
+            if config["features"] is not None:
+                yaml = config["features"]
+                # check if features field is base64 encoded
+                if self.__is_base64(yaml):
+                    # decode base64
+                    yaml = base64.b64decode(config["features"]).decode("utf-8")
+
+                with open(
+                    self.YAML_FILE,
+                    "w",
+                    encoding="utf-8",
+                ) as f:
+                    f.write(yaml)
+
+                self.__interval = self.OK_POLLING_TIME_SECONDS
+                self.__comms_controller.logger.debug("No features field in config")
+                return "OK"
+
+            self.__comms_controller.logger.error("No features field in config")
+            self.__interval = self.FAIL_POLLING_TIME_SECONDS
+        except KeyError:
+            self.__comms_controller.logger.error("KeyError features field in config")
+            self.__interval = self.FAIL_POLLING_TIME_SECONDS
+
+        return "FAIL"
+
+    def __action_cert_keys(self, config: dict) -> str:
+        """
+        Take cert/keys into use
+        :param config: config dict
+        :return: status
+        """
+        try:
+            if config["certificates"] is not None:
+                self.__comms_controller.logger.debug("certs field in config")
+                self.__comms_controller.logger.debug(
+                    "__action_cert_keys: not implemented"
+                )
+                return "OK"
+        except KeyError:
+            self.__comms_controller.logger.error(
+                "KeyError certificates field in config"
+            )
+
+        self.__interval = self.FAIL_POLLING_TIME_SECONDS
+        return "FAIL"
+
+    def __handle_received_config(self, response: requests.Response) -> None:
+        """
+        Handle received config
+        :param response: HTTP response
+        :return: -
+        """
+
+        self.__comms_controller.logger.debug(
+            f"HTTP Request Response: {response.text.strip()} {str(response.status_code).strip()}"
+        )
+        self.__previous_config = response.text.strip()
+
+        data = json.loads(response.text)
+
+        # radio configuration actions0
+        ret = self.__action_radio_configuration(response)
+        if ret == "FAIL":
+            return
+
+        # feature.yaml actions
+        ret = self.__action_feature_yaml(data)
+        if ret == "FAIL":
+            return
+
+        # cert/keys actions
+        ret = self.__action_cert_keys(data)
+        if ret == "FAIL":
+            return
 
     @staticmethod
     def __read_config_from_file() -> Optional[str]:
@@ -291,15 +406,22 @@ class MdmAgent:
             and self.__previous_config != response.text.strip()
         ):
             self.__handle_received_config(response)
-        elif response.status_code == 200 and self.__previous_config == response.text.strip():
+        elif (
+            response.status_code == 200
+            and self.__previous_config == response.text.strip()
+        ):
             self.__interval = self.OK_POLLING_TIME_SECONDS
         elif response.text.strip() == "" or response.status_code != 200:
             self.__interval = self.FAIL_POLLING_TIME_SECONDS
 
 
-async def main_mdm(keyfile=None, certfile=None, ca_file=None):
+async def main_mdm(keyfile=None, certfile=None, ca_file=None) -> None:
     """
     main
+    param: keyfile: keyfile
+    param: certfile: certfile
+    param: ca_file: ca_file
+    return: -
     """
     cc = CommsController()
 
@@ -356,13 +478,19 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None):
 
 
 # pylint: disable=too-many-arguments, too-many-locals, too-many-statements
-async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000):
+async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000) -> None:
     """
-    main
+    main fmo
+    param: server: server
+    param: port: port
+    param: keyfile: keyfile
+    param: certfile: certfile
+    param: interval: interval
+    return: -
     """
     cc = CommsController(interval)
 
-    nats_client = NATS()
+    nats_client = nats()
     status, _, identity_dict = cc.command.get_identity()
 
     if status == "OK":
@@ -426,8 +554,6 @@ async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000):
         data = message.data.decode()
         cc.logger.debug("Received a message on '%s': %s", subject, data)
         ret, info, resp = "FAIL", "Not supported subject", ""
-
-        command = json.loads(data)["cmd"]
 
         if subject == f"comms.settings.{identity}":
             ret, info = cc.settings.handle_mesh_settings(data)
@@ -502,9 +628,12 @@ if __name__ == "__main__":
 
     # test certificates location
     # if args.ca is None or args.certfile is None or args.keyfile is None:
-    #     args.ca = "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/ca.crt"
-    #     args.certfile = "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/issued/csl1.local.crt"
-    #     args.keyfile = "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/private/csl1.local.key"
+    #     args.ca = \
+    #         "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/ca.crt"
+    #     args.certfile = \
+    #         "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/issued/csl1.local.crt"
+    #     args.keyfile = \
+    #         "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/private/csl1.local.key"
 
     loop = asyncio.new_event_loop()
     if args.agent == "mdm":
