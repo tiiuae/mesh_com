@@ -5,3 +5,6 @@ RSS: false
 IDS: false
 jamming: false
 
+# will enable/disable all NATS features + FMO, dependency: jamming
+FMO: false
+

@@ -92,8 +92,17 @@ source_configuration() {
 # Function to extract value from MS2.0 features YAML file
 YAML_FILE="/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features.yaml"
 
+# Function to extract a value from the YAML file
 extract_features_value() {
     local key=$1    # key name searched
-    local file=$2
-    grep "^${key}:" "$file" | sed "s/^${key}: //"
+    local file=$2   # file name to search from
+    # shellcheck disable=SC2155
+    local value=$(grep "^${key}:" "$file" | sed "s/^${key}: //")
+
+    # Check if the value is found
+    if [ -z "$value" ]; then
+        echo "false"  # Return false if the key is not found
+    else
+        echo "$value"
+    fi
 }

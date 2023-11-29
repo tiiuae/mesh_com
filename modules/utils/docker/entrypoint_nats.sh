@@ -14,7 +14,7 @@ if [ "$MSVERSION" != "nats" ]; then
 else
 
   #######################################
-  # BC needs to be on Place before this #
+  # BC needs to be on place before this #
   #######################################
 
   # TODO: Identity from BC or HSM?
@@ -32,28 +32,25 @@ else
       sleep 1
   done
 
-  # TODO: remove as SLAAC and CBMA?
+  # TODO: remove as SLAAC?
   echo "set bridge ip"
   generate_lan_bridge_ip
 
-  echo "starting 11s mesh service"
-  # todo for loop range 0..3
-  /opt/S9011sNatsMesh start id0
-  if [ -f "/opt/1_mesh.conf" ]; then
-    /opt/S9011sNatsMesh start id1
-  fi
-  if [ -f "/opt/2_mesh.conf" ]; then
-    /opt/S9011sNatsMesh start id2
-  fi
+  echo "Starting 11s mesh service"
+  # Loop for mesh service
+  for i in {0..2}; do
+    if [ "$i" -eq 0 ] || [ -f "/opt/${i}_mesh.conf" ]; then
+      /opt/S9011sNatsMesh start id"$i"
+    fi
+  done
 
-  echo "starting AP service"
-  /opt/S90APoint start id0
-  if [ -f "/opt/1_mesh.conf" ]; then
-    /opt/S90APoint start id1
-  fi
-  if [ -f "/opt/2_mesh.conf" ]; then
-    /opt/S90APoint start id2
-  fi
+  echo "Starting AP service"
+  # Loop for AP service
+  for i in {0..2}; do
+    if [ "$i" -eq 0 ] || [ -f "/opt/${i}_mesh.conf" ]; then
+      /opt/S90APoint start id"$i"
+    fi
+  done
 
   # TODO: remove as SLAAC and CBMA?
   echo "wait for bridge to be up..."
@@ -66,8 +63,9 @@ else
   #######################################
   # Enable FMO stuff                    #
   #######################################
-  # TODO: behind FMO flags
-  # if [ "$FMO" = "true" ]; then
+  # FMO can be configured in the features.yaml file
+  #FMO=$(extract_features_value "FMO" $YAML_FILE)
+  #if [ "$FMO" = "true" ]; then
     echo "starting Alfred"
     /opt/S90Alfred start
 
@@ -77,6 +75,7 @@ else
     python /opt/nats/src/comms_provisioning.py -t 30 -s 192.168.1.254 -p 8080 -o /opt > /opt/comms_provisioning.log 2>&1
 
     echo "Start nats server and client nodes"
+    # todo: mDNS based
     /opt/S90nats_discovery start
 
     echo "wait for nats.conf to be created"
@@ -89,14 +88,14 @@ else
 
     echo "starting comms services"
     /opt/S90comms_controller start
-  # fi # FMO
+  #fi # FMO
 
   #######################################
   # Enable MDM stuff                    #
   #######################################
-  # TODO: not yet enabled
-  # echo "starting mdm agent for testing purposes"
-  # /opt/S90mdm_agent start
+  # TODO start mdm agent earlier?
+  echo "starting mdm agent for testing purposes"
+  /opt/S90mdm_agent start
 
   # Start jamming service
   JAMMING=$(extract_features_value "jamming" $YAML_FILE)
