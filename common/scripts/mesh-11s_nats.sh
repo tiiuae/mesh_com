@@ -167,8 +167,8 @@ slaac() {
     echo "  SLAAC for '$_slaac_interface'"
     /opt/slaac.sh $_slaac_interface
     echo "  SLAAC for '$_slaac_interface' DONE"
-  echo "SLAAC for '$_slaac_interfaces' DONE"
   done
+  echo "SLAAC for '$_slaac_interfaces' DONE"
 }
 
 mode_execute() {
