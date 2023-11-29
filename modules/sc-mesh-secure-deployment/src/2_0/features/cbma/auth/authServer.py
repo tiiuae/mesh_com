@@ -15,7 +15,7 @@ logger = logger_instance.get_logger()
 
 
 class AuthServer:
-    CLIENT_TIMEOUT = 30
+    CLIENT_TIMEOUT = 60
 
     def __init__(self, interface, ip_address, port, cert_path, ca_path, mua):
         threading.Thread.__init__(self)
