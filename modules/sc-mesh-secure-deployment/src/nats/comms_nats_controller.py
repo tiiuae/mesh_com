@@ -144,6 +144,7 @@ class MdmAgent:
 
     GET_CONFIG: str = "public/config"
     GET_DEVICE_CONFIG: str = "public/get_device_config"  # + config_type
+    PUT_DEVICE_CONFIG: str = "public/put_device_config"  # + config_type
 
     OK_POLLING_TIME_SECONDS: int = 600
     FAIL_POLLING_TIME_SECONDS: int = 1
@@ -177,10 +178,12 @@ class MdmAgent:
             service_name="MDM Service",
             service_type="_mdm._tcp.local.",
             service_cb=self.mdm_server_address_cb,
+            interface=self.__if_to_monitor
         )
         self.interface_monitor = comms_if_monitor.CommsInterfaceMonitor(
             self.interface_monitor_cb
         )
+        self.__certs_uploaded = False  # Should be true if CBMA certs exist
 
         try:
             with open("/opt/identity", "r", encoding="utf-8") as f:  # todo
@@ -222,7 +225,7 @@ class MdmAgent:
         Starts service monitor thread
         :param: -
         :return: -
-        """        
+        """
         if not self.service_monitor.running:
             self.__comms_controller.logger.debug(
                 "Start service monitor thread"
@@ -237,7 +240,7 @@ class MdmAgent:
         Stops service monitor thread
         :param: -
         :return: -
-        """           
+        """
         if self.service_monitor.running:
             self.__comms_controller.logger.debug(
                 "Stop service monitor thread"
@@ -261,6 +264,10 @@ class MdmAgent:
         while True:
             if self.mdm_service_available:
                 await self.__loop_run_executor(executor)
+            # if not self.__certs_uploaded:
+            #    resp = self.upload_certificate_bundle()
+            #    if resp.status_code == 200:
+            #        self.__certs_uploaded = True
             await asyncio.sleep(float(self.__interval))
 
     def __http_get_device_config(self) -> requests.Response:
@@ -452,6 +459,45 @@ class MdmAgent:
         """
         with open("/opt/config.json", "w", encoding="utf-8") as f:
             f.write(response.text.strip())
+
+    def upload_certificate_bundle(self) -> requests.Response:
+        try:
+            # TODO: Not sure what kind of bundle we should deliver
+            # so bundling just device cert and ca cert for now.
+            with open(self.__certificate_file, 'r') as cert_file:
+                certificate_content = cert_file.read()
+
+            with open(self.__ca, 'r') as ca_file:
+                ca_certificate_content = ca_file.read()
+
+            # Concatenate the certificate and CA certificate
+            bundle_content = certificate_content + ca_certificate_content
+
+            # Prepare the JSON data for the POST request
+            data = {
+                'device_id': self.__device_id,
+                'payload': bundle_content,
+            }
+
+            __https_url = self.__url
+            if "None" in __https_url:
+                return requests.Response()  # empty response
+
+            # Make the POST request
+            url = f"https://{__https_url}/{self.PUT_DEVICE_CONFIG}/certificates"
+            return requests.post(url,
+                                 json=data,
+                                 cert=(self.__certificate_file, self.__keyfile),
+                                 verify=self.__ca,
+                                 timeout=2,)
+        except FileNotFoundError as e:
+            self.__comms_controller.logger.error(
+                "Certificate file not found: %s", e
+            )
+        except requests.RequestException as e:
+            self.__comms_controller.logger.error(
+                "Post request failed with error: %s", e
+            )
 
     async def __loop_run_executor(self, executor) -> None:
         """
