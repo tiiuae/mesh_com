@@ -98,6 +98,13 @@ else
   # echo "starting mdm agent for testing purposes"
   # /opt/S90mdm_agent start
 
+  # Start jamming service
+  JAMMING=$(extract_features_value "jamming" $YAML_FILE)
+  if [ "$JAMMING" == "true" ]; then
+    echo "starting jamming avoidance service"
+    /opt/S99jammingavoidance start
+  fi
+
   # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"
 fi

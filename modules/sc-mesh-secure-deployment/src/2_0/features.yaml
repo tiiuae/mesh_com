@@ -1,0 +1,7 @@
+# By Defualt the features are disabled. To enable please type true
+
+PHY: false
+RSS: false
+IDS: false
+jamming: false
+
