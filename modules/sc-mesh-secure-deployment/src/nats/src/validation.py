@@ -286,6 +286,7 @@ def validate_batman_iface(batman_iface: str) -> bool:
         return False
     except (ValueError, TypeError, AttributeError):
         return False
+
 def validate_mptcp(mptcp: str) -> bool:
     """
     Validates a given mptcp.
@@ -295,5 +296,20 @@ def validate_mptcp(mptcp: str) -> bool:
         if mptcp in ("enable", "disable"):
             return True
         return False
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+def validate_slaac(slaac: str) -> bool:
+    """
+    Validates a given slaac ifaces.
+    Returns True if the slaac ifaces are valid, False otherwise.
+    """
+    try:
+        for slaac_if in slaac.split():
+            if (not slaac_if.startswith("wl") and
+                    not slaac_if.startswith("halow") and
+                    not slaac_if.startswith("usb")):
+                return False
+        return True
     except (ValueError, TypeError, AttributeError):
         return False
