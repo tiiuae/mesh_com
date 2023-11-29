@@ -258,7 +258,6 @@ async def main():
     # Get device identity
     logger.info("1. Get device identity")
     await get_device_identity()
-    await get_device_identity()
 
     # Switch to starting frequency
     logger.info("2. Switch to starting frequency")
@@ -267,9 +266,10 @@ async def main():
         await switch_frequency(args)
 
     # Validate configuration parameters
-    logger.info("3. Validate configuration parameters")
+    logger.info("3. Validate configuration")
     if not validate_configuration(args):
-        raise Exception("Configuration validation failed. Please adjust the configurations according to the above to run the jamming avoidance feature.")
+        logger.error("Invalid configuration. Please check messages above for more information.")
+        util.run_command(['/opt/S99jammingavoidance', 'stop'], "Stopping S99jammingavoidance service failed.")
 
     # Check interface for OSF
     logger.info("4. Check if osf interface is up")
@@ -279,7 +279,7 @@ async def main():
     logger.info("5. Get ipv6 of osf interface")
     osf_ipv6_address = util.get_ipv6_addr(args.osf_interface)
     if osf_ipv6_address is None:
-        raise ValueError("IPv6 address of the tun0 interface is not available.")
+        raise ValueError(f"No IPv6 address {args.osf_interface} interface.")
 
     # If the current node is a client, check ipv6 connectivity with server
     if args.jamming_osf_orchestrator != osf_ipv6_address:

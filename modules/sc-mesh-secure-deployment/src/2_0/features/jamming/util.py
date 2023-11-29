@@ -209,7 +209,7 @@ def run_command(command, error_message) -> None:
     """
     Execute a shell command and check for success.
 
-    param command: The shell command to execute.
+    param command: The shell command to execute in the form of list of strings.
     param error_message: Error message to display if the command fails.
     """
     try:
