@@ -317,10 +317,10 @@ class mutAuth:
                 ),
                 bridge_interface=self.bridge_interface,
             )
-            setup_ebtables_macsec(
-                interface=self.macsec_obj.get_macsec_interface_name(client_mac),
-                mac=client_mac
-                )
+            # setup_ebtables_macsec(
+            #     interface=self.macsec_obj.get_macsec_interface_name(client_mac),
+            #     mac=client_mac
+            # )
 
     def setup_batman(self):
         # Wait till a macsec interface is setup and added
