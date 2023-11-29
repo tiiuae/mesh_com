@@ -15,7 +15,7 @@ logger = logger_instance.get_logger()
 
 
 class AuthServer:
-    CLIENT_TIMEOUT = 30
+    CLIENT_TIMEOUT = 60
 
     def __init__(self, interface, ip_address, port, cert_path, ca_path, mua):
         threading.Thread.__init__(self)
@@ -30,6 +30,7 @@ class AuthServer:
         self.context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH,
                                                   cafile=glob.glob(self.ca)[0])
         self.context.minimum_version = ssl.TLSVersion.TLSv1_3
+        self.context.check_hostname = False
         self.context.verify_mode = ssl.CERT_REQUIRED
         self.context.load_cert_chain(
             certfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.crt")[0],
@@ -90,9 +91,13 @@ class AuthServer:
     def start_server(self):
         if is_ipv4(self.ipAddress):
             self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
             self.serverSocket.bind((self.ipAddress, self.port))
         elif is_ipv6(self.ipAddress):
             self.serverSocket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            self.serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
             scope_id = socket.if_nametoindex(self.interface)
             self.serverSocket.bind((self.ipAddress, int(self.port), 0, scope_id))
         else:
