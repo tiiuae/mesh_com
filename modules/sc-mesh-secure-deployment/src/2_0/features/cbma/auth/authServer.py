@@ -30,6 +30,7 @@ class AuthServer:
         self.context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH,
                                                   cafile=glob.glob(self.ca)[0])
         self.context.minimum_version = ssl.TLSVersion.TLSv1_3
+        self.context.check_hostname = False
         self.context.verify_mode = ssl.CERT_REQUIRED
         self.context.load_cert_chain(
             certfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.crt")[0],
