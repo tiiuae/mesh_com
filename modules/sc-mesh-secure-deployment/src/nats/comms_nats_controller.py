@@ -28,6 +28,7 @@ from src import batadvvis
 from src import batstat
 
 from src import comms_service_discovery
+from src import comms_if_monitor
 
 # FMO_SUPPORTED_COMMANDS = [
 #     "GET_IDENTITY",
@@ -154,6 +155,7 @@ class MdmAgent:
         keyfile: str = None,
         certificate_file: str = None,
         ca_file: str = None,
+        interface: str = None,
     ):
         """
         Constructor
@@ -169,6 +171,17 @@ class MdmAgent:
         self.__ca: str = ca_file
         self.__config_version: int = 0
         self.mdm_service_available: bool = False
+        self.__if_to_monitor = interface
+        self.__interfaces = {}
+        self.service_monitor = comms_service_discovery.CommsServiceMonitor(
+            service_name="MDM Service",
+            service_type="_mdm._tcp.local.",
+            service_cb=self.mdm_server_address_cb,
+        )
+        self.interface_monitor = comms_if_monitor.CommsInterfaceMonitor(
+            self.interface_monitor_cb
+        )
+
         try:
             with open("/opt/identity", "r", encoding="utf-8") as f:  # todo
                 self.__device_id = f.read().strip()
@@ -186,12 +199,64 @@ class MdmAgent:
         self.__url = address
         self.mdm_service_available = status
 
+    def interface_monitor_cb(self, interfaces) -> None:
+        """
+        Callback for network interfaces. Service
+        :param interfaces: list of dictionaries (ifname, ifstate)
+        :return: -
+        """
+        self.__interfaces = interfaces
+        self.__comms_controller.logger.debug(
+            "Interface monitor cb: %s", self.__interfaces
+            )
+        if self.__if_to_monitor is None:
+            self.start_service_discovery()
+        elif self.__if_to_monitor in self.__interfaces:
+            if self.__interfaces[self.__if_to_monitor] == "UP":
+                self.start_service_discovery()
+            elif self.__interfaces[self.__if_to_monitor] == "DOWN":
+                self.stop_service_discovery()
+
+    def start_service_discovery(self):
+        """
+        Starts service monitor thread
+        :param: -
+        :return: -
+        """        
+        if not self.service_monitor.running:
+            self.__comms_controller.logger.debug(
+                "Start service monitor thread"
+            )
+            self.service_monitor_thread = threading.Thread(
+                target=self.service_monitor.run
+            )
+            self.service_monitor_thread.start()
+
+    def stop_service_discovery(self):
+        """
+        Stops service monitor thread
+        :param: -
+        :return: -
+        """           
+        if self.service_monitor.running:
+            self.__comms_controller.logger.debug(
+                "Stop service monitor thread"
+            )
+            self.service_monitor.close()
+            self.service_monitor_thread.join()
+
     async def execute(self) -> None:
         """
         Execute MDM agent
         :return: -
         """
         executor = ThreadPoolExecutor(1)
+
+        # Create interface monitoring thread
+        self.thread_if_mon = threading.Thread(
+            target=self.interface_monitor.monitor_interfaces
+            )
+        self.thread_if_mon.start()
 
         while True:
             if self.mdm_service_available:
@@ -415,7 +480,7 @@ class MdmAgent:
             self.__interval = self.FAIL_POLLING_TIME_SECONDS
 
 
-async def main_mdm(keyfile=None, certfile=None, ca_file=None) -> None:
+async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) -> None:
     """
     main
     param: keyfile: keyfile
@@ -457,6 +522,12 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None) -> None:
 
     def signal_handler():
         cc.logger.debug("Disconnecting...")
+        mdm.mdm_service_available = False
+        if mdm.service_monitor.running:
+            mdm.stop_service_discovery()
+        if mdm.interface_monitor.running:
+            mdm.interface_monitor.running = False
+            mdm.thread_if_mon.join()
         asyncio.create_task(stop())
 
     for sig in ("SIGINT", "SIGTERM"):
@@ -468,13 +539,8 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None) -> None:
 
     # separate instances needed for FMO/MDM
 
-    mdm = MdmAgent(cc, keyfile, certfile, ca_file)
-    monitor = comms_service_discovery.CommsServiceMonitor(
-        service_name="MDM Service",
-        service_type="_mdm._tcp.local.",
-        service_cb=mdm.mdm_server_address_cb,
-    )
-    await asyncio.gather(mdm.execute(), monitor.async_run())
+    mdm = MdmAgent(cc, keyfile, certfile, ca_file, interface)
+    await asyncio.gather(mdm.execute())
 
 
 # pylint: disable=too-many-arguments, too-many-locals, too-many-statements
@@ -620,6 +686,7 @@ if __name__ == "__main__":
     parser.add_argument("-k", "--keyfile", help="TLS keyfile", required=False)
     parser.add_argument("-c", "--certfile", help="TLS certfile", required=False)
     parser.add_argument("-r", "--ca", help="ca certfile", required=False)
+    parser.add_argument("-i", "--interface", help="e.g. br-lan or bat0", required=False)
     parser.add_argument(
         "-a", "--agent", help="mdm or fmo", required=False, default="fmo"
     )
@@ -637,7 +704,9 @@ if __name__ == "__main__":
 
     loop = asyncio.new_event_loop()
     if args.agent == "mdm":
-        loop.run_until_complete(main_mdm(args.keyfile, args.certfile, args.ca))
+        loop.run_until_complete(
+            main_mdm(args.keyfile, args.certfile, args.ca, args.interface)
+        )
     else:
         loop.run_until_complete(
             main_fmo(args.server, args.port, args.keyfile, args.certfile)
