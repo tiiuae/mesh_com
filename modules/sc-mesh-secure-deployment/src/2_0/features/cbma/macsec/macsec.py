@@ -28,7 +28,7 @@ class Macsec:
                             "port", str(my_port),
                             "encrypt", self.macsec_encryption,
                             "cipher", "gcm-aes-256",
-                            "send_sci", "off",
+                            # "send_sci", "off",
                             "end_station", "on"],
                            check=True)
             subprocess.run(["ip", "macsec", "add", macsec_interface, "tx", "sa", "0", "pn", "1", "on", "key", "01", my_macsec_key], check=True)
