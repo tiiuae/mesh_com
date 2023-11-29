@@ -90,9 +90,13 @@ class AuthServer:
     def start_server(self):
         if is_ipv4(self.ipAddress):
             self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
             self.serverSocket.bind((self.ipAddress, self.port))
         elif is_ipv6(self.ipAddress):
             self.serverSocket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            self.serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
             scope_id = socket.if_nametoindex(self.interface)
             self.serverSocket.bind((self.ipAddress, int(self.port), 0, scope_id))
         else:
