@@ -35,6 +35,7 @@ class AuthClient:
         context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH,
                                              cafile=glob.glob(self.ca)[0])
         context.minimum_version = ssl.TLSVersion.TLSv1_3
+        context.check_hostname = False
         context.verify_mode = ssl.CERT_REQUIRED
 
         # Uncomment to enable Certificate Revocation List (CRL) check
