@@ -67,7 +67,8 @@ else
   #FMO=$(extract_features_value "FMO" $YAML_FILE)
   #if [ "$FMO" = "true" ]; then
     echo "starting Alfred"
-    /opt/S90Alfred start
+    #/opt/S90Alfred start
+    alfred -i $bridge_name -m &
 
     echo "starting provisioning agent"
     # blocks execution until provisioning is done or timeout (30s)
