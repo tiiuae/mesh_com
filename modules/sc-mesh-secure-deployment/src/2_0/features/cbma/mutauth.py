@@ -78,23 +78,19 @@ class mutAuth():
                 handle_peer_connected_thread.start()
 
     def handle_wpa_multicast_event(self, mac):
-        if mac not in self.connected_peers_status:
-            # There is no ongoing connection with peer yet
-            # Wait for random seconds
-            random_wait = random.uniform(0.5,3)  # Wait between 0.5 to 3 seconds. Random waiting to avoid race condition
-            time.sleep(random_wait)
-            if mac not in self.connected_peers_status:
+        if self.mymac > mac:
+            # I have higher mac, so I should initiate as client
+            with self.connected_peers_status_lock:
+                connected_peers_status = self.connected_peers_status
+            if mac not in connected_peers_status:
+                # There is no ongoing connection with peer yet
                 # Start as client
                 print("------------------client ---------------------")
                 with self.connected_peers_status_lock:
-                    self.connected_peers_status[mac] = ["ongoing", 0] # Update status as ongoing, num of failed attempts = 0
+                    self.connected_peers_status[mac] = ["ongoing", 0]  # Update status as ongoing, num of failed attempts = 0
                 self.start_auth_client(mac)
-        elif self.connected_peers_status[mac][0] not in ["ongoing", "authenticated"]:
-            # If node does not have ongoing authentication or is not already authenticated or has not been blacklisted
-            # Wait for random seconds
-            random_wait = random.uniform(0.5,3)  # Wait between 0.5 to 3 seconds. Random waiting to avoid race condition
-            time.sleep(random_wait)
-            if self.connected_peers_status[mac][0] not in ["ongoing", "authenticated"]:
+            elif connected_peers_status[mac][0] not in ["ongoing", "authenticated"]:
+                # If node does not have ongoing authentication or is not already authenticated or has not been blacklisted
                 # Start as client
                 print("------------------client ---------------------")
                 with self.connected_peers_status_lock:
