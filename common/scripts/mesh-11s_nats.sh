@@ -343,7 +343,8 @@ EOF
           modprobe batman-adv
         fi
       elif [ "$routing_algo" == "olsr" ]; then
-        mesh_kill "[o]lsrd -i $wifidev -d 0"
+        #mesh_kill "[o]lsrd -i $wifidev -d 0"
+        stop_olsrd 
       fi
 
       echo "$wifidev down.."

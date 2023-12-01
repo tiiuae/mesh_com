@@ -11,12 +11,12 @@ if [ "$#" -ne "2" ]; then
   echo "ERROR: script needs four arguments, where:"
   echo
   echo "1. Number of times to repeat test (e.g. 10)"
-  echo "2. Host running 'iperf -s' (e.g. somehost)"
+  echo "2. Host running 'iperf3 -s' (e.g. somehost)"
   echo
   echo "Example:"
   echo "  $(basename $0) 10 somehost"
   echo
-  echo "The above will run 'iperf -c' 10 times on the client and report totals and average."
+  echo "The above will run 'iperf3 -c' 10 times on the client and report totals and average."
   exit 1
 else
   runs=$1
@@ -47,7 +47,7 @@ echo "see $log for details"
 
 #######################################################################
 # Define the file path
-file_path=$log
+file_path="$log"
 
 # Check if the file exists
 if [ -f "$file_path" ]; then

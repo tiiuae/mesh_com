@@ -36,14 +36,20 @@ start_olsrd()
   }
   
 EOF
-  qos-olsrd -i "$INTERFACE" -d 0 -f /etc/olsrd/$INTERFACE.conf
+  qos-olsrd -i "$INTERFACE" -d 0 -f "/etc/olsrd/$INTERFACE.conf"
   // -p /run/olsrd-$INTERFACE.pid
 }
 
-stop_olsrd()
-{
-  
-  // killall olsrd 2>/dev/null	
-}
 
+stop_olsrd() 
+{
+    pid_file="/run/qos-olsrd.pid"
+
+    if [ -e "$pid_file" ]; then
+        echo "Stopping daemon using start-stop-daemon"
+        start-stop-daemon --stop --pidfile "$pid_file"
+    else
+        echo "PID file $pid_file not found. Daemon may not be running."
+    fi
+}
 
