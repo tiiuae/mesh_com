@@ -50,23 +50,23 @@ def test_is_ssl_socket(sec_message_handler, monkeypatch, mock_logger):
 def test_send_message_no_ssl(sec_message_handler, monkeypatch, mock_logger):
     monkeypatch.setattr(sec_message_handler.socket, '__class__', MagicMock())
     sec_message_handler.send_message("test_message")
-    sec_message_handler.socket.send.assert_not_called()
+    sec_message_handler.socket.sendall.assert_not_called()
 
 
 def test_send_message_ssl_inactive(sec_message_handler, monkeypatch, mock_logger):
     monkeypatch.setattr(sec_message_handler.socket, 'fileno', lambda: -1)
     sec_message_handler.send_message("test_message")
-    sec_message_handler.socket.send.assert_not_called()
+    sec_message_handler.socket.sendall.assert_not_called()
 
 
 def test_send_message_successful(sec_message_handler, monkeypatch, mock_logger):
     mock_ssl_socket = MagicMock(spec=ssl.SSLSocket)
     mock_ssl_socket.fileno.return_value = 5
-    mock_ssl_socket.send = MagicMock()
+    mock_ssl_socket.sendall = MagicMock()
     monkeypatch.setattr(sec_message_handler, 'socket', mock_ssl_socket)
 
     sec_message_handler.send_message("test_message")
-    mock_ssl_socket.send.assert_called_once_with("test_message".encode())
+    mock_ssl_socket.sendall.assert_called_once_with("test_message".encode())
 
 
 def test_receive_message_with_macsec_params(sec_message_handler, monkeypatch):
