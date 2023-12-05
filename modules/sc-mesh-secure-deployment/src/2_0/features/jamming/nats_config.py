@@ -7,7 +7,7 @@ try:
     from identity import MODULE_IDENTITY as IDENTITY
 except ImportError:
     IDENTITY = "no_identity"
-    logger.info("No identity found!")
+    logger.error("No identity found!")
 
 MODULE_IP = "10.10.20.2"  # or 192.168.1.x - brlan ip address
 MODULE_PORT = "4222"

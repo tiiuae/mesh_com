@@ -154,9 +154,6 @@ def start_jamming_scripts(args, osf_ipv6_address) -> None:
     """
     # Compare jamming_osf_orchestrator with osf_ipv6_address
     try:
-        logger.info("#######################")
-        logger.info(f"args.jamming_osf_orchestrator: {args.jamming_osf_orchestrator}")
-        logger.info(f"osf_ipv6_address: {osf_ipv6_address}")
         if args.jamming_osf_orchestrator == osf_ipv6_address:
             server_thread = threading.Thread(target=start_server, args=(args,))
             client_thread = threading.Thread(target=start_client, args=(args,))
