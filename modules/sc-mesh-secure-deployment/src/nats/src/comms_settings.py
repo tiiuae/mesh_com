@@ -348,7 +348,7 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write(
                     f"id{str(index)}_BATMAN_IFACE={quote(self.batman_iface[index])}\n"
                 )
-                mesh_conf.write(f"id{str(index)}_BRIDGE={quote(self.bridge[index])}\n")
+                mesh_conf.write(f"id{str(index)}_BRIDGE={self.bridge[index]}\n")
                 mesh_conf.write(f"id{str(index)}_SLAAC={quote(self.slaac[index])}\n")
 
         except:
