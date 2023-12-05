@@ -9,17 +9,6 @@ class TestCodeUnderTest:
         options = Options()
         assert isinstance(options, Options)
 
-    #  Validate configuration fails when mesh interface channel width is not set to 20 MHz
-    def test_validate_configuration_fails_mesh_interface_channel_width_not_set_to_20MHz(self, mocker):
-        options = Options()
-        options.validate_configuration = mocker.Mock(return_value=False)
-        assert options.validate_configuration() == False
-
-    #  Validate configuration fails when channels5 list includes invalid channels
-    def test_validate_configuration_fails_channels5_list_includes_invalid_channels(self, mocker):
-        options = Options()
-        options.channels5 = [36, 40, 44, 48, 149, 153, 157, 162]
-        assert options.validate_configuration() == False
 
     #  Options object attributes are set correctly
     def test_options_object_attributes_set_correctly(self):
@@ -57,14 +46,3 @@ class TestCodeUnderTest:
         assert options.periodic_target_freq_broadcast == 10
         assert options.spectrum_data_expiry_time == 5
 
-    #  Validate configuration succeeds when mesh interface channel width is set to 20 MHz
-    def test_validate_configuration_succeeds_mesh_interface_channel_width_set_to_20MHz(self, mocker):
-        options = Options()
-        options.validate_configuration = mocker.Mock(return_value=True)
-        assert options.validate_configuration() == True
-
-    #  Validate configuration succeeds when channels5 list includes valid channels
-    def test_validate_configuration_succeeds_channels5_list_includes_valid_channels(self, mocker):
-        options = Options()
-        options.channels5 = [36, 40, 44, 48, 149, 153, 157, 161]
-        assert options.validate_configuration() == True

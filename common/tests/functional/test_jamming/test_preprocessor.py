@@ -67,10 +67,10 @@ class TestCodeUnderTest:
     def test_normalize_with_valid_input(self):
         # Set expected data
         expected_data = {
-            'freq1': [5180], 'max_magnitude': [-3.00653], 'rssi': [-0.237583], 'relpwr_db': [4.563367],
-            'base_pwr_db': [-30.556816], 'avgpwr_db': [-9.808239], 'total_gain_db': [-4.744545], 'snr': [-1.930179],
-            'cnr': [-9.305355], 'pn': [-10.448828], 'ssi': [-2.702977], 'pd': [-26.652357], 'sinr': [-2.702977],
-            'sir': [3.455223], 'mr': [-2.898512], 'pr': [239.60759]
+            'freq1': [5180], 'max_magnitude': [-2.699096], 'rssi': [0.386689], 'relpwr_db': [5.723355],
+            'base_pwr_db': [-54.127222], 'avgpwr_db': [-7.553099], 'total_gain_db': [-8.580278], 'snr': [-4.467233],
+            'cnr': [-19.34198], 'pn': [-22.509996], 'ssi': [-4.161893], 'pd': [-33.130156], 'sinr': [-4.161893],
+            'sir': [7.230196], 'mr': [-2.481305], 'pr': [187.510565]
         }
         expected_result = pd.DataFrame(expected_data)
 

@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import patch
 
 import add_syspath
-from channel_quality_estimator import ChannelQualityEstimator
+from channel_quality_est import ChannelQualityEstimator
 
 
 class TestCodeUnderTest:
