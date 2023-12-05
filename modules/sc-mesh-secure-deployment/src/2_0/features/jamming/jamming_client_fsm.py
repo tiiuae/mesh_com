@@ -14,7 +14,7 @@ from netstring import encode, decode
 from channel_quality_est import ChannelQualityEstimator
 from options import Options
 from preprocessor import Preprocessor
-from util import get_frequency_quality, get_mesh_freq, get_ipv6_addr, switch_frequency
+from util import get_frequency_quality, get_mesh_freq, get_ipv6_addr, switch_frequency, kill_process_by_pid
 from wireless_scanner import WirelessScanner
 from log_config import logger
 
@@ -179,6 +179,8 @@ class JammingDetectionClient(threading.Thread):
         self.target_frequency: int = np.nan
         self.best_freq: int = np.nan
         self.freq_quality: dict = {}
+        self.num_retries = 0
+        self.max_retries = 3
 
         # Time for periodic events' variables (in seconds)
         self.time_last_scan: float = 0
@@ -378,11 +380,27 @@ class JammingDetectionClient(threading.Thread):
             # Validate outcome of switch frequency process
             self.current_frequency = get_mesh_freq()
 
-            if self.current_frequency != self.target_frequency:
-                logger.info("Frequency switch unsuccessful")
+            # If maximum frequency switch retries not reached, try to switch again
+            if self.current_frequency != self.target_frequency and self.num_retries < self.max_retries:
+                logger.info(f"Frequency switch unsuccessful, retry {num_retries}")
+                self.num_retries += 1
                 self.fsm.trigger(ClientEvent.SWITCH_UNSUCCESSFUL)
-            else:
+
+            # If max frequency switch retries reached, and mesh frequency is NaN, mesh failed, exit jamming avoidance
+            elif self.num_retries == self.max_retries and np.isnan(self.current_frequency):
+                logger.info("Mesh failed... exiting jamming avoidance scheme")
+                kill_process_by_pid("jamming_setup.py")
+
+            # If max frequency switch retries reached, and mesh switched to a different frequency, continue scheme on current frequency
+            elif self.current_frequency != self.target_frequency and self.num_retries == self.max_retries:
+                logger.info("Switched to different channel... continue")
+                self.num_retries = 0
+                self.fsm.trigger(ClientEvent.SWITCH_SUCCESSFUL)
+
+            # Frequency switch successful
+            elif self.current_frequency == self.target_frequency:
                 logger.info("Frequency switch successful")
+                self.num_retries = 0
                 self.fsm.trigger(ClientEvent.SWITCHED)
 
         except Exception as e:

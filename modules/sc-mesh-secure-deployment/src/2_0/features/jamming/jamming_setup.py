@@ -3,6 +3,7 @@ import subprocess
 import threading
 
 import netifaces
+import signal
 import sys
 import time
 import re
@@ -55,7 +56,7 @@ async def switch_frequency(args) -> None:
                     continue
                 else:
                     logger.info("Cannot set node to starting frequency. Maximum retries reached.")
-                    sys.exit(1)
+                    return
             else:
                 logger.info("Frequency switch successful")
                 switch_successful = True
@@ -68,7 +69,7 @@ async def switch_frequency(args) -> None:
                 time.sleep(1)  # Adjust sleep duration if needed
             else:
                 logger.info("Cannot set node to starting frequency. Maximum retries reached.")
-                sys.exit(1)
+                return
 
 
 def check_client_osf_connectivity(args) -> None:
@@ -190,7 +191,6 @@ async def get_device_identity() -> None:
         logger.error(rep.data)
 
         parameters = json.loads(rep.data.decode())
-        print(json.dumps(parameters, indent=2))
 
         if "identity" in parameters["data"]:
             with open("identity.py", "w") as f:
@@ -251,13 +251,38 @@ def validate_configuration(args) -> bool:
     return valid
 
 
+# Function to handle the SIGTERM signal
+def sigterm_handler(signum, frame):
+    """
+    Handles a signal interrupt (SIGINT).
+
+    :param sig: The signal received by the handler.
+    :param frame: The current execution frame.
+    """
+    try:
+        logger.info(f"Received SIGTERM signal. Attempting to stop jamming scripts.")
+        util.kill_process_by_pid("jamming_client_fsm.py")
+        util.kill_process_by_pid("jamming_server_fsm.py")
+        logger.info("Jamming scripts stopped.")
+        # Exit after cleanup
+        sys.exit(0)
+    except Exception as e:
+        logger.error("Error killing jamming client and server FSM scripts.")
+
+
+
+# Set up the signal handler for SIGTERM
+signal.signal(signal.SIGTERM, sigterm_handler)
+
+
 async def main():
     # Create Options instance
     args = Options()
 
     # Get device identity
-    logger.info("1. Get device identity")
-    await get_device_identity()
+    if not os.path.exists('identity.py'):
+        logger.info("1. Get device identity")
+        await get_device_identity()
 
     # Switch to starting frequency
     logger.info("2. Switch to starting frequency")

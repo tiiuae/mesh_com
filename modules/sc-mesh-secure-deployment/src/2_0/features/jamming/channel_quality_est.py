@@ -70,10 +70,8 @@ class ChannelQualityEstimator:
         :param probs: A 2D NumPy array of shape (n_channels, n_classes) containing the model's class probabilities.
         :return: A 1D NumPy array of shape (n_channels,) representing the channel quality scores for each channel.
         """
-        probs_argmax = np.argmax(probs, axis=1)
-        logger.info(f"#############Argmax index for each channel: {probs_argmax}")
         # Weights for good states (communication, floor, inter_mid, inter_high)
-        good_weights = np.array([1.0, 0.6, 0.4])
+        good_weights = np.array([1.0, 0.5, 0.5])
         # Compute good state probabilities
         good_probs = probs[:, :3]  # Get the probabilities for the first 3 states
         # Compute a score based on the good state probabilities and their weights
