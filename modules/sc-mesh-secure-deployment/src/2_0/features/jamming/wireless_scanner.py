@@ -124,8 +124,6 @@ class WirelessScanner:
             self.spec.read(bin_file)
             # Create scan dataframe
             scan = self.spec.create_dataframe(driver)
-            #scan.to_csv(f'/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/jamming/sample/jamming/samples_chamber_5180MHz_3dBm_TESTgaussiannoise_1.csv', index=False)
-            #logger.info("SCAN SAVED, NOW SWITCH TO DEBUG")
             logger.info(f"Scan: {scan}")
 
             # Check if the scan is valid, if it is, return it
