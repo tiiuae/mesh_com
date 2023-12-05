@@ -348,8 +348,14 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write(
                     f"id{str(index)}_BATMAN_IFACE={quote(self.batman_iface[index])}\n"
                 )
-                mesh_conf.write(f"id{str(index)}_BRIDGE={self.bridge[index]}\n")
-                mesh_conf.write(f"id{str(index)}_SLAAC={quote(self.slaac[index])}\n")
+
+                self.bridge[index] = self.bridge[index].replace('"', "")
+                self.bridge[index] = self.bridge[index].replace("'", "")
+                self.slaac[index] = self.slaac[index].replace('"', "")
+                self.slaac[index] = self.slaac[index].replace("'", "")
+
+                mesh_conf.write(f'id{str(index)}_BRIDGE="{self.bridge[index]}"\n')
+                mesh_conf.write(f'id{str(index)}_SLAAC="{self.slaac[index]}"\n')
 
         except:
             self.comms_status[index].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
@@ -402,9 +408,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 elif name == "BATMAN_IFACE":
                     self.batman_iface.append(match[1])
                 elif name == "BRIDGE":
-                    self.bridge.append(match[1])
+                    self.bridge.append(str(match[1]))
                 elif name == "SLAAC":
-                    self.slaac.append(match[1])
+                    self.slaac.append(str(match[1]))
                 else:
                     self.logger.error("unknown config parameter: %s", name)
             else:  # global config without index
