@@ -219,7 +219,7 @@ def run_command(command, error_message) -> None:
             return_code = subprocess.call(command, shell=False, stdout=subprocess_output, stderr=subprocess_output)
 
         if return_code != 0:
-            logger.error(f"Command failed with return code {return_code}")
+            logger.error(f"Command {command} failed with return code {return_code}")
     except Exception as e:
         logger.error(f"{error_message}. Error: {e}")
         raise Exception(error_message) from e
@@ -302,9 +302,12 @@ def kill_process_by_pid(process_name: str) -> None:
 
     param: The name of the process to be killed.
     """
-    # Retrieve the Process ID (PID) of the specified process
-    pid = get_pid_by_process_name(process_name)
-    try:
-        subprocess.check_output(['kill', str(pid)])
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to kill process: {e}")  # Failed to kill the process
+    if is_process_running(process_name):
+        # Retrieve the Process ID (PID) of the specified process
+        pid = get_pid_by_process_name(process_name)
+        try:
+            subprocess.check_output(['kill', str(pid)])
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to kill process: {e}")  # Failed to kill the process
+    else:
+        logger.info(f"{process_name} not running, nothing to kill.")

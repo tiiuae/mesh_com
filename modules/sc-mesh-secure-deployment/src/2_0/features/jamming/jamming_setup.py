@@ -154,6 +154,9 @@ def start_jamming_scripts(args, osf_ipv6_address) -> None:
     """
     # Compare jamming_osf_orchestrator with osf_ipv6_address
     try:
+        logger.info("#######################")
+        logger.info(f"args.jamming_osf_orchestrator: {args.jamming_osf_orchestrator}")
+        logger.info(f"osf_ipv6_address: {osf_ipv6_address}")
         if args.jamming_osf_orchestrator == osf_ipv6_address:
             server_thread = threading.Thread(target=start_server, args=(args,))
             client_thread = threading.Thread(target=start_client, args=(args,))
@@ -256,7 +259,7 @@ def sigterm_handler(signum, frame):
     """
     Handles a signal interrupt (SIGINT).
 
-    :param sig: The signal received by the handler.
+    :param signum: The signal number received by the handler.
     :param frame: The current execution frame.
     """
     try:
@@ -267,8 +270,9 @@ def sigterm_handler(signum, frame):
         # Exit after cleanup
         sys.exit(0)
     except Exception as e:
-        logger.error("Error killing jamming client and server FSM scripts.")
-
+        logger.error(f"Error killing jamming client and server FSM scripts. {str(e)}")
+        # Exit with an error code
+        sys.exit(1)
 
 
 # Set up the signal handler for SIGTERM
