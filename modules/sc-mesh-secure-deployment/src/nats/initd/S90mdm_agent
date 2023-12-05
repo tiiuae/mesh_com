@@ -1,16 +1,17 @@
-#!/bin/bash
-### BEGIN INIT INFO
-# Provides:          S90mdm_agent
-# Short-Description: MDM client
-# Description:       Starts comms controller as MDM client
-### END INIT INFO
+#!/bin/sh
 
-DAEMON="comms_nats_controller.py"
-DIR="/opt/nats/"
-PIDFILE="/var/run/$DAEMON.pid"
-# shellcheck source=/dev/null
-[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-LOG_FILE=/opt/mdm_agent.log
+# The daemon's name (to ensure uniqueness and for stop, restart and status)
+name="mdm_agent"
+
+# The path of the Python executable
+python_exec="/usr/bin/python"
+exec="/opt/nats/comms_nats_controller.py"
+
+[ -x "$python_exec" ] || exit 0
+[ -f "$exec" ] || exit 0
+
+# The path of the daemon executable
+daemon="/usr/bin/daemon"
 
 # TODO testing purposes
 BC_KEY_FILE="/opt/certs/CBMA/BirthCerts/csl1.local.key"
@@ -23,56 +24,77 @@ CBMA_CERT_FILE="/opt/certs/CBMA/LowerCBMA/csl1.local.crt"
 CBMA_CA_FILE="/opt/certs/CBMA/LowerCBMA/ca.crt"
 
 
-
 if [ -e "$BC_CA_FILE" ] && [ -e "$BC_KEY_FILE" ] && [ -e "$BC_CERT_FILE" ]; then
-  ARGS="-k $BC_KEY_FILE -c $BC_CERT_FILE -r $BC_CA_FILE --agent mdm"
+  command_args="-k $BC_KEY_FILE -c $BC_CERT_FILE -r $BC_CA_FILE --agent mdm"
 elif [ -e "$CBMA_KEY_FILE" ] && [ -e "$CBMA_CERT_FILE" ] && [ -e "$CBMA_CA_FILE" ]; then
-  ARGS="-k $CBMA_KEY_FILE -c $CBMA_CERT_FILE -r $CBMA_CA_FILE --agent mdm"
+  command_args="-k $CBMA_KEY_FILE -c $CBMA_CERT_FILE -r $CBMA_CA_FILE --agent mdm"
 else
-  ARGS="--agent mdm"
+  command_args="--agent mdm"
 fi
 
-start() {
-    echo "$ARGS"
-    printf 'Starting %s: ' "$DAEMON"
-    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec python $DIR$DAEMON \
-          $ARGS > $LOG_FILE 2>&1"
-    status=$?
-    if [ "$status" -eq 0 ]; then
-        echo "OK"
-    else
-        echo "FAIL"
-    fi
-    return "$status"
-}
+LOG_FILE=/opt/mdm_agent.log
+# Other configuration parameters for the service
+pidfiles="/var/run"
+user=""
+chroot=""
+chdir=""
+umask=""
+stdout="$LOG_FILE"
+stderr="$LOG_FILE"
+daemon_start_args="--delay=11 --attempts=1 --respawn"
 
-stop() {
-    printf 'Stopping %s: ' "$DAEMON"
-    start-stop-daemon -K -q -p "$PIDFILE"
-    status=$?
-    if [ "$status" -eq 0 ]; then
-        rm -f "$PIDFILE"
-        echo "OK"
-    else
-        echo "FAIL"
-    fi
-    return "$status"
-}
-restart() {
-    stop
-    sleep 1
-    start
-}
 case "$1" in
-    start|stop|restart)
-        "$1";;
-    reload)
-        # Restart, since there is no true "reload" feature.
-        restart;;
+    start)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "$name is already running."
+        else
+            echo "Starting $name..."
+            "$daemon" $daemon_start_args \
+                --name "$name" --pidfiles "$pidfiles" \
+                ${user:+--user $user} ${chroot:+--chroot $chroot} \
+                ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
+                ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
+                --  "$python_exec" "$exec" $command_args
+            echo done.
+        fi
+        ;;
+
+
+    stop)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Stopping $name..."
+            "$daemon" --stop --name "$name" --pidfiles "$pidfiles"
+            echo done.
+        else
+            echo "$name is not running."
+        fi
+        ;;
+
+
+    restart|reload)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Restarting $name..."
+            "$daemon" --restart --name "$name" --pidfiles "$pidfiles"
+            echo done.
+        else
+            echo "$name is not running."
+            exit 0
+        fi
+        ;;
+
+
+    status)
+        "$daemon" --running --name "$name" --pidfiles "$pidfiles" --verbose
+        ;;
+
+
     *)
-        echo "Usage: $0 {start|stop|restart|reload}"
+        echo "usage: $0 <start|stop|restart|reload|status>" >&2
         exit 1
 esac
 
-exit 0
 
+exit 0

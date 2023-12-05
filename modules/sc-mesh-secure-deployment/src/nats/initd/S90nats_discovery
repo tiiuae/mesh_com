@@ -1,16 +1,11 @@
-#!/bin/bash
-### BEGIN INIT INFO
-# Provides:          S90nats_discovery
-# Short-Description: Comms nats discovery
-# Description:       Starts comms nats discovery
-### END INIT INFO
+#!/bin/sh
 
-DAEMON="comms_nats_discovery.py"
-DIR="/opt/nats/"
-PIDFILE="/var/run/$DAEMON.pid"
-# shellcheck source=/dev/null
-[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-LOG_FILE=/opt/comms_discovery.log
+# The daemon's name (to ensure uniqueness and for stop, restart and status)
+name="nats_discovery"
+
+# The path of the Python executable
+python_exec="/usr/bin/python"
+exec="/opt/nats/comms_nats_discovery.py"
 
 source /opt/mesh-helper.sh
 # for ROLE
@@ -22,51 +17,86 @@ SERVER_CERT_FILE="/etc/ssl/certs/comms_server_cert.pem"
 CA="/etc/ssl/certs/root-ca.cert.pem"
 
 if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
-  ARGS="--role $ROLE -k $KEY_FILE -c $CERT_FILE -s $SERVER_CERT_FILE -a $CA"
+  command_args="--role $ROLE -k $KEY_FILE -c $CERT_FILE -s $SERVER_CERT_FILE -a $CA"
 else
-  ARGS="--role $ROLE"
+  command_args="--role $ROLE"
 fi
 
-start() {
-    echo "$ARGS"
-    printf 'Starting %s: ' "$DAEMON"
-    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec python $DIR$DAEMON \
-          $ARGS > $LOG_FILE 2>&1"
-    status=$?
-    if [ "$status" -eq 0 ]; then
-        echo "OK"
-    else
-        echo "FAIL"
-    fi
-    return "$status"
-}
-stop() {
-    printf 'Stopping %s: ' "$DAEMON"
-    start-stop-daemon -K -q -p "$PIDFILE"
-    status=$?
-    if [ "$status" -eq 0 ]; then
-        rm -f "$PIDFILE"
-        echo "OK"
-    else
-        echo "FAIL"
-    fi
-    return "$status"
-}
-restart() {
-    stop
-    sleep 1
-    start
-}
+[ -x "$python_exec" ] || exit 0
+[ -f "$exec" ] || exit 0
+
+# The path of the daemon executable
+daemon="/usr/bin/daemon"
+
+LOG_FILE=/opt/comms_discovery.log
+# Other configuration parameters for the service
+pidfiles="/var/run"
+user=""
+chroot=""
+chdir=""
+umask=""
+stdout="$LOG_FILE"
+stderr="$LOG_FILE"
+daemon_start_args="--delay=11 --attempts=1 --respawn"
+
 case "$1" in
-    start|stop|restart)
-        "$1";;
-    reload)
-        # Restart, since there is no true "reload" feature.
-        restart;;
+    start)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "$name is already running."
+        else
+            echo "Starting $name..."
+            "$daemon" $daemon_start_args \
+                --name "$name" --pidfiles "$pidfiles" \
+                ${user:+--user $user} ${chroot:+--chroot $chroot} \
+                ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
+                ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
+                --  "$python_exec" "$exec" $command_args
+            echo done.
+        fi
+        ;;
+
+
+    stop)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Stopping $name..."
+            "$daemon" --stop --name "$name" --pidfiles "$pidfiles"
+            echo done.
+        else
+            echo "$name is not running."
+        fi
+        ;;
+
+
+    restart|reload)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Restarting $name..."
+            "$daemon" --restart --name "$name" --pidfiles "$pidfiles"
+            echo done.
+        else
+            echo "Starting $name..."
+            "$daemon" $daemon_start_args \
+                --name "$name" --pidfiles "$pidfiles" \
+                ${user:+--user $user} ${chroot:+--chroot $chroot} \
+                ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
+                ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
+                --  "$python_exec" "$exec" $command_args
+            echo done.
+        fi
+        ;;
+
+
+    status)
+        "$daemon" --running --name "$name" --pidfiles "$pidfiles" --verbose
+        ;;
+
+
     *)
-        echo "Usage: $0 {start|stop|restart|reload}"
+        echo "usage: $0 <start|stop|restart|reload|status>" >&2
         exit 1
 esac
 
-exit 0
 
+exit 0

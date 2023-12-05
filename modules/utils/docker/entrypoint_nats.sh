@@ -28,6 +28,7 @@ else
   #######################################
 
   # Do not continue in case halow init has not finished
+  # Halow is slow to start, so we wait for it to finish
   while ps aux | grep [i]nit_halow > /dev/null; do
       sleep 1
   done
@@ -52,13 +53,21 @@ else
     fi
   done
 
-  # TODO: remove as SLAAC and CBMA?
-  echo "wait for bridge to be up..."
-  while ! (ifconfig | grep -e "$bridge_ip") > /dev/null; do
-    sleep 1
-  done
-
   sleep 3
+
+  #######################################
+  # Enable MDM stuff                    #
+  #######################################
+  # TODO start mdm agent earlier? and wait in first boot?
+  echo "starting mdm agent for testing purposes"
+  /opt/S90mdm_agent start
+
+  # Start jamming service
+  JAMMING=$(extract_features_value "jamming" $YAML_FILE)
+  if [ "$JAMMING" == "true" ]; then
+    echo "starting jamming avoidance service"
+    /opt/S99jammingavoidance start
+  fi
 
   #######################################
   # Enable FMO stuff                    #
@@ -67,8 +76,7 @@ else
   #FMO=$(extract_features_value "FMO" $YAML_FILE)
   #if [ "$FMO" = "true" ]; then
     echo "starting Alfred"
-    #/opt/S90Alfred start
-    alfred -i $bridge_name -m &
+    /opt/S90Alfred start
 
     echo "starting provisioning agent"
     # blocks execution until provisioning is done or timeout (30s)
@@ -90,20 +98,6 @@ else
     echo "starting comms services"
     /opt/S90comms_controller start
   #fi # FMO
-
-  #######################################
-  # Enable MDM stuff                    #
-  #######################################
-  # TODO start mdm agent earlier?
-  echo "starting mdm agent for testing purposes"
-  /opt/S90mdm_agent start
-
-  # Start jamming service
-  JAMMING=$(extract_features_value "jamming" $YAML_FILE)
-  if [ "$JAMMING" == "true" ]; then
-    echo "starting jamming avoidance service"
-    /opt/S99jammingavoidance start
-  fi
 
   # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"

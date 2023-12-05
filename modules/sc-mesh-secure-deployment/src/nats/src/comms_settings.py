@@ -172,7 +172,8 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
 
             if validation.validate_radio_index(
                 radio_index
-            ) and validation.validate_frequency(int(freq)):
+            ) and validation.validate_frequency(int(freq)) and int(radio_index) < len(
+                self.frequency):
                 self.frequency[int(radio_index)] = freq
                 ret, info = "TRIGGER", "Channel change settings OK"
             else:
