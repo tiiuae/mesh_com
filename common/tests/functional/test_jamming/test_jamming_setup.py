@@ -4,7 +4,7 @@ from unittest import mock
 
 import add_syspath
 import util
-from jamming_setup import is_interface_up, switch_frequency, check_osf_connectivity, setup_osf_interface, start_jamming_scripts, start_client, start_server, main
+from jamming_setup import is_interface_up, switch_frequency, check_osf_interface, start_jamming_scripts, start_client, start_server, main
 from options import Options
 
 
@@ -12,21 +12,6 @@ class TestCodeUnderTest:
     """
     A suite of test cases for the code.
     """
-
-    #  OSF interface is set up successfully
-    def test_osf_interface_setup_success(self, mocker):
-        # Mock the is_interface_up function
-        mocker.patch('jamming_setup.is_interface_up', return_value=False)
-        mocker.patch("subprocess.call", return_value=0)
-
-        # Mock the run_command function to not raise an exception
-        mock_run_command = mocker.patch('util.run_command', side_effect=lambda command, error_message: (["start_tunslip6.sh", "/dev/nrf0", "tun0"], 'Failed to set up OSF interface'))
-
-        # Call the function under test
-        setup_osf_interface(Options())
-
-        # Assert that the run_command function was called with the correct command
-        mock_run_command.assert_called_with(["start_tunslip6.sh", "/dev/nrf0", "tun0"], "Failed to set up OSF interface")
 
     #  Mesh frequency is switched to starting frequency successfully
     def test_switch_frequency_success(self, mocker):
@@ -66,12 +51,12 @@ class TestCodeUnderTest:
         assert ipv6_address == '2001:db8::1'
 
     #  IPv6 connectivity with remote server is successful
-    def test_check_osf_connectivity_success(self, mocker):
+    def test_check_osf_interface_success(self, mocker):
         # Mock the subprocess.check_output function to not raise an exception
         mocker.patch('subprocess.check_output')
 
         # Call the function under test
-        check_osf_connectivity(Options())
+        check_osf_interface(Options())
 
         # Assert that the subprocess.check_output function was called with the correct command
         subprocess.check_output.assert_called_with(['ping6', '-c', '1', Options().jamming_osf_orchestrator], text=True)
@@ -91,15 +76,6 @@ class TestCodeUnderTest:
         # Assert that the run_command function was called with the correct command
         mock_run_command.assert_called_with(["python", "jamming_client_fsm.py"], 'Failed to run jamming_client_fsm file')
 
-    #  OSF interface is not set up successfully
-    def test_osf_interface_setup_failure(self, mocker):
-        # Mock the is_interface_up function to return True
-        mocker.patch('jamming_setup.is_interface_up', return_value=False)
-        mocker.patch('util.run_command', side_effect=lambda command, error_message: (False, "Failed to set up OSF interface"))
-
-        # Call the function under test and assert that it raises an Exception
-        with pytest.raises(Exception):
-            util.setup_osf_interface(Options())
 
     #  Mesh frequency cannot be switched to starting frequency
     def test_switch_frequency_failure(self, mocker):
@@ -126,11 +102,10 @@ class TestCodeUnderTest:
         mocker.patch('util.get_ipv6_addr', return_value=None)
 
         # Mock all other functions to set value error
-        mocker.patch('jamming_setup.setup_osf_interface', return_value=True)
         mocker.patch('util.get_mesh_freq', return_value=True)
         mocker.patch('jamming_setup.switch_frequency', return_value=True)
         mocker.patch('util.map_channel_to_freq', return_value=True)
-        mocker.patch('jamming_setup.check_osf_connectivity', return_value=True)
+        mocker.patch('jamming_setup.check_osf_interface', return_value=True)
         mocker.patch('jamming_setup.start_jamming_scripts', return_value=True)
 
         # Call the main function and assert that it raises a ValueError
@@ -138,13 +113,13 @@ class TestCodeUnderTest:
             main()
 
     #  IPv6 connectivity with remote server fails
-    def test_check_osf_connectivity_failure(self, mocker):
+    def test_check_osf_interface_failure(self, mocker):
         # Mock the subprocess.check_output function to raise a subprocess.CalledProcessError
         mocker.patch('subprocess.check_output', side_effect=subprocess.CalledProcessError(1, 'ping6'))
 
         # Call the function under test and assert that it raises a SystemExit
         with pytest.raises(SystemExit):
-            check_osf_connectivity(Options())
+            check_osf_interface(Options())
 
     #  is_interface_up function returns True if interface is up
     def test_is_interface_up_returns_true_if_interface_is_up(self, mocker):

@@ -4,7 +4,7 @@ VALID_CHANNELS = [36, 40, 44, 48, 149, 153, 157, 161]
 
 class Options:
     def __init__(self):
-        self.jamming_osf_orchestrator: str = 'fd04::1'
+        self.jamming_osf_orchestrator: str = 'fde3:49c:9f74:4742:0:4c:372b:1c4f'
         self.port: int = 8080
         self.radio_index: str = "0"
         self.starting_channel: int = 36
@@ -13,9 +13,9 @@ class Options:
         self.scan_interface: str = 'wlp1s0'
         self.debug: bool = False
         self.min_rows: int = 16
-        self.periodic_scan: float = 60
-        self.periodic_recovery_switch: float = 20
-        self.periodic_target_freq_broadcast: float = 10
+        self.periodic_scan: float = 30
+        self.periodic_recovery_switch: float = 3
+        self.periodic_target_freq_broadcast: float = 15
         self.data_gathering_wait_time: float = len(self.channels5) + 5
         self.log_file: str = '/var/log/jamming_avoidance.log'
         # Path to JSON file containing mean and std for spectral scan data normalization

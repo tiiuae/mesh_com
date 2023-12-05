@@ -8,7 +8,6 @@ from contextlib import contextmanager
 
 import pytest
 
-import add_syspath
 from jamming_client_fsm import JammingDetectionClient, ClientEvent, ClientState, ClientFSM
 from options import Options
 
