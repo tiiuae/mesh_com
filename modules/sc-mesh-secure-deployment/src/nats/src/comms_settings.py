@@ -123,7 +123,6 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             return "FAIL", "Invalid batman iface"
         self.logger.debug("validate mesh settings batman iface ok")
 
-
         return "OK", "Mesh settings OK"
 
     def __clean_all_settings(self) -> None:
@@ -342,11 +341,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write(
                     f"id{str(index)}_BATMAN_IFACE={quote(self.batman_iface[index])}\n"
                 )
-
                 self.bridge[index] = self.bridge[index].replace('"', "")
                 self.bridge[index] = self.bridge[index].replace("'", "")
                 mesh_conf.write(f'id{str(index)}_BRIDGE="{self.bridge[index]}"\n')
-
 
         except:
             self.comms_status[index].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
