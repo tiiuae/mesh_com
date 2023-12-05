@@ -215,7 +215,10 @@ class JammingServer:
                 netstring_data = encode(serialized_data)
                 client.socket.sendall(netstring_data)
             except BrokenPipeError:
-                logger.info("Broken pipe error, client disconnected:", client.address)
+                logger.info(f"Broken pipe error, client disconnected: {client.address}")
+                self.clients.remove(client)
+            except Exception as e:
+                logger.info(f"Error sending data to client {client.address}: {e}")
                 self.clients.remove(client)
 
     def check_jammed_frequency(self, trigger_event) -> None:
@@ -424,7 +427,7 @@ class JammingClientTwin(threading.Thread):
                         break
                 except Exception as e:
                     # Handle netstring decoding errors
-                    logger.info(f"Failed to decode netstring: {e}")
+                    logger.error(f"Failed to decode netstring: {e}")
                     break
 
                 # Deserialize the MessagePack message
@@ -443,15 +446,15 @@ class JammingClientTwin(threading.Thread):
                         self.estimation_report_message = unpacked_data
 
                 except msgpack.UnpackException as e:
-                    logger.info(f"Failed to decode MessagePack: {e}")
+                    logger.error(f"Failed to decode MessagePack: {e}")
                     continue
 
                 except Exception as e:
-                    logger.info(f"Error in received message: {e}")
+                    logger.error(f"Error in received message: {e}")
                     continue
 
             except ConnectionResetError:
-                logger.info("Connection forcibly closed by the remote host")
+                logger.error("Connection forcibly closed by the remote host")
                 break
 
     def reset(self):
