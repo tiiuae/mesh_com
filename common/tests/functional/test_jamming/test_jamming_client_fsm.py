@@ -193,7 +193,7 @@ class TestCodeUnderTest:
             receive_thread.join()
 
             # Assert that logger.error was called with the expected message
-            error_mock.assert_called_with("Error in received message: int is not allowed for map key when strict_map_key=True")
+            error_mock.assert_called_with('Error in received message: int is not allowed for map key')
 
         # Assert that no state transition occurred
         assert client.fsm.state == ClientState.IDLE

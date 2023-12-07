@@ -2,26 +2,39 @@ import os
 import pathlib
 import random
 import re
+import ssl
 import subprocess
-import time
-from enum import Enum
-from typing import Tuple
-
+import asyncio
+import json
 import netifaces
 import numpy as np
 import pandas as pd
+import nats
+from nats.aio.client import Client
+from enum import Enum
+from typing import Tuple
+
+import nats_client
+import nats_config
 from options import Options
 from log_config import logger
-
 args = Options()
 
+# Channel to frequency and frequency to channel mapping
 CH_TO_FREQ = {1: 2412, 2: 2417, 3: 2422, 4: 2427, 5: 2432, 6: 2437, 7: 2442, 8: 2447, 9: 2452, 10: 2457, 11: 2462,
               36: 5180, 40: 5200, 44: 5220, 48: 5240, 52: 5260, 56: 5280, 60: 5300, 64: 5320, 100: 5500, 104: 5520,
               108: 5540, 112: 5560, 116: 5580, 120: 5600, 124: 5620, 128: 5640, 132: 5660, 136: 5680, 140: 5700,
               149: 5745, 153: 5765, 157: 5785, 161: 5805}
+
 FREQ_TO_CH = {v: k for k, v in CH_TO_FREQ.items()}
 
+# Ath10k scan features
 FEATS_ATH10K = ['max_magnitude', 'total_gain_db', 'base_pwr_db', 'rssi', 'relpwr_db', 'avgpwr_db', 'snr', 'cnr', 'pn', 'ssi', 'pd', 'sinr', 'sir', 'mr', 'pr']
+
+# Certificates
+client_cert = "/etc/ssl/certs/comms_auth_cert.pem"
+key = "/etc/ssl/private/comms_auth_private_key.pem"
+ca_cert = "/etc/ssl/certs/root-ca.cert.pem"
 
 
 class Band(Enum):
@@ -107,49 +120,26 @@ def map_freq_to_channel(freq: int) -> int:
     return FREQ_TO_CH[freq]
 
 
-def switch_frequency(frequency: str) -> None:
+async def switch_frequency(frequency: str) -> None:
     """
-    Change the mesh frequency to the starting frequency.
+    Change the mesh frequency to the specified frequency using NATS.
     """
     logger.info(f"Moving to {frequency} MHz ...")
 
-    # Run commands
-    cmd_rmv_ip = ["ifconfig", f"{args.mesh_interface}", "0"]
-    cmd_interface_down = ["ifconfig", f"{args.mesh_interface}", "down"]
-    run_command(cmd_rmv_ip, 'Failed to set interface 0')
-    run_command(cmd_interface_down, 'Failed to set interface down')
+    # Connect to NATS
+    nc = await nats_client.connect_nats()
 
-    # If wpa_supplicant is running, kill it before restarting
-    if is_process_running('wpa_supplicant'):
-        kill_process_by_pid('wpa_supplicant')
-        time.sleep(10)
+    cmd_dict = {"frequency": frequency, "radio_index": args.radio_index}
+    cmd = json.dumps(cmd_dict)
 
-    # Remove mesh interface file to avoid errors when reinitializing interface
-    interface_file = '/var/run/wpa_supplicant/' + args.mesh_interface
-    if os.path.exists(interface_file):
-        os.remove(interface_file)
-
-    # Read and check wpa supplicant config
-    wpa_supplicant_conf = '/var/run/wpa_supplicant-11s_wlp1s0.conf'
-    conf = read_file(wpa_supplicant_conf, 'Failed to read wpa supplicant config')
-    if conf is None:
-        logger.info("wpa supplicant config is None. Aborting.")
-        return
-
-    # Edit wpa supplicant config with new mesh freq
-    edited_conf = re.sub(r'frequency=\d*', f'frequency={frequency}', conf)
-
-    # Write edited config back to file
-    write_file(wpa_supplicant_conf, edited_conf, 'Failed to write wpa supplicant config')
-
-    # Restart wpa_supplicant
-    cmd_restart_supplicant = ["wpa_supplicant", "-Dnl80211", f"-i{args.mesh_interface}", "-c", wpa_supplicant_conf, "-B"]
-    run_command(cmd_restart_supplicant, 'Failed to restart wpa supplicant')
-    time.sleep(6)
-
-    # Check mesh frequency switch output
-    cmd_iw_dev = ["iw", "dev"]
-    run_command(cmd_iw_dev, 'Failed to run iw dev')
+    try:
+        await nc.request(f"comms.channel_change.{nats_config.MODULE_IDENTITY}", cmd.encode(), timeout=10)
+        logger.info(f"Published to comms.channel_change: {cmd}")
+        await asyncio.sleep(15)
+    except Exception as e:
+        logger.error(f"Failed to change channel: {e}")
+    finally:
+        await nc.close()
 
 
 def load_sample_data(args: Options = Options()) -> Tuple[str, pd.DataFrame]:
@@ -199,7 +189,7 @@ def get_frequency_quality(freq_quality: np.ndarray, probs: np.ndarray, frequenci
 
     for i, freq in enumerate(frequencies):
         index = np.argmax(probs[i])
-        freq_quality_dict[str(freq)] = float(freq_quality[i])
+        freq_quality_dict[str(freq)] = round(float(freq_quality[i]), 5)
         if index == 0:
             pred = 'floor like interference'
         elif index == 1:
@@ -219,7 +209,7 @@ def run_command(command, error_message) -> None:
     """
     Execute a shell command and check for success.
 
-    param command: The shell command to execute.
+    param command: The shell command to execute in the form of list of strings.
     param error_message: Error message to display if the command fails.
     """
     try:
@@ -229,7 +219,7 @@ def run_command(command, error_message) -> None:
             return_code = subprocess.call(command, shell=False, stdout=subprocess_output, stderr=subprocess_output)
 
         if return_code != 0:
-            logger.error(f"Command failed with return code {return_code}")
+            logger.error(f"Command {command} failed with return code {return_code}")
     except Exception as e:
         logger.error(f"{error_message}. Error: {e}")
         raise Exception(error_message) from e
@@ -278,11 +268,7 @@ def is_process_running(process_name: str) -> bool:
     try:
         ps_output = subprocess.check_output(['ps', 'aux']).decode('utf-8')
         if process_name in ps_output:
-            if process_name == 'wpa_supplicant':
-                if args.mesh_interface in ps_output:
-                    return True
-            else:
-                return True
+            return True
         else:
             return False
     except subprocess.CalledProcessError as e:
@@ -303,13 +289,8 @@ def get_pid_by_process_name(process_name: str) -> int:
         ps_output = subprocess.check_output(['ps', 'aux'], text=True)
         for line in ps_output.split('\n'):
             if process_name in line:
-                if process_name == 'wpa_supplicant':
-                    if args.mesh_interface in line:
-                        pid = int(line.split()[0])
-                        return pid
-                else:
-                    pid = int(line.split()[0])
-                    return pid
+                pid = int(line.split()[0])
+                return pid
         return 0  # Process not found
     except subprocess.CalledProcessError:
         return 0
@@ -321,9 +302,12 @@ def kill_process_by_pid(process_name: str) -> None:
 
     param: The name of the process to be killed.
     """
-    # Retrieve the Process ID (PID) of the specified process
-    pid = get_pid_by_process_name(process_name)
-    try:
-        subprocess.check_output(['kill', str(pid)])
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to kill process: {e}")  # Failed to kill the process
+    if is_process_running(process_name):
+        # Retrieve the Process ID (PID) of the specified process
+        pid = get_pid_by_process_name(process_name)
+        try:
+            subprocess.check_output(['kill', str(pid)])
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to kill process: {e}")  # Failed to kill the process
+    else:
+        logger.info(f"{process_name} not running, nothing to kill.")

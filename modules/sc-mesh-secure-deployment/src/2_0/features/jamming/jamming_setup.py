@@ -1,11 +1,18 @@
+import json
 import subprocess
 import threading
 
 import netifaces
+import signal
 import sys
 import time
+import re
+import os
+import asyncio
 import numpy as np
 import util
+import nats_client
+import options
 from options import Options
 from log_config import logger
 
@@ -21,9 +28,9 @@ def is_interface_up(interface) -> bool:
     return interface in available_interfaces
 
 
-def switch_frequency(args) -> None:
+async def switch_frequency(args) -> None:
     """
-    Change the mesh frequency to the starting frequency.
+    Change to starting frequency.
     """
     # Set max number of reties to perform the switch frequency method in case it fails
     max_retries: int = 3
@@ -36,10 +43,11 @@ def switch_frequency(args) -> None:
     while not switch_successful:
         try:
             # Execute switch frequency function
-            util.switch_frequency(starting_frequency)
+            await util.switch_frequency(starting_frequency)
 
             # Validate outcome of switch frequency process
             mesh_freq = util.get_mesh_freq()
+
             if mesh_freq != int(starting_frequency):
                 if num_switch_freq_retries < max_retries:
                     logger.info("Frequency switch unsuccessful... retrying")
@@ -48,7 +56,7 @@ def switch_frequency(args) -> None:
                     continue
                 else:
                     logger.info("Cannot set node to starting frequency. Maximum retries reached.")
-                    sys.exit(1)
+                    return
             else:
                 logger.info("Frequency switch successful")
                 switch_successful = True
@@ -61,10 +69,10 @@ def switch_frequency(args) -> None:
                 time.sleep(1)  # Adjust sleep duration if needed
             else:
                 logger.info("Cannot set node to starting frequency. Maximum retries reached.")
-                sys.exit(1)
+                return
 
 
-def check_osf_connectivity(args) -> None:
+def check_client_osf_connectivity(args) -> None:
     """
     Check IPv6 connectivity with a remote server.
 
@@ -86,19 +94,22 @@ def check_osf_connectivity(args) -> None:
             sys.exit(1)
 
 
-def setup_osf_interface(args: Options) -> None:
+def check_osf_interface(args: Options) -> None:
     """
-    Set up the OSF interface using a tun0 tunnel.
+    Check if OSF interface is up.
 
     param args: Options object containing configuration options.
     """
+    num_retries: int = 0
+    max_retries: int = 3
     interface_status: bool = is_interface_up(args.osf_interface)
-    if not interface_status:
-        try:
-            setup_osf_interface_command = ["start_tunslip6.sh", "/dev/nrf0", f"{args.osf_interface}"]
-            util.run_command(setup_osf_interface_command, "Failed to set up OSF interface")
-        except Exception as e:
-            logger.error(f"OSF interface failed: {e}")
+
+    while not interface_status and num_retries < max_retries:
+        time.sleep(10)
+        interface_status = is_interface_up(args.osf_interface)
+        num_retries += 1
+        if num_retries == max_retries:
+            logger.error(f"OSF interface failed")
             sys.exit(1)
 
 
@@ -163,34 +174,149 @@ def start_jamming_scripts(args, osf_ipv6_address) -> None:
         logger.info(f"Error starting jamming server/client scripts: {e}")
         raise Exception(e)
 
-def main():
+
+async def get_device_identity() -> None:
+    """
+    Request device identity
+    """
+    try:
+        # Connect to NATS!
+        nc = await nats_client.connect_nats()
+
+        cmd_dict = {"api_version": 1, "cmd": "GET_IDENTITY"}
+        cmd = json.dumps(cmd_dict)
+        rep = await nc.request("comms.identity",
+                               cmd.encode(),
+                               timeout=2)
+        logger.error(rep.data)
+
+        parameters = json.loads(rep.data.decode())
+
+        if "identity" in parameters["data"]:
+            with open("identity.py", "w") as f:
+                f.write(f"MODULE_IDENTITY=\"{parameters['data']['identity']}\"\n")
+        else:
+            logger.error("No identity received!")
+        await nc.close()
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error get_device_identity")
+        time.sleep(2)
+
+
+def validate_configuration(args) -> bool:
+    """
+    Validate that scan interface and scan channels configurations are valid for jamming detection feature.
+
+    :return: A boolean to denote whether the device and parameter configurations are valid.
+    """
+    valid = True
+
+    # Check that scan interface is set to 20mhz
+    try:
+        iw_output = os.popen('iw dev').read()
+        iw_output = re.sub(r'\s+', ' ', iw_output).split(' ')
+
+        # Extract interface sections from iw_output
+        idx_list = [idx - 1 for idx, val in enumerate(iw_output) if val == "Interface"]
+        if len(idx_list) > 1:
+            idx_list.pop(0)
+
+        # Calculate the start and end indices for interface sections
+        start_indices = [0] + idx_list
+        end_indices = idx_list + ([len(iw_output)] if idx_list[-1] != len(iw_output) else [])
+
+        # Use zip to create pairs of start and end indices, and extract interface sections
+        iw_interfaces = [iw_output[start:end] for start, end in zip(start_indices, end_indices)]
+
+        # Get scan interface channel width
+        for interface_list in iw_interfaces:
+            if args.scan_interface in interface_list:
+                channel_width_index = interface_list.index("width:") + 1
+                channel_width = re.sub("[^0-9]", "", interface_list[channel_width_index]).split()[0]
+                if channel_width != "20":
+                    logger.info(f"{args.scan_interface} interface channel width must be set to 20 MHz.")
+                    valid = False
+                break
+            else:
+                logger.info(f"No {args.scan_interface} interface")
+    except Exception as e:
+        logger.error(f"Exception: {e}")
+
+    # Check that list of channels to scan does not include any DFS channels
+    if not all(channel in options.VALID_CHANNELS for channel in args.channels5):
+        logger.info("5 GHz channels must be of the following: (36,40,44,48,149,153,157,161)")
+        valid = False
+
+    # Return validity after all checks performed
+    return valid
+
+
+# Function to handle the SIGTERM signal
+def sigterm_handler(signum, frame):
+    """
+    Handles a signal interrupt (SIGINT).
+
+    :param signum: The signal number received by the handler.
+    :param frame: The current execution frame.
+    """
+    try:
+        logger.info(f"Received SIGTERM signal. Attempting to stop jamming scripts.")
+        util.kill_process_by_pid("jamming_client_fsm.py")
+        util.kill_process_by_pid("jamming_server_fsm.py")
+        logger.info("Jamming scripts stopped.")
+        # Exit after cleanup
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"Error killing jamming client and server FSM scripts. {str(e)}")
+        # Exit with an error code
+        sys.exit(1)
+
+
+# Set up the signal handler for SIGTERM
+signal.signal(signal.SIGTERM, sigterm_handler)
+
+
+async def main():
     # Create Options instance
     args = Options()
 
-    # Set up tun0 interface for OSF
-    logger.info("1. Set up tun0 osf interface")
-    setup_osf_interface(args)
+    # Get device identity
+    if not os.path.exists('identity.py'):
+        logger.info("1. Get device identity")
+        await get_device_identity()
 
     # Switch to starting frequency
     logger.info("2. Switch to starting frequency")
     mesh_freq = util.get_mesh_freq()
     if mesh_freq == np.nan or util.map_channel_to_freq(args.starting_channel) != mesh_freq:
-        switch_frequency(args)
+        await switch_frequency(args)
 
-    # Get the IPv6 address of the tun0 interface
-    logger.info("3. Get ipv6 of tun0")
+    # Validate configuration parameters
+    logger.info("3. Validate configuration")
+    if not validate_configuration(args):
+        logger.error("Invalid configuration. Please check messages above for more information.")
+        util.run_command(['/opt/S99jammingavoidance', 'stop'], "Stopping S99jammingavoidance service failed.")
+
+    # Check interface for OSF
+    logger.info("4. Check if osf interface is up")
+    check_osf_interface(args)
+
+    # Get IPv6 address of osf interface
+    logger.info("5. Get ipv6 of osf interface")
     osf_ipv6_address = util.get_ipv6_addr(args.osf_interface)
     if osf_ipv6_address is None:
-        raise ValueError("IPv6 address of the tun0 interface is not available.")
+        raise ValueError(f"No IPv6 address {args.osf_interface} interface.")
 
     # If the current node is a client, check ipv6 connectivity with server
-    logger.info("4. Check connectivity")
     if args.jamming_osf_orchestrator != osf_ipv6_address:
-        check_osf_connectivity(args)
+        logger.info("6. Check client osf connectivity with server")
+        check_client_osf_connectivity(args)
 
     # Start jamming-related scripts
     start_jamming_scripts(args, osf_ipv6_address)
 
 
 if __name__ == "__main__":
-    main()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
+    loop.close()

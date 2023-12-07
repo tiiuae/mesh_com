@@ -1,14 +1,4 @@
 #!/bin/bash
-### BEGIN INIT INFO
-# Provides:          S9011APoint
-# Should-Start:      $syslog
-# Should-Stop:       $syslog
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: start S9011sAP during boot time
-# Description:       wifi mesh daemon for configuring mesh network
-#                    automatically
-### END INIT INFO
 
 source /opt/mesh-helper.sh
 # sources mesh configuration
@@ -21,61 +11,108 @@ DAEMON="mesh-11s_nats.sh"
 DIR="/opt/"
 _WIFI="${RADIO_INDEX}_MESH_VIF"
 _MODE="${RADIO_INDEX}_MODE"
-PIDFILE="/var/run/${DAEMON}_hostapd_${RADIO_INDEX}.pid"
 LOG_FILE=/opt/mesh-11s_AP_${RADIO_INDEX}.log
 
-# shellcheck source=/dev/null
-[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
+# The daemon's name (to ensure uniqueness and for stop, restart and status)
+name="mesh-11s_nats_AP_${RADIO_INDEX}"
 
-start() {
-    if [ "${!_MODE}" == "ap+mesh_mcc" ] || [ "${!_MODE}" == "ap+mesh_scc" ]; then
-      printf 'Starting %s: ' "$DAEMON"
-      start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON ${!_MODE} ${RADIO_INDEX} > $LOG_FILE 2>&1"
-      status=$?
-      if [ "$status" -eq 0 ]; then
-        echo "OK"
-      else
-        echo "FAIL"
-      fi
-    else
-      echo "ap+mesh not starting..."
-      echo "S90APoint: ap+mesh not starting..." > $LOG_FILE
-      return 0
-    fi
-    return "$status"
-}
-stop() {
-    printf 'Stopping %s: ' "$DAEMON"
-    # shellcheck disable=SC2009 #pgrep is not available
-    NEW_PID=$(ps ax | grep -E "[h]ostapd-$RADIO_INDEX" | awk {'print $1'})
-    kill -9 "$NEW_PID"
-    start-stop-daemon -K -o -q -p "$PIDFILE"
-    rm -fr /var/run/hostapd/* 2>/dev/null
-    ifconfig "${!_WIFI}"-1 down 2>/dev/null
-    iw dev "${!_WIFI}"-1 del 2>/dev/null
-    ifname_ap="$(ifconfig -a | grep -m 1 "wlan*" | awk -F':' '{ print $1 }')"
-    ifconfig "$ifname_ap" down 2>/dev/null
-    iw dev "$ifname_ap" del 2>/dev/null
-    status=$?
-    if [ "$status" -eq 0 ]; then
-        rm -f "$PIDFILE"
-        echo "OK"
-    else
-        echo "FAIL"
-    fi
-    return "$status"
-}
-restart() {
-    stop
-    sleep 1
-    start
-}
+# The path of the daemon executable
+daemon="/usr/bin/daemon"
+
+# Other configuration parameters for the service
+pidfiles="/var/run"
+user=""
+chroot=""
+chdir=""
+umask=""
+stdout="$LOG_FILE"
+stderr="$LOG_FILE"
+daemon_start_args="--delay=11 --attempts=1 --respawn --ignore-eof"
+
 case "$1" in
-    start|stop|restart)
-        "$1";;
-    reload)
-        # Restart, since there is no true "reload" feature.
-        restart;;
+    start)
+      if [ "${!_MODE}" == "ap+mesh_mcc" ] || [ "${!_MODE}" == "ap+mesh_scc" ]; then
+
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "$name is already running."
+        else
+            echo "Starting $name..."
+            "$daemon" $daemon_start_args \
+                --name "$name" --pidfiles "$pidfiles" \
+                ${user:+--user $user} ${chroot:+--chroot $chroot} \
+                ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
+                ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
+                -- $DIR$DAEMON ${!_MODE} $RADIO_INDEX
+            echo done.
+        fi
+       else
+          echo "ap+mesh not starting..."
+          echo "S90APoint: ap+mesh not starting..."
+          exit 0
+       fi
+        ;;
+
+
+    stop)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Stopping $name..."
+            "$daemon" --stop --name "$name" --pidfiles "$pidfiles"
+            echo done.
+
+            NEW_PID=$(ps ax | grep -E "[h]ostapd-$RADIO_INDEX" | awk {'print $1'})
+            kill -9 "$NEW_PID"
+            rm -fr /var/run/hostapd/* 2>/dev/null
+            ifconfig "${!_WIFI}"-1 down 2>/dev/null
+            iw dev "${!_WIFI}"-1 del 2>/dev/null
+            ifname_ap="$(ifconfig -a | grep -m 1 "wlan*" | awk -F':' '{ print $1 }')"
+            ifconfig "$ifname_ap" down 2>/dev/null
+            iw dev "$ifname_ap" del 2>/dev/null
+            return 0
+        else
+            echo "$name is not running."
+        fi
+        ;;
+
+
+    restart|reload)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Stopping $name..."
+            "$daemon" --stop --name "$name" --pidfiles "$pidfiles"
+            echo done.
+
+            NEW_PID=$(ps ax | grep -E "[h]ostapd-$RADIO_INDEX" | awk {'print $1'})
+            kill -9 "$NEW_PID"
+            rm -fr /var/run/hostapd/* 2>/dev/null
+            ifconfig "${!_WIFI}"-1 down 2>/dev/null
+            iw dev "${!_WIFI}"-1 del 2>/dev/null
+            ifname_ap="$(ifconfig -a | grep -m 1 "wlan*" | awk -F':' '{ print $1 }')"
+            ifconfig "$ifname_ap" down 2>/dev/null
+            iw dev "$ifname_ap" del 2>/dev/null
+            return 0
+        fi
+        if [ "${!_MODE}" == "ap+mesh_mcc" ] || [ "${!_MODE}" == "ap+mesh_scc" ]; then
+	          # start if not running
+            echo "Starting $name..."
+            "$daemon" $daemon_start_args \
+                --name "$name" --pidfiles "$pidfiles" \
+                ${user:+--user $user} ${chroot:+--chroot $chroot} \
+                ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
+                ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
+                -- $DIR$DAEMON ${!_MODE} $RADIO_INDEX
+            echo done.
+        fi
+
+        ;;
+
+
+    status)
+        "$daemon" --running --name "$name" --pidfiles "$pidfiles" --verbose
+        ;;
+
+
     *)
         echo "Usage: $0 {start|stop|restart|reload}"
         exit 1

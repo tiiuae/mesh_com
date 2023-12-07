@@ -1,6 +1,7 @@
 """
 Helper functions for validating NATS parameters
 """
+import os
 import re
 import socket
 
@@ -262,14 +263,23 @@ def validate_radio_index(radio_index: str) -> bool:
 #         return True
 #     return False
 
+def is_valid_interface(interface_name: str) -> bool:
+    """
+    Validates a given interface.
+    Returns True if the interface is valid, False otherwise.
+    """
+    interfaces = os.listdir('/sys/class/net')
+    if interface_name in interfaces or validate_batman_iface(interface_name):
+        return True
+    return False
+
 def validate_mesh_vif(mesh_vif: str) -> bool:
     """
     Validates a given mesh vif.
     Returns True if the mesh vif is valid, False otherwise.
     """
-    # todo add more checks
     try:
-        if mesh_vif.startswith("wl") or mesh_vif.startswith("halow"):
+        if is_valid_interface(mesh_vif):
             return True
         return False
     except (ValueError, TypeError, AttributeError):
@@ -286,6 +296,7 @@ def validate_batman_iface(batman_iface: str) -> bool:
         return False
     except (ValueError, TypeError, AttributeError):
         return False
+
 def validate_mptcp(mptcp: str) -> bool:
     """
     Validates a given mptcp.
@@ -295,5 +306,18 @@ def validate_mptcp(mptcp: str) -> bool:
         if mptcp in ("enable", "disable"):
             return True
         return False
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+def validate_slaac(slaac: str) -> bool:
+    """
+    Validates a given slaac ifaces.
+    Returns True if the slaac ifaces are valid, False otherwise.
+    """
+    try:
+        for slaac_if in slaac.split():
+            if not is_valid_interface(slaac_if):
+                return False
+        return True
     except (ValueError, TypeError, AttributeError):
         return False
