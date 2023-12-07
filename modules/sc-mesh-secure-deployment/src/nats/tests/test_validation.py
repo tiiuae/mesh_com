@@ -4,6 +4,8 @@ Unittests for validations.py
 # pylint: disable=import-error, wrong-import-position, unused-import, \
 # disable=unresolved-reference, undefined-variable, too-long
 import unittest
+import os
+import random
 from .context import validation
 
 
@@ -18,9 +20,9 @@ class TestValidation(unittest.TestCase):
         Test cases for validate_ssid(ssid)
         """
         # ssid is valid
-        self.assertTrue(validation.validate_ssid('mesh'))
+        self.assertTrue(validation.validate_ssid("mesh"))
         # ssid is invalid
-        self.assertFalse(validation.validate_ssid('meshmeshmessshmeshmessshmeshmesss'))
+        self.assertFalse(validation.validate_ssid("meshmeshmessshmeshmessshmeshmesss"))
         # ssid is invalid
         self.assertFalse(validation.validate_ssid(1))
         # print ascii chars in the range of ascii code 32 to 126 (decimal)
@@ -36,38 +38,41 @@ class TestValidation(unittest.TestCase):
         # psk is invalid
         self.assertFalse(validation.validate_wpa3_psk(1))
         # psk is valid
-        self.assertTrue(validation.validate_wpa3_psk('12345678'))
+        self.assertTrue(validation.validate_wpa3_psk("12345678"))
         # psk is invalid (short)
-        self.assertFalse(validation.validate_wpa3_psk('1234567'))
+        self.assertFalse(validation.validate_wpa3_psk("1234567"))
         # psk with invalid (long)
         self.assertFalse(
-            validation.validate_wpa3_psk("""12345678901234567890123456789012345678901234567890123456789012345"""))
+            validation.validate_wpa3_psk(
+                """12345678901234567890123456789012345678901234567890123456789012345"""
+            )
+        )
 
     def test_validate_ip_address(self):
         """
         Test cases for validate_ip_address(ip)
         """
         # ip is valid
-        self.assertTrue(validation.validate_ip_address('10.10.10.10'))
+        self.assertTrue(validation.validate_ip_address("10.10.10.10"))
         # ip is invalid
-        self.assertFalse(validation.validate_ip_address('1000.0.0.0'))
+        self.assertFalse(validation.validate_ip_address("1000.0.0.0"))
         # ip is invalid
         self.assertFalse(validation.validate_ip_address(1))
         # ip is invalid
-        self.assertFalse(validation.validate_ip_address('0.0.0'))
+        self.assertFalse(validation.validate_ip_address("0.0.0"))
         # ip is invalid
-        self.assertFalse(validation.validate_ip_address('0.0.256.0'))
+        self.assertFalse(validation.validate_ip_address("0.0.256.0"))
 
     def test_validate_netmask(self):
         """
         Test cases for validate_netmask(netmask)
         """
         # netmask is valid
-        self.assertTrue(validation.validate_netmask('255.255.255.0'))
+        self.assertTrue(validation.validate_netmask("255.255.255.0"))
         # netmask is invalid
-        self.assertFalse(validation.validate_netmask('0.0.0.255'))
+        self.assertFalse(validation.validate_netmask("0.0.0.255"))
         # netmask is invalid
-        self.assertFalse(validation.validate_netmask('a.b.c.d'))
+        self.assertFalse(validation.validate_netmask("a.b.c.d"))
         # netmask is invalid
         self.assertFalse(validation.validate_netmask(1))
 
@@ -91,32 +96,32 @@ class TestValidation(unittest.TestCase):
         Test cases for validate_country_code(country_code)
         """
         # country code is valid
-        self.assertTrue(validation.validate_country_code('DE'))
+        self.assertTrue(validation.validate_country_code("DE"))
         # country code is invalid
-        self.assertFalse(validation.validate_country_code('DEU'))
+        self.assertFalse(validation.validate_country_code("DEU"))
         # country code is invalid
-        self.assertFalse(validation.validate_country_code('D'))
+        self.assertFalse(validation.validate_country_code("D"))
         # country code is invalid
-        self.assertFalse(validation.validate_country_code('DEUTSCHLAND'))
+        self.assertFalse(validation.validate_country_code("DEUTSCHLAND"))
         # country code is invalid
-        self.assertFalse(validation.validate_country_code(''))
+        self.assertFalse(validation.validate_country_code(""))
         # country code is invalid
-        self.assertFalse(validation.validate_country_code(' '))
+        self.assertFalse(validation.validate_country_code(" "))
         # country code is invalid
-        self.assertFalse(validation.validate_country_code('  '))
+        self.assertFalse(validation.validate_country_code("  "))
         # country code is invalid
-        self.assertFalse(validation.validate_country_code('   '))
+        self.assertFalse(validation.validate_country_code("   "))
         # country code is invalid
         self.assertFalse(validation.validate_country_code(1))
 
     def test_validate_wifi_mode(self):
         """
-       Test cases for validate_wifi_mode(mode)
-       """
-        self.assertFalse(validation.validate_mode('ap'))
+        Test cases for validate_wifi_mode(mode)
+        """
+        self.assertFalse(validation.validate_mode("ap"))
         self.assertFalse(validation.validate_mode(1))
-        self.assertFalse(validation.validate_mode('sta'))
-        self.assertTrue(validation.validate_mode('mesh'))
+        self.assertFalse(validation.validate_mode("sta"))
+        self.assertTrue(validation.validate_mode("mesh"))
 
     def test_validate_frequency(self):
         """
@@ -146,17 +151,17 @@ class TestValidation(unittest.TestCase):
         Test cases for validate_routing(routing)
         """
         # routing is invalid
-        self.assertFalse(validation.validate_routing('none'))
+        self.assertFalse(validation.validate_routing("none"))
         # routing is valid
-        self.assertTrue(validation.validate_routing('olsr'))
+        self.assertTrue(validation.validate_routing("olsr"))
         # routing is valid
-        self.assertTrue(validation.validate_routing('batman-adv'))
+        self.assertTrue(validation.validate_routing("batman-adv"))
         # routing is invalid
-        self.assertFalse(validation.validate_routing('nonee'))
+        self.assertFalse(validation.validate_routing("nonee"))
         # routing is invalid
-        self.assertFalse(validation.validate_routing('olsrr'))
+        self.assertFalse(validation.validate_routing("olsrr"))
         # routing is invalid
-        self.assertFalse(validation.validate_routing('batmann'))
+        self.assertFalse(validation.validate_routing("batmann"))
         # routing is invalid
         self.assertFalse(validation.validate_routing(1))
 
@@ -165,17 +170,17 @@ class TestValidation(unittest.TestCase):
         Test cases for validate_priority(priority)
         """
         # priority is invalid
-        self.assertFalse(validation.validate_priority('none'))
+        self.assertFalse(validation.validate_priority("none"))
         # priority is valid
-        self.assertTrue(validation.validate_priority('long_range'))
+        self.assertTrue(validation.validate_priority("long_range"))
         # priority is valid
-        self.assertFalse(validation.validate_priority('high'))
+        self.assertFalse(validation.validate_priority("high"))
         # priority is invalid
-        self.assertFalse(validation.validate_priority('nonee'))
+        self.assertFalse(validation.validate_priority("nonee"))
         # priority is invalid
-        self.assertFalse(validation.validate_priority('long_rang'))
+        self.assertFalse(validation.validate_priority("long_rang"))
         # priority is invalid
-        self.assertFalse(validation.validate_priority('hig'))
+        self.assertFalse(validation.validate_priority("hig"))
         # priority is invalid
         self.assertFalse(validation.validate_priority(1))
         # priotity is valid
@@ -201,26 +206,15 @@ class TestValidation(unittest.TestCase):
         """
         Test cases for validate_mesh_vif(mesh_vif)
         """
-        # mesh vif is valid
-        self.assertTrue(validation.validate_mesh_vif("wlp2s0"))
-        # mesh vif is valid
-        self.assertTrue(validation.validate_mesh_vif("wlp3s0"))
-        # mesh vif is valid
-        self.assertTrue(validation.validate_mesh_vif("halow1"))
-        # mesh vif is valid
-        self.assertTrue(validation.validate_mesh_vif("wlp2s1"))
-        # mesh vif is valid
-        self.assertTrue(validation.validate_mesh_vif("wlp3s1"))
-        # mesh vif is valid
-        self.assertTrue(validation.validate_mesh_vif("halow2"))
-        # mesh vif is invalid
-        self.assertFalse(validation.validate_mesh_vif("lan1"))
-        # mesh vif is invalid
-        self.assertFalse(validation.validate_mesh_vif("eth0"))
-        # mesh vif is invalid
-        self.assertFalse(validation.validate_mesh_vif("usb0"))
-        # mesh vif is invalid
-        self.assertFalse(validation.validate_mesh_vif(0))
+        interfaces = os.listdir("/sys/class/net")
+        for interface_name in interfaces:
+            self.assertTrue(validation.validate_mesh_vif(interface_name))
+            self.assertFalse(validation.validate_mesh_vif(interface_name[::-1]))
+
+        self.assertFalse(validation.validate_mesh_vif(1))
+        self.assertFalse(validation.validate_mesh_vif(""))
+        self.assertFalse(validation.validate_mesh_vif(" "))
+        self.assertFalse(validation.validate_mesh_vif("  "))
 
     def test_validate_batman_iface(self):
         """
@@ -238,8 +232,5 @@ class TestValidation(unittest.TestCase):
         self.assertFalse(validation.validate_batman_iface(0))
 
 
-
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

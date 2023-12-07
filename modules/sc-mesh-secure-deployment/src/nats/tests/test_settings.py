@@ -4,23 +4,28 @@ Unittests for validations.py
 # pylint: disable=import-error, wrong-import-position, unused-import, \
 # disable=unresolved-reference, undefined-variable, too-long
 import unittest
+from unittest.mock import patch
 import json
 import logging
 import warnings
 from .context import comms_settings as comms
 from .context import comms_status as comms_status
 
-
 class TestSettings(unittest.TestCase):
     """
     Test cases for comms_settings.py
     """
 
-    def test_handle_mesh_settings(self):
+    @patch("src.validation.is_valid_interface")
+    def test_handle_mesh_settings(self, mock_is_valid_interface):
         """
         Test cases for handle_mesh_settings()
         """
+
         with warnings.catch_warnings():
+            # interface validation will be tested separately
+            mock_is_valid_interface.return_value = True
+
             warnings.simplefilter("ignore", ResourceWarning)
             # settings json is valid
             logger = logging.getLogger("test")
@@ -101,7 +106,9 @@ class TestSettings(unittest.TestCase):
             }
 
             jsoned = json.dumps(cmd_dict)
-            ret, mesh_status = settings.handle_mesh_settings(jsoned, "./tests", "mesh.conf")
+            ret, mesh_status = settings.handle_mesh_settings(
+                jsoned, "./tests", "mesh.conf"
+            )
             self.assertEqual(ret, "OK", msg=f"ret: {ret}, mesh_status: {mesh_status}")
 
             # settings json is invalid

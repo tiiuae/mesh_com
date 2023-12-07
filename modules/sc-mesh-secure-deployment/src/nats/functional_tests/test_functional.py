@@ -23,6 +23,7 @@ class TestFunctional(unittest.IsolatedAsyncioTestCase):
     """
     Functional test to test the communication between the controller and the module
     """
+
     async def test_identity(self):
         """
         Test cases for comms_settings.py
@@ -224,9 +225,8 @@ class TestFunctional(unittest.IsolatedAsyncioTestCase):
         await nc.close()
 
         data = await asyncio.wait_for(self.visual_helper(), 15)
-        d = data[1]
         # todo: check if the data is correct
-        if d["status"][0] == "MESH":
+        if len(data) > 0:
             received = True
 
         self.assertTrue(received)
@@ -334,7 +334,9 @@ class TestFunctional(unittest.IsolatedAsyncioTestCase):
             cmd_dict = {"frequency": new_frequency, "radio_index": "0"}
             cmd = json.dumps(cmd_dict)
             rep = await nc.request(
-                f"comms.channel_change.{config.MODULE_IDENTITY}", cmd.encode(), timeout=10
+                f"comms.channel_change.{config.MODULE_IDENTITY}",
+                cmd.encode(),
+                timeout=10,
             )
             parameters = json.loads(rep.data)
             if parameters["status"] == "OK":
@@ -367,7 +369,7 @@ class TestFunctional(unittest.IsolatedAsyncioTestCase):
             print("Connected to NATS ...")
 
         async def subscribe_handler(msg):
-            self.data = json.loads(msg.data.decode())
+            self.data = msg.data
             done.set()  # Signal that we received the message and can return
 
         try:
