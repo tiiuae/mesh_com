@@ -16,40 +16,46 @@ get_ipv6_address "$desired_interface"
 }
 
 
-start_olsrd()
-{
+
+start_olsrd() {
   INTERFACE="$1"
-  echo "testing in olsr"
-  cat > /etc/olsrd/$INTERFACE.conf <<- EOF
-  LinkQualityFishEye   0
+  PID_FILE="/run/olsrd-$INTERFACE.pid"
+  CONFIG_FILE="/etc/olsrd/$INTERFACE.conf"
 
-  Interface "$INTERFACE"
-  {
-  }
-
-  IpVersion               6
-  LinkQualityFishEye      0
-  LinkQualityAlgorithm "etx_ffeth_nl80211"
-
-  LoadPlugin "/usr/lib/olsrd_arprefresh.so.0.1"  
-  {
-  }
+  echo "Testing in OLSR"
   
+  cat > "$CONFIG_FILE" <<- EOF
+    LinkQualityFishEye   0
+
+    Interface "$INTERFACE"
+    {
+    }
+
+    IpVersion               6
+    LinkQualityFishEye      0
+    LinkQualityAlgorithm "etx_ffeth_nl80211"
+
+    LoadPlugin "/usr/lib/olsrd_arprefresh.so.0.1"
+    {
+    }
 EOF
-  qos-olsrd -i "$INTERFACE" -d 0 -f "/etc/olsrd/$INTERFACE.conf"
-  // -p /run/olsrd-$INTERFACE.pid
+
+  # Use start-stop-daemon to start the OLSR daemon
+  start-stop-daemon --start --background --make-pidfile --pidfile "$PID_FILE" \
+    --exec /usr/sbin/qos-olsrd -- -i "$INTERFACE" -d 0 -f "$CONFIG_FILE"
 }
 
 
-stop_olsrd() 
-{
-    pid_file="/run/qos-olsrd.pid"
+stop_olsrd() {
+  INTERFACE="$1"
+  PID_FILE="/run/olsrd-$INTERFACE.pid"
 
-    if [ -e "$pid_file" ]; then
-        echo "Stopping daemon using start-stop-daemon"
-        start-stop-daemon --stop --pidfile "$pid_file"
-    else
-        echo "PID file $pid_file not found. Daemon may not be running."
-    fi
+  if [ -e "$PID_FILE" ]; then
+    echo "Stopping OLSR daemon for $INTERFACE using start-stop-daemon"
+    start-stop-daemon --stop --pidfile "$PID_FILE"
+    rm -f "$PID_FILE"  # Remove the PID file after stopping the daemon
+  else
+    echo "PID file $PID_FILE not found. OLSR daemon may not be running."
+  fi
 }
 
