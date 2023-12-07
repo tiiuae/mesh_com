@@ -344,7 +344,7 @@ EOF
         fi
       elif [ "$routing_algo" == "olsr" ]; then
         #mesh_kill "[o]lsrd -i $wifidev -d 0"
-        stop_olsrd 
+        stop_olsrd "$id0_MESH_VIF"
       fi
 
       echo "$wifidev down.."
