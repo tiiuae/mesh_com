@@ -1,20 +1,11 @@
 #!/bin/sh
 
 # The daemon's name (to ensure uniqueness and for stop, restart and status)
-name="comms_controller"
+name="mdm_agent"
 
 # The path of the Python executable
 python_exec="/usr/bin/python"
 exec="/opt/nats/comms_nats_controller.py"
-
-KEY_FILE="/etc/ssl/private/comms_auth_private_key.pem"
-CERT_FILE="/etc/ssl/certs/comms_auth_cert.pem"
-
-if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
-  command_args="-s 0.0.0.0 -p 4222 -k $KEY_FILE -c $CERT_FILE --agent fmo"
-else
-  command_args="-s 0.0.0.0 -p 4222 --agent fmo"
-fi
 
 [ -x "$python_exec" ] || exit 0
 [ -f "$exec" ] || exit 0
@@ -22,7 +13,26 @@ fi
 # The path of the daemon executable
 daemon="/usr/bin/daemon"
 
-LOG_FILE=/opt/comms_controller.log
+# TODO testing purposes
+BC_KEY_FILE="/opt/certs/CBMA/BirthCerts/csl1.local.key"
+BC_CERT_FILE="/opt/certs/CBMA/BirthCerts/csl1.local.crt"
+BC_CA_FILE="/opt/certs/CBMA/BirthCerts/ca.crt"
+
+# TODO naming
+CBMA_KEY_FILE="/opt/certs/CBMA/LowerCBMA/csl1.local.key"
+CBMA_CERT_FILE="/opt/certs/CBMA/LowerCBMA/csl1.local.crt"
+CBMA_CA_FILE="/opt/certs/CBMA/LowerCBMA/ca.crt"
+
+
+if [ -e "$BC_CA_FILE" ] && [ -e "$BC_KEY_FILE" ] && [ -e "$BC_CERT_FILE" ]; then
+  command_args="-k $BC_KEY_FILE -c $BC_CERT_FILE -r $BC_CA_FILE --agent mdm"
+elif [ -e "$CBMA_KEY_FILE" ] && [ -e "$CBMA_CERT_FILE" ] && [ -e "$CBMA_CA_FILE" ]; then
+  command_args="-k $CBMA_KEY_FILE -c $CBMA_CERT_FILE -r $CBMA_CA_FILE --agent mdm"
+else
+  command_args="--agent mdm"
+fi
+
+LOG_FILE=/opt/mdm_agent.log
 # Other configuration parameters for the service
 pidfiles="/var/run"
 user=""

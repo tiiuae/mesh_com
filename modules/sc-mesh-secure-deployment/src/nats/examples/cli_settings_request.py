@@ -29,6 +29,7 @@ async def main():
                 "mesh_vif": "wlp2s0",
                 "batman_iface": "bat0",
                 "bridge": "br-lan bat0 eth1 lan1 eth0 usb0",
+                "slaac": "usb0 wlp2s0", # SLAAC support for usb0 + mesh_vif
             },
             {
                 "radio_index": "1",
@@ -48,6 +49,7 @@ async def main():
                 "mesh_vif": "wlp3s0",  # this needs to be correct
                 "batman_iface": "bat0",
                 "bridge": "br-lan bat0 eth1 lan1 eth0 usb0",
+                "slaac": "usb0 wlp3s0", # SLAAC support for usb0 + mesh_vif
             },
             {
                 "radio_index": "2",
@@ -67,6 +69,7 @@ async def main():
                 "mesh_vif": "halow1",
                 "batman_iface": "bat0",
                 "bridge": "br-lan bat0 eth1 lan1 eth0 usb0",
+                "slaac": "usb0 halow1", # SLAAC support for usb0 + mesh_vif
             },
         ],
     }

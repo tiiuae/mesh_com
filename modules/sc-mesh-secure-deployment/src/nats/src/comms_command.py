@@ -54,9 +54,7 @@ class Command:  # pylint: disable=too-many-instance-attributes
     Command class
     """
 
-    def __init__(self, server, port, comms_status: List[CommsStatus], logger):
-        self.nats_server = server
-        self.port = port
+    def __init__(self, comms_status: List[CommsStatus], logger):
         self.logger = logger
         self.api_version = 1
         self.command = ""

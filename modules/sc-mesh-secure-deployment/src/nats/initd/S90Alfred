@@ -1,70 +1,79 @@
-#!/bin/bash
-### BEGIN INIT INFO
-# Provides:          S90Alfred
-# Short-Description: alfred
-# Description:       Starts alfred to provide visualization data
-### END INIT INFO
+#!/bin/sh
 
-DAEMON="alfred"
-DIR="/usr/bin/"
-PIDFILE="/var/run/$DAEMON.pid"
-# shellcheck source=/dev/null
-[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
-LOG_FILE=/opt/alfred.log
+# The daemon's name (to ensure uniqueness and for stop, restart and status)
+name="alfred"
 
-source /opt/mesh-helper.sh
-# sources mesh configuration
-source_configuration "id0"
-bridge_name=$(echo "$BRIDGE" | cut -d' ' -f1)
+# The path of the Python executable
+exec="/usr/bin/alfred"
+command_args="-i bat0 -m"
 
-ARGS="-i $bridge_name -m"
+[ -x "$exec" ] || exit 0
 
-wait_for_bridge() {
-  while [ ! -d "/sys/class/net/$bridge_name" ]; do
-    sleep 1
-  done
-}
+# The path of the daemon executable
+daemon="/usr/bin/daemon"
 
-start() {
-    echo "$ARGS"
-    printf 'Starting %s: ' "$DAEMON"
-    start-stop-daemon -b -m -S -q -p "$PIDFILE" -a /bin/bash -- -c "exec $DIR$DAEMON \
-          $ARGS > $LOG_FILE 2>&1"
-    status=$?
-    if [ "$status" -eq 0 ]; then
-        echo "OK"
-    else
-        echo "FAIL"
-    fi
-    return "$status"
-}
-stop() {
-    printf 'Stopping %s: ' "$DAEMON"
-    start-stop-daemon -K -q -p "$PIDFILE"
-    status=$?
-    if [ "$status" -eq 0 ]; then
-        rm -f "$PIDFILE"
-        echo "OK"
-    else
-        echo "FAIL"
-    fi
-    return "$status"
-}
-restart() {
-    stop
-    sleep 1
-    start
-}
+# Other configuration parameters for the service
+pidfiles="/var/run"
+user=""
+chroot=""
+chdir=""
+umask=""
+stdout="daemon.info"
+stderr="daemon.err"
+daemon_start_args="--delay=11 --attempts=1 --respawn"
+
 case "$1" in
-    start|stop|restart)
-        "$1";;
-    reload)
-        # Restart, since there is no true "reload" feature.
-        restart;;
+    start)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "$name is already running."
+        else
+            echo "Starting $name..."
+            "$daemon" $daemon_start_args \
+                --name "$name" --pidfiles "$pidfiles" \
+                ${user:+--user $user} ${chroot:+--chroot $chroot} \
+                ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
+                ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
+                -- "$exec" $command_args
+            echo done.
+        fi
+        ;;
+
+
+    stop)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Stopping $name..."
+            "$daemon" --stop --name "$name" --pidfiles "$pidfiles"
+            echo done.
+        else
+            echo "$name is not running."
+        fi
+        ;;
+
+
+    restart|reload)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Restarting $name..."
+            "$daemon" --restart --name "$name" --pidfiles "$pidfiles"
+            echo done.
+        else
+            echo "$name is not running."
+            exit 0
+        fi
+        ;;
+
+
+    status)
+        "$daemon" --running --name "$name" --pidfiles "$pidfiles" --verbose
+        ;;
+
+
     *)
-        echo "Usage: $0 {start|stop|restart|reload}"
+        echo "usage: $0 <start|stop|restart|reload|status>" >&2
         exit 1
 esac
 
-exit 0
 
+exit 0
