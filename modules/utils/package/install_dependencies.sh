@@ -1,9 +1,8 @@
-# Install machine learning packages
+# Install ml_packages
+cd /opt/mesh_com/modules/utils/package || exit
 chmod +x /opt/mesh_com/modules/utils/package/ml_packages.tar.gz
 tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/ml_packages.tar.gz
-
 cd /opt/mesh_com/modules/utils/package/ml_packages || exit
-
 for f in {*.whl,*.gz};
 do
   name="$(echo "$f" | cut -d'-' -f1)"
@@ -16,3 +15,7 @@ do
 fi
 done;
 
+cd .. ;
+
+cp /opt/mesh_com/modules/utils/package/ml_packages/libpcap.so.0.8 /usr/lib/.
+cp /opt/mesh_com/modules/utils/package/ml_packages/pcap.cpython-39-aarch64-linux-gnu.so /usr/lib/python3.9/site-packages/.
