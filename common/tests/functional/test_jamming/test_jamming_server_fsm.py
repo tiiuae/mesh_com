@@ -212,7 +212,7 @@ class TestCodeUnderTest:
         server.clients.append(mock_client)
 
         # Set the last_requested_spectrum_data attribute to a time in the past
-        server.last_requested_spectrum_data = time.time() - 10
+        server.last_requested_spectrum_data = time.time() - 1000000
 
         # Trigger the spectrum data gathering expired event
         server.fsm.trigger(ServerEvent.SPECTRUM_DATA_GATHERING_EXPIRED)
@@ -270,7 +270,7 @@ class TestCodeUnderTest:
         server.clients.append(mock_client2)
 
         # Set the last_requested_spectrum_data attribute to a time in the past
-        server.last_requested_spectrum_data = time.time() - 10
+        server.last_requested_spectrum_data = time.time() - 1000000
 
         # Trigger the gathered all spectrum data event
         server.fsm.trigger(ServerEvent.GATHERED_ALL_SPECTRUM_DATA)
@@ -398,7 +398,7 @@ class TestCodeUnderTest:
         server = JammingServer('::1', 12345)
         server.running = True
         server.fsm.state = ServerState.IDLE
-        server.last_target_freq_broadcast = time.time() - 10
+        server.last_target_freq_broadcast = time.time() - 1000000
 
         # Create a thread to run run_server_fsm
         run_server_fsm_thread = threading.Thread(target=server.run_server_fsm)
