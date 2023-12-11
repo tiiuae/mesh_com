@@ -1,5 +1,5 @@
 #!/bin/bash
-
+source ./qos_olsrd_conf.sh
 is_interface() {
   # arguments:
   # $1 = interface name
@@ -160,6 +160,17 @@ find_phy_interface() {
   done
 }
 
+slaac() {
+  _slaac_interfaces=$1
+  echo "SLAAC for '$_slaac_interfaces'"
+  for _slaac_interface in $_slaac_interfaces; do
+    echo "  SLAAC for '$_slaac_interface'"
+    /opt/slaac.sh $_slaac_interface
+    echo "  SLAAC for '$_slaac_interface' DONE"
+  done
+  echo "SLAAC for '$_slaac_interfaces' DONE"
+}
+
 mode_execute() {
   # parameters:
   # $1 = mode
@@ -267,6 +278,9 @@ EOF
         (olsrd -i "$wifidev" -d 0)&
       fi
 
+      #SLAAC immediately after basic setup
+      slaac "$slaac"
+
       if [ "$routing_algo" == "batman-adv" ]; then
         sleep 3
         # for visualisation
@@ -329,7 +343,8 @@ EOF
           modprobe batman-adv
         fi
       elif [ "$routing_algo" == "olsr" ]; then
-        mesh_kill "[o]lsrd -i $wifidev -d 0"
+        #mesh_kill "[o]lsrd -i $wifidev -d 0"
+        stop_olsrd "$id0_MESH_VIF"
       fi
 
       echo "$wifidev down.."
@@ -379,8 +394,12 @@ EOF
       elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
         # Enable debug level as necessary
-        (olsrd -i "$wifidev" -d 0)&
+        #(olsrd -i "$wifidev" -d 0)&
+        start_olsrd "$id0_MESH_VIF"
       fi
+
+      #SLAAC immediately after basic setup
+      slaac "$slaac"
 
       # Radio parameters
       iw dev "$wifidev" set txpower limit "$txpwr"00
@@ -450,6 +469,9 @@ EOF
       route add -net "$network" gw "$bridge_ip" netmask "$nmask" dev "$bridge_name"
       iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
 
+      #SLAAC immediately after basic setup
+      slaac "$slaac"
+
       # Start AP
       /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX".conf -f /tmp/hostapd_"$INDEX".log
       ;;
@@ -517,6 +539,9 @@ EOF
       ifconfig "$bridge_name"
       iptables -P FORWARD ACCEPT
       ip addr flush dev "$batman_iface"
+
+      #SLAAC immediately after basic setup
+      slaac "$slaac"
 
       # Start AP
       /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX".conf  -f /tmp/hostapd_"$INDEX".log
@@ -626,6 +651,10 @@ main () {
   _bridge="${INDEX}_BRIDGE"
   bridge="${!_bridge}"
 
+  _slaac="${INDEX}_SLAAC"
+  slaac="${!_slaac}"
+  echo "SLAAC ifaces: '$slaac'"
+
   # shellcheck disable=SC2153
   # shellcheck disable=SC2034
   # this is for the future use
@@ -656,7 +685,7 @@ main () {
       bridge_ip=$bridge_ip
       calculate_network_address "$bridge_ip" "$nmask"
   fi
-  if [ $mptcp == "enable" ]; then
+  if [ "$mptcp" == "enable" ]; then
     echo "MPTCP enabled"
     if ! [ -f /var/run/mptcp.conf ]; then
         echo "SUBFLOWS=0" > /var/run/mptcp.conf

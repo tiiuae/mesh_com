@@ -13,65 +13,91 @@ if [ "$MSVERSION" != "nats" ]; then
   fi
 else
 
+  #######################################
+  # BC needs to be on place before this #
+  #######################################
+
+  # TODO: Identity from BC or HSM?
   if [ ! -f "/opt/identity" ]; then
       echo "generates identity id"
       generate_identity_id
   fi
 
+  #######################################
+  # Initialise default radios and IF    #
+  #######################################
+
   # Do not continue in case halow init has not finished
+  # Halow is slow to start, so we wait for it to finish
   while ps aux | grep [i]nit_halow > /dev/null; do
       sleep 1
   done
 
+  # TODO: remove as SLAAC?
   echo "set bridge ip"
   generate_lan_bridge_ip
 
-  echo "starting 11s mesh service"
-  # todo for loop range 0..3
-  /opt/S9011sNatsMesh start id0
-  if [ -f "/opt/1_mesh.conf" ]; then
-    /opt/S9011sNatsMesh start id1
-  fi
-  if [ -f "/opt/2_mesh.conf" ]; then
-    /opt/S9011sNatsMesh start id2
-  fi
+  echo "Starting 11s mesh service"
+  # Loop for mesh service
+  for i in {0..2}; do
+    if [ "$i" -eq 0 ] || [ -f "/opt/${i}_mesh.conf" ]; then
+      /opt/S9011sNatsMesh start id"$i"
+    fi
+  done
 
-  echo "starting AP service"
-  /opt/S90APoint start id0
-  if [ -f "/opt/1_mesh.conf" ]; then
-    /opt/S90APoint start id1
-  fi
-  if [ -f "/opt/2_mesh.conf" ]; then
-    /opt/S90APoint start id2
-  fi
-
-  echo "wait for bridge to be up..."
-  while ! (ifconfig | grep -e "$bridge_ip") > /dev/null; do
-    sleep 1
+  echo "Starting AP service"
+  # Loop for AP service
+  for i in {0..2}; do
+    if [ "$i" -eq 0 ] || [ -f "/opt/${i}_mesh.conf" ]; then
+      /opt/S90APoint start id"$i"
+    fi
   done
 
   sleep 3
 
-  /opt/S90Alfred start
+  #######################################
+  # Enable MDM stuff                    #
+  #######################################
+  # TODO start mdm agent earlier? and wait in first boot?
+  echo "starting mdm agent for testing purposes"
+  /opt/S90mdm_agent start
 
-  echo "starting provisioning agent"
-  # blocks execution until provisioning is done or timeout (30s)
-  # IP address and port are passed as arguments and hardcoded. TODO: mDNS
-  python /opt/nats/src/comms_provisioning.py -t 30 -s 192.168.1.254 -p 8080 -o /opt > /opt/comms_provisioning.log 2>&1
+  # Start jamming service
+  JAMMING=$(extract_features_value "jamming" $YAML_FILE)
+  if [ "$JAMMING" == "true" ]; then
+    echo "starting jamming avoidance service"
+    /opt/S99jammingavoidance start
+  fi
 
-  echo "Start nats server and client nodes"
-  /opt/S90nats_discovery start
+  #######################################
+  # Enable FMO stuff                    #
+  #######################################
+  # FMO can be configured in the features.yaml file
+  #FMO=$(extract_features_value "FMO" $YAML_FILE)
+  #if [ "$FMO" = "true" ]; then
+    echo "starting Alfred"
+    /opt/S90Alfred start
 
-  echo "wait for nats.conf to be created"
-  until [ -f /var/run/nats.conf ]; do
-    sleep 1
-  done
+    echo "starting provisioning agent"
+    # blocks execution until provisioning is done or timeout (30s)
+    # IP address and port are passed as arguments and hardcoded. TODO: mDNS
+    python /opt/nats/src/comms_provisioning.py -t 30 -s 192.168.1.254 -p 8080 -o /opt > /opt/comms_provisioning.log 2>&1
 
-  echo "starting nats server"
-  /opt/S90nats_server start
+    echo "Start nats server and client nodes"
+    # todo: mDNS based
+    /opt/S90nats_discovery start
 
-  echo "starting comms services"
-  /opt/S90comms_controller start
+    echo "wait for nats.conf to be created"
+    until [ -f /var/run/nats.conf ]; do
+      sleep 1
+    done
+
+    echo "starting nats server"
+    /opt/S90nats_server start
+
+    echo "starting comms services"
+    /opt/S90comms_controller start
+  #fi # FMO
 
   # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"
