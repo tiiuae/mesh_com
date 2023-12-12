@@ -28,5 +28,7 @@ class RSS_Auth(ObservableModule):
     def check(self):
         # Simulated DPI detection logic
         if random.choice([True, False]):
-            ip = f"192.168.1.{random.randint(1, 3)}"
-            self.notify({"feature": "RSS", "module": "rss_auth", "result": "fail", "ip": ip})
+            rand_int = random.randint(1, 3)
+            ip = f"fe80::a8bb:ccff::fed:dee0:{rand_int}"
+            mac = f"aa:bb:cc:dd:ee:{rand_int}{rand_int}"
+            self.notify({"feature": "RSS", "module": "rss_auth", "result": "fail", "ip": ip, "mac": mac})

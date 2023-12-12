@@ -19,7 +19,42 @@ logger = CustomLogger("mba").get_logger()
 
 
 class MBA(ObservableModule):
+    """
+    A class representing a Malicious Behavior Announcement (MBA) system,
+    responsible for sending and receiving multicast messages about malicious behavior.
+
+    Inherits from ObservableModule to utilize its notification system.
+
+    Attributes:
+    multicast_group (str): The IPv6 address of the multicast group.
+    port (int): The port number used for multicast communication.
+    interface (str): The network interface used for sending and receiving multicast MBA messages.
+    stop_event (threading.Event): An event to stop the receiver loop.
+    mymac (str): MAC address of the interface used for MBA multicast in the current machine.
+    my_cert_dir (str): Directory containing the machine's private key.
+    peer_cert_dir (str): Directory containing the public keys of peers.
+
+    Methods:
+    send_mba(mac, ip): Sends a malicious behavior announcement to the multicast group.
+    receive_mba(): Continuously listens for and processes incoming MBA messages.
+    sign_mba_message(message): Signs an MBA message with the machine's private key.
+    verify_mba_signature(signature, message, source_ip): Verifies the signature of a received MBA message.
+    """
     def __init__(self, decision_engine, multicast_group, port, interface, my_cert_dir, peer_cert_dir, stop_event=threading.Event()):
+        """
+        Initializes the MBA instance with multicast group details, network interface, certificate directories,
+        and a stop event for controlling the receiver loop.
+
+        Parameters:
+        decision_engine: An instance of a decision engine for processing received messages.
+        multicast_group (str): The IPv6 address of the multicast group.
+        port (int): The port number used for multicast communication.
+        interface (str): The network interface used for sending and receiving multicast messages.
+        my_cert_dir (str): Directory containing the machine's private key.
+        peer_cert_dir (str): Directory containing the public keys of peers.
+        stop_event (threading.Event, optional): An event to stop the receiver loop. Defaults to threading.Event().
+        """
+
         super().__init__(decision_engine)
         self.multicast_group = multicast_group
         self.port = port
@@ -30,6 +65,13 @@ class MBA(ObservableModule):
         self.peer_cert_dir = peer_cert_dir
 
     def send_mba(self, mac, ip):
+        """
+        Sends a malicious behavior announcement to the multicast group.
+
+        Parameters:
+        mac (str): MAC address of the malicious node.
+        ip (str): IP address of the malicious node.
+        """
         with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as sock:
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, 1)
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, socket.if_nametoindex(self.interface)) # Set multicast interface
@@ -45,6 +87,11 @@ class MBA(ObservableModule):
             sock.sendto(signed_message, (self.multicast_group, self.port))
 
     def receive_mba(self):
+        """
+        Listens for incoming MBA messages and processes them.
+        Runs continuously until the stop_event is set.
+        Validates the message signature and notifies the decision engine if valid.
+        """
 
         with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -74,11 +121,31 @@ class MBA(ObservableModule):
                         self.notify({"module": "MBA", "mac": decoded_message['mal_mac'], "ip": decoded_message['mal_ip']})
 
     def sign_mba_message(self, message):
+        """
+        Signs an MBA message using the private key of the machine.
+
+        Parameters:
+        message (bytes): The MBA message to be signed.
+
+        Returns:
+        bytes: The message, combined with its signature.
+        """
         path_to_priv_key = f"{self.my_cert_dir}/macsec_{self.mymac.replace(':','')}.key" # TODO: update priv key access when HSM is in use
         signature = cryptography_tools.sign_message(message, path_to_priv_key, logger)
         return cryptography_tools.generate_signed_message(message, signature)
 
     def verify_mba_signature(self, signature, message, source_ip):
+        """
+        Verifies the signature of an MBA message using the sender's public key.
+
+        Parameters:
+        signature (bytes): The signature to be verified.
+        message (bytes): The MBA message that was signed.
+        source_ip (str): The source IP address of the message, used to determine the sender's MAC address.
+
+        Returns:
+        bool: True if the signature is valid, False otherwise.
+        """
         source_mac = get_mac_from_ipv6(source_ip, self.interface)
         path_to_pub_key = f"{self.peer_cert_dir}/macsec_{source_mac.replace(':','')}.pem"
         return cryptography_tools.verify_signature(signature, message, path_to_pub_key, logger)

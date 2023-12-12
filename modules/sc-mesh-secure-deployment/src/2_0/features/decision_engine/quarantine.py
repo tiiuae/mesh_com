@@ -11,13 +11,46 @@ sys.path.append(f'{path_to_decision_engine}/..')
 from cbma.tools.custom_logger import CustomLogger
 logger = CustomLogger("quarantine").get_logger()
 
-#TODO: block, unblock, encrypt blacklist
+#TODO: call comms controller blacklist, remove_from_blacklist functionalities, and encrypt local blacklist
 class Quarantine:
-    def __init__(self, mal_id, mal_ip, quarantine_period, blacklist_lock, blocked_ips, blacklist_dir = './blacklist', blacklist_filename = 'blacklist.csv', debug=False):
+    """
+    A class to manage the quarantine of malicious nodes.
+
+    Attributes:
+    dir (str): Directory where the local blacklist file is stored.
+    file_name (str): Name of the local blacklist CSV file.
+    file_path (str): Full path to the local blacklist file.
+    mal_mac (str): MAC address of the malicious node.
+    mal_ip (str): IP address of the malicious node.
+    quarantine_period (int): Duration of the quarantine in seconds.
+    blacklist_lock (threading.Lock): Lock for synchronizing access to the local blacklist file.
+    blocked_ips (set): Set of IPs currently blocked.
+    debug (bool): Flag to enable debug logging.
+
+    Methods:
+    start_quarantine(): Adds node to blacklist and starts quarantine.
+    add_to_blacklist(): Adds node to local blacklist file.
+    end_quarantine(): Removes node from blacklist and ends its quarantine.
+    remove_from_blacklist(): Removes node from local blacklist file.
+    """
+    def __init__(self, mal_mac, mal_ip, quarantine_period, blacklist_lock, blocked_ips, blacklist_dir = './blacklist', blacklist_filename = 'blacklist.csv', debug=False):
+        """
+        Constructs all the necessary attributes for the Quarantine object.
+
+        Parameters:
+        mal_mac (str): MAC address of the malicious node.
+        mal_ip (str): IP address of the malicious node.
+        quarantine_period (int): Duration of the quarantine in seconds.
+        blacklist_lock (threading.Lock): Lock for synchronizing access to the blacklist file.
+        blocked_ips (set): Set of IPs currently blocked.
+        blacklist_dir (str, optional): Directory where the blacklist file is stored. Defaults to './blacklist'.
+        blacklist_filename (str, optional): Name of the local blacklist CSV file. Defaults to 'blacklist.csv'.
+        debug (bool, optional): Flag to enable debug logging. Defaults to False.
+        """
         self.dir = blacklist_dir
         self.file_name = blacklist_filename
         self.file_path = os.path.join(self.dir, self.file_name)
-        self.mal_id = mal_id
+        self.mal_mac = mal_mac
         self.mal_ip = mal_ip
         self.quarantine_period = quarantine_period
         self.blacklist_lock = blacklist_lock
@@ -25,10 +58,13 @@ class Quarantine:
         self.debug = debug
     def start_quarantine(self):
         """
-        Adds node to blacklist and starts quarantine
-        Calls end_quarantine method automatically once quarantine_period is over
+        Adds the node to the blacklist and starts a timer for the quarantine period.
 
-        :return: quarantine_timer thread
+        There is a placeholder to call the comms controller blacklist functionality.
+        At the end of the quarantine period, it automatically calls the end_quarantine method.
+
+        Returns:
+        threading.Timer: A timer thread that counts down the quarantine period.
         """
         self.add_to_blacklist()
         logger.info(f'Starting quarantine for node {self.mal_ip}')
@@ -40,14 +76,16 @@ class Quarantine:
 
     def add_to_blacklist(self):
         """
-        Adds node to local blacklist file
+        Adds the malicious node to the local blacklist file.
+
+        The node's information is appended to the CSV file, creating the file if it doesn't exist.
         """
         # Create the directory if it doesn't exist
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
 
         # Initialize df
-        data = {'ID': [self.mal_id], 'IP': [self.mal_ip], 'Quarantine_Period': [self.quarantine_period]}
+        data = {'MAC': [self.mal_mac], 'IP': [self.mal_ip], 'Quarantine_Period': [self.quarantine_period]}
         df = pd.DataFrame(data)
         # Add current timestamp as start timestamp for each row in df
         df['Start_timestamp'] = time.time()
@@ -65,7 +103,10 @@ class Quarantine:
 
     def end_quarantine(self):
         """
-        Removes node from blacklist and ends its quarantine
+        Ends the quarantine for the node by removing it from the blacklist.
+
+        There is a placeholder to call the comms controller functionality to remove a node from being blacklisted.
+        Updates the set of blocked IPs and calls the method to remove the node from the local blacklist file.
         """
         self.blocked_ips.discard(self.mal_ip)
         self.remove_from_blacklist()
@@ -74,14 +115,16 @@ class Quarantine:
 
     def remove_from_blacklist(self):
         """
-        Removes node from local blacklist file
+        Removes the node from the local blacklist file.
+
+        Reads the current blacklist, removes the node's entry, and writes the updated list back to the file.
         """
         with self.blacklist_lock:
             # Read the df from the CSV file
             df = pd.read_csv(self.file_path)
             # Remove row for malicious node
-            df = df[df['ID'] != self.mal_id]
+            df = df[df['IP'] != self.mal_ip]
             if self.debug:
-                logger.info(f'Blacklist after removing mal node {self.mal_id}:\n{df}')
+                logger.info(f'Blacklist after removing mal node {self.mal_ip}:\n{df}')
             # Save the updated DataFrame back to the original CSV file
             df.to_csv(self.file_path, index=False, header=True, mode='w')
