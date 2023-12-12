@@ -106,7 +106,7 @@ class AuthClient:
             self.logger.error("Unable to get the server certificate", exc_info=True)
             #raise CertificateNoPresentError("Unable to get the server certificate")
             return
-
+        store_peer_certificate(peer_cert=server_cert, peer_mac=self.server_mac, logger=self.logger)
         result['authenticated'] = verify_cert(server_cert, self.ca, self.sslServerIP, self.interface, self.logger)
 
         # # Safe to proceed with the communication, even if the certificate is not authenticated

@@ -4,6 +4,9 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from .utils import get_mac_from_ipv6
 import re
+import ssl
+import os
+
 
 # Custom exceptions for certificate verification
 class CertificateExpiredError(Exception):
@@ -136,3 +139,28 @@ def _verify_certificate_chain(cert, trusted_certs, logging):
     except Exception as e:
         logging.error(f"Certificate chain verification failed: {e}", exc_info=True)
         return False
+
+def store_peer_certificate(peer_cert, peer_mac, logger):
+    """
+    Store peer certificate to a file
+    """
+    try:
+        # Convert DER to PEM
+        peer_cert_pem = ssl.DER_cert_to_PEM_cert(peer_cert)
+
+        # Write the PEM certificate to a file
+        directory = '/tmp/peer_certificates/'
+        filename = f"macsec_{peer_mac.replace(':', '')}.pem"
+        file_path = os.path.join(directory, filename)
+
+        # Create the directory if it doesn't exist
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        # Write the PEM certificate to the file
+        with open(file_path, 'w') as cert_file:
+            cert_file.write(peer_cert_pem)
+
+        logger.info(f"Stored peer certificate for {peer_mac}")
+    except Exception as e:
+        logger.info(f"Error storing peer certificate for {peer_mac}: {e}")
