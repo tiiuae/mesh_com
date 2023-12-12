@@ -37,7 +37,6 @@ stop() {
     rm -fr /var/run/ss-redir.json 2>/dev/null
     kill -9 "$(ps ax | grep -E "ss-server" | awk 'NR==1{print $1'})"
     rm -fr /var/run/ss-server.json 2>/dev/null
-    rm -fr /var/run/mptcp.conf 2>/dev/null
     iptables -t nat -F
 
     start-stop-daemon -K -o -q -p "$PIDFILE"
