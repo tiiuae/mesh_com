@@ -174,6 +174,8 @@ class TestCodeUnderTest:
     def test_successfully_kill_process_by_pid(self, mocker):
         # Mock the get_pid_by_process_name function to return a valid PID
         mocker.patch('util.get_pid_by_process_name', return_value=1234)
+        # Mock the get_pid_by_process_name function to return a valid PID
+        mocker.patch('util.is_process_running', return_value=True)
 
         # Mock the subprocess.check_output function to avoid actually killing the process
         mocker.patch('subprocess.check_output')
@@ -181,7 +183,7 @@ class TestCodeUnderTest:
         # Call the kill_process_by_pid function
         kill_process_by_pid('process_name')
 
-        # Assert that the subprocess.check_output function was called with the correct arguments
+        # Assert that the subprocess.check_output function was called to kill running process
         subprocess.check_output.assert_called_once_with(['kill', '1234'])
 
     #  Get the frequency quality information for all frequencies even if some frequencies have errors
