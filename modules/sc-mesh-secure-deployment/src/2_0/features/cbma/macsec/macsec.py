@@ -23,6 +23,11 @@ class Macsec:
         # Sets up macsec link and adds tx channel
         macsec_interface = self.get_macsec_interface_name(client_mac)
         try:
+            subprocess.run(["ip", "link", "delete", macsec_interface], check=True)
+        except:
+            pass
+
+        try:
             subprocess.run(["ip", "link", "add", "link", self.interface, macsec_interface,
                             "type", "macsec",
                             "port", str(my_port),
