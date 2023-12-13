@@ -25,7 +25,6 @@ do
    fi
    i=$(($i+1));
 done <<< "$iface_list"
-SUBFLOWS=$i
 ip mptcp limits set subflow $SUBFLOWS add_addr_accepted $SUBFLOWS
 
 BR_PHY=$(brctl show | grep $BRIDGE_IFACE | awk -F " " '{printf $4}')
