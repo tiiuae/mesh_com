@@ -9,6 +9,7 @@ import base64
 from shlex import quote
 import hashlib
 import os
+import time
 from typing import Tuple, Union, List
 
 import netifaces as ni  # type: ignore
@@ -247,13 +248,12 @@ class Command:  # pylint: disable=too-many-instance-attributes
             ]
             # Stop S90mptcp before restarting S9011sNatsMesh
             ret = subprocess.run(
-                ["/opt/S90mptcp", "stop"], shell=False, check=True, capture_output=True,)
+                ["/opt/S90mptcp", "stop"], shell=False, check=True, capture_output=True, )
             if ret.returncode != 0:
                 return "FAIL", f"Clearing MPTCP configs failed" + str(
                     ret.returncode
                 ) + str(ret.stdout) + str(ret.stderr)
             self.logger.debug("Stopped MPTCP service")
-            return "OK", "Stopped MPTCP service"
 
             for process in processes:
                 # delay before restarting mesh using delay
@@ -268,7 +268,8 @@ class Command:  # pylint: disable=too-many-instance-attributes
                         ret.returncode
                     ) + str(ret.stdout) + str(ret.stderr)
             self.logger.debug("Mission configurations applied")
-            return "OK", "Mission configurations applied"
+
+            time.sleep(5)
             # Start S90mptcp after restarting S9011sNatsMesh
             ret = subprocess.run(
                 ["/opt/S90mptcp", "start"], shell=False, check=True, capture_output=True, )
@@ -278,7 +279,6 @@ class Command:  # pylint: disable=too-many-instance-attributes
                 ) + str(ret.stdout) + str(ret.stderr)
             self.logger.debug("Started MPTCP service")
             return "OK", "Started MPTCP service"
-
         self.logger.debug("No mission config to apply!")
         return "FAIL", "No setting to apply"
 
