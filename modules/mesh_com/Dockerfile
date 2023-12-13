@@ -1,5 +1,5 @@
 # Given dynamically from CI job.
-FROM --platform=${BUILDPLATFORM:-linux/amd64} ghcr.io/tiiuae/fog-ros-sdk:sha-ba8047f-${TARGETARCH:-amd64} AS builder
+FROM --platform=${BUILDPLATFORM:-linux/amd64} ghcr.io/tiiuae/fog-ros-sdk:v3.1.0-${TARGETARCH:-amd64} AS builder
 
 # Install build dependencies
 RUN apt update -y && apt install -y --no-install-recommends \
@@ -24,7 +24,7 @@ RUN /packaging/build.sh
 #  ▲               runtime ──┐
 #  └── build                 ▼
 
-FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-ba8047f
+FROM ghcr.io/tiiuae/fog-ros-baseimage:v3.1.0
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 
