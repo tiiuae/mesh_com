@@ -15,6 +15,8 @@ logger = logger_instance.get_logger()
 
 
 class AuthServer:
+    CLIENT_TIMEOUT = 60
+
     def __init__(self, interface, ip_address, port, cert_path, ca_path, mua):
         threading.Thread.__init__(self)
         self.running = True
@@ -31,8 +33,8 @@ class AuthServer:
         self.context.check_hostname = False
         self.context.verify_mode = ssl.CERT_REQUIRED
         self.context.load_cert_chain(
-            certfile=glob.glob(f"{self.CERT_PATH}/MAC/{self.mymac}.crt")[0],
-            keyfile=glob.glob(f"{self.CERT_PATH}/private.key")[0],
+            certfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.crt")[0],
+            keyfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.key")[0],
         )
         self.client_auth_results = {}
         self.active_sockets = {}
@@ -53,13 +55,13 @@ class AuthServer:
 
     def authenticate_client(self, client_connection, client_address, client_mac):
         secure_client_socket = self.context.wrap_socket(client_connection, server_side=True)
+        secure_client_socket.settimeout(self.CLIENT_TIMEOUT)
+
         try:
             client_cert = secure_client_socket.getpeercert(binary_form=True)
             if not client_cert:
                 logger.error(f"Unable to get the certificate from the client {client_address[0]}", exc_info=True)
                 raise CertificateNoPresentError("Unable to get the certificate from the client")
-
-            store_peer_certificate(peer_cert=client_cert, peer_mac=client_mac, logger=logger)
 
             auth = verify_cert(client_cert, self.ca, client_address[0], self.interface, logger)
             with self.client_auth_results_lock:
@@ -71,12 +73,12 @@ class AuthServer:
             else:
                 # Handle the case when authentication fails, maybe send an error message
                 self.mua.auth_fail(client_mac=client_mac)
+                secure_client_socket.close()
                 # secure_client_socket.sendall(b"Authentication failed.")
         except Exception as e:
             logger.error(f"An error occurred while handling the client {client_address[0]}.", exc_info=True)
             self.mua.auth_fail(client_mac=client_mac)
-        # finally:
-        #     secure_client_socket.close()
+            secure_client_socket.close()
 
     def get_secure_socket(self, client_address):
         with self.active_sockets_lock:
@@ -102,29 +104,18 @@ class AuthServer:
             raise ValueError("Invalid IP address")
 
         self.serverSocket.listen()
-        self.serverSocket.settimeout(2)
         logger.info("Server listening")
 
         while self.running and not self.mua.shutdown_event.is_set():
             try:
                 client_connection, client_address = self.serverSocket.accept()
                 threading.Thread(target=self.handle_client, args=(client_connection, client_address)).start()
-            except socket.timeout:  # In case we add a timeout later.
-                if self.mua.shutdown_event.is_set():
-                    self.stop_server()
-                    break
-                continue
             except Exception as e:
                 if self.running:
                     logger.error("Unexpected error in server loop.", exc_info=True)
 
     def stop_server(self):
         self.running = False
-        if hasattr(self, "serverSocket"):
-            self.serverSocket.close()
-            for sock in self.active_sockets.values():
-                sock.close()
-
         if is_ipv4(self.ipAddress):
             serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             serverSocket.bind((self.ipAddress, self.port))
@@ -132,3 +123,7 @@ class AuthServer:
             serverSocket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
             scope_id = socket.if_nametoindex(self.interface)
             serverSocket.bind((self.ipAddress, int(self.port), 0, scope_id))
+        if hasattr(self, "serverSocket"):
+            self.serverSocket.close()
+            for sock in self.active_sockets.values():
+                sock.close()
