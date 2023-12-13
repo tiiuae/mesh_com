@@ -656,14 +656,22 @@ main () {
   fi
   if [ $mptcp == "enable" ]; then
     echo "MPTCP enabled"
+    if ! [ -f /var/run/mptcp.conf ]; then
+        echo "SUBFLOWS=-1" > /var/run/mptcp.conf
+    fi
     if [ $(grep -ic "INTERFACE_${INDEX}" /var/run/mptcp.conf) -eq 1 ]; then
         source /var/run/mptcp.conf
         sed -i "/INTERFACE_${INDEX}/d" /var/run/mptcp.conf
+    else
+        source /var/run/mptcp.conf
+        subflows=$((SUBFLOWS+1))
+        sed_param=s/SUBFLOWS=.*/SUBFLOWS=${subflows}/
+        sed -i "$sed_param" /var/run/mptcp.conf
+    fi
+    if [[ -n $bridge_name ]]; then
         if [ $(grep -ic "BRIDGE_IFACE" /var/run/mptcp.conf) -eq 1 ]; then
           sed -i "/BRIDGE_IFACE/d" /var/run/mptcp.conf
         fi
-    fi
-    if [[ -n $bridge_name ]]; then
         echo "BRIDGE_IFACE=${bridge_name}" >> /var/run/mptcp.conf
         echo "INTERFACE_${INDEX}=${bridge_name}" >> /var/run/mptcp.conf
         source /var/run/mptcp.conf
