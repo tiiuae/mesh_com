@@ -31,6 +31,7 @@ def batman(batman_interface):
         logger.error(f'Error setting up {batman_interface}: {e}')
         sys.exit(1)
 
+
 def setup_batman(batman_interface):
     # Wait till a macsec interface is setup and added
     # to batman before setting up batman interface
@@ -53,6 +54,7 @@ def setup_batman(batman_interface):
         #     bridge_interface = "br-lan"
         #     if not is_interface_up(bridge_interface):
         #         self.setup_bridge_over_batman(batman_interface, bridge_interface)
+
 
 def setup_bridge_over_batman(batman_interface, bridge_interface):
     # TODO: Need to configure interfaces to add to br-lan
@@ -169,9 +171,6 @@ def mesh_service():
                 e.returncode,
             )
             logger.error("Error output: %s", e.stderr)
-
-
-# Call the function
 
 
 def killall(interface):
@@ -424,10 +423,8 @@ def is_interface_pingable(interface_name, ip_address):
             ping_output = subprocess.check_output(
                 [
                     "ping",
-                    "-c",
-                    "1",
-                    "-w",
-                    "1",
+                    "-c", "1",
+                    "-w", "1",
                     f"{ip_address}%{interface_name}",
                 ],
                 stderr=subprocess.STDOUT,

@@ -85,7 +85,7 @@ class mutAuth:
         self.macsec_obj = macsec.Macsec(
             level=self.level,
             interface=self.meshiface,
-            macsec_encryption=macsec_encryption,
+            macsec_encryption=macsec_encryption
         )  # Initialize macsec object
         if self.level == "upper":
             self.bridge_interface = (
