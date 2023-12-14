@@ -5,6 +5,11 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509
 
+# ************************************************************ Note ********************************************************************
+# The code currently loads private key from a file
+# HSM integration is on the way, and once done, the sign_message function should be updated to access the private key securely
+# **************************************************************************************************************************************
+
 def sign_message(message, priv_key_location, logger):
      """
     Sign a message using an ECDSA private key.
