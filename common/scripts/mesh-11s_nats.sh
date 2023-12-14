@@ -1,5 +1,5 @@
 #!/bin/bash
-
+source ./qos_olsrd_conf.sh
 is_interface() {
   # arguments:
   # $1 = interface name
@@ -343,7 +343,8 @@ EOF
           modprobe batman-adv
         fi
       elif [ "$routing_algo" == "olsr" ]; then
-        mesh_kill "[o]lsrd -i $wifidev -d 0"
+        #mesh_kill "[o]lsrd -i $wifidev -d 0"
+        stop_olsrd "$id0_MESH_VIF"
       fi
 
       echo "$wifidev down.."
@@ -393,7 +394,8 @@ EOF
       elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
         # Enable debug level as necessary
-        (olsrd -i "$wifidev" -d 0)&
+        #(olsrd -i "$wifidev" -d 0)&
+        start_olsrd "$id0_MESH_VIF"
       fi
 
       #SLAAC immediately after basic setup
@@ -683,7 +685,7 @@ main () {
       bridge_ip=$bridge_ip
       calculate_network_address "$bridge_ip" "$nmask"
   fi
-  if [ $mptcp == "enable" ]; then
+  if [ "$mptcp" == "enable" ]; then
     echo "MPTCP enabled"
     if ! [ -f /var/run/mptcp.conf ]; then
         echo "SUBFLOWS=0" > /var/run/mptcp.conf
