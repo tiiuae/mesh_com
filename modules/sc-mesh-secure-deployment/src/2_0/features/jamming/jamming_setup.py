@@ -211,6 +211,13 @@ def validate_configuration(args) -> bool:
     """
     valid = True
 
+    # Check device driver
+    valid_drivers = ["ath10k"]
+    driver = os.popen('ls /sys/kernel/debug/ieee80211/phy* | grep ath').read().strip()
+    if driver not in valid_drivers:
+        logger.error("Please use ath10k driver.")
+        valid = False
+
     # Check that scan interface is set to 20mhz
     try:
         iw_output = os.popen('iw dev').read()
@@ -294,8 +301,12 @@ async def main():
     # Validate configuration parameters
     logger.info("3. Validate configuration")
     if not validate_configuration(args):
-        logger.error("Invalid configuration. Please check messages above for more information.")
-        util.run_command(['/opt/S99jammingavoidance', 'stop'], "Stopping S99jammingavoidance service failed.")
+        logger.error("Invalid configuration... jamming avoidance stopped. Please check messages above for more information.")
+        jamming_avoidance_service = '/opt/S99jammingavoidance'
+        if os.path.exists(jamming_avoidance_service):
+            util.run_command([jamming_avoidance_service, 'stop'], "Stopping S99jammingavoidance service failed.")
+        else:
+            sys.exit(0)
 
     # Check interface for OSF
     logger.info("4. Check if osf interface is up")
