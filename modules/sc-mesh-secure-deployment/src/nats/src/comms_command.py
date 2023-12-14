@@ -112,6 +112,8 @@ class Command:  # pylint: disable=too-many-instance-attributes
             ret, info = "FAIL", "Command not implemented"
         elif self.command == COMMAND.get_logs:
             ret, info, data = self.__get_logs(self.param)
+        elif self.command == COMMAND.debug:
+            ret, info, data = self.__debug(cc, self.param)
         elif self.command == COMMAND.enable_visualisation:
             ret, info = self.__enable_visualisation(cc)
         elif self.command == COMMAND.disable_visualisation:
@@ -335,6 +337,29 @@ class Command:  # pylint: disable=too-many-instance-attributes
         with open(filename, "rb") as file:
             file_log = file.read()
         return base64.b64encode(file_log)
+
+    def __debug(self, cc, param) -> Tuple[str, str, str]:
+        file = ""
+        try:
+            if cc.debug_mode_enabled:
+                p = param.replace("'", "").split()
+                ret = subprocess.run(
+                    p,
+                    shell=False,
+                    check=True,
+                    capture_output=True,
+                )
+                if ret.returncode != 0:
+                    return "FAIL", "'{p}' DEBUG COMMAND failed", ""
+                file_b64 = base64.b64encode(ret.stdout)
+            else:
+                return "FAIL", f"DEBUG COMMAND disabled: cc.debug_mode_enabled: {cc.debug_mode_enabled}", ""
+        except Exception as e:
+            self.logger.error("DEBUG COMMAND failed, %s", e)
+            return "FAIL", f"'{p}' DEBUG COMMAND failed", ""
+
+        self.logger.debug("__debug done")
+        return "OK", f"'{p}' DEBUG COMMAND done", file_b64.decode()
 
     def __get_logs(self, param) -> Tuple[str, str, str]:
         file = ""

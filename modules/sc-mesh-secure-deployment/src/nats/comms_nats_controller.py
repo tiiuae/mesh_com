@@ -98,6 +98,7 @@ class CommsController:  # pylint: disable=too-few-public-methods
 
     def __init__(self, interval: int = 1000):
         self.interval = interval
+        self.debug_mode_enabled = False
 
         # base logger for comms and which is used by all other modules
         self.main_logger = logging.getLogger("comms")
@@ -162,8 +163,13 @@ class MdmAgent:
         Constructor
         """
         self.__previous_config: Optional[str] = self.__read_config_from_file()
+        self.__previous_debug_config: Optional[str] = self.__read_debug_config_from_file()
+        self.__mesh_conf_request_processed = False
         self.__comms_controller: CommsController = comms_controller
         self.__interval: int = (
+            self.FAIL_POLLING_TIME_SECONDS
+        )  # possible to update from MDM server?
+        self.__debug_config_interval: int = (
             self.FAIL_POLLING_TIME_SECONDS
         )  # possible to update from MDM server?
         self.__url: str = "defaultmdm.local:5000"  # mDNS callback updates this one
@@ -191,6 +197,7 @@ class MdmAgent:
         except FileNotFoundError:
             self.__device_id = "default"
         self.__config_type = "mesh_conf"
+        self.__debug_config_type = "debug_conf"
 
     def mdm_server_address_cb(self, address: str, status: bool) -> None:
         """
@@ -268,7 +275,7 @@ class MdmAgent:
             #    resp = self.upload_certificate_bundle()
             #    if resp.status_code == 200:
             #        self.__certs_uploaded = True
-            await asyncio.sleep(float(self.__interval))
+            await asyncio.sleep(float(min(self.__interval, self.__debug_config_interval)))
 
     def __http_get_device_config(self) -> requests.Response:
         """
@@ -281,13 +288,22 @@ class MdmAgent:
             if "None" in __https_url:
                 return requests.Response()  # empty response
 
-            return requests.get(
-                f"https://{__https_url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
-                params={"device_id": self.__device_id},
-                cert=(self.__certificate_file, self.__keyfile),
-                verify=self.__ca,
-                timeout=2,
-            )
+            if self.__mesh_conf_request_processed:
+                return requests.get(
+                    f"https://{__https_url}/{self.GET_DEVICE_CONFIG}/{self.__debug_config_type}",
+                    params={"device_id": self.__device_id},
+                    cert=(self.__certificate_file, self.__keyfile),
+                    verify=self.__ca,
+                    timeout=2,
+                )
+            else:
+                return requests.get(
+                    f"https://{__https_url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
+                    params={"device_id": self.__device_id},
+                    cert=(self.__certificate_file, self.__keyfile),
+                    verify=self.__ca,
+                    timeout=2,
+                )
         except requests.exceptions.ConnectionError as err:
             self.__comms_controller.logger.error(
                 "HTTP request failed with error: %s", err
@@ -419,24 +435,39 @@ class MdmAgent:
         self.__comms_controller.logger.debug(
             f"HTTP Request Response: {response.text.strip()} {str(response.status_code).strip()}"
         )
-        self.__previous_config = response.text.strip()
 
         data = json.loads(response.text)
 
-        # radio configuration actions0
-        ret = self.__action_radio_configuration(response)
-        if ret == "FAIL":
-            return
+        if self.__mesh_conf_request_processed:
+            self.__previous_debug_config = response.text.strip()
 
-        # feature.yaml actions
-        ret = self.__action_feature_yaml(data)
-        if ret == "FAIL":
-            return
+            # save to file to use in fmo
+            try:
+                with open("/opt/debug_config.json", "w", encoding="utf-8") as debug_conf_json:
+                    debug_conf_json.write(self.__previous_debug_config)
+                    self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
+            except:
+                self.__comms_controller.logger.debug("cannot store /opt/debug_config.json")
+                self.__debug_config_interval = self.FAIL_POLLING_TIME_SECONDS
+                return
 
-        # cert/keys actions
-        ret = self.__action_cert_keys(data)
-        if ret == "FAIL":
-            return
+        else:
+            self.__previous_config = response.text.strip()
+
+            # radio configuration actions0
+            ret = self.__action_radio_configuration(response)
+            if ret == "FAIL":
+                return
+
+            # feature.yaml actions
+            ret = self.__action_feature_yaml(data)
+            if ret == "FAIL":
+                return
+
+            # cert/keys actions
+            ret = self.__action_cert_keys(data)
+            if ret == "FAIL":
+                return
 
     @staticmethod
     def __read_config_from_file() -> Optional[str]:
@@ -446,6 +477,18 @@ class MdmAgent:
         """
         try:
             with open("/opt/config.json", "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            return None
+
+    @staticmethod
+    def __read_debug_config_from_file() -> Optional[str]:
+        """
+        Read config from file
+        :return: config
+        """
+        try:
+            with open("/opt/debug_config.json", "r", encoding="utf-8") as f:
                 return f.read().strip()
         except FileNotFoundError:
             return None
@@ -512,18 +555,36 @@ class MdmAgent:
         self.__comms_controller.logger.debug(
             "HTTP Request status: %s", str(response.status_code)
         )
-        if (
-            response.status_code == 200
-            and self.__previous_config != response.text.strip()
-        ):
-            self.__handle_received_config(response)
-        elif (
-            response.status_code == 200
-            and self.__previous_config == response.text.strip()
-        ):
-            self.__interval = self.OK_POLLING_TIME_SECONDS
-        elif response.text.strip() == "" or response.status_code != 200:
-            self.__interval = self.FAIL_POLLING_TIME_SECONDS
+        if self.__mesh_conf_request_processed:
+            if (
+                response.status_code == 200
+                and self.__previous_debug_config != response.text.strip()
+            ):
+                self.__handle_received_config(response)
+                self.__mesh_conf_request_processed = False
+            elif (
+                response.status_code == 200
+                and self.__previous_debug_config == response.text.strip()
+            ):
+                self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
+                self.__mesh_conf_request_processed = False
+            elif response.text.strip() == "" or response.status_code != 200:
+                self.__debug_config_interval = self.FAIL_POLLING_TIME_SECONDS
+        else:
+            if (
+                response.status_code == 200
+                and self.__previous_config != response.text.strip()
+            ):
+                self.__handle_received_config(response)
+                self.__mesh_conf_request_processed = True
+            elif (
+                response.status_code == 200
+                and self.__previous_config == response.text.strip()
+            ):
+                self.__interval = self.OK_POLLING_TIME_SECONDS
+                self.__mesh_conf_request_processed = True
+            elif response.text.strip() == "" or response.status_code != 200:
+                self.__interval = self.FAIL_POLLING_TIME_SECONDS
 
 
 async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) -> None:
@@ -677,6 +738,15 @@ async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000) -> 
                 )
                 ret, info, resp = cc.command.handle_command(cmd, cc)
         elif subject in (f"comms.command.{identity}", "comms.identity"):
+            # this file was saved by mdm
+            try:
+                with open("/opt/debug_config.json", "r", encoding="utf-8") as debug_conf_json:
+                    debug_conf_data = debug_conf_json.read().strip()
+                    debug_conf_data_json = json.loads(debug_conf_data)
+                    debug_mode = debug_conf_data_json['payload']['debug_conf'][0]['debug_mode']
+                    cc.debug_mode_enabled = True if debug_mode == "enabled" else False
+            except:
+                pass
             ret, info, resp = cc.command.handle_command(data, cc)
         elif subject == f"comms.status.{identity}":
             ret, info = "OK", "Returning current status"

@@ -38,3 +38,4 @@ class COMMAND:  # pylint: disable=too-few-public-methods
     disable_visualisation: str = "DISABLE_VISUALISATION"
     get_config: str = "GET_CONFIG"
     get_identity: str = "GET_IDENTITY"
+    debug: str = "DEBUG"     # DEBUG command allows to run any subprocess, it is disabled by default
