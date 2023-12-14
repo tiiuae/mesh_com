@@ -568,15 +568,14 @@ class MdmAgent:
             ):
                 self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
                 self.__mesh_conf_request_processed = False
-            elif (
-                response.status_code == 405
-            ):
-                self.__comms_controller.logger.debug(
-                    "MDM Server has no support for debug mode"
-                )
-                self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
             elif response.text.strip() == "" or response.status_code != 200:
                 self.__debug_config_interval = self.FAIL_POLLING_TIME_SECONDS
+                if response.status_code == 405:
+                    self.__comms_controller.logger.debug(
+                        "MDM Server has no support for debug mode"
+                    )
+                    self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
+                    self.__mesh_conf_request_processed = False
         else:
             if (
                 response.status_code == 200
