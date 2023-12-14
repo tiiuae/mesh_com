@@ -2,10 +2,16 @@ import yaml
 import time
 import os
 # Import classes for features
+# Needs to be replaced by actual features
 from features.sample_feature_classes.ids import IDS
 from features.sample_feature_classes.SP_CRA import PHYCRA
 from features.sample_feature_classes.RSS_auth import RSS_Auth
 from features.decision_engine.decision_engine import DecisionEngine
+
+# ************************************************************ Note **************************************************************************
+# The MBA module utilizes the certificates exchanged during CBMA to sign and verify messages
+# So CBMA must be setup before running this code. Refer to /opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/cbma/setup_cbma.py
+# ********************************************************************************************************************************************
 
 # Defining constants (these can be configured as needed)
 MBA_MULTICAST_ADDRESS = 'ff02::1'

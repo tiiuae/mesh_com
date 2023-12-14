@@ -11,7 +11,12 @@ sys.path.append(f'{path_to_decision_engine}/..')
 from cbma.tools.custom_logger import CustomLogger
 logger = CustomLogger("quarantine").get_logger()
 
-#TODO: call comms controller blacklist, remove_from_blacklist functionalities, and encrypt local blacklist
+# ************************************************************ Note ********************************************************************
+# The code currently only has placeholders to call the blacklisting and remove from blacklist functionality from the comms controller
+# These comms controller functions will actually deal with removing the malicious node's access to the network, and actions for CRL updates.
+# Once available, these functions should be called in the placeholders in the start_quarantine and end_quarantine methods.
+# **************************************************************************************************************************************
+
 class Quarantine:
     """
     A class to manage the quarantine of malicious nodes.
