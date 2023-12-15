@@ -2,6 +2,7 @@ from typing import List
 from mutauth import *
 from tools.monitoring_wpa import WPAMonitor
 import subprocess
+import argparse
 
 from tools.utils import batman
 
@@ -57,7 +58,9 @@ def setup_macsec(level, interface_name, port, batman_interface, path_to_certific
     mua = mutAuth(in_queue, level=level, meshiface=interface_name, port=port,
                   batman_interface=batman_interface, path_to_certificate=path_to_certificate, path_to_ca=path_to_ca, macsec_encryption=macsec_encryption, shutdown_event=shutdown_event)
     # Wait for wireless interface to be pingable before starting mtls server, multicast
-    wait_for_interface_to_be_pingable(mua.meshiface, mua.ipAddress)
+    # wait_for_interface_to_be_pingable(mua.meshiface, mua.ipAddress)
+    time.sleep(3)
+
     # Start server to facilitate client auth requests, monitor ongoing auths and start client request if there is a new peer/ server baecon
     auth_server_thread, auth_server = mua.start_auth_server()
 
@@ -97,7 +100,7 @@ def cbma(level, interface_name, port, batman_interface, path_to_certificate, pat
     process.start(level, interface_name, port, batman_interface, path_to_certificate, path_to_ca, macsec_encryption, wpa_supplicant_control_path)
     return process
 
-def main():
+def main(cert_folder: str):
     '''
     Example of setting up cbma for interfaces wlp1s0, eth1
 
@@ -129,8 +132,8 @@ def main():
         "wlp1s0", # interface_name
         15001, # port
         "bat0", # batman_interface
-        f'{file_dir}/cert_generation/certificates', # path_to_certificate
-        f'{file_dir}/cert_generation/certificates/ca.crt', # path_to_ca
+        f'{file_dir}/{cert_folder}', # path_to_certificate
+        f'{file_dir}/{cert_folder}/ca.crt', # path_to_ca
         "off", # macsec_encryption (can be "on" if required)
         '/var/run/wpa_supplicant_id0/wlp1s0' # wpa_supplicant_control_path
     )
@@ -141,8 +144,8 @@ def main():
         "eth1",
         15001,
         "bat0",
-        f'{file_dir}/cert_generation/certificates',
-        f'{file_dir}/cert_generation/certificates/ca.crt',
+        f'{file_dir}/{cert_folder}', # path_to_certificate
+        f'{file_dir}/{cert_folder}/ca.crt', # path_to_ca
         "off",
         None
     )
@@ -161,8 +164,8 @@ def main():
         "bat0",
         15002,
         "bat1",
-        f'{file_dir}/cert_generation/certificates',
-        f'{file_dir}/cert_generation/certificates/ca.crt',
+        f'{file_dir}/{cert_folder}', # path_to_certificate
+        f'{file_dir}/{cert_folder}/ca.crt', # path_to_ca
         "on",
         None
     )
@@ -173,8 +176,12 @@ def main():
     cbma_bat0.join()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--certdir', default="cert_generation/certificates", help='Folder where certs are placed', required=False)
+    args = parser.parse_args()
+
     try:
-        main()
+        main(args.certdir)
     except (Exception, KeyboardInterrupt):
         print("Whoopsie...", flush=True)
         shutdown_event.set()
