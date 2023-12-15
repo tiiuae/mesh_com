@@ -22,7 +22,8 @@ class NatsServerCtrl:
 
     SERVICE_TYPE: str = '_natsseed._tcp.local.'
     SERVICE_NAME: str = 'NATSSeed_{identifier}'
-    SERVICE_PORT: int = 7422
+    SEED_SERVICE_PORT: int = 7422
+    NATS_PORT: int = 4222
     GROUNDSTATION_ROLE: str = "gcs"
 
     class IPvUsage(Enum):
@@ -36,21 +37,19 @@ class NatsServerCtrl:
         def ipv6Enabled(self) -> bool:
             return bool(self == self.AnyIPv or self == self.IPv6Only)
 
-    def __init__(self, logger: Logger, role, key, cert, servercert, ca, ipvUsage: IPvUsage):
-        self.logger = logger
-        self.role = role
-        self.key = key
-        self.cert = cert
-        self.server_cert = servercert
-        self.cert_authority = ca
-        self.leaf_port = 7422
-        self.seed_ip_address = None
-        self.tls_required = False
+    def __init__(self, logger: Logger, key, cert, servercert, ca, ipvUsage: IPvUsage):
+        self.__logger = logger
+        self.__key = key
+        self.__cert = cert
+        self.__server_cert = servercert
+        self.__cert_authority = ca
+        self.__tls_required = False
         self.ipvUsage = ipvUsage
 
-        if self.key is not None and self.cert is not None \
-           and self.server_cert is not None and self.cert_authority is not None:
-            self.tls_required = True
+        # set __tls_required flag if all the tls parameters are given
+        if self.__key is not None and self.__cert is not None \
+           and self.__server_cert is not None and self.__cert_authority is not None:
+            self.__tls_required = True
 
     # restarts nats server
     def reload_config(self) -> int:
@@ -62,11 +61,11 @@ class NatsServerCtrl:
             ret = subprocess.run(["/opt/S90nats_server", "restart"],
                                     shell=False, check=True, capture_output=True)
             if ret.returncode != 0:
-                self.logger.error("Default mesh starting failed ")
+                self.__logger.error("Default mesh starting failed ")
                 return -1
 
         except:
-            self.logger.error("Default mesh starting failed ")
+            self.__logger.error("Default mesh starting failed ")
             return -1
 
         return 0
@@ -78,31 +77,31 @@ class NatsServerCtrl:
         :return: None
         """
 
-        if self.tls_required:
+        if self.__tls_required:
             config = textwrap.dedent(f"""
-                listen: 0.0.0.0:4222
+                listen: 0.0.0.0:{NatsServerCtrl.NATS_PORT}
                 tls {{
-                    key_file: {self.key}
-                    cert_file: {self.server_cert}
-                    ca_file: {self.cert_authority}
+                    key_file: {self.__key}
+                    cert_file: {self.__server_cert}
+                    ca_file: {self.__cert_authority}
                     verify: true
                 }}
                 leafnodes {{
-                    port: 7422
+                    port: {NatsServerCtrl.SEED_SERVICE_PORT}
                     tls {{
-                        key_file: {self.key}
-                        cert_file: {self.server_cert}
-                        ca_file: {self.cert_authority}
+                        key_file: {self.__key}
+                        cert_file: {self.__server_cert}
+                        ca_file: {self.__cert_authority}
                         verify: true
                     }}
                 }}
             """)
         else:
-            config = textwrap.dedent("""
-                listen: 0.0.0.0:4222
-                leafnodes {
-                    port: 7422
-                }
+            config = textwrap.dedent(f"""
+                listen: 0.0.0.0:{NatsServerCtrl.NATS_PORT}
+                leafnodes {{
+                    port: {NatsServerCtrl.SEED_SERVICE_PORT}
+                }}
             """)
 
         with open('/var/run/nats.conf', 'w',  encoding='UTF-8') as file_nats_conf:
@@ -115,7 +114,7 @@ class NatsServerCtrl:
         :param seeds: seeds to be added dict{seed_name, list[ipaddr_str]}
         :return: None
         """
-        if self.tls_required:
+        if self.__tls_required:
             protocol = "tls"
             remoteCfg = ""
             for seedUrls in seeds.values():
@@ -124,19 +123,19 @@ class NatsServerCtrl:
                     {{
                         urls: {urls}
                         tls {{
-                            key_file: {self.key}
-                            cert_file: {self.cert}
-                            ca_file: {self.cert_authority}
+                            key_file: {self.__key}
+                            cert_file: {self.__cert}
+                            ca_file: {self.__cert_authority}
                             verify: true
                         }}
                     }},"""
 
             config = textwrap.dedent(f"""
-                listen: 0.0.0.0:4222
+                listen: 0.0.0.0:{NatsServerCtrl.NATS_PORT}
                 tls {{
-                    key_file: {self.key}
-                    cert_file: {self.server_cert}
-                    ca_file: {self.cert_authority}
+                    key_file: {self.__key}
+                    cert_file: {self.__server_cert}
+                    ca_file: {self.__cert_authority}
                     verify: true
                 }}
                 leafnodes {{
@@ -155,7 +154,7 @@ class NatsServerCtrl:
                     }},"""
                 
             config = textwrap.dedent(f"""
-                listen: 0.0.0.0:4222
+                listen: 0.0.0.0:{NatsServerCtrl.NATS_PORT}
                 leafnodes {{
                     remotes = [{remoteCfg}
                     ]
@@ -173,13 +172,13 @@ class NatsServerCtrl:
         :param ip_address: ip address of the seed node
         :return: None
         """
-        self.logger.debug("Updating configurations and reloading nats-server configuration")
+        self.__logger.debug("Updating configurations and reloading nats-server configuration")
         self.generate_leaf_config(seeds)
 
         # reload nats-server configuration
         ret = self.reload_config()
         if ret != 0:
-            self.logger.error("Error reloading nats-server configuration")
+            self.__logger.error("Error reloading nats-server configuration")
             return
 
 
@@ -189,13 +188,13 @@ class NatsServerCtrl:
 class NatsSeedDiscovery:
 
     def __init__(self, natsCtrl: NatsServerCtrl, logger: Logger):
-        self.natsCtrl = natsCtrl
-        self.logger = logger
-        self.seeds = {}
+        self.__natsCtrl = natsCtrl
+        self.__logger = logger
+        self.__seeds = {}
 
     # callback handler called when CommsServiceDiscovery founds a new seed service
     def __seed_service_found(self, service_name, ipv4_addresses, ipv6_addresses, port, status):
-        self.logger.debug(f"Seed service found: name:{service_name}, ip:{ipv4_addresses}, ip6:{ipv6_addresses}, port:{port}, online: {status}")
+        self.__logger.debug(f"Seed service found: name:{service_name}, ip:{ipv4_addresses}, ip6:{ipv6_addresses}, port:{port}, online: {status}")
 
         # add new leaf
         if (status):
@@ -205,19 +204,19 @@ class NatsSeedDiscovery:
             for ip in ipv6_addresses:
                 uris.append(f"$PROTOCOL$://[{ip}]:{port}")
 
-            self.seeds[service_name] = uris
-            self.natsCtrl.update_configurations_and_restart(self.seeds)
-        # disconnected leafs are not removed from config as they often are temporarily out of reach.
+            self.__seeds[service_name] = uris
+            self.__natsCtrl.update_configurations_and_restart(self.__seeds)
+        # disconnected leafs are not removed from config as they often are just temporarily out.
 
     # starts to monitor services and updates nats.conf when new seed is found
     def run(self):
         # generate empty leaf config so nats-server can start-up
-        self.natsCtrl.generate_leaf_config({})
+        self.__natsCtrl.generate_leaf_config({})
 
-        self.logger.debug("Searching seed services.")
+        self.__logger.debug("Searching seed services.")
         monitor = CommsServiceMonitor(
             service_name=None,
-            service_type=self.natsCtrl.SERVICE_TYPE,
+            service_type=self.__natsCtrl.SERVICE_TYPE,
             service_cb=self.__seed_service_found
         )
         monitor.run()
@@ -229,41 +228,45 @@ class NatsSeedDiscovery:
 class NatsSeedPublish:
 
     def __init__(self, natsCtrl: NatsServerCtrl, logger: Logger, ifName):
-        self.zeroconf: Zeroconf = None
-        self.serviceInfo: ServiceInfo = None
-        self.seed_ipv4_addr = None
-        self.seed_ipv6_addr = None
+        self.__zeroconf: Zeroconf = None
+        self.__serviceInfo: ServiceInfo = None
+        self.__seed_ipv4_addr = None
+        self.__seed_ipv6_addr = None
 
-        self.logger = logger
-        self.natsCtrl = natsCtrl
-        self.ifName = ifName
+        self.__logger = logger
+        self.__natsCtrl = natsCtrl
+        self.__ifName = ifName
         
+        # fetch ipv4 addr even if not published, get device index from it.
         ipv4 = self.__get_ip4_address(ifName)
         if not ipv4:
             raise ValueError(f"Network interface {ifName} does not found.")
 
-        if self.natsCtrl.ipvUsage.ipv4Enabled():
-            self.seed_ipv4_addr = ipv4.get_attr('IFA_ADDRESS')
-        if self.natsCtrl.ipvUsage.ipv6Enabled():
+        # set ipv4 and/or ipv6 according the flags
+        if self.__natsCtrl.ipvUsage.ipv4Enabled():
+            self.__seed_ipv4_addr = ipv4.get_attr('IFA_ADDRESS')
+        if self.__natsCtrl.ipvUsage.ipv6Enabled():
             ipv6 = self.__get_ip6_address(ipv4['index'])
             if not ipv6:
-                self.seed_ipv6_addr = None
+                self.__seed_ipv6_addr = None
             else:    
-                self.seed_ipv6_addr = ipv6.get_attr('IFA_ADDRESS')
+                self.__seed_ipv6_addr = ipv6.get_attr('IFA_ADDRESS')
 
-        if self.natsCtrl.ipvUsage == NatsServerCtrl.IPvUsage.IPv4Only:
-            if not self.seed_ipv4_addr: 
+        # validate that we got the addresses we want to publish
+        if self.__natsCtrl.ipvUsage == NatsServerCtrl.IPvUsage.IPv4Only:
+            if not self.__seed_ipv4_addr: 
                 raise ValueError(f"bridge {ifName} does not have valid ip4 address.")
-        elif self.natsCtrl.ipvUsage == NatsServerCtrl.IPvUsage.IPv6Only:
-            if not self.seed_ipv6_addr: 
+        elif self.__natsCtrl.ipvUsage == NatsServerCtrl.IPvUsage.IPv6Only:
+            if not self.__seed_ipv6_addr: 
                 raise ValueError(f"bridge {ifName} does not have valid ip6 address.")
-        elif self.natsCtrl.ipvUsage == NatsServerCtrl.IPvUsage.AnyIPv:
-            if not self.seed_ipv4_addr and not self.seed_ipv6_addr: 
+        elif self.__natsCtrl.ipvUsage == NatsServerCtrl.IPvUsage.AnyIPv:
+            if not self.__seed_ipv4_addr and not self.__seed_ipv6_addr: 
                 raise ValueError(f"bridge {ifName} does not have valid ip4 or ip6 address.")
         
+        # get MAC address and calculate md5 from it, will use it as service name GUID.
         mac = self.__getHwAddr(ifName)
         self.uid = hashlib.md5(mac.encode()).hexdigest()
-        self.logger.debug(f"IPv4: {self.seed_ipv4_addr} IPv6: {self.seed_ipv6_addr} MAC: {mac} UID:{self.uid}")
+        self.__logger.debug(f"IPv4: {self.__seed_ipv4_addr} IPv6: {self.__seed_ipv6_addr} MAC: {mac} UID:{self.uid}")
 
     @staticmethod
     def __get_ip4_address(adapterName):
@@ -296,46 +299,46 @@ class NatsSeedPublish:
     # publish service using Zeroconf
     def __register_seed_service(self):
 
-        if self.zeroconf is not None or self.serviceInfo is not None:
+        if self.__zeroconf is not None or self.__serviceInfo is not None:
             raise SystemError("Service already registered.")
 
         serviceName = NatsServerCtrl.SERVICE_NAME.format(identifier=self.uid)
 
         # include ipv4, ipv6 or both addresses.
         addrs = []
-        if self.natsCtrl.ipvUsage == NatsServerCtrl.IPvUsage.IPv4Only:
-            addrs.append(socket.inet_aton(self.seed_ipv4_addr))
-        elif self.natsCtrl.ipvUsage == NatsServerCtrl.IPvUsage.IPv6Only:
-            addrs.append(socket.inet_pton(socket.AF_INET6, self.seed_ipv6_addr))
-        elif self.natsCtrl.ipvUsage == NatsServerCtrl.IPvUsage.AnyIPv:
-            addrs.append(socket.inet_aton(self.seed_ipv4_addr))
-            if self.seed_ipv6_addr:
-                addrs.append(socket.inet_pton(socket.AF_INET6, self.seed_ipv6_addr))
+        if self.__natsCtrl.ipvUsage == NatsServerCtrl.IPvUsage.IPv4Only:
+            addrs.append(socket.inet_aton(self.__seed_ipv4_addr))
+        elif self.__natsCtrl.ipvUsage == NatsServerCtrl.IPvUsage.IPv6Only:
+            addrs.append(socket.inet_pton(socket.AF_INET6, self.__seed_ipv6_addr))
+        elif self.__natsCtrl.ipvUsage == NatsServerCtrl.IPvUsage.AnyIPv:
+            addrs.append(socket.inet_aton(self.__seed_ipv4_addr))
+            if self.__seed_ipv6_addr:
+                addrs.append(socket.inet_pton(socket.AF_INET6, self.__seed_ipv6_addr))
 
         # publish the service information
-        self.serviceInfo = ServiceInfo(type_=NatsServerCtrl.SERVICE_TYPE,
+        self.__serviceInfo = ServiceInfo(type_=NatsServerCtrl.SERVICE_TYPE,
             name=f'{serviceName}.{NatsServerCtrl.SERVICE_TYPE}',
             addresses=addrs,
-            port=NatsServerCtrl.SERVICE_PORT,
+            port=NatsServerCtrl.SEED_SERVICE_PORT,
             properties={'description': serviceName})
 
-        self.zeroconf = Zeroconf(ip_version=IPVersion.All)
-        self.zeroconf.register_service(info=self.serviceInfo,
+        self.__zeroconf = Zeroconf(ip_version=IPVersion.All)
+        self.__zeroconf.register_service(info=self.__serviceInfo,
                                        cooperating_responders=True)
         
     # removes (unpublish) service from Zeroconf
     def __unregister_seed_service(self):
-        self.logger.debug("unregister_seed_service called")
-        if self.zeroconf is None or self.serviceInfo is None:
+        self.__logger.debug("unregister_seed_service called")
+        if self.__zeroconf is None or self.__serviceInfo is None:
             raise SystemError("Service NOT registered.")
-        self.zeroconf.unregister_service(self.serviceInfo)
-        self.zeroconf.close()
+        self.__zeroconf.unregister_service(self.__serviceInfo)
+        self.__zeroconf.close()
 
     # keeps the service published until script is stopped
     def run(self):
-        self.logger.debug("Publish seed service.")
-        self.natsCtrl.generate_seed_config()
-        self.natsCtrl.reload_config()
+        self.__logger.debug("Publish seed service.")
+        self.__natsCtrl.generate_seed_config()
+        self.__natsCtrl.reload_config()
 
         try:
             self.__register_seed_service()
@@ -380,7 +383,7 @@ if __name__ == "__main__":
     if (args.ipv6):
         ipvUsage = NatsServerCtrl.IPvUsage.IPv6Only
 
-    natsCtrl = NatsServerCtrl(logger, args.role, args.key, args.cert, args.servercert, args.ca, ipvUsage)
+    natsCtrl = NatsServerCtrl(logger, args.key, args.cert, args.servercert, args.ca, ipvUsage)
 
     # start seed publish or seed discovery according the role.
     if (args.role == NatsServerCtrl.GROUNDSTATION_ROLE):
