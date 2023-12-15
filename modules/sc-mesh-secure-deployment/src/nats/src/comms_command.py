@@ -165,6 +165,14 @@ class Command:  # pylint: disable=too-many-instance-attributes
             "/opt/S90APoint",
             "/opt/S90nats_discovery",
         ]
+        # Stop S90mptcp before restarting S9011sNatsMesh
+        ret = subprocess.run(
+                ["/opt/S90mptcp", "stop"], shell=False, check=True, capture_output=True, )
+        if ret.returncode != 0:
+                return "FAIL", f"Clearing MPTCP configs failed" + str(
+                    ret.returncode
+                ) + str(ret.stdout) + str(ret.stderr)
+        self.logger.debug("Stopped MPTCP service")
 
         for process in processes:
             # Restart mesh with default settings
@@ -278,7 +286,7 @@ class Command:  # pylint: disable=too-many-instance-attributes
                     ret.returncode
                 ) + str(ret.stdout) + str(ret.stderr)
             self.logger.debug("Started MPTCP service")
-            return "OK", "Started MPTCP service"
+            return "OK", "Mission configurations applied"
         self.logger.debug("No mission config to apply!")
         return "FAIL", "No setting to apply"
 
