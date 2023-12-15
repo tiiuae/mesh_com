@@ -1,4 +1,10 @@
-# Install torch
+# Python packages installed:
+# Pypcap: required for LDPI (IDS)
+# Pytorch: required for Jamming Avoidance and LDPI (IDS)
+# Scikit-Learn: required for LDPI (IDS)
+# Scipy: required for PHY-CRA/RSS and LDPI (IDS)
+
+# Install pytorch
 chmod +x /opt/mesh_com/modules/utils/package/ml_packages.tar.gz
 tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/ml_packages.tar.gz
 cd /opt/mesh_com/modules/utils/package/ml_packages || exit
