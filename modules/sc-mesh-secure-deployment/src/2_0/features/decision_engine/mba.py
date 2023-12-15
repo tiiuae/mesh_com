@@ -83,8 +83,11 @@ class MBA(ObservableModule):
                 'sender_mac': self.mymac
             }
             signed_message = self.sign_mba_message(json.dumps(message).encode('utf-8'))
-            logger.info(f'Sending data {message} to {self.multicast_group}:{self.port} from interface {self.interface}')
-            sock.sendto(signed_message, (self.multicast_group, self.port))
+            if signed_message:
+                logger.info(f'Sending data {message} to {self.multicast_group}:{self.port} from interface {self.interface}')
+                sock.sendto(signed_message, (self.multicast_group, self.port))
+            else:
+                logger.error('Could not sign MBA message')
 
     def receive_mba(self):
         """
@@ -110,15 +113,26 @@ class MBA(ObservableModule):
             # Add the membership to the socket
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
 
+            sock.settimeout(2)
+
             logger.info(f"Listening for messages on {self.multicast_group}:{self.port}...")
             while not self.stop_event.is_set():
-                data, address = sock.recvfrom(1024)
-                signature, message = cryptography_tools.extract_message_sign_from_signed_message(data)
-                decoded_message = json.loads(message.decode())
-                if decoded_message['message_type'] == 'malicious_behaviour_announcement' and decoded_message['sender_mac'] not in self.mymac:  # Ignore mba sent by self
-                    logger.info(f'Received data {decoded_message} from {address} at interface {self.interface}')
-                    if self.verify_mba_signature(signature, message, address[0]):
-                        self.notify({"module": "MBA", "mac": decoded_message['mal_mac'], "ip": decoded_message['mal_ip']})
+                try:
+                    data, address = sock.recvfrom(1024)
+                    try:
+                        signature, message = cryptography_tools.extract_message_sign_from_signed_message(data)
+                        decoded_message = json.loads(message.decode())
+                        if decoded_message['message_type'] == 'malicious_behaviour_announcement' and decoded_message['sender_mac'] not in self.mymac:  # Ignore mba sent by self
+                            logger.info(f'Received data {decoded_message} from {address} at interface {self.interface}')
+                            if self.verify_mba_signature(signature, message, address[0]):
+                                self.notify({"module": "MBA", "mac": decoded_message['mal_mac'], "ip": decoded_message['mal_ip']})
+                    except Exception as e:
+                        logger.error(f"Error processing received message: {e}")
+                except socket.timeout:
+                    # No data received within the timeout period
+                    continue  # Go back to the start of the loop
+                except Exception as e:
+                    logger.error(f"Error processing received message: {e}")
 
     def sign_mba_message(self, message):
         """
@@ -131,8 +145,10 @@ class MBA(ObservableModule):
         bytes: The message, combined with its signature.
         """
         path_to_priv_key = f"{self.my_cert_dir}/macsec_{self.mymac.replace(':','')}.key" # TODO: update priv key access when HSM is in use
-        signature = cryptography_tools.sign_message(message, path_to_priv_key, logger)
-        return cryptography_tools.generate_signed_message(message, signature)
+        if signature := cryptography_tools.sign_message(message, path_to_priv_key, logger):
+            return cryptography_tools.generate_signed_message(message, signature)
+        else:
+            return None
 
     def verify_mba_signature(self, signature, message, source_ip):
         """
@@ -149,27 +165,3 @@ class MBA(ObservableModule):
         source_mac = get_mac_from_ipv6(source_ip, self.interface)
         path_to_pub_key = f"{self.peer_cert_dir}/macsec_{source_mac.replace(':','')}.pem"
         return cryptography_tools.verify_signature(signature, message, path_to_pub_key, logger)
-
-
-def main():
-    parser = argparse.ArgumentParser(description="IPv6 Multicast Sender/Receiver")
-    parser.add_argument('--address', default='ff02::1', help='Multicast IPv6 address (default: ff02::1)')
-    parser.add_argument('--port', type=int, default=12345, help='Port to use (default: 12345)')
-    parser.add_argument('--interface', default="wlp1s0", help='Multicast interface (default: wlp1s0)')
-
-    args = parser.parse_args()
-    decision_engine = "dummy"
-    mba = MBA(decision_engine, args.address, args.port, args.interface)
-    mac = 'test mac'
-    ip = 'test ip'
-
-    receiver_thread = threading.Thread(target=mba.receive_mba)
-    receiver_thread.start()
-
-    # Wait a bit for the receiver thread to start
-    time.sleep(2)
-
-    mba.send_mba(mac, ip)
-
-if __name__ == "__main__":
-    main()
