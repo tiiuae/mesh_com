@@ -9,6 +9,9 @@ import signal
 import ssl
 import subprocess
 import threading
+import os
+import glob
+import base64
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
@@ -32,6 +35,7 @@ from src import comms_status
 #     "ENABLE_VISUALISATION",
 #     "DISABLE_VISUALISATION",
 # ]
+
 
 class MeshTelemetry:
     """
@@ -186,7 +190,14 @@ class MdmAgent:
         )
         self.service_monitor_thread: Optional[threading.Thread] = None
         self.thread_if_mon: Optional[threading.Thread] = None
-        self.__certs_uploaded = False  # Should be true if CBMA certs exist
+
+        try:
+            with open("/opt/certs_uploaded", "r", encoding="utf-8") as f:
+                self.__certs_uploaded = True
+                self.__comms_controller.logger.debug("No need to upload certificates")
+        except FileNotFoundError:
+            self.__certs_uploaded = False
+            self.__comms_controller.logger.debug("Certificate upload needed")
 
         try:
             with open("/opt/identity", "r", encoding="utf-8") as f:  # todo
@@ -261,8 +272,6 @@ class MdmAgent:
         self.thread_if_mon.start()
 
         while True:
-            if self.mdm_service_available:
-                await self.__loop_run_executor(executor)
             if not self.__certs_uploaded:
                 resp = self.upload_certificate_bundle()
                 self.__comms_controller.logger.debug(
@@ -270,6 +279,13 @@ class MdmAgent:
                 )
                 if resp.status_code == 200:
                     self.__certs_uploaded = True
+                    with open("/opt/certs_uploaded", "w", encoding="utf-8") as f:
+                        f.write("certs uploaded")
+                else:
+                    self.__comms_controller.logger.debug("Certificate upload failed")
+            elif self.mdm_service_available:
+                await self.__loop_run_executor(executor)
+
             await asyncio.sleep(float(self.__interval))
 
     def __http_get_device_config(self) -> requests.Response:
@@ -448,24 +464,26 @@ class MdmAgent:
         :return: HTTP response
         """
         try:
-            # TODO: Not sure what kind of bundle we should deliver
-            # so bundling just device cert and ca cert for now.
+            certificates_dict = {}
+
+            files = glob.glob("/opt/at_birth.tar.bz2*")
+
+            if len(files) == 0:
+                self.__comms_controller.logger.debug("No certificates found")
+                return requests.Response()
+
+            for file in files:
+                with open(file, "rb") as f:
+                    data = f.read()
+                    base64_data = base64.b64encode(data)
+                    certificates_dict[os.path.basename(file)] = base64_data.decode("utf-8")
 
             self.__comms_controller.logger.debug("Uploading certificate bundle")
-
-            with open(self.__certificate_file, "r", encoding="utf-8") as cert_file:
-                certificate_content = cert_file.read()
-
-            with open(self.__ca, "r", encoding="utf-8") as ca_file:
-                ca_certificate_content = ca_file.read()
-
-            # Concatenate the certificate and CA certificate
-            bundle_content = certificate_content + ca_certificate_content
 
             # Prepare the JSON data for the POST request
             data = {
                 "device_id": self.__device_id,
-                "payload": bundle_content,
+                "payload": certificates_dict,
             }
 
             __https_url = self.__url
@@ -487,7 +505,7 @@ class MdmAgent:
             self.__comms_controller.logger.error(
                 "Post request failed with error: %s", e
             )
-            return requests.Response()
+        return requests.Response()
 
     async def __loop_run_executor(self, executor) -> None:
         """
