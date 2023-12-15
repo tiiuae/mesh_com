@@ -688,16 +688,27 @@ main () {
   if [ "$mptcp" == "enable" ]; then
     echo "MPTCP enabled"
     if ! [ -f /var/run/mptcp.conf ]; then
-        echo "SUBFLOWS=0" > /var/run/mptcp.conf
+        echo "SUBFLOWS=-1" > /var/run/mptcp.conf
+    fi
+    if [ $(grep -ic "INTERFACE_${INDEX}" /var/run/mptcp.conf) -eq 1 ]; then
+        source /var/run/mptcp.conf
+        sed -i "/INTERFACE_${INDEX}/d" /var/run/mptcp.conf
+    else
+        source /var/run/mptcp.conf
+        subflows=$((SUBFLOWS+1))
+        sed_param=s/SUBFLOWS=.*/SUBFLOWS=${subflows}/
+        sed -i "$sed_param" /var/run/mptcp.conf
     fi
     if [[ -n $bridge_name ]]; then
-        source /var/run/mptcp.conf
+        if [ $(grep -ic "BRIDGE_IFACE" /var/run/mptcp.conf) -eq 1 ]; then
+          sed -i "/BRIDGE_IFACE/d" /var/run/mptcp.conf
+        fi
         echo "BRIDGE_IFACE=${bridge_name}" >> /var/run/mptcp.conf
+        echo "INTERFACE_${INDEX}=${bridge_name}" >> /var/run/mptcp.conf
+        source /var/run/mptcp.conf
     else
-          source /opt/mptcp.conf
-          sed -i "s/$SUBFLOWS/$((SUBFLOWS + 1))/" /var/run/mptcp.conf
-          source /var/run/mptcp.conf
-          echo "INTERFACE_${SUBFLOWS}=${batman_iface}" >> /var/run/mptcp.conf
+        echo "index="$INDEX
+        echo "INTERFACE_${INDEX}=${batman_iface}" >> /var/run/mptcp.conf
     fi
   fi
   mode_execute "$mode"
