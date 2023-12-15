@@ -320,7 +320,7 @@ def get_mac_from_ipv6(ipv6_address, interface):
         # Send pings to the IPv6 address to prompt an NDP exchange
         # Increase the ping count, if needed, for better reliability
         subprocess.run(
-            ["ping6", "-c", "1", f"{ipv6_address}%{interface}"],
+            ["ping", "-c", "1", f"{ipv6_address}%{interface}"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=5,
