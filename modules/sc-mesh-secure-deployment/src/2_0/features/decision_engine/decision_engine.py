@@ -103,3 +103,4 @@ class DecisionEngine:
         self.stop_event.set()
         for thread in self.quarantine_timer_threads:
             thread.join()
+        self.mba_receiver_thread.join()
