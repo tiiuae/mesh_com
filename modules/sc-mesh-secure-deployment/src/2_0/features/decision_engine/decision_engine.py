@@ -1,14 +1,13 @@
 import sys
 import os
+import threading
 
 path_to_decision_engine = os.path.dirname(__file__) # Path to dir containing this script
 sys.path.insert(0, path_to_decision_engine)
 sys.path.append(f'{path_to_decision_engine}/..')
 
-from .quarantine import Quarantine
-import threading
-import pandas as pd
-from .mba import MBA
+from quarantine import Quarantine
+from mba import MBA
 from cbma.tools.custom_logger import CustomLogger
 logger = CustomLogger("decision_engine").get_logger()
 
@@ -81,7 +80,7 @@ class DecisionEngine:
         """
         if ip not in self.blocked_ips:
             self.blocked_ips.add(ip)
-            mal_peer = Quarantine(mal_mac="dummy", mal_ip=ip, quarantine_period=self.quarantine_period,
+            mal_peer = Quarantine(mal_mac=mac, mal_ip=ip, quarantine_period=self.quarantine_period,
                                   blacklist_lock=blacklist_lock, blacklist_dir='./blacklist',
                                   blacklist_filename='blacklist.csv', blocked_ips=self.blocked_ips)
             # Start quarantine
