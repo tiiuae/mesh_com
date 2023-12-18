@@ -150,40 +150,24 @@ class mutAuth:
                 handle_peer_connected_thread.start()
 
     def handle_wpa_multicast_event(self, mac):
-        if mac not in self.connected_peers_status:
-            # There is no ongoing connection with peer yet
-            # Wait for random seconds to avoid race condition
-            random_wait = random.uniform(0.5, 3)
-            time.sleep(random_wait)
-            if mac not in self.connected_peers_status:
-                # Start as client
-                print("------------------client ---------------------")
+            if self.mymac > mac:
+                # I have higher mac, so I should initiate as client
                 with self.connected_peers_status_lock:
-                    self.connected_peers_status[mac] = [
-                        "ongoing",
-                        0,
-                    ]  # Update status as ongoing, num of failed attempts = 0
-                self.start_auth_client(mac)
-        elif self.connected_peers_status[mac][0] not in [
-            "ongoing",
-            "authenticated",
-        ]:
-            # If node does not have ongoing authentication or is not already
-            # authenticated or has not been blacklisted
-
-            # Wait for random seconds to avoid race condition
-            random_wait = random.uniform(0.5, 3)
-            time.sleep(random_wait)
-            if self.connected_peers_status[mac][0] not in [
-                "ongoing",
-                "authenticated",
-            ]:
-                # Start as client
-                print("------------------client ---------------------")
-                with self.connected_peers_status_lock:
-                    # Update status as ongoing, num of failed attempts
-                    # = same as before
-                    self.connected_peers_status[mac][0] = "ongoing"
+                    connected_peers_status = self.connected_peers_status
+                    if mac not in connected_peers_status:
+                        # There is no ongoing connection with peer yet
+                        # Start as client
+                        print("------------------client ---------------------")
+                        # Update status as ongoing, num of failed attempts = 0
+                        self.connected_peers_status[mac] = ["ongoing", 0]
+                    elif connected_peers_status[mac][0] not in ["ongoing", "authenticated"]:
+                        # If node does not have ongoing authentication or is not already authenticated or has not been blacklisted
+                        # Start as client
+                        print("------------------client ---------------------")
+                        # Update status as ongoing, num of failed attempts = same as before
+                        self.connected_peers_status[mac][0] = "ongoing"
+                    else:
+                        return
                 self.start_auth_client(mac)
 
     def start_auth_server(self):
