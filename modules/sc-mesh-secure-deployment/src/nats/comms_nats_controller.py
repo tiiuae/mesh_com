@@ -1,34 +1,34 @@
 """
 Comms NATS controller
 """
+import argparse
 import asyncio
+import json
+import logging
 import signal
 import ssl
-import argparse
-import logging
-import threading
-import json
-import re
-import base64
-from typing import Optional
-from datetime import datetime
 import subprocess
+import threading
+import os
+import glob
+import base64
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from typing import Optional
+
 import OpenSSL.crypto
-
-
-from nats.aio.client import Client as nats
 import requests
-
-from src import comms_settings
-from src import comms_command
-from src import comms_status
+import yaml
+from nats.aio.client import Client as nats
 
 from src import batadvvis
 from src import batstat
-
-from src import comms_service_discovery
+from src import comms_command
 from src import comms_if_monitor
+from src import comms_service_discovery
+from src import comms_settings
+from src import comms_status
+
 
 # FMO_SUPPORTED_COMMANDS = [
 #     "GET_IDENTITY",
@@ -69,7 +69,9 @@ class MeshTelemetry:
 
         :return: -
         """
-        self.thread_visual = threading.Thread(target=self.batman_visual.run)  # create thread
+        self.thread_visual = threading.Thread(
+            target=self.batman_visual.run
+        )  # create thread
         self.thread_visual.start()  # start thread
         self.thread_stats = threading.Thread(target=self.batman.run)  # create thread
         self.thread_stats.start()  # start thread
@@ -149,8 +151,11 @@ class MdmAgent:
 
     OK_POLLING_TIME_SECONDS: int = 600
     FAIL_POLLING_TIME_SECONDS: int = 1
-    YAML_FILE: str = "/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features.yaml"
+    YAML_FILE: str = (
+        "/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features.yaml"
+    )
 
+    # pylint: disable=too-many-arguments
     def __init__(
         self,
         comms_controller,
@@ -184,12 +189,21 @@ class MdmAgent:
             service_name="MDM Service",
             service_type="_mdm._tcp.local.",
             service_cb=self.mdm_server_address_cb,
-            interface=self.__if_to_monitor
+            interface=self.__if_to_monitor,
         )
         self.interface_monitor = comms_if_monitor.CommsInterfaceMonitor(
             self.interface_monitor_cb
         )
-        self.__certs_uploaded = False  # Should be true if CBMA certs exist
+        self.service_monitor_thread: Optional[threading.Thread] = None
+        self.thread_if_mon: Optional[threading.Thread] = None
+
+        try:
+            with open("/opt/certs_uploaded", "r", encoding="utf-8") as f:
+                self.__certs_uploaded = True
+                self.__comms_controller.logger.debug("No need to upload certificates")
+        except FileNotFoundError:
+            self.__certs_uploaded = False
+            self.__comms_controller.logger.debug("Certificate upload needed")
 
         try:
             with open("/opt/identity", "r", encoding="utf-8") as f:  # todo
@@ -218,7 +232,7 @@ class MdmAgent:
         self.__interfaces = interfaces
         self.__comms_controller.logger.debug(
             "Interface monitor cb: %s", self.__interfaces
-            )
+        )
         if self.__if_to_monitor is None:
             self.start_service_discovery()
         elif self.__if_to_monitor in self.__interfaces:
@@ -234,9 +248,7 @@ class MdmAgent:
         :return: -
         """
         if not self.service_monitor.running:
-            self.__comms_controller.logger.debug(
-                "Start service monitor thread"
-            )
+            self.__comms_controller.logger.debug("Start service monitor thread")
             self.service_monitor_thread = threading.Thread(
                 target=self.service_monitor.run
             )
@@ -249,9 +261,7 @@ class MdmAgent:
         :return: -
         """
         if self.service_monitor.running:
-            self.__comms_controller.logger.debug(
-                "Stop service monitor thread"
-            )
+            self.__comms_controller.logger.debug("Stop service monitor thread")
             self.service_monitor.close()
             self.service_monitor_thread.join()
 
@@ -265,16 +275,24 @@ class MdmAgent:
         # Create interface monitoring thread
         self.thread_if_mon = threading.Thread(
             target=self.interface_monitor.monitor_interfaces
-            )
+        )
         self.thread_if_mon.start()
 
         while True:
-            if self.mdm_service_available:
+            if not self.__certs_uploaded:
+                resp = self.upload_certificate_bundle()
+                self.__comms_controller.logger.debug(
+                    "Certificate upload response: %s", resp
+                )
+                if resp.status_code == 200:
+                    self.__certs_uploaded = True
+                    with open("/opt/certs_uploaded", "w", encoding="utf-8") as f:
+                        f.write("certs uploaded")
+                else:
+                    self.__comms_controller.logger.debug("Certificate upload failed")
+            elif self.mdm_service_available:
                 await self.__loop_run_executor(executor)
-            # if not self.__certs_uploaded:
-            #    resp = self.upload_certificate_bundle()
-            #    if resp.status_code == 200:
-            #        self.__certs_uploaded = True
+
             await asyncio.sleep(float(min(self.__interval, self.__debug_config_interval)))
 
     def __http_get_device_config(self) -> requests.Response:
@@ -309,24 +327,6 @@ class MdmAgent:
                 "HTTP request failed with error: %s", err
             )
             return requests.Response()
-
-    @staticmethod
-    def __is_base64(string_to_check: str) -> bool:
-        """
-        Check if string is base64 encoded
-        :param string_to_check: string to check
-        :return: True if base64 encoded
-        """
-        try:
-            # Check if the string is a valid base64 format
-            if not re.match("^[A-Za-z0-9+/]+[=]{0,2}$", string_to_check):
-                return False
-
-            # Attempt to decode
-            _ = base64.b64decode(string_to_check, validate=True)
-            return True
-        except (re.error, __import__("binascii").Error):
-            return False
 
     def __action_radio_configuration(self, response: requests.Response) -> str:
         """
@@ -379,18 +379,16 @@ class MdmAgent:
 
         try:
             if config["features"] is not None:
-                yaml = config["features"]
-                # check if features field is base64 encoded
-                if self.__is_base64(yaml):
-                    # decode base64
-                    yaml = base64.b64decode(config["features"]).decode("utf-8")
+                data_json = config["features"]
+                features_dict = json.loads(data_json)
+                features_yaml = yaml.dump(features_dict, default_flow_style=False)
 
                 with open(
                     self.YAML_FILE,
                     "w",
                     encoding="utf-8",
-                ) as f:
-                    f.write(yaml)
+                ) as file_handle:
+                    file_handle.write(features_yaml)
 
                 self.__interval = self.OK_POLLING_TIME_SECONDS
                 self.__comms_controller.logger.debug("No features field in config")
@@ -476,8 +474,8 @@ class MdmAgent:
         :return: config
         """
         try:
-            with open("/opt/config.json", "r", encoding="utf-8") as f:
-                return f.read().strip()
+            with open("/opt/config.json", "r", encoding="utf-8") as f_handle:
+                return f_handle.read().strip()
         except FileNotFoundError:
             return None
 
@@ -500,26 +498,35 @@ class MdmAgent:
         :param response: HTTP response
         :return: -
         """
-        with open("/opt/config.json", "w", encoding="utf-8") as f:
-            f.write(response.text.strip())
+        with open("/opt/config.json", "w", encoding="utf-8") as f_handle:
+            f_handle.write(response.text.strip())
 
     def upload_certificate_bundle(self) -> requests.Response:
+        """
+        Upload certificate bundle
+        :return: HTTP response
+        """
         try:
-            # TODO: Not sure what kind of bundle we should deliver
-            # so bundling just device cert and ca cert for now.
-            with open(self.__certificate_file, 'r') as cert_file:
-                certificate_content = cert_file.read()
+            certificates_dict = {}
 
-            with open(self.__ca, 'r') as ca_file:
-                ca_certificate_content = ca_file.read()
+            files = glob.glob("/opt/at_birth.tar.bz2*")
 
-            # Concatenate the certificate and CA certificate
-            bundle_content = certificate_content + ca_certificate_content
+            if len(files) == 0:
+                self.__comms_controller.logger.debug("No certificates found")
+                return requests.Response()
+
+            for file in files:
+                with open(file, "rb") as f:
+                    data = f.read()
+                    base64_data = base64.b64encode(data)
+                    certificates_dict[os.path.basename(file)] = base64_data.decode("utf-8")
+
+            self.__comms_controller.logger.debug("Uploading certificate bundle")
 
             # Prepare the JSON data for the POST request
             data = {
-                'device_id': self.__device_id,
-                'payload': bundle_content,
+                "device_id": self.__device_id,
+                "payload": certificates_dict,
             }
 
             __https_url = self.__url
@@ -528,19 +535,20 @@ class MdmAgent:
 
             # Make the POST request
             url = f"https://{__https_url}/{self.PUT_DEVICE_CONFIG}/certificates"
-            return requests.post(url,
-                                 json=data,
-                                 cert=(self.__certificate_file, self.__keyfile),
-                                 verify=self.__ca,
-                                 timeout=2,)
-        except FileNotFoundError as e:
-            self.__comms_controller.logger.error(
-                "Certificate file not found: %s", e
+            return requests.post(
+                url,
+                json=data,
+                cert=(self.__certificate_file, self.__keyfile),
+                verify=self.__ca,
+                timeout=2,
             )
+        except FileNotFoundError as e:
+            self.__comms_controller.logger.error("Certificate file not found: %s", e)
         except requests.RequestException as e:
             self.__comms_controller.logger.error(
                 "Post request failed with error: %s", e
             )
+        return requests.Response()
 
     async def __loop_run_executor(self, executor) -> None:
         """
@@ -789,7 +797,6 @@ async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000) -> 
 
     cc.logger.debug("FMO comms_nats_controller Listening for requests")
 
-    # separate instances needed for FMO/MDM
     while True:
         await asyncio.sleep(float(cc.interval) / 1000.0)
         try:
