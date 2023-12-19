@@ -363,8 +363,6 @@ class MdmAgent:
         """
         config:dict = json.loads(response.text)
 
-        self.__comms_controller.logger.debug(f"config: {config} {self.__previous_config_mesh}")
-
         try:
             if json.loads(self.__previous_config_mesh) == config:
                 self.__comms_controller.logger.debug(
