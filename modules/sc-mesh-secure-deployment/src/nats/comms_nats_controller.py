@@ -505,6 +505,7 @@ class MdmAgent:
                 ) as debug_conf_json:
                     debug_conf_json.write(self.__previous_debug_config)
                     self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
+                return "OK"
             except:
                 self.__comms_controller.logger.debug(
                     "cannot store /opt/debug_config.json"
