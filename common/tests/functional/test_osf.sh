@@ -45,7 +45,7 @@ _test() {
 
   # Extract the inet6 IP address starting with 'fde3' from the 'tun0' interface
   ip_address=$(ifconfig tun0 | grep -o 'inet6 fde3:[^ ]*' | awk '{print $2}')
-  # Use ping6 to ping the IP address fd02::1 over the tun0 interface
+  # Use ping6 to ping the IP address over the tun0 interface
   if ! ping6 -c 3 -I tun0 "$ip_address" &>/dev/null; then
     echo "ping6 test to $ip_address over tun0 failed." | print_log
     result=$FAIL
