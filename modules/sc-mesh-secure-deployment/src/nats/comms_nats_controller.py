@@ -597,7 +597,7 @@ class MdmAgent:
                 return requests.Response()  # empty response
 
             # Make the POST request
-            url = f"https://{__https_url}/{self.PUT_DEVICE_CONFIG}/certificates"
+            url = f"https://{__https_url}/{self.PUT_DEVICE_CONFIG}/{ConfigType.CERTIFICATES}"
             return requests.post(
                 url,
                 json=data,
