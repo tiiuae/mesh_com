@@ -218,7 +218,6 @@ EOF
           logger "ERROR: HaLoW radio not found."
           return 1
         fi
-
       # otherwise use the old detection code.
       else
         # Radio spi bus number
