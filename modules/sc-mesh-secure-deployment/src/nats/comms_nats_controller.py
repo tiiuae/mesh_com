@@ -12,6 +12,7 @@ import threading
 import os
 import glob
 import base64
+from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
@@ -140,6 +141,18 @@ class CommsController:  # pylint: disable=too-few-public-methods
         self.logger = self.main_logger.getChild("controller")
 
 
+class ConfigType(str, Enum):
+    """
+    Config type
+    """
+
+    BASE = "base"
+    MESH_CONFIG = "mesh_conf"
+    CERTIFICATES = "certificates"
+    FEATURES = "features"
+    DEBUG_CONFIG = "debug_conf"
+
+
 class MdmAgent:
     """
     MDM Agent
@@ -167,8 +180,26 @@ class MdmAgent:
         """
         Constructor
         """
-        self.__previous_config: Optional[str] = self.__read_config_from_file()
-        self.__previous_debug_config: Optional[str] = self.__read_debug_config_from_file()
+        self.__status: dict = {
+            ConfigType.MESH_CONFIG.value: "FAIL",
+            ConfigType.FEATURES.value: "FAIL",
+            ConfigType.CERTIFICATES.value: "FAIL",
+        }
+        self.__previous_config_mesh: Optional[str] = self.__read_config_from_file(
+            ConfigType.MESH_CONFIG.value
+        )
+        self.__previous_config_mesh_base: Optional[str] = self.__read_config_from_file(
+            ConfigType.BASE.value
+        )
+        self.__previous_config_features: Optional[str] = self.__read_config_from_file(
+            ConfigType.FEATURES.value
+        )
+        self.__previous_config_certificates: Optional[
+            str
+        ] = self.__read_config_from_file(ConfigType.CERTIFICATES.value)
+        self.__previous_debug_config: Optional[
+            str
+        ] = self.__read_debug_config_from_file()
         self.__mesh_conf_request_processed = False
         self.__comms_controller: CommsController = comms_controller
         self.__interval: int = (
@@ -177,6 +208,7 @@ class MdmAgent:
         self.__debug_config_interval: int = (
             self.FAIL_POLLING_TIME_SECONDS
         )  # possible to update from MDM server?
+
         self.__url: str = "defaultmdm.local:5000"  # mDNS callback updates this one
         self.__keyfile: str = keyfile
         self.__certificate_file: str = certificate_file
@@ -210,8 +242,6 @@ class MdmAgent:
                 self.__device_id = f.read().strip()
         except FileNotFoundError:
             self.__device_id = "default"
-        self.__config_type = "mesh_conf"
-        self.__debug_config_type = "debug_conf"
 
     def mdm_server_address_cb(self, address: str, status: bool) -> None:
         """
@@ -279,7 +309,7 @@ class MdmAgent:
         self.thread_if_mon.start()
 
         while True:
-            if not self.__certs_uploaded:
+            if not self.__certs_uploaded and self.mdm_service_available:
                 resp = self.upload_certificate_bundle()
                 self.__comms_controller.logger.debug(
                     "Certificate upload response: %s", resp
@@ -291,37 +321,34 @@ class MdmAgent:
                 else:
                     self.__comms_controller.logger.debug("Certificate upload failed")
             elif self.mdm_service_available:
-                await self.__loop_run_executor(executor)
+                await self.__loop_run_executor(executor, ConfigType.FEATURES)
+                await self.__loop_run_executor(executor, ConfigType.CERTIFICATES)
+                await self.__loop_run_executor(executor, ConfigType.MESH_CONFIG)
+                if self.__mesh_conf_request_processed:
+                    await self.__loop_run_executor(executor, ConfigType.DEBUG_CONFIG)
 
-            await asyncio.sleep(float(min(self.__interval, self.__debug_config_interval)))
+            await asyncio.sleep(
+                float(min(self.__interval, self.__debug_config_interval))
+            )
 
-    def __http_get_device_config(self) -> requests.Response:
+    def __http_get_device_config(self, config: ConfigType) -> requests.Response:
         """
         HTTP get device config
         :return: HTTP response
         """
         try:
-            # mDNS discovery callback updates the url and can be None
+            # "mDNS" discovery callback updates the url and can be None
             __https_url = self.__url
             if "None" in __https_url:
                 return requests.Response()  # empty response
 
-            if self.__mesh_conf_request_processed:
-                return requests.get(
-                    f"https://{__https_url}/{self.GET_DEVICE_CONFIG}/{self.__debug_config_type}",
-                    params={"device_id": self.__device_id},
-                    cert=(self.__certificate_file, self.__keyfile),
-                    verify=self.__ca,
-                    timeout=2,
-                )
-            else:
-                return requests.get(
-                    f"https://{__https_url}/{self.GET_DEVICE_CONFIG}/{self.__config_type}",
-                    params={"device_id": self.__device_id},
-                    cert=(self.__certificate_file, self.__keyfile),
-                    verify=self.__ca,
-                    timeout=2,
-                )
+            return requests.get(
+                f"https://{__https_url}/{self.GET_DEVICE_CONFIG}/{config.value}",
+                params={"device_id": self.__device_id},
+                cert=(self.__certificate_file, self.__keyfile),
+                verify=self.__ca,
+                timeout=2,
+            )
         except requests.exceptions.ConnectionError as err:
             self.__comms_controller.logger.error(
                 "HTTP request failed with error: %s", err
@@ -334,13 +361,26 @@ class MdmAgent:
         :param response: https response
         :return: status
         """
-        config = json.loads(response.text)
+        config: dict = json.loads(response.text)
+
+        try:
+            self.__comms_controller.logger.debug(
+                f"config: {config} previous: {json.loads(self.__previous_config_mesh)}"
+            )
+            if json.loads(self.__previous_config_mesh) == config:
+                self.__comms_controller.logger.debug(
+                    "No changes in mesh config, not updating."
+                )
+                return "OK"
+        except TypeError:
+            self.__comms_controller.logger.debug("No previous mesh config")
 
         ret, info = self.__comms_controller.settings.handle_mesh_settings(
             json.dumps(config["payload"])
         )
 
         self.__comms_controller.logger.debug("ret: %s info: %s", ret, info)
+
         if ret == "OK":
             for radio in config["payload"]["radios"]:
                 # Extract the radio_index
@@ -362,14 +402,15 @@ class MdmAgent:
 
             if ret == "OK":
                 self.__config_version = int(config["version"])
-                self.__interval = self.OK_POLLING_TIME_SECONDS
-                self.__write_config_to_file(response)  # TODO: remove certs from config
-        else:
-            self.__interval = self.FAIL_POLLING_TIME_SECONDS
+                self.__write_config_to_file(response, ConfigType.MESH_CONFIG.value)
+
+                self.__previous_config_mesh = self.__read_config_from_file(
+                    ConfigType.MESH_CONFIG.value
+                )
 
         return ret
 
-    def __action_feature_yaml(self, config: dict) -> str:
+    def __action_feature_yaml(self, response: requests.Response) -> str:
         """
         Take feature.yaml into use
         :param config: config dict
@@ -378,9 +419,23 @@ class MdmAgent:
         # check if features field exists
 
         try:
-            if config["features"] is not None:
-                data_json = config["features"]
-                features_dict = json.loads(data_json)
+            config: dict = json.loads(response.text)
+
+            try:
+                self.__comms_controller.logger.debug(
+                    f"config: {config} previous: {json.loads(self.__previous_config_features)}"
+                )
+                if json.loads(self.__previous_config_features) == config:
+                    self.__comms_controller.logger.debug(
+                        "No changes in features config, not updating."
+                    )
+                    return "OK"
+            except TypeError:
+                self.__comms_controller.logger.debug("No previous features config")
+
+            if config["payload"] is not None:
+                features_dict = config["payload"]["features"]
+
                 features_yaml = yaml.dump(features_dict, default_flow_style=False)
 
                 with open(
@@ -390,40 +445,52 @@ class MdmAgent:
                 ) as file_handle:
                     file_handle.write(features_yaml)
 
-                self.__interval = self.OK_POLLING_TIME_SECONDS
-                self.__comms_controller.logger.debug("No features field in config")
+                self.__write_config_to_file(response, ConfigType.FEATURES.value)
+                self.__previous_config_features = self.__read_config_from_file(ConfigType.FEATURES.value)
                 return "OK"
 
             self.__comms_controller.logger.error("No features field in config")
-            self.__interval = self.FAIL_POLLING_TIME_SECONDS
         except KeyError:
             self.__comms_controller.logger.error("KeyError features field in config")
-            self.__interval = self.FAIL_POLLING_TIME_SECONDS
 
         return "FAIL"
 
-    def __action_cert_keys(self, config: dict) -> str:
+    def __action_cert_keys(self, response: requests.Response) -> str:
         """
         Take cert/keys into use
         :param config: config dict
         :return: status
         """
         try:
-            if config["certificates"] is not None:
+            config: dict = json.loads(response.text)
+
+            try:
+                if json.loads(self.__previous_config_certificates) == config:
+                    self.__comms_controller.logger.debug(
+                        "No changes in features config, not updating."
+                    )
+                    return "OK"
+            except TypeError:
+                self.__comms_controller.logger.debug("No previous certificates config")
+
+            if config["payload"] is not None:
+                data = config["payload"]["features"]  # todo implementation
                 self.__comms_controller.logger.debug("certs field in config")
                 self.__comms_controller.logger.debug(
                     "__action_cert_keys: not implemented"
                 )
+                self.__write_config_to_file(response, ConfigType.CERTIFICATES.value)
                 return "OK"
         except KeyError:
             self.__comms_controller.logger.error(
                 "KeyError certificates field in config"
             )
 
-        self.__interval = self.FAIL_POLLING_TIME_SECONDS
         return "FAIL"
 
-    def __handle_received_config(self, response: requests.Response) -> None:
+    def __handle_received_config(
+        self, response: requests.Response, config: ConfigType
+    ) -> str:
         """
         Handle received config
         :param response: HTTP response
@@ -436,45 +503,47 @@ class MdmAgent:
 
         data = json.loads(response.text)
 
-        if self.__mesh_conf_request_processed:
+        if self.__mesh_conf_request_processed and config.value == ConfigType.DEBUG_CONFIG.value:
             self.__previous_debug_config = response.text.strip()
 
             # save to file to use in fmo
             try:
-                with open("/opt/debug_config.json", "w", encoding="utf-8") as debug_conf_json:
+                with open(
+                    "/opt/debug_config.json", "w", encoding="utf-8"
+                ) as debug_conf_json:
                     debug_conf_json.write(self.__previous_debug_config)
                     self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
+                return "OK"
             except:
-                self.__comms_controller.logger.debug("cannot store /opt/debug_config.json")
+                self.__comms_controller.logger.debug(
+                    "cannot store /opt/debug_config.json"
+                )
                 self.__debug_config_interval = self.FAIL_POLLING_TIME_SECONDS
-                return
-
+                return "FAIL"
         else:
-            self.__previous_config = response.text.strip()
-
-            # radio configuration actions0
-            ret = self.__action_radio_configuration(response)
-            if ret == "FAIL":
-                return
+            # radio configuration actions
+            if config.value == ConfigType.MESH_CONFIG.value:
+                ret = self.__action_radio_configuration(response)
+                return ret
 
             # feature.yaml actions
-            ret = self.__action_feature_yaml(data)
-            if ret == "FAIL":
-                return
+            if config.value == ConfigType.FEATURES.value:
+                ret = self.__action_feature_yaml(response)
+                return ret
 
             # cert/keys actions
-            ret = self.__action_cert_keys(data)
-            if ret == "FAIL":
-                return
+            if config.value == ConfigType.CERTIFICATES.value:
+                ret = self.__action_cert_keys(response)
+                return ret
 
     @staticmethod
-    def __read_config_from_file() -> Optional[str]:
+    def __read_config_from_file(config: str) -> Optional[str]:
         """
         Read config from file
         :return: config
         """
         try:
-            with open("/opt/config.json", "r", encoding="utf-8") as f_handle:
+            with open(f"/opt/config_{config}.json", "r", encoding="utf-8") as f_handle:
                 return f_handle.read().strip()
         except FileNotFoundError:
             return None
@@ -492,13 +561,13 @@ class MdmAgent:
             return None
 
     @staticmethod
-    def __write_config_to_file(response: requests.Response) -> None:
+    def __write_config_to_file(response: requests.Response, config: str) -> None:
         """
         Write config to file
         :param response: HTTP response
         :return: -
         """
-        with open("/opt/config.json", "w", encoding="utf-8") as f_handle:
+        with open(f"/opt/config_{config}.json", "w", encoding="utf-8") as f_handle:
             f_handle.write(response.text.strip())
 
     def upload_certificate_bundle(self) -> requests.Response:
@@ -519,7 +588,9 @@ class MdmAgent:
                 with open(file, "rb") as f:
                     data = f.read()
                     base64_data = base64.b64encode(data)
-                    certificates_dict[os.path.basename(file)] = base64_data.decode("utf-8")
+                    certificates_dict[os.path.basename(file)] = base64_data.decode(
+                        "utf-8"
+                    )
 
             self.__comms_controller.logger.debug("Uploading certificate bundle")
 
@@ -534,7 +605,7 @@ class MdmAgent:
                 return requests.Response()  # empty response
 
             # Make the POST request
-            url = f"https://{__https_url}/{self.PUT_DEVICE_CONFIG}/certificates"
+            url = f"https://{__https_url}/{self.PUT_DEVICE_CONFIG}/{ConfigType.CERTIFICATES.value}"
             return requests.post(
                 url,
                 json=data,
@@ -550,7 +621,7 @@ class MdmAgent:
             )
         return requests.Response()
 
-    async def __loop_run_executor(self, executor) -> None:
+    async def __loop_run_executor(self, executor, config: ConfigType) -> None:
         """
         Loop run executor
         :param executor: executor
@@ -558,17 +629,18 @@ class MdmAgent:
         # This function makes a synchronous HTTP request using ThreadPoolExecutor
         https_loop = asyncio.get_event_loop()
         response = await https_loop.run_in_executor(
-            executor, self.__http_get_device_config
+            executor, self.__http_get_device_config, config
         )
+
         self.__comms_controller.logger.debug(
-            "HTTP Request status: %s", str(response.status_code)
+            "HTTP Request status: %s, config: %s", str(response.status_code), config
         )
         if self.__mesh_conf_request_processed:
             if (
                 response.status_code == 200
                 and self.__previous_debug_config != response.text.strip()
             ):
-                self.__handle_received_config(response)
+                self.__handle_received_config(response, ConfigType.DEBUG_CONFIG)
                 self.__mesh_conf_request_processed = False
             elif (
                 response.status_code == 200
@@ -585,20 +657,28 @@ class MdmAgent:
                     self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
                     self.__mesh_conf_request_processed = False
         else:
-            if (
-                response.status_code == 200
-                and self.__previous_config != response.text.strip()
-            ):
-                self.__handle_received_config(response)
-                self.__mesh_conf_request_processed = True
-            elif (
-                response.status_code == 200
-                and self.__previous_config == response.text.strip()
+            if response.status_code == 200:
+                ret = self.__handle_received_config(response, config)
+                self.__comms_controller.logger.debug("config: %s, ret: %s", config, ret)
+                if ret == "OK":
+                    self.__status[config.value] = "OK"
+                if config.value == ConfigType.MESH_CONFIG.value and ret == "OK":
+                    self.__mesh_conf_request_processed = True
+            elif response.status_code != 200:
+                self.__status[config.value] = "FAIL"
+
+            # if all statuses are OK, then we can start the OK polling
+            # todo remove this and leave all() check once certificate download is working
+            if all(value == "OK" for value in self.__status.values()) or (
+                self.__status[ConfigType.CERTIFICATES.value] == "FAIL"
+                and self.__status[ConfigType.FEATURES.value] == "OK"
+                and self.__status[ConfigType.MESH_CONFIG.value] == "OK"
             ):
                 self.__interval = self.OK_POLLING_TIME_SECONDS
-                self.__mesh_conf_request_processed = True
-            elif response.text.strip() == "" or response.status_code != 200:
+            else:
                 self.__interval = self.FAIL_POLLING_TIME_SECONDS
+
+            self.__comms_controller.logger.debug("status: %s", self.__status)
 
 
 async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) -> None:
@@ -754,10 +834,14 @@ async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000) -> 
         elif subject in (f"comms.command.{identity}", "comms.identity"):
             # this file was saved by mdm
             try:
-                with open("/opt/debug_config.json", "r", encoding="utf-8") as debug_conf_json:
+                with open(
+                    "/opt/debug_config.json", "r", encoding="utf-8"
+                ) as debug_conf_json:
                     debug_conf_data = debug_conf_json.read().strip()
                     debug_conf_data_json = json.loads(debug_conf_data)
-                    debug_mode = debug_conf_data_json['payload']['debug_conf'][0]['debug_mode']
+                    debug_mode = debug_conf_data_json["payload"]["debug_conf"][0][
+                        "debug_mode"
+                    ]
                     cc.debug_mode_enabled = True if debug_mode == "enabled" else False
             except:
                 pass
