@@ -79,6 +79,7 @@ def setup_macsec(
     )  # Wait for interface to be up, if not already
     if shutdown_event.is_set():
         return None
+
     # Queue to store wpa peer connected messages /
     # multicast messages on interface for cbma
     in_queue = queue.Queue()
@@ -98,7 +99,7 @@ def setup_macsec(
     # utils.wait_for_interface_to_be_pingable(
     #     mua.meshiface, mua.ipAddress, shutdown_event
     # )
-
+    # TODO Using sleep as in some cases the interface may never be pingable
     time.sleep(3)
 
     if shutdown_event.is_set():
@@ -181,7 +182,7 @@ def cbma(
 # pylint: enable=too-many-arguments
 
 
-def main(cert_folder: str, wlan: str, eth: str):
+def main(wlan: str, eth: str, cert_folder: str, cert_chain: str):
     """
     Example of setting up cbma for interfaces wlp1s0, eth1
 
@@ -215,8 +216,8 @@ def main(cert_folder: str, wlan: str, eth: str):
         wlan,  # interface_name
         15001, # port
         "bat0", # batman_interface
-        f'{file_dir}/{cert_folder}', # path_to_certificate
-        f'{file_dir}/{cert_folder}/ca.crt', # path_to_ca
+        cert_folder,
+        cert_chain,
         "off", # macsec_encryption (can be "on" if required)
         f"/var/run/wpa_supplicant_id0/{wlan}",  # wpa_supplicant ctrl path
         _shutdown_event
@@ -228,8 +229,8 @@ def main(cert_folder: str, wlan: str, eth: str):
         eth,
         15001,
         "bat0",
-        f'{file_dir}/{cert_folder}', # path_to_certificate
-        f'{file_dir}/{cert_folder}/ca.crt', # path_to_ca
+        cert_folder,
+        cert_chain,
         "off",
         None,
         _shutdown_event
@@ -254,8 +255,8 @@ def main(cert_folder: str, wlan: str, eth: str):
         "bat0",
         15002,
         "bat1",
-        f'{file_dir}/{cert_folder}', # path_to_certificate
-        f'{file_dir}/{cert_folder}/ca.crt', # path_to_ca
+        cert_folder,
+        cert_chain,
         "on",
         None,
         _shutdown_event
@@ -294,15 +295,23 @@ if __name__ == "__main__":
         required=False
     )
     parser.add_argument(
-        '--certdir',
-        default="cert_generation/certificates",
-        help='Folder where certs are placed',
+        "-d",
+        "--certdir",
+        default="/opt/crypto/ecdsa/birth/filebased",
+        help="Folder where birth certs are placed",
+        required=False
+    )
+    parser.add_argument(
+        "-c",
+        "--certchain",
+        default="/opt/mspki/ecdsa/certificate_chain.crt",
+        help="Path to certificate chain",
         required=False
     )
     args = parser.parse_args()
 
     try:
-        main(args.certdir, args.wlan, args.eth)
+        main(args.wlan, args.eth, args.certdir, args.certchain)
     except (Exception, KeyboardInterrupt):
         print("Whoopsie...", flush=True)
 

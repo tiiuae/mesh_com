@@ -33,8 +33,8 @@ class AuthServer:
         self.context.check_hostname = False
         self.context.verify_mode = ssl.CERT_REQUIRED
         self.context.load_cert_chain(
-            certfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.crt")[0],
-            keyfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.key")[0],
+            certfile=glob.glob(f"{self.CERT_PATH}/MAC/{self.mymac}.crt")[0],
+            keyfile=glob.glob(f"{self.CERT_PATH}/private.key")[0],
         )
         self.client_auth_results = {}
         self.active_sockets = {}
@@ -75,7 +75,7 @@ class AuthServer:
                 self.mua.auth_fail(client_mac=client_mac)
                 secure_client_socket.close()
                 # secure_client_socket.sendall(b"Authentication failed.")
-        except Exception as e:
+        except Exception:
             logger.error(f"An error occurred while handling the client {client_address[0]}.", exc_info=True)
             self.mua.auth_fail(client_mac=client_mac)
             secure_client_socket.close()
