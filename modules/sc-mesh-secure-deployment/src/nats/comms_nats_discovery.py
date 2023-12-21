@@ -12,6 +12,8 @@ from enum import Enum
 from pyroute2 import IPRoute
 from zeroconf import Zeroconf, IPVersion, ServiceInfo
 from src.comms_service_discovery import CommsServiceMonitor
+import signal
+import atexit
 
 
 #
@@ -192,9 +194,9 @@ class NatsSeedDiscovery:
         self.__logger = logger
         self.__seeds = {}
 
-    # callback handler called when CommsServiceDiscovery founds a new seed service
-    def __seed_service_found(self, service_name, ipv4_addresses, ipv6_addresses, port, status):
-        self.__logger.debug(f"Seed service found: name:{service_name}, ip:{ipv4_addresses}, ip6:{ipv6_addresses}, port:{port}, online: {status}")
+    # callback handler called when CommsServiceDiscovery receives seed service update
+    def __seed_service_callback(self, service_name, ipv4_addresses, ipv6_addresses, port, status):
+        self.__logger.debug(f"Seed service callback: name:{service_name}, ip:{ipv4_addresses}, ip6:{ipv6_addresses}, port:{port}, online: {status}")
 
         # add new leaf
         if (status):
@@ -217,7 +219,7 @@ class NatsSeedDiscovery:
         monitor = CommsServiceMonitor(
             service_name=None,
             service_type=self.__natsCtrl.SERVICE_TYPE,
-            service_cb=self.__seed_service_found
+            service_cb=self.__seed_service_callback
         )
         monitor.run()
 
@@ -237,7 +239,7 @@ class NatsSeedPublish:
         self.__natsCtrl = natsCtrl
         self.__ifName = ifName
         
-        # fetch ipv4 addr even if not published, get device index from it.
+        # fetch ipv4 addr even if ipv6 only, need to get device index from it.
         ipv4 = self.__get_ip4_address(ifName)
         if not ipv4:
             raise ValueError(f"Network interface {ifName} does not found.")
@@ -334,19 +336,25 @@ class NatsSeedPublish:
         self.__zeroconf.unregister_service(self.__serviceInfo)
         self.__zeroconf.close()
 
+    def __exit_handler(self):
+        self.__unregister_seed_service()
+
+    def __kill_handler(self, *args):
+        exit(0)
+
     # keeps the service published until script is stopped
     def run(self):
         self.__logger.debug("Publish seed service.")
         self.__natsCtrl.generate_seed_config()
         self.__natsCtrl.reload_config()
 
-        try:
-            self.__register_seed_service()
-            while True:
-                time.sleep(1)
-        finally:
-            self.__unregister_seed_service()
-            exit(0)
+        atexit.register(self.__exit_handler)
+        signal.signal(signal.SIGTERM, self.__kill_handler)
+        signal.signal(signal.SIGINT, self.__kill_handler)
+
+        self.__register_seed_service()
+        while True:
+            time.sleep(1)
 
 
 if __name__ == "__main__":
