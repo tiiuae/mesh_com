@@ -77,11 +77,9 @@ class CommsServiceMonitor:
         """
         self.running = True
         if self.interface:
-            print("eka")
             addresses = self.__get_ip_addresses(self.interface)
             self.zeroconf = Zeroconf(interfaces=addresses)
         else:
-            print("toka")
             self.zeroconf = Zeroconf()
 
         self.service_browser = ServiceBrowser(
@@ -140,7 +138,7 @@ class CommsServiceMonitor:
             if state_change == ServiceStateChange.Removed:
                 service_available = False
             info.request(zeroconf, 3000)
-            print(info)
+
             if self.service_callback:
                 server = info.server
                 if server:

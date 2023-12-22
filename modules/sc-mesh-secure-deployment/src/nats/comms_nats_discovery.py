@@ -14,6 +14,7 @@ from zeroconf import Zeroconf, IPVersion, ServiceInfo
 from src.comms_service_discovery import CommsServiceMonitor
 import signal
 import atexit
+import os
 
 
 #
@@ -163,9 +164,20 @@ class NatsServerCtrl:
                 }}
             """)
 
-        print(config)
-        with open('/var/run/nats.conf', 'w',  encoding='UTF-8') as file_nats_conf:
-            file_nats_conf.write(config)
+        # check if config is really modified, to prevent unnecessary nats server restart.
+        modified = True
+        configPath = '/var/run/nats.conf'
+        if (os.path.isfile(configPath)):
+            modified = open(configPath, 'r', encoding='UTF-8').read() != config
+        # write only if modded.
+        if (modified):
+            self.__logger.debug(f"Write fresh configs to {configPath}")
+            with open('/var/run/nats.conf', 'w',  encoding='UTF-8') as file_nats_conf:
+                file_nats_conf.write(config)
+        else:
+            self.__logger.debug("Config file was not modified, skip.")
+
+        return modified
 
     # generate nats config with given seeds and restart the server
     def update_configurations_and_restart(self, seeds) -> None:
@@ -174,14 +186,15 @@ class NatsServerCtrl:
         :param ip_address: ip address of the seed node
         :return: None
         """
-        self.__logger.debug("Updating configurations and reloading nats-server configuration")
-        self.generate_leaf_config(seeds)
+        self.__logger.debug("Updating configurations and reloading NATS-server configuration if needed.")
+        ret = self.generate_leaf_config(seeds)
 
         # reload nats-server configuration
-        ret = self.reload_config()
-        if ret != 0:
-            self.__logger.error("Error reloading nats-server configuration")
-            return
+        if (ret):
+            self.__logger.debug("Restart NATS-server")
+            ret = self.reload_config()
+            if ret != 0:
+                self.__logger.error("Error reloading nats-server configuration")
 
 
 #
