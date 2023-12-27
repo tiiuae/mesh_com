@@ -1,6 +1,15 @@
 """
 Comms NATS controller
 """
+from os import sys, path
+if __name__ == "__main__" and __package__ is None:
+    PARENT_DIR = path.dirname(path.dirname(path.abspath(__file__)))
+    MS20_FEATURES_PATH = path.join(PARENT_DIR, "2_0/features")
+    sys.path.append(MS20_FEATURES_PATH)
+    # Make it possible to run this module also in other folder (e.g. /opt/nats):
+    sys.path.append("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features")
+
+# pylint: disable=wrong-import-position
 import argparse
 import asyncio
 import json
@@ -16,10 +25,13 @@ from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
+from typing import List, Dict
 
 import OpenSSL.crypto
 import requests
 import yaml
+from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
+from cbma import setup_cbma  # type: ignore[import-not-found]
 from nats.aio.client import Client as nats
 
 from src import batadvvis
@@ -153,6 +165,18 @@ class ConfigType(str, Enum):
     DEBUG_CONFIG = "debug_conf"
 
 
+# pylint: disable=too-few-public-methods
+class Interface:
+    """
+    Class to store interface name, operationstatus and MAC address
+    """
+    def __init__(self, interface_name, operstat, mac_address):
+        self.interface_name = interface_name
+        self.operstat = operstat
+        self.mac_address = mac_address
+# pylint: enable=too-few-public-methods
+
+
 class MdmAgent:
     """
     MDM Agent
@@ -216,7 +240,8 @@ class MdmAgent:
         self.__config_version: int = 0
         self.mdm_service_available: bool = False
         self.__if_to_monitor = interface
-        self.__interfaces = {}
+        self.__interfaces: List[Interface] = []
+        self.executor = ThreadPoolExecutor(1)
         self.service_monitor = comms_service_discovery.CommsServiceMonitor(
             service_name="MDM Service",
             service_type="_mdm._tcp.local.",
@@ -226,9 +251,17 @@ class MdmAgent:
         self.interface_monitor = comms_if_monitor.CommsInterfaceMonitor(
             self.interface_monitor_cb
         )
-        self.service_monitor_thread: Optional[threading.Thread] = None
-        self.thread_if_mon: Optional[threading.Thread] = None
+        self.__service_monitor_thread = threading.Thread(
+            target=self.service_monitor.run
+        )
 
+        self.thread_if_mon = threading.Thread(
+            target=self.interface_monitor.monitor_interfaces
+        )
+
+        self.__cbma_set_up = (
+            False  # Indicates whether CBMA has been configured
+        )
         try:
             with open("/opt/certs_uploaded", "r", encoding="utf-8") as f:
                 self.__certs_uploaded = True
@@ -236,6 +269,12 @@ class MdmAgent:
         except FileNotFoundError:
             self.__certs_uploaded = False
             self.__comms_controller.logger.debug("Certificate upload needed")
+
+        self.__cbm_certs_path = "/opt/crypto/ecdsa/birth/filebased"
+        self.__cbma_ca_cert_path = "/opt/mspki/ecdsa/certificate_chain.crt"
+        self.__cbma_threads: Dict[str, str] = {}
+        self.__cbma_shutdown_event = threading.Event()
+        self.running = False
 
         try:
             with open("/opt/identity", "r", encoding="utf-8") as f:  # todo
@@ -256,20 +295,32 @@ class MdmAgent:
     def interface_monitor_cb(self, interfaces) -> None:
         """
         Callback for network interfaces. Service
-        :param interfaces: list of dictionaries (ifname, ifstate)
+        :param interfaces: list of dictionaries that includes
+                           interface_name, operstate, mac_address.
         :return: -
         """
-        self.__interfaces = interfaces
         self.__comms_controller.logger.debug(
-            "Interface monitor cb: %s", self.__interfaces
+            "Interface monitor cb: %s", interfaces
         )
+        self.__interfaces.clear()
+
+        for interface_data in interfaces:
+            interface = Interface(
+                interface_name=interface_data["interface_name"],
+                operstat=interface_data["operstate"],
+                mac_address=interface_data["mac_address"]
+            )
+            self.__interfaces.append(interface)
+
         if self.__if_to_monitor is None:
             self.start_service_discovery()
-        elif self.__if_to_monitor in self.__interfaces:
-            if self.__interfaces[self.__if_to_monitor] == "UP":
-                self.start_service_discovery()
-            elif self.__interfaces[self.__if_to_monitor] == "DOWN":
-                self.stop_service_discovery()
+        else:
+            for interface in self.__interfaces:
+                if interface.interface_name == self.__if_to_monitor:
+                    if interface.operstat == "UP":
+                        self.start_service_discovery()
+                    elif interface.operstat == "DOWN":
+                        self.stop_service_discovery()
 
     def start_service_discovery(self):
         """
@@ -278,11 +329,11 @@ class MdmAgent:
         :return: -
         """
         if not self.service_monitor.running:
-            self.__comms_controller.logger.debug("Start service monitor thread")
-            self.service_monitor_thread = threading.Thread(
-                target=self.service_monitor.run
+            self.__comms_controller.logger.debug(
+                "Start service monitor thread"
             )
-            self.service_monitor_thread.start()
+
+            self.__service_monitor_thread.start()
 
     def stop_service_discovery(self):
         """
@@ -293,22 +344,22 @@ class MdmAgent:
         if self.service_monitor.running:
             self.__comms_controller.logger.debug("Stop service monitor thread")
             self.service_monitor.close()
-            self.service_monitor_thread.join()
+            self.__service_monitor_thread.join()
+
+    def start_interface_monitor(self) -> None:
+        """
+        Start interface monitoring
+        """
+        self.thread_if_mon.start()
 
     async def execute(self) -> None:
         """
         Execute MDM agent
         :return: -
         """
-        executor = ThreadPoolExecutor(1)
+        self.running = True
 
-        # Create interface monitoring thread
-        self.thread_if_mon = threading.Thread(
-            target=self.interface_monitor.monitor_interfaces
-        )
-        self.thread_if_mon.start()
-
-        while True:
+        while self.running:
             if not self.__certs_uploaded and self.mdm_service_available:
                 resp = self.upload_certificate_bundle()
                 self.__comms_controller.logger.debug(
@@ -321,12 +372,15 @@ class MdmAgent:
                 else:
                     self.__comms_controller.logger.debug("Certificate upload failed")
             elif self.mdm_service_available:
-                await self.__loop_run_executor(executor, ConfigType.FEATURES)
-                await self.__loop_run_executor(executor, ConfigType.CERTIFICATES)
-                await self.__loop_run_executor(executor, ConfigType.MESH_CONFIG)
+                await self.__loop_run_executor(self.executor, ConfigType.FEATURES)
+                await self.__loop_run_executor(self.executor, ConfigType.CERTIFICATES)
+                await self.__loop_run_executor(self.executor, ConfigType.MESH_CONFIG)
                 if self.__mesh_conf_request_processed:
-                    await self.__loop_run_executor(executor, ConfigType.DEBUG_CONFIG)
-
+                    await self.__loop_run_executor(self.executor, ConfigType.DEBUG_CONFIG)
+            if self.__is_cbma_feature_enabled() and not self.__cbma_set_up:
+                self.__setup_cbma()
+            if self.__cbma_threads:
+                self.__cbma_thread_alive_check()
             await asyncio.sleep(
                 float(min(self.__interval, self.__debug_config_interval))
             )
@@ -621,6 +675,309 @@ class MdmAgent:
             )
         return requests.Response()
 
+    @staticmethod
+    def __cleanup_default_batman():
+        # Create an IPRoute object
+        # pylint: disable=invalid-name
+        ip = IPRoute()
+        # pylint: enable=invalid-name
+
+        interfaces_to_cleanup = ["bat0"]
+
+        for interface in interfaces_to_cleanup:
+            if interface in [
+                link.get_attr("IFLA_IFNAME") for link in ip.get_links()
+            ]:
+                # If the interface exists, set it down, and then delete it
+                ip.link(
+                    "set",
+                    index=ip.link_lookup(ifname=interface)[0],
+                    state="down",
+                )
+                ip.link("delete", index=ip.link_lookup(ifname=interface)[0])
+
+        # Close the IPRoute object
+        ip.close()
+
+    def __remove_all_interfaces_from_bridge(self, bridge_name):
+        # Create an IPRoute object
+        ip = IPRoute()
+
+        try:
+            # Get the index of the bridge
+            bridge_index = ip.link_lookup(ifname=bridge_name)[0]
+
+            # Get the indices of all interfaces currently in the bridge
+            interfaces_indices = [link['index'] for link in ip.get_links(master=bridge_index)]
+
+            # Remove each interface from the bridge
+            for interface_index in interfaces_indices:
+                ip.link("set", index=interface_index, master=0)  # Set the master to 0 (no bridge)
+
+        except Exception as e:
+            self.__comms_controller.logger.debug(
+                "Error removing interfaces from bridge %s!",
+                e,
+            )
+
+        finally:
+            # Close the IPRoute object
+            ip.close()
+
+    def __add_interface_to_bridge(self, bridge_name, interface_to_add):
+        # Create an IPRoute object
+        ip = IPRoute()
+
+        try:
+            # Get the index of the bridge
+            bridge_index = ip.link_lookup(ifname=bridge_name)[0]
+
+            # Get the index of the interface to add
+            interface_index = ip.link_lookup(ifname=interface_to_add)[0]
+
+            # Add the interface to the bridge
+            ip.link("set", index=interface_index, master=bridge_index)
+
+        except Exception as e:
+            self.__comms_controller.logger.debug(
+                "Error adding interface to bridge %s!",
+                e,
+            )
+
+        finally:
+            # Close the IPRoute object
+            ip.close()
+
+    @staticmethod
+    def __delete_macsec_links():
+        # Define the command as a list of arguments
+        command_macsec = ["ip", "macsec", "show"]
+        command_grep = ["grep", ": protect on validate"]
+        command_awk1 = ["awk", "-F:", "{print $2}"]
+        command_awk2 = ["awk", "{print $1}"]
+        command_xargs = ["xargs", "-I", "{}", "ip", "link", "delete", "{}"]
+
+        # Run the commands using subprocess and connect their pipes
+        proc_macsec = subprocess.Popen(command_macsec, stdout=subprocess.PIPE)
+        proc_grep = subprocess.Popen(
+            command_grep, stdin=proc_macsec.stdout, stdout=subprocess.PIPE
+        )
+        proc_awk1 = subprocess.Popen(
+            command_awk1, stdin=proc_grep.stdout, stdout=subprocess.PIPE
+        )
+        proc_awk2 = subprocess.Popen(
+            command_awk2, stdin=proc_awk1.stdout, stdout=subprocess.PIPE
+        )
+        proc_xargs = subprocess.Popen(command_xargs, stdin=proc_awk2.stdout)
+
+        # Wait for the xargs process to finish
+        proc_xargs.wait()
+
+    def __shutdown_interface(self, interface_name):
+        # pylint: disable=invalid-name
+        ip = IPRoute()
+        # pylint: enable=invalid-name
+        try:
+            index = ip.link_lookup(ifname=interface_name)[0]
+            ip.link("set", index=index, state="down")
+        except IndexError:
+            self.__comms_controller.logger.debug(
+                "Not able to shutdown interface %s! Interface not found!",
+                interface_name,
+            )
+        finally:
+            ip.close()
+
+    def __destroy_batman_interface(self, mesh_interface):
+        # pylint: disable=invalid-name
+        ip = IPRoute()
+        # pylint: enable=invalid-name
+        try:
+            ip.link("delete", ifname=mesh_interface)
+        except Exception as e:
+            self.__comms_controller.logger.debug(
+                f"Error: Unable to destroy interface {mesh_interface}."
+            )
+            self.__comms_controller.logger.debug(f"Exception: {str(e)}")
+        finally:
+            ip.close()
+
+    def __shutdown_and_delete_bridge(self, bridge_name):
+        ip = IPRoute()
+        try:
+            index = ip.link_lookup(ifname=bridge_name)[0]
+            ip.link("set", index=index, state="down")
+            ip.link("delete", index=index)
+        except IndexError:
+            self.__comms_controller.logger.debug(
+                "Not able to delete bridge %s! Bridge not found!", bridge_name
+            )
+        finally:
+            ip.close()
+
+    def stop_cbma(self):
+        try:
+            self.__comms_controller.logger.debug("Stopping CBMA...")
+            # Set shutdown event to signal CBMA threads to stop
+            self.__cbma_shutdown_event.set()
+            # Waith for threads to stop
+            for thread_name, thread in self.__cbma_threads.items():
+                try:
+                    if thread.is_alive():
+                        thread.join()
+                except Exception as e:
+                    self.__comms_controller.logger.error(
+                        f"Thread join error: {e}"
+                    )
+
+            self.__comms_controller.logger.debug(
+                "CBMA threads stopped, continue cleanup..."
+            )
+            self.__delete_macsec_links()
+            self.__shutdown_interface("bat0")
+            self.__shutdown_interface("bat1")
+            self.__destroy_batman_interface("bat0")
+            self.__destroy_batman_interface("bat1")
+            self.__shutdown_and_delete_bridge("br-upper")
+            self.__comms_controller.logger.debug("CBMA cleanup finished")
+
+        except Exception as e:
+            self.__comms_controller.logger.error(f"Stop CBMA error: {e}")
+
+    def __has_certificate(self, mac) -> bool:
+        if not path.exists(f"{self.__cbm_certs_path}/MAC/{mac}.crt"):
+            return False
+
+        if not path.exists(f"{self.__cbm_certs_path}/private.key"):
+            return False
+
+        return True
+
+    def __is_cbma_feature_enabled(self):
+        with open(self.YAML_FILE, "r", encoding="utf-8") as stream:
+            try:
+                features = yaml.safe_load(stream)
+                for feature in features:
+                    if features["CBMA"]:
+                        return True
+            except yaml.YAMLError as exc:
+                self.__comms_controller.logger.error(
+                        f"Error reading features file: {exc}"
+                    )
+            return False
+
+    def __setup_cbma(self):
+        """
+        TODO: This method contains currently proof of content type of functionality
+        that mimics cbma example code functionality to enable very basic testing.
+
+        It is already known that next cbma PR is such that we should use multiprocessing
+        instead of threading. br-lan/batman control is also changing in next cbma version
+        and they should be handled in this module instead.
+
+        """
+
+        # These would tell current settings
+        print("mesh_if:", self.__comms_controller.settings.mesh_vif)
+        print("radio index:", self.__comms_controller.settings.radio_index)
+
+        # Cleanup and delete bat0
+        self.__cleanup_default_batman()
+        # Cleanup default bridge
+        self.__remove_all_interfaces_from_bridge("br-lan")
+        
+        # Fixme: Add usb0 interface to br-lan.
+        # This is temporary to allow testing of MDM server via
+        # ethernet over usb.
+        self.__add_interface_to_bridge("br-lan", "usb0")
+
+        wlan_interfaces = ["wlp1s0", "wlp2s0", "wlp3s0", "halow1"]
+        for interface in self.__interfaces:
+            interface_name = interface.interface_name.lower()
+            if any(prefix in interface_name for prefix in wlan_interfaces):
+                if not self.__has_certificate(interface.mac_address):
+                    continue
+                try:
+                    index = self.__comms_controller.settings.mesh_vif.index(
+                        interface_name
+                    )
+                except ValueError:
+                    continue
+                thread = threading.Thread(
+                    target=setup_cbma.cbma,
+                    args=(
+                        "lower",
+                        interface_name,
+                        15001,
+                        "bat0",
+                        self.__cbm_certs_path,
+                        self.__cbma_ca_cert_path,
+                        "off",
+                        f"/var/run/wpa_supplicant_id{index}/{interface_name}",
+                        self.__cbma_shutdown_event,
+                    ),
+                )
+                self.__cbma_threads[interface_name] = thread
+                thread.start()
+
+        for interface in self.__interfaces:
+            interface_name = interface.interface_name.lower()
+            if any(prefix in interface_name for prefix in ["eth"]) or (
+                "lan" in interface_name
+                and not interface_name.startswith("br-lan")
+                and not interface_name.startswith("wlan")
+            ):
+                if not self.__has_certificate(interface.mac_address):
+                    continue
+                thread = threading.Thread(
+                    target=setup_cbma.cbma,
+                    args=(
+                        "lower",
+                        interface_name,
+                        15001,
+                        "bat0",
+                        self.__cbm_certs_path,
+                        self.__cbma_ca_cert_path,
+                        "off",
+                        None,
+                        self.__cbma_shutdown_event,
+                    ),
+                )
+                self.__cbma_threads[interface_name] = thread
+                thread.start()
+
+        thread = threading.Thread(
+            target=setup_cbma.cbma,
+            args=(
+                "upper",
+                "bat0",
+                15002,
+                "bat1",
+                self.__cbm_certs_path,
+                self.__cbma_ca_cert_path,
+                "off",
+                None,
+                self.__cbma_shutdown_event,
+            ),
+        )
+        self.__cbma_threads[interface_name] = thread
+        thread.start()
+
+        # TODO: Perhaps we need to maintain
+        # list of interface specific statuses?
+        self.__cbma_set_up = True
+
+    def __cbma_thread_alive_check(self):
+        # Check if any of launched cbma threads have terminated
+        terminated_threads = []
+        for thread_name, thread in self.__cbma_threads.items():
+            if not thread.is_alive():
+                terminated_threads.append(thread_name)
+
+        # Remove terminated threads from the dictionary
+        for thread_name in terminated_threads:
+            del self.__cbma_threads[thread_name]
+
     async def __loop_run_executor(self, executor, config: ConfigType) -> None:
         """
         Loop run executor
@@ -722,13 +1079,17 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
         asyncio.get_running_loop().stop()
 
     def signal_handler():
-        cc.logger.debug("Disconnecting...")
+        cc.logger.debug("Disconnecting MDM agent...")
         mdm.mdm_service_available = False
+        mdm.running = False
+        mdm.executor.shutdown()
+        mdm.stop_cbma()
         if mdm.service_monitor.running:
             mdm.stop_service_discovery()
         if mdm.interface_monitor.running:
             mdm.interface_monitor.running = False
             mdm.thread_if_mon.join()
+            cc.logger.debug("Interface monitor stopped")
         asyncio.create_task(stop())
 
     for sig in ("SIGINT", "SIGTERM"):
@@ -741,6 +1102,7 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
     # separate instances needed for FMO/MDM
 
     mdm = MdmAgent(cc, keyfile, certfile, ca_file, interface)
+    mdm.start_interface_monitor()
     await asyncio.gather(mdm.execute())
 
 
@@ -916,13 +1278,16 @@ if __name__ == "__main__":
     #         "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/private/csl1.local.key"
 
     loop = asyncio.new_event_loop()
-    if args.agent == "mdm":
-        loop.run_until_complete(
-            main_mdm(args.keyfile, args.certfile, args.ca, args.interface)
-        )
-    else:
-        loop.run_until_complete(
-            main_fmo(args.server, args.port, args.keyfile, args.certfile)
-        )
-    loop.run_forever()
+
+    try:
+        if args.agent == "mdm":
+            loop.run_until_complete(
+                main_mdm(args.keyfile, args.certfile, args.ca, args.interface)
+            )
+        else:
+            loop.run_until_complete(
+                main_fmo(args.server, args.port, args.keyfile, args.certfile)
+            )
+    except Exception as e:
+        pass
     loop.close()

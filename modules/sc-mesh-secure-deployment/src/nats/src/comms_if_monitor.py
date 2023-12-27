@@ -13,19 +13,32 @@ class CommsInterfaceMonitor:
     A class to get network interfaces status.
     """
     def __init__(self, callback) -> None:
-        self.__interfaces = {}
+        self.__interfaces = []
+        self.__previous_interfaces = []
         self.__callback = callback
         self.running = False
         self.__ipr = IPRoute()
 
     def __get_initial_interfaces(self):
         for link in self.__ipr.get_links():
-            ifname = link.get_attr('IFLA_IFNAME')
-            ifstate = link.get_attr('IFLA_OPERSTATE')
-            if ifname and ifstate:
-                self.__interfaces[ifname] = ifstate
+            interface_info = self.__get_interface_info(link)
+            if interface_info:
+                self.__interfaces.append(interface_info)
+
         if self.__callback:
             self.__callback(self.__interfaces)
+
+    def __get_interface_info(self, link):
+        ifname = link.get_attr('IFLA_IFNAME')
+        ifstate = link.get_attr('IFLA_OPERSTATE')
+        mac_address = link.get_attr('IFLA_ADDRESS')
+
+        interface_info = {
+            "interface_name": ifname,
+            "operstate": ifstate,
+            "mac_address": mac_address,
+        }
+        return interface_info
 
     def monitor_interfaces(self):
         """
@@ -42,7 +55,6 @@ class CommsInterfaceMonitor:
         self.__get_initial_interfaces()
 
         self.running = True
-        # Subscribe to netlink events for network interfaces
         self.__ipr.bind()
 
         while self.running:
@@ -50,20 +62,23 @@ class CommsInterfaceMonitor:
                 messages = self.__ipr.get()
                 for msg in messages:
                     if msg['event'] == 'RTM_NEWLINK' or msg['event'] == 'RTM_DELLINK':
-                        # Get interface name and its status
-                        ifname = msg.get_attr('IFLA_IFNAME')
-                        ifstate = msg.get_attr('IFLA_OPERSTATE')
-
-                        if ifname and ifstate:
-                            # Update the initial list with the changed state
-                            if msg['event'] == 'RTM_DELLINK' and ifname in self.__interfaces:
-                                # Interface is deleted, remove it from the list
-                                del self.__interfaces[ifname]
+                        interface_info = self.__get_interface_info(msg)
+                        if interface_info:
+                            existing_interface = next(
+                                (iface for iface in self.__interfaces if iface['interface_name'] == interface_info['interface_name']),
+                                None
+                            )
+                            if msg['event'] == 'RTM_DELLINK' and existing_interface:
+                                self.__interfaces.remove(existing_interface)
                             else:
-                                # Interface is added or modified, update its state
-                                self.__interfaces[ifname] = ifstate
-                            if self.__callback:
+                                if existing_interface:
+                                    # Update existing interface settings
+                                    existing_interface.update(interface_info)
+                                else:
+                                    self.__interfaces.append(interface_info)
+                            if self.__callback and self.__interfaces != self.__previous_interfaces:
                                 self.__callback(self.__interfaces)
+                                self.__previous_interfaces = self.__interfaces.copy()
             except KeyboardInterrupt:
                 break
         self.__ipr.close()
@@ -71,7 +86,7 @@ class CommsInterfaceMonitor:
 
 def main():
     """
-    Function to test interface monitoring 
+    Function to test interface monitoring
     by running module locally.
     """
     def callback(interfaces):

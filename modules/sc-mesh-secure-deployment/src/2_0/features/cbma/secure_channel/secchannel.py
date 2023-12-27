@@ -51,9 +51,11 @@ class SecMessageHandler:
         if not self._is_ssl_socket():
             self.logger.error("Socket is not SSL enabled.")
             return
-        try:
-            while not self.shutdown_event.is_set():
+        
+        while not self.shutdown_event.is_set():
+            try:
                 # No need to check _is_socket_active here, rely on recv's result.
+                self.socket.settimeout(2)  # 2s timeout to enable shutdown event check
                 data = self.socket.recv(1024).decode()
                 if not data:
                     self.logger.warning("Connection closed or socket not active.")
@@ -68,7 +70,8 @@ class SecMessageHandler:
                     if 'bytes_for_my_key' in data and 'bytes_for_client_key' in data and 'port' in data: # if received data has macsec parameters, put it in queue
                         macsec_param_q.put(data)
 
-        except socket.timeout:
-            self.logger.warning("Connection timed out. Ending communication.")
-        except Exception as e:
-            self.logger.error("Error receiving message.", exc_info=True)
+            except socket.timeout:
+                self.logger.warning("receive_message timeout.")
+            except Exception as e:
+                self.logger.error("Error receiving message.", exc_info=True)
+                break

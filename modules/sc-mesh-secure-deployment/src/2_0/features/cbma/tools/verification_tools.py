@@ -1,8 +1,9 @@
 from datetime import datetime
-import OpenSSL
 from OpenSSL import crypto
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
 from .utils import get_mac_from_ipv6
-
+import re
 
 # Custom exceptions for certificate verification
 class CertificateExpiredError(Exception):
@@ -32,8 +33,10 @@ class CertificateNoPresentError(Exception):
 class CertificateDifferentCN(Exception):
     pass
 
+
 class ServerConnectionRefusedError(Exception):
     pass
+
 
 def verify_cert(cert, ca_cert, IPaddress, interface, logging):
     try:
@@ -48,11 +51,11 @@ def verify_cert(cert, ca_cert, IPaddress, interface, logging):
 
 def validation(cert, ca_cert, IPaddress, interface, logging):
     # Load the DER certificate into an OpenSSL certificate object
-    x509 = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_ASN1, cert)
+    _x509 = crypto.load_certificate(crypto.FILETYPE_ASN1, cert)
 
     # Get the certificate expiration date and activation date using OpenSSL methods
-    expiration_date_str = x509.get_notAfter().decode('utf-8')
-    activation_date_str = x509.get_notBefore().decode('utf-8')
+    expiration_date_str = _x509.get_notAfter().decode('utf-8')
+    activation_date_str = _x509.get_notBefore().decode('utf-8')
 
     expiration_date = datetime.strptime(expiration_date_str, '%Y%m%d%H%M%SZ')
     activation_date = datetime.strptime(activation_date_str, '%Y%m%d%H%M%SZ')
@@ -67,15 +70,37 @@ def validation(cert, ca_cert, IPaddress, interface, logging):
         logging.error(f"Client certificate not yet active for {IPaddress}.", exc_info=True)
         raise CertificateExpiredError("Client certificate not yet active")
 
-    # Extract the actual ID from CN
-    common_name = x509.get_subject().CN
-    if common_name != get_mac_from_ipv6(IPaddress, interface):
-        logging.error(f"CN does not match the MAC Address for {IPaddress}", exc_info=True)
-        raise CertificateDifferentCN("CN does not match the MAC Address.")
+    _cert = x509.load_der_x509_certificate(cert, default_backend())
+
+    # Extract the MAC from SAN otherName field
+    san_extension = _cert.extensions.get_extension_for_class(
+        x509.SubjectAlternativeName
+    )
+    othername_values = [
+        general_name.value
+        for general_name in san_extension.value
+        if isinstance(general_name, x509.OtherName)
+    ]
+    mac_from_san = None
+    for value in othername_values:
+        print("value:", value)
+        try:
+            if isinstance(value, bytes) and san_extension.value[0].type_id == x509.ObjectIdentifier('1.3.6.1.1.1.1.22'):
+                mac_from_san = value[2:].decode('ascii')  # Skip the first 2 bytes
+        except Exception as e:
+            print(f"Error processing OtherName value: {e}")
+
+    print("mac_from_san:", mac_from_san)
+    print("mac_from_ipv6", get_mac_from_ipv6(IPaddress, interface))
+
+    if mac_from_san != get_mac_from_ipv6(IPaddress, interface):
+        logging.error(f"MAC in SAN otherName doesn't match MAC Address for {IPaddress}", exc_info=True)
+        raise CertificateDifferentCN("MAC from SAN otherName does not match the interface MAC Address.")
 
     if _verify_certificate_chain(cert, ca_cert, logging):
         # Extract the public key from the certificate
-        pub_key_der = OpenSSL.crypto.dump_publickey(OpenSSL.crypto.FILETYPE_ASN1, x509.get_pubkey())
+        pub_key_der = crypto.dump_publickey(crypto.FILETYPE_ASN1, _x509.get_pubkey())
+
         # If the client certificate has passed all verifications, you can print or log a success message
         logging.info(f"Certificate verification successful for {IPaddress}.")
         return True
@@ -85,13 +110,8 @@ def validation(cert, ca_cert, IPaddress, interface, logging):
 
 
 def _verify_certificate_chain(cert, trusted_certs, logging):
-    """
-    this function is not being used right now, because we only have one certificate (ca.crt), not a full chain (CA, Interm CA, etc)
-    but I left the code for further adaptation
-    """
     try:
         x509 = crypto.load_certificate(crypto.FILETYPE_ASN1, cert)
-        cert_pem = crypto.dump_certificate(crypto.FILETYPE_PEM, x509)
 
         store = crypto.X509Store()
 
@@ -99,9 +119,15 @@ def _verify_certificate_chain(cert, trusted_certs, logging):
         if not isinstance(trusted_certs, list):
             trusted_certs = [trusted_certs]
 
+        _PEM_RE = re.compile(
+            b'-----BEGIN CERTIFICATE-----\r?.+?\r?-----END CERTIFICATE-----\r?\n?', re.DOTALL
+        )
         for _cert in trusted_certs:
-            cert_data = crypto.load_certificate(crypto.FILETYPE_PEM, open(_cert).read())
-            store.add_cert(cert_data)
+            with open(_cert, 'rb') as f:
+                for c in _PEM_RE.finditer(f.read()):
+                    tc = c.group()
+                    cert_data = crypto.load_certificate(crypto.FILETYPE_PEM, tc)
+                    store.add_cert(cert_data)
 
         store_ctx = crypto.X509StoreContext(store, x509)
         store_ctx.verify_certificate()

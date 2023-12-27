@@ -29,8 +29,8 @@ class AuthServer:
         self.context.verify_mode = ssl.CERT_REQUIRED
         self.context.load_verify_locations(glob.glob(self.ca)[0])
         self.context.load_cert_chain(
-            certfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.crt")[0],
-            keyfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.key")[0],
+            certfile=glob.glob(f"{self.CERT_PATH}/MAC/{self.mymac}.crt")[0],
+            keyfile=glob.glob(f"{self.CERT_PATH}/private.key")[0],
         )
         self.client_auth_results = {}
         self.active_sockets = {}
@@ -94,7 +94,7 @@ class AuthServer:
             raise ValueError("Invalid IP address")
 
         self.serverSocket.listen()
-        self.serverSocket.settimeout(99999)  # maybe we can remove timeout since server needs to be listening throughout
+        self.serverSocket.settimeout(2)
         logger.info("Server listening")
 
         while self.running and not self.mua.shutdown_event.is_set():
@@ -102,6 +102,9 @@ class AuthServer:
                 client_connection, client_address = self.serverSocket.accept()
                 threading.Thread(target=self.handle_client, args=(client_connection, client_address)).start()
             except socket.timeout:  # In case we add a timeout later.
+                if self.mua.shutdown_event.is_set():
+                    self.stop_server()
+                    break
                 continue
             except Exception as e:
                 if self.running:
@@ -109,6 +112,11 @@ class AuthServer:
 
     def stop_server(self):
         self.running = False
+        if hasattr(self, "serverSocket"):
+            self.serverSocket.close()
+            for sock in self.active_sockets.values():
+                sock.close()
+
         if is_ipv4(self.ipAddress):
             serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             serverSocket.bind((self.ipAddress, self.port))
@@ -116,10 +124,6 @@ class AuthServer:
             serverSocket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
             scope_id = socket.if_nametoindex(self.interface)
             serverSocket.bind((self.ipAddress, int(self.port), 0, scope_id))
-        if hasattr(self, "serverSocket"):
-            self.serverSocket.close()
-            for sock in auth_server.active_sockets.values():
-                sock.close()
 
 if __name__ == "__main__":
     # IP address and the port number of the server

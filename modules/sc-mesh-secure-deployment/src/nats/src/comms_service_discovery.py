@@ -77,11 +77,9 @@ class CommsServiceMonitor:
         """
         self.running = True
         if self.interface:
-            print("eka")
             addresses = self.__get_ip_addresses(self.interface)
             self.zeroconf = Zeroconf(interfaces=addresses)
         else:
-            print("toka")
             self.zeroconf = Zeroconf()
 
         self.service_browser = ServiceBrowser(
@@ -158,7 +156,7 @@ if __name__ == "__main__":
 
     monitor = CommsServiceMonitor(
         service_name="MDM Service",
-        service_type="_mdm1._tcp.local.",
+        service_type="_mdm._tcp.local.",
         service_cb=service_discovery_cb,
         #interface="br-lan"
     )
