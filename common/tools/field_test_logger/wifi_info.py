@@ -141,24 +141,64 @@ class WifiInfo:
         rx_mcs = "NaN"
         rssi = "NaN"
 
+        # halow station info fetched from cli_app if needed.
+        halow_stations = None
+
         for line in lines:
             if "Station" in line:
                 # Line format is 'Station AA:BB:CC:DD:EE:FF (on wlp1s0)'
                 station_mac = line.split()[1]
 
-            if "signal:" in line and "]" in line:
-                # Line format is 'signal: -21 [-26, -30, -24] dBm'
+            if "signal:" in line:
                 rssi = line[line.index("signal:")+len("signal:"):].strip()
-                rssi = rssi[:rssi.index("]")+1]
+                if "]" in line:
+                    # Line format is 'signal: -21 [-26, -30, -24] dBm'
+                    rssi = rssi[:rssi.index("]")+1]
+                else:
+                    # halow station dump does not contain [].
+                    # signal:  	-63 dBm
+                    rssi = rssi[:rssi.index("dBm")-4]
 
             if "tx bitrate:" in line:
                 if "MCS" in line:
                     tx_mcs = line[line.index("MCS")+4:line.index("MCS") + 6]
+                else:
+                    if (halow_stations is None):
+                        halow_stations = self.get_halow_stations()
+                    try:
+                        tx_mcs = halow_stations.get(station_mac)[0]
+                    except IndexError:
+                        pass
             elif "rx bitrate:" in line:
                 if "MCS" in line:
                     rx_mcs = line[line.index("MCS")+4:line.index("MCS") + 6]
-
+                else:
+                    if (halow_stations is None):
+                        halow_stations = self.get_halow_stations()
+                    try:
+                        rx_mcs = halow_stations.get(station_mac)[1]
+                    except IndexError:
+                        pass
                 self.__stations[station_mac] = [rssi, tx_mcs, rx_mcs]
+
+    def get_halow_stations(self):
+        cli_app_cmd = ['cli_app', 'show', 'sta', '0', 'all']
+        cli_app_proc = subprocess.Popen(cli_app_cmd, stdout=subprocess.PIPE)
+        out = cli_app_proc.communicate()[0].decode().rstrip()
+        lines = out.split("\n")
+        data_begins = False
+        halow_stations = {}
+        for line in lines:
+            if (data_begins):
+                # 0          84:25:3f:9c:0a:e9    2      ASSOC   3.00MBit/s(MCS 7)  0.30MBit/s(MCS 0)
+                cols = line.split()
+                if (cols.count == 8):
+                    halow_stations[cols[1]] = [cols[5][:-1], cols[7][:-1]]
+            if "=======" in line:
+                data_begins = True
+            if "Duplicate" in line:
+                break
+        return halow_stations
 
     def __update_noise(self):
         iw_cmd = ['iw', 'dev', f"{self.__interface}", 'survey', 'dump']

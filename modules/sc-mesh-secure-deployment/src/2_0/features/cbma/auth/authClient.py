@@ -40,8 +40,8 @@ class AuthClient:
 
         context.load_verify_locations(glob.glob(self.ca)[0])
         context.load_cert_chain(
-            certfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.crt")[0],
-            keyfile=glob.glob(f"{self.CERT_PATH}/macsec_{self.mymac.replace(':', '')}.key")[0],
+            certfile=glob.glob(f"{self.CERT_PATH}/MAC/{self.mymac}.crt")[0],
+            keyfile=glob.glob(f"{self.CERT_PATH}/private.key")[0],
         )
 
         # Detect if the server IP is IPv4 or IPv6 and create a socket accordingly

@@ -73,8 +73,8 @@ else
   # Enable FMO stuff                    #
   #######################################
   # FMO can be configured in the features.yaml file
-  #FMO=$(extract_features_value "FMO" $YAML_FILE)
-  #if [ "$FMO" = "true" ]; then
+  FMO=$(extract_features_value "FMO" $YAML_FILE)
+  if [ "$FMO" = "true" ]; then
     echo "starting Alfred"
     /opt/S90Alfred start
 
@@ -97,8 +97,12 @@ else
 
     echo "starting comms services"
     /opt/S90comms_controller start
-  #fi # FMO
+  fi # FMO
 
+  echo "starting mptcp"
+  if [ -f "/var/run/mptcp.conf" ]; then
+    /opt/S90mptcp start
+  fi
   # alive
   nohup /bin/bash -c "while true; do sleep infinity; done"
 fi

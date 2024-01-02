@@ -54,14 +54,22 @@ class MulticastHandler:
             # Add the membership to the socket
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
 
+            # Set a timeout for the socket to ensure it is not blocking shutdown
+            timeout = 2
+            sock.settimeout(timeout)
+
             self.logger.info(f"Listening for messages on {self.multicast_group}:{self.port}...")
             while not self.shutdown_event.is_set():
-                data, address = sock.recvfrom(1024)
-                decoded_data = json.loads(data.decode())
-                if decoded_data['mac_address'] not in self.excluded:
-                    self.logger.info(f'Received data {decoded_data} from {address} at interface {self.interface}')
-                    if 'mac_address' in decoded_data:
-                        self.queue.put(("MULTICAST", decoded_data['mac_address']))
+                try:
+                    data, address = sock.recvfrom(1024)
+                    decoded_data = json.loads(data.decode())
+                    if decoded_data['mac_address'] not in self.excluded:
+                        self.logger.info(f'Received data {decoded_data} from {address} at interface {self.interface}')
+                        if 'mac_address' in decoded_data:
+                            self.queue.put(("MULTICAST", decoded_data['mac_address']))
+                except socket.timeout:
+                    # Continue in loop unless shutdown_event is set
+                    pass
 
     def multicast_message(self):
         self.receive_multicast()

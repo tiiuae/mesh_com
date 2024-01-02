@@ -36,16 +36,34 @@ _init() {
 _test() {
   echo "$0, test called" | print_log
 
-  # Check if tun0 has an IPv6 address
-  if ! ip -6 addr show tun0 | grep -q "inet6"; then
-    echo "tun0 interface does not have an IPv6 address." | print_log
+  # Extract the raw output from slipcmd to get the IPv6 address of the node. We need to stop and start OSF as slipcmd 
+  # uses the same serial ports as tunslip6, and doesn't release them until after the script ends, so jams tunslip6.
+  /etc/init.d/S98osf52setup stop
+  sleep 3
+  slip_output=$(slipcmd -sn -R'?Y' /dev/nrf0)
+  /etc/init.d/S98osf52setup start
+  sleep 3
+
+  # Check if slipcmd returned any output
+  if [ -z "$slip_output" ]; then
+    echo "slipcmd did not return an IPv6 address." | print_log
     result=$FAIL
     return
   fi
 
-  # Use ping6 to ping the IP address fd02::1 over the tun0 interface
-  if ! ping6 -c 3 -I tun0 fd02::1 &>/dev/null; then
-    echo "ping6 test to fd02::1 over tun0 failed." | print_log
+  # Extract the IPv6 address starting with 'fde3' from slip_output
+  ip_address=$(echo "$slip_output" | grep -oE 'fde3:[0-9a-fA-F:]+')
+
+  # Check if ip_address is empty after extraction
+  if [ -z "$ip_address" ]; then
+    echo "Failed to extract IPv6 address from slipcmd output." | print_log
+    result=$FAIL
+    return
+  fi
+
+  # Use ping6 to ping the IP address over the tun0 interface
+  if ! ping6 -c 3 -I tun0 "$ip_address" &>/dev/null; then
+    echo "ping6 test to $ip_address over tun0 failed." | print_log
     result=$FAIL
     return
   fi

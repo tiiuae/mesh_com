@@ -1,21 +1,40 @@
-# Install ml_packages
-cd /opt/mesh_com/modules/utils/package || exit
+# Python packages installed:
+# Pypcap: required for LDPI (IDS)
+# Pytorch: required for Jamming Avoidance and LDPI (IDS)
+# Scikit-Learn: required for LDPI (IDS)
+# Scipy: required for PHY-CRA/RSS and LDPI (IDS)
+
+# Install pytorch
 chmod +x /opt/mesh_com/modules/utils/package/ml_packages.tar.gz
 tar -C /opt/mesh_com/modules/utils/package/ -zxvf /opt/mesh_com/modules/utils/package/ml_packages.tar.gz
 cd /opt/mesh_com/modules/utils/package/ml_packages || exit
-for f in {*.whl,*.gz};
+
+for f in {*.whl,*.gz}
 do
-  name="$(echo "$f" | cut -d'-' -f1)"
-  if python -c 'import pkgutil; exit(not pkgutil.find_loader("$name"))'; then
-    echo "$name" "installed"
+  package="$(echo "$f" | cut -d'-' -f1)"
+  if python -c 'import pkgutil; exit(not pkgutil.find_loader("$package"))'; then
+    echo "$package installed."
   else
-    echo "$name" "not found"
-    echo "installing" "$name"
+    echo "$package not found. Installing..."
     pip install --no-index "$f" --find-links .;
-fi
-done;
+  fi
+done
 
-cd .. ;
-
+# Install pypcap
 cp /opt/mesh_com/modules/utils/package/ml_packages/libpcap.so.0.8 /usr/lib/.
 cp /opt/mesh_com/modules/utils/package/ml_packages/pcap.cpython-39-aarch64-linux-gnu.so /usr/lib/python3.9/site-packages/.
+
+# Install scipy, scikit-learn
+packages=("scipy" "scikit_learn")
+
+for package in "${packages[@]}"
+do
+    if python -c 'import pkgutil; exit(not pkgutil.find_loader("$package"))'; then
+      echo "$package installed."
+    else
+      chmod +x "/opt/mesh_com/modules/utils/package/${package}.tar.gz"
+      tar -C /opt/mesh_com/modules/utils/package/ -zxvf "/opt/mesh_com/modules/utils/package/${package}.tar.gz"
+      cd "/opt/mesh_com/modules/utils/package/${package}" || exit
+      cp -r "/opt/mesh_com/modules/utils/package/${package}"/* "/usr/lib/python3.9/site-packages/"
+    fi
+done
