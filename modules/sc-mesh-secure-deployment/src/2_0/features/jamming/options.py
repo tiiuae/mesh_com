@@ -2,6 +2,7 @@ from typing import List
 
 VALID_CHANNELS = [36, 40, 44, 48, 149, 153, 157, 161]
 
+
 class Options:
     def __init__(self):
         self.jamming_osf_orchestrator: str = 'fde3:49c:9f74:4742:0:4c:372b:1c4f'

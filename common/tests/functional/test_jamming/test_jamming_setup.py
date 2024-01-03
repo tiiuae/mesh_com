@@ -9,9 +9,6 @@ from options import Options
 
 
 class TestCodeUnderTest:
-    """
-    A suite of test cases for the code.
-    """
 
     #  Mesh frequency is switched to starting frequency successfully
     def test_switch_frequency_success(self, mocker):
@@ -80,7 +77,7 @@ class TestCodeUnderTest:
     #  is_interface_up function returns True if interface is up
     def test_is_interface_up_returns_true_if_interface_is_up(self, mocker):
         # Mock the netifaces.interfaces function to return a list of available interfaces
-        mocker.patch('netifaces.interfaces', return_value=['eth0', 'wlp1s0', 'tun0'])
+        mocker.patch('netifaces.interfaces', return_value=['eth0', 'wlp1s0', 'wlp2s0', 'wlp3s0', 'tun0'])
 
         # Call the function under test
         result = is_interface_up('wlp1s0')
@@ -96,6 +93,19 @@ class TestCodeUnderTest:
 
     #  Validate configuration succeeds when channels5 list includes valid channels
     def test_validate_configuration_succeeds_channels5_list_includes_valid_channels(self, mocker):
+        # Create an instance of Options class
         args = Options()
+
+        # Mock the return value for 'driver' and 'channel_width'
+        mocker.patch('os.popen')
+        mocker.patch('re.sub')
+
+        # Set the return value for the mocked 'driver' and 'channel_width'
+        mocker.patch('os.popen.return_value.read').return_value = 'ath10k'
+        mocker.patch('re.sub.return_value').split.return_value = ['20']
+
+        # Set the channels5 list to include valid channels
         args.channels5 = [36, 40, 44, 48, 149, 153, 157, 161]
+
+        # Assert that validate_configuration(args) returns True
         assert validate_configuration(args) == True
