@@ -123,7 +123,16 @@ class CommsServiceMonitor:
         if not self.running:
             return
 
-        if name == f"{self.service_name}.{self.service_type}":
+        # if service_name is given, filter using that. otherwise filter with service_type.
+        eventMatch = False
+        if not self.service_name:
+            if service_type == self.service_type:
+                eventMatch = True
+        else:
+            if name == f"{self.service_name}.{self.service_type}":
+                eventMatch = True
+
+        if eventMatch:
             info = ServiceInfo(service_type, name)
             service_available = True
             if state_change == ServiceStateChange.Removed:
@@ -134,8 +143,14 @@ class CommsServiceMonitor:
                 server = info.server
                 if server:
                     server = server.rstrip(".")
-                url = f'{server}:{info.port}'
-                self.service_callback(url, service_available)
+
+                if self.service_callback.__code__.co_argcount == 3:
+                    url = f'{server}:{info.port}'
+                    self.service_callback(url, service_available)
+                elif self.service_callback.__code__.co_argcount == 6:
+                    self.service_callback(name, info._ipv4_addresses, info._ipv6_addresses, info.port, service_available)
+                else:
+                    raise TypeError("Invalid callback type")
 
 
 if __name__ == "__main__":
@@ -153,6 +168,25 @@ if __name__ == "__main__":
             None
         """
         print(f"Callback received, service url {url}, online: {status}")
+
+        """
+        Secondary callback type example. You can use either one.
+        REMARK: ip addresses and port are None when service is unregistered, only service_name and status are given so
+        calling client must identify the services by service_name.
+
+        Arguments:
+            service_name (str) -- Registered service name, 'myservice'
+            ipv4_addresses (List(IPv4Address)) -- List of ipv4 addresses published for service.
+            ipv6_addresses (List(IPv6Address)) -- List of ipv6 addresses published for service.
+            port (int)-- tcp port of service
+            status (bool) -- Boolean to indicate is service available or not.
+
+        Returns:
+            None
+        """
+    def service_discovery_cb2(service_name, ipv4_addresses, ipv6_addresses, port, status):
+        print(f"Callback received, service name:{service_name}, ipv4_addresses:{ipv4_addresses}, ipv6_addresses:{ipv6_addresses}, port:{port}, online: {status}")
+
 
     monitor = CommsServiceMonitor(
         service_name="MDM Service",
