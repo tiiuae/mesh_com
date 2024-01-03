@@ -1,7 +1,9 @@
+import contextlib
 import threading
 import time
 import os
 import pytest
+import subprocess
 from unittest.mock import patch, MagicMock
 
 import add_syspath
@@ -9,14 +11,24 @@ from mba import MBA
 
 path_to_dir = os.path.dirname(__file__)  # Path to dir containing this script
 
+# Hack to support CM2 as well
+# Use the first interface which is available in the device to test MBA
+interfaces = ["wlp1s0", "wlp2s0", "wlp3s0", "halow1", "eth0"]
+for interface in interfaces:
+    with contextlib.suppress(subprocess.CalledProcessError):
+        output = subprocess.check_output(['ifconfig', interface], stderr=subprocess.DEVNULL)
+        if 'inet' in output.decode():
+            test_interface = interface
+            break
+
 @pytest.fixture
 def mba_setup():
     mock_sender_mac = "mac1"
     mock_receiver_mac = "mac2"
 
     with patch('mba.logger', new_callable=MagicMock) as mock_logger:
-        sender = MBA(decision_engine=MagicMock(), multicast_group="ff02::1", port=12345, interface="wlp1s0", my_cert_dir=f"{path_to_dir}/certificate_samples", peer_cert_dir=f"{path_to_dir}/certificate_samples", stop_event=threading.Event())
-        receiver = MBA(decision_engine=MagicMock(), multicast_group="ff02::1", port=12345, interface="wlp1s0", my_cert_dir=f"{path_to_dir}/certificate_samples", peer_cert_dir=f"{path_to_dir}/certificate_samples", stop_event=threading.Event())
+        sender = MBA(decision_engine=MagicMock(), multicast_group="ff02::1", port=12345, interface=test_interface, my_cert_dir=f"{path_to_dir}/certificate_samples", peer_cert_dir=f"{path_to_dir}/certificate_samples", stop_event=threading.Event())
+        receiver = MBA(decision_engine=MagicMock(), multicast_group="ff02::1", port=12345, interface=test_interface, my_cert_dir=f"{path_to_dir}/certificate_samples", peer_cert_dir=f"{path_to_dir}/certificate_samples", stop_event=threading.Event())
 
         sender.mymac = mock_sender_mac
         receiver.mymac = mock_receiver_mac
@@ -67,8 +79,8 @@ def mba_invalid_signature_setup():
     mock_receiver_mac = "mac2"
 
     with patch('mba.logger', new_callable=MagicMock) as mock_logger:
-        sender = MBA(decision_engine=MagicMock(), multicast_group="ff02::1", port=12345, interface="wlp1s0", my_cert_dir=f"{path_to_dir}/certificate_samples", peer_cert_dir=f"{path_to_dir}/certificate_samples", stop_event=threading.Event())
-        receiver = MBA(decision_engine=MagicMock(), multicast_group="ff02::1", port=12345, interface="wlp1s0", my_cert_dir=f"{path_to_dir}/certificate_samples", peer_cert_dir=f"{path_to_dir}/certificate_samples", stop_event=threading.Event())
+        sender = MBA(decision_engine=MagicMock(), multicast_group="ff02::1", port=12345, interface=test_interface, my_cert_dir=f"{path_to_dir}/certificate_samples", peer_cert_dir=f"{path_to_dir}/certificate_samples", stop_event=threading.Event())
+        receiver = MBA(decision_engine=MagicMock(), multicast_group="ff02::1", port=12345, interface=test_interface, my_cert_dir=f"{path_to_dir}/certificate_samples", peer_cert_dir=f"{path_to_dir}/certificate_samples", stop_event=threading.Event())
 
         sender.mymac = mock_sender_mac
         receiver.mymac = mock_receiver_mac
