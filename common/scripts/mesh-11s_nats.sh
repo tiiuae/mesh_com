@@ -204,19 +204,38 @@ EOF
 
       modprobe mac80211
 
-      # Radio spi bus number
-      BUSNO=$(for i in /sys/class/spi_master/*/; do
-      if [ -e "$i/device" ] && [ "$(basename "$(readlink "$i/device")")" == "spi-ft232h.0" ]; then
-        echo "${i//[^0-9]/}"
-      fi
-      done)
-
-      # /usr/local/bin/init_halow.sh will take care of the firmware copy to /lib/firmware
-      if [ "$BUSNO" -gt 0 ]; then
-          command="insmod /lib/modules/$KERNEL_VERSION/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat spi_bus_num=$BUSNO spi_polling_interval=3 hifspeed=20000000 spi_gpio_irq=-1 power_save=0 sw_enc=0"
+    command=
+      # read halow cfg written by init_halow.sh if found
+      if [ -f /var/run/halow_init.conf ]; then
+        source /var/run/halow_init.conf
+        if [ $SPI_BUS_NO ]; then
+          command="insmod /lib/modules/$KERNEL_VERSION/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat hifspeed=${DRV_SPI_SPEED} power_save=${DRV_POWER_SAVE} sw_enc=${DRV_SW_ENC} spi_gpio_irq=${DRV_GPIO_IRQ} spi_bus_num=${SPI_BUS_NO}"
+          if [ $DRV_POLLING_INTERVAL ]; then
+            command="${command}  spi_polling_interval=${DRV_POLLING_INTERVAL}"
+          fi
+        else
+          echo "ERROR: HaLoW radio not found."
+          logger "ERROR: HaLoW radio not found."
+          return 1
+        fi
+      # otherwise use the old detection code.
       else
-          command="insmod /lib/modules/$KERNEL_VERSION/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat hifspeed=20000000 power_save=0 sw_enc=1 spi_bus_num=0 spi_gpio_irq=5"
+        # Radio spi bus number
+        BUSNO=$(for i in /sys/class/spi_master/*/; do
+        if [ -e "$i/device" ] && [ "$(basename "$(readlink "$i/device")")" == "spi-ft232h.0" ]; then
+          echo "${i//[^0-9]/}"
+        fi
+        done)
+
+        # /usr/local/bin/init_halow.sh will take care of the firmware copy to /lib/firmware
+        if [ "$BUSNO" -gt 0 ]; then
+            command="insmod /lib/modules/$KERNEL_VERSION/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat spi_bus_num=$BUSNO spi_polling_interval=3 hifspeed=20000000 spi_gpio_irq=-1 power_save=0 sw_enc=0"
+        else
+            command="insmod /lib/modules/$KERNEL_VERSION/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat hifspeed=20000000 power_save=0 sw_enc=1 spi_bus_num=0 spi_gpio_irq=5"
+        fi
       fi
+
+      # load the kernel driver.
 
       # remove nrc module before init
       rmmod nrc.ko
