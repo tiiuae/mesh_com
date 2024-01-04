@@ -2,6 +2,7 @@
 Comms NATS controller
 """
 from os import sys, path
+
 if __name__ == "__main__" and __package__ is None:
     PARENT_DIR = path.dirname(path.dirname(path.abspath(__file__)))
     MS20_FEATURES_PATH = path.join(PARENT_DIR, "2_0/features")
@@ -158,9 +159,8 @@ class ConfigType(str, Enum):
     Config type
     """
 
-    BASE = "base"
     MESH_CONFIG = "mesh_conf"
-    CERTIFICATES = "certificates"
+    BIRTH_CERTIFICATE = "birth_certificate"
     FEATURES = "features"
     DEBUG_CONFIG = "debug_conf"
 
@@ -170,10 +170,13 @@ class Interface:
     """
     Class to store interface name, operationstatus and MAC address
     """
+
     def __init__(self, interface_name, operstat, mac_address):
         self.interface_name = interface_name
         self.operstat = operstat
         self.mac_address = mac_address
+
+
 # pylint: enable=too-few-public-methods
 
 
@@ -185,6 +188,9 @@ class MdmAgent:
     GET_CONFIG: str = "public/config"
     GET_DEVICE_CONFIG: str = "public/get_device_config"  # + config_type
     PUT_DEVICE_CONFIG: str = "public/put_device_config"  # + config_type
+
+    GET_DEVICE_CERTIFICATES: str = "public/get_device_certificates"
+    PUT_DEVICE_CERTIFICATES: str = "public/put_device_certificates/{certificate_type}"
 
     OK_POLLING_TIME_SECONDS: int = 600
     FAIL_POLLING_TIME_SECONDS: int = 1
@@ -207,20 +213,17 @@ class MdmAgent:
         self.__status: dict = {
             ConfigType.MESH_CONFIG.value: "FAIL",
             ConfigType.FEATURES.value: "FAIL",
-            ConfigType.CERTIFICATES.value: "FAIL",
+            ConfigType.BIRTH_CERTIFICATE.value: "FAIL",
         }
         self.__previous_config_mesh: Optional[str] = self.__read_config_from_file(
             ConfigType.MESH_CONFIG.value
-        )
-        self.__previous_config_mesh_base: Optional[str] = self.__read_config_from_file(
-            ConfigType.BASE.value
         )
         self.__previous_config_features: Optional[str] = self.__read_config_from_file(
             ConfigType.FEATURES.value
         )
         self.__previous_config_certificates: Optional[
             str
-        ] = self.__read_config_from_file(ConfigType.CERTIFICATES.value)
+        ] = self.__read_config_from_file(ConfigType.BIRTH_CERTIFICATE.value)
         self.__previous_debug_config: Optional[
             str
         ] = self.__read_debug_config_from_file()
@@ -259,9 +262,7 @@ class MdmAgent:
             target=self.interface_monitor.monitor_interfaces
         )
 
-        self.__cbma_set_up = (
-            False  # Indicates whether CBMA has been configured
-        )
+        self.__cbma_set_up = False  # Indicates whether CBMA has been configured
         try:
             with open("/opt/certs_uploaded", "r", encoding="utf-8") as f:
                 self.__certs_uploaded = True
@@ -299,16 +300,14 @@ class MdmAgent:
                            interface_name, operstate, mac_address.
         :return: -
         """
-        self.__comms_controller.logger.debug(
-            "Interface monitor cb: %s", interfaces
-        )
+        self.__comms_controller.logger.debug("Interface monitor cb: %s", interfaces)
         self.__interfaces.clear()
 
         for interface_data in interfaces:
             interface = Interface(
                 interface_name=interface_data["interface_name"],
                 operstat=interface_data["operstate"],
-                mac_address=interface_data["mac_address"]
+                mac_address=interface_data["mac_address"],
             )
             self.__interfaces.append(interface)
 
@@ -329,9 +328,7 @@ class MdmAgent:
         :return: -
         """
         if not self.service_monitor.running:
-            self.__comms_controller.logger.debug(
-                "Start service monitor thread"
-            )
+            self.__comms_controller.logger.debug("Start service monitor thread")
 
             self.__service_monitor_thread.start()
 
@@ -373,10 +370,12 @@ class MdmAgent:
                     self.__comms_controller.logger.debug("Certificate upload failed")
             elif self.mdm_service_available:
                 await self.__loop_run_executor(self.executor, ConfigType.FEATURES)
-                await self.__loop_run_executor(self.executor, ConfigType.CERTIFICATES)
+                await self.__loop_run_executor(self.executor, ConfigType.BIRTH_CERTIFICATE)
                 await self.__loop_run_executor(self.executor, ConfigType.MESH_CONFIG)
                 if self.__mesh_conf_request_processed:
-                    await self.__loop_run_executor(self.executor, ConfigType.DEBUG_CONFIG)
+                    await self.__loop_run_executor(
+                        self.executor, ConfigType.DEBUG_CONFIG
+                    )
             if self.__is_cbma_feature_enabled() and not self.__cbma_set_up:
                 self.__setup_cbma()
             if self.__cbma_threads:
@@ -500,7 +499,9 @@ class MdmAgent:
                     file_handle.write(features_yaml)
 
                 self.__write_config_to_file(response, ConfigType.FEATURES.value)
-                self.__previous_config_features = self.__read_config_from_file(ConfigType.FEATURES.value)
+                self.__previous_config_features = self.__read_config_from_file(
+                    ConfigType.FEATURES.value
+                )
                 return "OK"
 
             self.__comms_controller.logger.error("No features field in config")
@@ -533,7 +534,7 @@ class MdmAgent:
                 self.__comms_controller.logger.debug(
                     "__action_cert_keys: not implemented"
                 )
-                self.__write_config_to_file(response, ConfigType.CERTIFICATES.value)
+                self.__write_config_to_file(response, ConfigType.BIRTH_CERTIFICATE.value)
                 return "OK"
         except KeyError:
             self.__comms_controller.logger.error(
@@ -557,7 +558,10 @@ class MdmAgent:
 
         data = json.loads(response.text)
 
-        if self.__mesh_conf_request_processed and config.value == ConfigType.DEBUG_CONFIG.value:
+        if (
+            self.__mesh_conf_request_processed
+            and config.value == ConfigType.DEBUG_CONFIG.value
+        ):
             self.__previous_debug_config = response.text.strip()
 
             # save to file to use in fmo
@@ -586,7 +590,7 @@ class MdmAgent:
                 return ret
 
             # cert/keys actions
-            if config.value == ConfigType.CERTIFICATES.value:
+            if config.value == ConfigType.BIRTH_CERTIFICATE.value:
                 ret = self.__action_cert_keys(response)
                 return ret
 
@@ -652,6 +656,7 @@ class MdmAgent:
             data = {
                 "device_id": self.__device_id,
                 "payload": certificates_dict,
+                "format": None
             }
 
             __https_url = self.__url
@@ -659,7 +664,7 @@ class MdmAgent:
                 return requests.Response()  # empty response
 
             # Make the POST request
-            url = f"https://{__https_url}/{self.PUT_DEVICE_CONFIG}/{ConfigType.CERTIFICATES.value}"
+            url = f"https://{__https_url}/{self.PUT_DEVICE_CERTIFICATES}/{ConfigType.BIRTH_CERTIFICATE.value}"
             return requests.post(
                 url,
                 json=data,
@@ -685,9 +690,7 @@ class MdmAgent:
         interfaces_to_cleanup = ["bat0"]
 
         for interface in interfaces_to_cleanup:
-            if interface in [
-                link.get_attr("IFLA_IFNAME") for link in ip.get_links()
-            ]:
+            if interface in [link.get_attr("IFLA_IFNAME") for link in ip.get_links()]:
                 # If the interface exists, set it down, and then delete it
                 ip.link(
                     "set",
@@ -708,11 +711,15 @@ class MdmAgent:
             bridge_index = ip.link_lookup(ifname=bridge_name)[0]
 
             # Get the indices of all interfaces currently in the bridge
-            interfaces_indices = [link['index'] for link in ip.get_links(master=bridge_index)]
+            interfaces_indices = [
+                link["index"] for link in ip.get_links(master=bridge_index)
+            ]
 
             # Remove each interface from the bridge
             for interface_index in interfaces_indices:
-                ip.link("set", index=interface_index, master=0)  # Set the master to 0 (no bridge)
+                ip.link(
+                    "set", index=interface_index, master=0
+                )  # Set the master to 0 (no bridge)
 
         except Exception as e:
             self.__comms_controller.logger.debug(
@@ -826,9 +833,7 @@ class MdmAgent:
                     if thread.is_alive():
                         thread.join()
                 except Exception as e:
-                    self.__comms_controller.logger.error(
-                        f"Thread join error: {e}"
-                    )
+                    self.__comms_controller.logger.error(f"Thread join error: {e}")
 
             self.__comms_controller.logger.debug(
                 "CBMA threads stopped, continue cleanup..."
@@ -862,8 +867,8 @@ class MdmAgent:
                         return True
             except yaml.YAMLError as exc:
                 self.__comms_controller.logger.error(
-                        f"Error reading features file: {exc}"
-                    )
+                    f"Error reading features file: {exc}"
+                )
             return False
 
     def __setup_cbma(self):
@@ -885,7 +890,7 @@ class MdmAgent:
         self.__cleanup_default_batman()
         # Cleanup default bridge
         self.__remove_all_interfaces_from_bridge("br-lan")
-        
+
         # Fixme: Add usb0 interface to br-lan.
         # This is temporary to allow testing of MDM server via
         # ethernet over usb.
@@ -1027,7 +1032,7 @@ class MdmAgent:
             # if all statuses are OK, then we can start the OK polling
             # todo remove this and leave all() check once certificate download is working
             if all(value == "OK" for value in self.__status.values()) or (
-                self.__status[ConfigType.CERTIFICATES.value] == "FAIL"
+                self.__status[ConfigType.BIRTH_CERTIFICATE.value] == "FAIL"
                 and self.__status[ConfigType.FEATURES.value] == "OK"
                 and self.__status[ConfigType.MESH_CONFIG.value] == "OK"
             ):
@@ -1267,16 +1272,6 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-
-    # test certificates location
-    # if args.ca is None or args.certfile is None or args.keyfile is None:
-    #     args.ca = \
-    #         "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/ca.crt"
-    #     args.certfile = \
-    #         "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/issued/csl1.local.crt"
-    #     args.keyfile = \
-    #         "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/private/csl1.local.key"
-
     loop = asyncio.new_event_loop()
 
     try:
