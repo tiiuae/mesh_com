@@ -46,7 +46,7 @@ launch_server() {
     command ssh -t -t "root@${MDM_SERVER_IP}" sh <<- EOF ${DEBUG+>/dev/null 2>&1} &
         unset PS1
 
-				cd $MDM_SERVER_DIR
+				cd "$MDM_SERVER_DIR"
 
 				. venv/bin/activate
 
@@ -72,9 +72,9 @@ launch_client() {
     command ssh -t -t "root@${ip}" sh <<- EOF ${DEBUG+>/dev/null 2>&1} &
         unset PS1
 
-				cd $MDM_AGENT_DIR
+				cd "$MDM_AGENT_DIR"
 
-				python3 comms_nats_controller.py -s "${MDM_SERVER_IP}" -p "${MDM_SERVER_PORT}" -a mdm -c "${MDM_AGENT_CERTS}/clients/csl${num}.local.crt" -k "${MDM_AGENT_CERTS}/clients/csl${num}.local.key" -r ${MDM_AGENT_CERTS}/clients/certs/ca.crt &
+				python3 comms_nats_controller.py -s "${MDM_SERVER_IP}" -p "${MDM_SERVER_PORT}" -a mdm -c "${MDM_AGENT_CERTS}/clients/csl${num}.local.crt" -k "${MDM_AGENT_CERTS}/clients/csl${num}.local.key" -r "${MDM_AGENT_CERTS}/clients/certs/ca.crt" &
 
         pid=$!
         trap "kill $pid" INT KILL QUIT EXIT
