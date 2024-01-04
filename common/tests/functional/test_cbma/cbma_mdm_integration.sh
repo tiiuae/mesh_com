@@ -4,7 +4,7 @@
 MDM_AGENT_DIR="/opt/mesh_com/modules/sc-mesh-secure-deployment/src/nats"
 MDM_AGENT_CERTS="${MDM_AGENT_DIR}/certs"
 
-MDM_SERVER_DIR="~/mdm-server"
+MDM_SERVER_DIR="\${HOME}/mdm-server"
 MDM_SERVER_BIND_IP="0.0.0.0"
 MDM_SERVER_PORT="5000"
 
