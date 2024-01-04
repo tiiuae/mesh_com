@@ -23,6 +23,7 @@ umask=""
 stdout="$LOG_FILE"
 stderr="$LOG_FILE"
 daemon_start_args="--delay=11 --attempts=1 --respawn"
+command_args="-t 30 -o /opt"
 
 case "$1" in
     start)
