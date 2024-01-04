@@ -33,11 +33,17 @@ usage() {
 setup_ssh() {
     ip="$1"
 
-    echo -n "[+] Setting up SSH setup for ${ip}... "
+    echo "[+] Setting up SSH configuration for ${ip}..."
 
-    command ssh "root@${ip}" "cat ~/.ssh/id_rsa" | ssh-add - >/dev/null 2>&1
+    ln -fs /dev/fd/2 "/tmp/${ip}"
 
-    echo "done"
+    echo y | ssh-keygen -q -N '' -f "/tmp/${ip}" 2>&1 >/dev/null | ssh-add - >/dev/null 2>&1
+
+    ssh-copy-id -i "/tmp/${ip}.pub" "root@${ip}" >/dev/null 2>&1
+
+    rm "/tmp/${ip}" "/tmp/${ip}.pub"
+
+    echo "[+] SSH setup for ${ip} completed"
 }
 
 launch_server() {
