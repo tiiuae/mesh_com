@@ -185,12 +185,15 @@ class MdmAgent:
     MDM Agent
     """
 
+    DOWNLOAD_CERTIFICATES = "download_certificates"
+    UPLOAD_CERTIFICATES = "upload_certificates"
+
     GET_CONFIG: str = "public/config"
     GET_DEVICE_CONFIG: str = "public/get_device_config"  # + config_type
     PUT_DEVICE_CONFIG: str = "public/put_device_config"  # + config_type
 
     GET_DEVICE_CERTIFICATES: str = "public/get_device_certificates"
-    PUT_DEVICE_CERTIFICATES: str = "public/put_device_certificates/{certificate_type}"
+    PUT_DEVICE_CERTIFICATES: str = "public/put_device_certificates"
 
     OK_POLLING_TIME_SECONDS: int = 600
     FAIL_POLLING_TIME_SECONDS: int = 1
@@ -210,11 +213,6 @@ class MdmAgent:
         """
         Constructor
         """
-        self.__status: dict = {
-            ConfigType.MESH_CONFIG.value: "FAIL",
-            ConfigType.FEATURES.value: "FAIL",
-            ConfigType.BIRTH_CERTIFICATE.value: "FAIL",
-        }
         self.__previous_config_mesh: Optional[str] = self.__read_config_from_file(
             ConfigType.MESH_CONFIG.value
         )
@@ -271,11 +269,27 @@ class MdmAgent:
             self.__certs_uploaded = False
             self.__comms_controller.logger.debug("Certificate upload needed")
 
+        try:
+            with open("/opt/certs_downloaded", "r", encoding="utf-8") as f:
+                self.__certs_downloaded = True
+                self.__comms_controller.logger.debug("No need to download certificates")
+        except FileNotFoundError:
+            self.__certs_downloaded = False
+            self.__comms_controller.logger.debug("Certificate download needed")
+
         self.__cbm_certs_path = "/opt/crypto/ecdsa/birth/filebased"
+        self.__cbm_certs_downloaded = "/opt"
         self.__cbma_ca_cert_path = "/opt/mspki/ecdsa/certificate_chain.crt"
         self.__cbma_threads: Dict[str, str] = {}
         self.__cbma_shutdown_event = threading.Event()
         self.running = False
+
+        self.__status: dict = {
+            ConfigType.MESH_CONFIG.value: "FAIL",
+            ConfigType.FEATURES.value: "FAIL",
+            self.DOWNLOAD_CERTIFICATES: "OK" if self.__certs_downloaded else "FAIL",
+            self.UPLOAD_CERTIFICATES: "OK" if self.__certs_uploaded else "FAIL",
+        }
 
         try:
             with open("/opt/identity", "r", encoding="utf-8") as f:  # todo
@@ -357,20 +371,47 @@ class MdmAgent:
         self.running = True
 
         while self.running:
-            if not self.__certs_uploaded and self.mdm_service_available:
+            self.__comms_controller.logger.debug("status: %s, mdm_available: %s", self.__status, self.mdm_service_available)
+
+            if (
+                self.__status[self.UPLOAD_CERTIFICATES] == "FAIL"
+                and self.mdm_service_available ):
+
                 resp = self.upload_certificate_bundle()
                 self.__comms_controller.logger.debug(
                     "Certificate upload response: %s", resp
                 )
                 if resp.status_code == 200:
-                    self.__certs_uploaded = True
+                    self.__status[self.UPLOAD_CERTIFICATES] = "OK"
                     with open("/opt/certs_uploaded", "w", encoding="utf-8") as f:
                         f.write("certs uploaded")
                 else:
                     self.__comms_controller.logger.debug("Certificate upload failed")
+            elif (
+                self.__status[self.DOWNLOAD_CERTIFICATES] == "FAIL"
+                and self.__status[self.UPLOAD_CERTIFICATES] == "OK"
+                and self.mdm_service_available ):
+
+                resp = self.download_certificate_bundle()
+                self.__comms_controller.logger.debug(
+                    "Certificate download response: %s", resp
+                )
+                if resp.status_code == 200:
+                    self.__status[
+                        self.DOWNLOAD_CERTIFICATES
+                    ] = self.__action_certificates(resp)
+                    if self.__status[self.DOWNLOAD_CERTIFICATES] == "OK":
+                        with open("/opt/certs_downloaded", "w", encoding="utf-8") as f:
+                            f.write("certs downloaded")
+                    else:
+                        self.__comms_controller.logger.debug(
+                            "Certificates action failed"
+                        )
+
+                else:
+                    self.__comms_controller.logger.debug("Certificate download failed")
             elif self.mdm_service_available:
                 await self.__loop_run_executor(self.executor, ConfigType.FEATURES)
-                await self.__loop_run_executor(self.executor, ConfigType.BIRTH_CERTIFICATE)
                 await self.__loop_run_executor(self.executor, ConfigType.MESH_CONFIG)
                 if self.__mesh_conf_request_processed:
                     await self.__loop_run_executor(
@@ -380,6 +421,7 @@ class MdmAgent:
                 self.__setup_cbma()
             if self.__cbma_threads:
                 self.__cbma_thread_alive_check()
+
             await asyncio.sleep(
                 float(min(self.__interval, self.__debug_config_interval))
             )
@@ -407,6 +449,37 @@ class MdmAgent:
                 "HTTP request failed with error: %s", err
             )
             return requests.Response()
+
+    def __action_certificates(self, response: requests.Response) -> str:
+        """
+        Action certificates
+        :param response: HTTP response
+        :return: -
+        """
+        try:
+            payload_dict = json.loads(response.text)["payload"]
+            self.__comms_controller.logger.debug(
+                "payload_dict[role]: %s", payload_dict["role"]
+            )
+            self.__comms_controller.logger.debug(
+                "payload_dict[group]: %s", payload_dict["group"]
+            )
+
+            certificates_dict = json.loads(response.text)["payload"]["certificates"]
+
+            for certificate_name, certificate in certificates_dict.items():
+                with open(
+                    f"{self.__cbm_certs_downloaded}/{certificate_name}", "wb"
+                ) as cert_file:
+                    cert_file.write(base64.b64decode(certificate))
+
+            self.__comms_controller.logger.debug("Certificates saved")
+        except Exception as e:
+            self.__comms_controller.logger.error(
+                "Error saving certificates: %s", str(e)
+            )
+            return "FAIL"
+        return "OK"
 
     def __action_radio_configuration(self, response: requests.Response) -> str:
         """
@@ -534,7 +607,9 @@ class MdmAgent:
                 self.__comms_controller.logger.debug(
                     "__action_cert_keys: not implemented"
                 )
-                self.__write_config_to_file(response, ConfigType.BIRTH_CERTIFICATE.value)
+                self.__write_config_to_file(
+                    response, ConfigType.BIRTH_CERTIFICATE.value
+                )
                 return "OK"
         except KeyError:
             self.__comms_controller.logger.error(
@@ -628,6 +703,42 @@ class MdmAgent:
         with open(f"/opt/config_{config}.json", "w", encoding="utf-8") as f_handle:
             f_handle.write(response.text.strip())
 
+    def download_certificate_bundle(self) -> requests.Response:
+        """
+        Download certificate bundle
+        :return: HTTP response
+        """
+
+        try:
+            self.__comms_controller.logger.debug("Downloading certificate bundle")
+
+            # Prepare the JSON data for the POST request
+            data = {
+                "device_id": self.__device_id,
+                # "certificate_type": None,
+            }
+
+            __https_url = self.__url
+            if "None" in __https_url:
+                return requests.Response()  # empty response
+
+            # Make the GET request
+            url = f"https://{__https_url}/{self.GET_DEVICE_CERTIFICATES}"
+            return requests.get(
+                url,
+                params=data,
+                cert=(self.__certificate_file, self.__keyfile),
+                verify=self.__ca,
+                timeout=2,
+            )
+        except FileNotFoundError as e:
+            self.__comms_controller.logger.error("Certificate file not found: %s", e)
+        except requests.RequestException as e:
+            self.__comms_controller.logger.error(
+                "Post request failed with error: %s", e
+            )
+        return requests.Response()
+
     def upload_certificate_bundle(self) -> requests.Response:
         """
         Upload certificate bundle
@@ -656,7 +767,7 @@ class MdmAgent:
             data = {
                 "device_id": self.__device_id,
                 "payload": certificates_dict,
-                "format": None
+                "format": "text",
             }
 
             __https_url = self.__url
@@ -858,16 +969,18 @@ class MdmAgent:
 
         return True
 
-    def __is_cbma_feature_enabled(self):
+    def __is_cbma_feature_enabled(self) -> bool:
+        """
+        Check if CBMA feature is enabled
+        :return: True if enabled, False otherwise
+        """
         with open(self.YAML_FILE, "r", encoding="utf-8") as stream:
             try:
                 features = yaml.safe_load(stream)
-                for feature in features:
-                    if features["CBMA"]:
-                        return True
-            except yaml.YAMLError as exc:
+                return bool(features["CBMA"])
+            except (yaml.YAMLError, KeyError, FileNotFoundError) as exc:
                 self.__comms_controller.logger.error(
-                    f"Error reading features file: {exc}"
+                    f"CBMA disabled as feature configuration not found: {exc}"
                 )
             return False
 
@@ -1030,12 +1143,7 @@ class MdmAgent:
                 self.__status[config.value] = "FAIL"
 
             # if all statuses are OK, then we can start the OK polling
-            # todo remove this and leave all() check once certificate download is working
-            if all(value == "OK" for value in self.__status.values()) or (
-                self.__status[ConfigType.BIRTH_CERTIFICATE.value] == "FAIL"
-                and self.__status[ConfigType.FEATURES.value] == "OK"
-                and self.__status[ConfigType.MESH_CONFIG.value] == "OK"
-            ):
+            if all(value == "OK" for value in self.__status.values()):
                 self.__interval = self.OK_POLLING_TIME_SECONDS
             else:
                 self.__interval = self.FAIL_POLLING_TIME_SECONDS
