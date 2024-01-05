@@ -163,5 +163,5 @@ class MBA(ObservableModule):
         bool: True if the signature is valid, False otherwise.
         """
         source_mac = get_mac_from_ipv6(source_ip, self.interface)
-        path_to_pub_key = f"{self.peer_cert_dir}/macsec_{source_mac.replace(':','')}.pem"
+        path_to_pub_key = f"{self.peer_cert_dir}/{source_mac}.pem"
         return cryptography_tools.verify_signature(signature, message, path_to_pub_key, logger)
