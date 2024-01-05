@@ -144,7 +144,7 @@ class MBA(ObservableModule):
         Returns:
         bytes: The message, combined with its signature.
         """
-        path_to_priv_key = f"{self.my_cert_dir}/macsec_{self.mymac.replace(':','')}.key" # TODO: update priv key access when HSM is in use
+        path_to_priv_key = f"{self.my_cert_dir}/private.key" # TODO: update priv key access when HSM is in use
         if signature := cryptography_tools.sign_message(message, path_to_priv_key, logger):
             return cryptography_tools.generate_signed_message(message, signature)
         else:

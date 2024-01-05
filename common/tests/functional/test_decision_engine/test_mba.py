@@ -31,7 +31,9 @@ def mba_setup():
         receiver = MBA(decision_engine=MagicMock(), multicast_group="ff02::1", port=12345, interface=test_interface, my_cert_dir=f"{path_to_dir}/certificate_samples", peer_cert_dir=f"{path_to_dir}/certificate_samples", stop_event=threading.Event())
 
         sender.mymac = mock_sender_mac
+        sender.my_cert_dir = f"{path_to_dir}/certificate_samples/{mock_sender_mac}"
         receiver.mymac = mock_receiver_mac
+        receiver.my_cert_dir = f"{path_to_dir}/certificate_samples/{mock_receiver_mac}"
 
         receiver_thread = threading.Thread(target=receiver.receive_mba)
         receiver_thread.start()
@@ -83,7 +85,9 @@ def mba_invalid_signature_setup():
         receiver = MBA(decision_engine=MagicMock(), multicast_group="ff02::1", port=12345, interface=test_interface, my_cert_dir=f"{path_to_dir}/certificate_samples", peer_cert_dir=f"{path_to_dir}/certificate_samples", stop_event=threading.Event())
 
         sender.mymac = mock_sender_mac
+        sender.my_cert_dir = f"{path_to_dir}/certificate_samples/{mock_sender_mac}"
         receiver.mymac = mock_receiver_mac
+        receiver.my_cert_dir = f"{path_to_dir}/certificate_samples/{mock_receiver_mac}"
 
         receiver_thread = threading.Thread(target=receiver.receive_mba)
         receiver_thread.start()
