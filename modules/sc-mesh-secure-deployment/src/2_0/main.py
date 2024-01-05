@@ -18,7 +18,7 @@ MBA_MULTICAST_ADDRESS = 'ff02::1'
 MBA_PORT = 12345
 MBA_INTERFACE = "bat1" # Should be br-lan if it is there
 QUARANTINE_PERIOD = 10 # Quarantine period in seconds
-PATH_TO_MY_CERT_DIR = f"{os.path.dirname(__file__)}/features/cbma/cert_generation/certificates" # Path to the folder where private key is stored (Needs to be updated when we use HSM)
+PATH_TO_MY_CERT_DIR = "/opt/crypto/ecdsa/birth/filebased" # Path to the folder where private key is stored (Needs to be updated when we use HSM)
 PATH_TO_PEER_CERT_DIR = "/tmp/peer_certificates" # Path to the folder where peer certificates are stored by cbma/auth/authClient.py and cbma/auth/authServer.py
 
 def launch_PHY(decision_engine):
