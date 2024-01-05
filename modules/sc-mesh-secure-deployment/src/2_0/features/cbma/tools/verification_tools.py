@@ -150,7 +150,7 @@ def store_peer_certificate(peer_cert, peer_mac, logger):
 
         # Write the PEM certificate to a file
         directory = '/tmp/peer_certificates/'
-        filename = f"macsec_{peer_mac.replace(':', '')}.pem"
+        filename = f"{peer_mac}.pem"
         file_path = os.path.join(directory, filename)
 
         # Create the directory if it doesn't exist
