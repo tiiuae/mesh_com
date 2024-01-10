@@ -8,6 +8,7 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(MS20_FEATURES_PATH)
     # Make it possible to run this module also in other folder (e.g. /opt/nats):
     sys.path.append("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features")
+    sys.path.append("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/cbma")
 
 # pylint: disable=wrong-import-position
 import argparse
