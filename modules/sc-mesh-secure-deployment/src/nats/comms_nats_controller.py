@@ -616,41 +616,6 @@ class MdmAgent:
 
         return "FAIL"
 
-    def __action_cert_keys(self, response: requests.Response) -> str:
-        """
-        Take cert/keys into use
-        :param config: config dict
-        :return: status
-        """
-        try:
-            config: dict = json.loads(response.text)
-
-            try:
-                if json.loads(self.__previous_config_certificates) == config:
-                    self.__comms_controller.logger.debug(
-                        "No changes in features config, not updating."
-                    )
-                    return "OK"
-            except TypeError:
-                self.__comms_controller.logger.debug("No previous certificates config")
-
-            if config["payload"] is not None:
-                data = config["payload"]["features"]  # todo implementation
-                self.__comms_controller.logger.debug("certs field in config")
-                self.__comms_controller.logger.debug(
-                    "__action_cert_keys: not implemented"
-                )
-                self.__write_config_to_file(
-                    response, ConfigType.BIRTH_CERTIFICATE.value
-                )
-                return "OK"
-        except KeyError:
-            self.__comms_controller.logger.error(
-                "KeyError certificates field in config"
-            )
-
-        return "FAIL"
-
     def __handle_received_config(
         self, response: requests.Response, config: ConfigType
     ) -> (str, str):
@@ -698,11 +663,6 @@ class MdmAgent:
             if config.value == ConfigType.FEATURES.value:
                 ret = self.__action_feature_yaml(response)
                 return ret
-
-            # cert/keys actions
-            # if config.value == ConfigType.BIRTH_CERTIFICATE.value:
-            #     ret = self.__action_cert_keys(response)
-            #     return ret
 
     @staticmethod
     def __read_config_from_file(config: str) -> Optional[str]:
