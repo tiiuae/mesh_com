@@ -1,4 +1,3 @@
-import multiprocessing
 import threading
 import queue
 import os
@@ -7,6 +6,7 @@ import time
 import subprocess
 import argparse
 
+from multiprocessing import Process
 from typing import List
 
 from tools.monitoring_wpa import WPAMonitor
@@ -19,42 +19,8 @@ except ImportError:
 
 
 _shutdown_event = threading.Event()
+cbma_processes: List[Process] = []
 file_dir = os.path.dirname(__file__)  # Path to dir containing this script
-
-
-########### TEMPORARY - TO BE MOVED LATER ###########
-
-class ProcessManager(object):
-    def __init__(self, function) -> None:
-        self.function = function
-        self.process = None
-
-    def start(self, *args, **kwargs):
-        self.process = multiprocessing.Process(target=self.function, args=args, kwargs=kwargs, daemon=True)
-        self.process.start()
-
-    def join(self) -> None:
-        if self.process is not None and self.process.is_alive():
-            self.process.join()
-
-    def status(self) -> str:
-        if self.process is None:
-            return "Process not started"
-        if self.process.is_alive():
-            return "Process is running"
-        return "Process finished"
-
-    def terminate(self) -> None:
-        if self.process is not None and self.process.is_alive():
-            self.process.terminate()
-        else:
-            print("Process is not running")
-
-
-cbma_processes: List[ProcessManager] = []
-
-#####################################################
-
 
 
 # pylint: disable=too-many-arguments, too-many-locals
@@ -166,18 +132,23 @@ def cbma(
     wpa_supplicant_control_path: Path to wpa supplicant control (if any)
     """
 
-    process = ProcessManager(setup_macsec)
-    process.start(
-        level,
-        interface_name,
-        port,
-        batman_interface,
-        path_to_certificate,
-        path_to_ca,
-        macsec_encryption,
-        wpa_supplicant_control_path,
-        shutdown_event,
+    process = Process(
+        target=setup_macsec,
+        daemon=True,
+        args=(
+            level,
+            interface_name,
+            port,
+            batman_interface,
+            path_to_certificate,
+            path_to_ca,
+            macsec_encryption,
+            wpa_supplicant_control_path,
+            shutdown_event
+        )
     )
+
+    process.start()
     return process
 # pylint: enable=too-many-arguments
 
@@ -265,14 +236,16 @@ def main(wlan: str, eth: str, cert_folder: str, cert_chain: str):
     global cbma_processes
     cbma_processes = [cbma_wlp1s0, cbma_eth1, cbma_bat0]
 
-    cbma_bat0.join()
+    if cbma_bat0.is_alive():
+        cbma_bat0.join()
 
 
 def stop():
     _shutdown_event.set()
 
     for p in cbma_processes:
-        p.terminate()
+        if p.is_alive():
+            p.terminate()
 
     # Delete macsec links, batman interfaces and bridges created within CBMA
     subprocess.run([f"{file_dir}/cleanup_cbma.sh"])
