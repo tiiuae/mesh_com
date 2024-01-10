@@ -18,6 +18,8 @@ logger_instance = CustomLogger("authClient")
 
 
 class AuthClient:
+    CLIENT_TIMEOUT = 60
+
     def __init__(self, interface, server_mac, server_port, cert_path, ca_path, mua):
         self.sslServerIP = mac_to_ipv6(server_mac)
         self.sslServerPort = server_port
@@ -54,6 +56,7 @@ class AuthClient:
 
         # Make the client socket suitable for secure communication
         self.secure_client_socket = context.wrap_socket(clientSocket)
+        self.secure_client_socket.settimeout(self.CLIENT_TIMEOUT)
         try:
             result = self.connection(self.secure_client_socket)
             if result['authenticated']:

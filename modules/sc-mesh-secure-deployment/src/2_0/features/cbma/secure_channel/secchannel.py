@@ -55,7 +55,6 @@ class SecMessageHandler:
         while not self.shutdown_event.is_set():
             try:
                 # No need to check _is_socket_active here, rely on recv's result.
-                self.socket.settimeout(2)  # 2s timeout to enable shutdown event check
                 data = self.socket.recv(1024).decode()
                 if not data:
                     self.logger.warning("Connection closed or socket not active.")
