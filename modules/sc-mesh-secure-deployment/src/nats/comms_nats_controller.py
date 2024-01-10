@@ -36,6 +36,8 @@ from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
 from cbma import setup_cbma  # type: ignore[import-not-found]
 from nats.aio.client import Client as nats
 
+from cbma.tools.utils import batman  # type: ignore[import-not-found]
+
 from src import batadvvis
 from src import batstat
 from src import comms_command
@@ -916,6 +918,11 @@ class MdmAgent:
         # This is temporary to allow testing of MDM server via
         # ethernet over usb.
         self.__add_interface_to_bridge("br-lan", "usb0")
+
+        # TODO - Shall this be done differently?
+        # Create batman interfaces
+        batman("bat0")
+        batman("bat1")
 
         wlan_interfaces = ["wlp1s0", "wlp2s0", "wlp3s0", "halow1"]
         for interface in self.__interfaces:
