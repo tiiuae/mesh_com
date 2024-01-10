@@ -751,6 +751,24 @@ class MdmAgent:
             ip.close()
 
     @staticmethod
+    def __delete_ebtables_rules():
+        command_ebtables = ["ebtables", "-t", "nat", "-L", "OUTPUT"]
+        command_sed = ["sed", "-n", "/OUTPUT/,/^$/{/^--/p}"]
+        command_xargs = ["xargs", "ebtables", "-t", "nat", "-D", "OUTPUT"]
+
+        proc_ebtables = subprocess.Popen(command_ebtables, stdout=subprocess.PIPE)
+        proc_sed = subprocess.Popen(
+            command_sed, stdin=proc_ebtables.stdout, stdout=subprocess.PIPE
+        )
+        proc_xargs = subprocess.Popen(command_xargs, stdin=proc_sed.stdout)
+        proc_xargs.wait()
+
+        subprocess.run(["ebtables", "--delete", "FORWARD",
+                        "--logical-in", "br-upper", "--jump", "ACCEPT"])
+        subprocess.run(["ebtables", "--delete", "FORWARD",
+                        "--logical-out", "br-upper", "--jump", "ACCEPT"])
+
+    @staticmethod
     def __delete_macsec_links():
         # Define the command as a list of arguments
         command_macsec = ["ip", "macsec", "show"]
@@ -817,6 +835,15 @@ class MdmAgent:
         finally:
             ip.close()
 
+    def __cleanup_cbma(self):
+        self.__shutdown_interface("bat0")
+        self.__shutdown_interface("bat1")
+        self.__delete_ebtables_rules()
+        self.__delete_macsec_links()
+        self.__destroy_batman_interface("bat0")
+        self.__destroy_batman_interface("bat1")
+        self.__shutdown_and_delete_bridge("br-upper")
+
     def stop_cbma(self):
         try:
             self.__comms_controller.logger.debug("Stopping CBMA...")
@@ -836,12 +863,7 @@ class MdmAgent:
             self.__comms_controller.logger.debug(
                 "CBMA processes terminated, continue cleanup..."
             )
-            self.__delete_macsec_links()
-            self.__shutdown_interface("bat0")
-            self.__shutdown_interface("bat1")
-            self.__destroy_batman_interface("bat0")
-            self.__destroy_batman_interface("bat1")
-            self.__shutdown_and_delete_bridge("br-upper")
+            self.__cleanup_cbma()
             self.__comms_controller.logger.debug("CBMA cleanup finished")
 
         except Exception as e:
@@ -884,8 +906,9 @@ class MdmAgent:
         print("mesh_if:", self.__comms_controller.settings.mesh_vif)
         print("radio index:", self.__comms_controller.settings.radio_index)
 
-        # Cleanup and delete bat0
-        self.__cleanup_default_batman()
+        # Cleanup CBMA before starting it
+        self.__cleanup_cbma()
+
         # Cleanup default bridge
         self.__remove_all_interfaces_from_bridge("br-lan")
 
