@@ -22,7 +22,8 @@ import threading
 import os
 import glob
 import base64
-from enum import Enum
+import tarfile
+
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
@@ -42,7 +43,7 @@ from src import comms_if_monitor
 from src import comms_service_discovery
 from src import comms_settings
 from src import comms_status
-
+from src.constants import Constants, ConfigType, StatusType
 
 # FMO_SUPPORTED_COMMANDS = [
 #     "GET_IDENTITY",
@@ -154,17 +155,6 @@ class CommsController:  # pylint: disable=too-few-public-methods
         self.logger = self.main_logger.getChild("controller")
 
 
-class ConfigType(str, Enum):
-    """
-    Config type
-    """
-
-    MESH_CONFIG = "mesh_conf"
-    BIRTH_CERTIFICATE = "birth_certificate"
-    FEATURES = "features"
-    DEBUG_CONFIG = "debug_conf"
-
-
 # pylint: disable=too-few-public-methods
 class Interface:
     """
@@ -184,22 +174,6 @@ class MdmAgent:
     """
     MDM Agent
     """
-
-    DOWNLOAD_CERTIFICATES = "download_certificates"
-    UPLOAD_CERTIFICATES = "upload_certificates"
-
-    GET_CONFIG: str = "public/config"
-    GET_DEVICE_CONFIG: str = "public/get_device_config"  # + config_type
-    PUT_DEVICE_CONFIG: str = "public/put_device_config"  # + config_type
-
-    GET_DEVICE_CERTIFICATES: str = "public/get_device_certificates"
-    PUT_DEVICE_CERTIFICATES: str = "public/put_device_certificates"
-
-    OK_POLLING_TIME_SECONDS: int = 600
-    FAIL_POLLING_TIME_SECONDS: int = 1
-    YAML_FILE: str = (
-        "/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features.yaml"
-    )
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -228,10 +202,10 @@ class MdmAgent:
         self.__mesh_conf_request_processed = False
         self.__comms_controller: CommsController = comms_controller
         self.__interval: int = (
-            self.FAIL_POLLING_TIME_SECONDS
+            Constants.FAIL_POLLING_TIME_SECONDS.value
         )  # possible to update from MDM server?
         self.__debug_config_interval: int = (
-            self.FAIL_POLLING_TIME_SECONDS
+            Constants.FAIL_POLLING_TIME_SECONDS.value
         )  # possible to update from MDM server?
 
         self.__url: str = "defaultmdm.local:5000"  # mDNS callback updates this one
@@ -263,6 +237,7 @@ class MdmAgent:
         self.__cbma_set_up = False  # Indicates whether CBMA has been configured
         try:
             with open("/opt/certs_uploaded", "r", encoding="utf-8") as f:
+                f.write("certs uploaded")
                 self.__certs_uploaded = True
                 self.__comms_controller.logger.debug("No need to upload certificates")
         except FileNotFoundError:
@@ -271,6 +246,7 @@ class MdmAgent:
 
         try:
             with open("/opt/certs_downloaded", "r", encoding="utf-8") as f:
+                f.write("certs downloaded")
                 self.__certs_downloaded = True
                 self.__comms_controller.logger.debug("No need to download certificates")
         except FileNotFoundError:
@@ -285,10 +261,22 @@ class MdmAgent:
         self.running = False
 
         self.__status: dict = {
-            ConfigType.MESH_CONFIG.value: "FAIL",
-            ConfigType.FEATURES.value: "FAIL",
-            self.DOWNLOAD_CERTIFICATES: "OK" if self.__certs_downloaded else "FAIL",
-            self.UPLOAD_CERTIFICATES: "OK" if self.__certs_uploaded else "FAIL",
+            StatusType.DOWNLOAD_MESH_CONFIG.value: "FAIL",
+            StatusType.DOWNLOAD_FEATURES.value: "FAIL",
+            StatusType.DOWNLOAD_CERTIFICATES.value: "OK"
+            if self.__certs_downloaded
+            else "FAIL",
+            StatusType.UPLOAD_CERTIFICATES.value: "OK"
+            if self.__certs_uploaded
+            else "FAIL",
+        }
+
+        self.__config_status_mapping = {
+            ConfigType.MESH_CONFIG: StatusType.DOWNLOAD_MESH_CONFIG,
+            ConfigType.FEATURES: StatusType.DOWNLOAD_FEATURES,
+            ConfigType.BIRTH_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
+            ConfigType.LOWER_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
+            ConfigType.UPPER_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
         }
 
         try:
@@ -371,36 +359,48 @@ class MdmAgent:
         self.running = True
 
         while self.running:
-            self.__comms_controller.logger.debug("status: %s, mdm_available: %s", self.__status, self.mdm_service_available)
+            self.__comms_controller.logger.debug(
+                "status: %s, mdm_available: %s",
+                self.__status,
+                self.mdm_service_available,
+            )
 
             if (
-                self.__status[self.UPLOAD_CERTIFICATES] == "FAIL"
-                and self.mdm_service_available ):
-
+                self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "FAIL"
+                and self.mdm_service_available
+            ):
                 resp = self.upload_certificate_bundle()
                 self.__comms_controller.logger.debug(
                     "Certificate upload response: %s", resp
                 )
                 if resp.status_code == 200:
-                    self.__status[self.UPLOAD_CERTIFICATES] = "OK"
+                    self.__status[StatusType.UPLOAD_CERTIFICATES.value] = "OK"
                     with open("/opt/certs_uploaded", "w", encoding="utf-8") as f:
                         f.write("certs uploaded")
                 else:
                     self.__comms_controller.logger.debug("Certificate upload failed")
             elif (
-                self.__status[self.DOWNLOAD_CERTIFICATES] == "FAIL"
-                and self.__status[self.UPLOAD_CERTIFICATES] == "OK"
-                and self.mdm_service_available ):
+                self.__status[StatusType.DOWNLOAD_CERTIFICATES.value] == "FAIL"
+                and self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "OK"
+                and self.mdm_service_available
+            ):
+                # todo; for loop for all certificate types ConfigType.BIRTH_CERTIFICATE,
+                #  ConfigType.UPPER_CERTIFICATE, ConfigType.LOWER_CERTIFICATE ?? need to sync with mdm-server
 
-                resp = self.download_certificate_bundle()
+                resp = self.download_certificate_bundle(
+                    ConfigType.BIRTH_CERTIFICATE
+                )  # todo certificate type handling
                 self.__comms_controller.logger.debug(
                     "Certificate download response: %s", resp
                 )
                 if resp.status_code == 200:
                     self.__status[
-                        self.DOWNLOAD_CERTIFICATES
-                    ] = self.__action_certificates(resp)
-                    if self.__status[self.DOWNLOAD_CERTIFICATES] == "OK":
+                        StatusType.DOWNLOAD_CERTIFICATES.value
+                    ] = self.__action_certificates(
+                        resp, ConfigType.BIRTH_CERTIFICATE
+                    )  # todo certificate type handling
+
+                    if self.__status[StatusType.DOWNLOAD_CERTIFICATES.value] == "OK":
                         with open("/opt/certs_downloaded", "w", encoding="utf-8") as f:
                             f.write("certs downloaded")
                     else:
@@ -438,7 +438,7 @@ class MdmAgent:
                 return requests.Response()  # empty response
 
             return requests.get(
-                f"https://{__https_url}/{self.GET_DEVICE_CONFIG}/{config.value}",
+                f"https://{__https_url}/{Constants.GET_DEVICE_CONFIG.value}/{config.value}",
                 params={"device_id": self.__device_id},
                 cert=(self.__certificate_file, self.__keyfile),
                 verify=self.__ca,
@@ -450,13 +450,25 @@ class MdmAgent:
             )
             return requests.Response()
 
-    def __action_certificates(self, response: requests.Response) -> str:
+    def __action_certificates(
+        self, response: requests.Response, certificate_type: str
+    ) -> str:
         """
         Action certificates
         :param response: HTTP response
         :return: -
         """
         try:
+            if certificate_type == ConfigType.BIRTH_CERTIFICATE:
+                cert_path = Constants.DOWNLOADED_CBMA_BIRTHCERTS_PATH.value
+            elif certificate_type == ConfigType.UPPER_CERTIFICATE:
+                cert_path = Constants.DOWNLOADED_CBMA_UPPER_PATH.value
+            elif certificate_type == ConfigType.LOWER_CERTIFICATE:
+                cert_path = Constants.DOWNLOADED_CBMA_LOWER_PATH.value
+            else:
+                self.__comms_controller.logger.error("Unknown certificate type")
+                return "FAIL"
+
             payload_dict = json.loads(response.text)["payload"]
             self.__comms_controller.logger.debug(
                 "payload_dict[role]: %s", payload_dict["role"]
@@ -468,12 +480,33 @@ class MdmAgent:
             certificates_dict = json.loads(response.text)["payload"]["certificates"]
 
             for certificate_name, certificate in certificates_dict.items():
-                with open(
-                    f"{self.__cbm_certs_downloaded}/{certificate_name}", "wb"
-                ) as cert_file:
-                    cert_file.write(base64.b64decode(certificate))
+                if str(certificate_name).endswith(".tar.bz2"):
+                    with open(
+                        f"{self.__cbm_certs_downloaded}/{certificate_name}", "wb"
+                    ) as cert_file:
+                        cert_file.write(base64.b64decode(certificate))
+                        self.__comms_controller.logger.debug(
+                            "Certificate %s saved", certificate_name
+                        )
+                        with tarfile.open(
+                            f"{self.__cbm_certs_downloaded}/{certificate_name}", "r:bz2"
+                        ) as tar:
+                            tar.extractall(path=cert_path)
+                            self.__comms_controller.logger.debug(
+                                "Certificate %s extracted to %s",
+                                certificate_name,
+                                cert_path,
+                            )
+                elif str(certificate_name).endswith("-sig"):
+                    with open(
+                        f"{self.__cbm_certs_downloaded}/{certificate_name}", "wb"
+                    ) as sig_file:
+                        sig_file.write(base64.b64decode(certificate))
+                        self.__comms_controller.logger.debug(
+                            "Sig %s saved", certificate_name
+                        )
+            self.__comms_controller.logger.debug("Downloaded bundle saved")
 
-            self.__comms_controller.logger.debug("Certificates saved")
         except Exception as e:
             self.__comms_controller.logger.error(
                 "Error saving certificates: %s", str(e)
@@ -565,7 +598,7 @@ class MdmAgent:
                 features_yaml = yaml.dump(features_dict, default_flow_style=False)
 
                 with open(
-                    self.YAML_FILE,
+                    Constants.YAML_FILE,
                     "w",
                     encoding="utf-8",
                 ) as file_handle:
@@ -620,7 +653,7 @@ class MdmAgent:
 
     def __handle_received_config(
         self, response: requests.Response, config: ConfigType
-    ) -> str:
+    ) -> (str, str):
         """
         Handle received config
         :param response: HTTP response
@@ -631,7 +664,7 @@ class MdmAgent:
             f"HTTP Request Response: {response.text.strip()} {str(response.status_code).strip()}"
         )
 
-        data = json.loads(response.text)
+        # data = json.loads(response.text)
 
         if (
             self.__mesh_conf_request_processed
@@ -645,13 +678,15 @@ class MdmAgent:
                     "/opt/debug_config.json", "w", encoding="utf-8"
                 ) as debug_conf_json:
                     debug_conf_json.write(self.__previous_debug_config)
-                    self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
+                    self.__debug_config_interval = (
+                        Constants.OK_POLLING_TIME_SECONDS.value
+                    )
                 return "OK"
             except:
                 self.__comms_controller.logger.debug(
                     "cannot store /opt/debug_config.json"
                 )
-                self.__debug_config_interval = self.FAIL_POLLING_TIME_SECONDS
+                self.__debug_config_interval = Constants.FAIL_POLLING_TIME_SECONDS.value
                 return "FAIL"
         else:
             # radio configuration actions
@@ -665,9 +700,9 @@ class MdmAgent:
                 return ret
 
             # cert/keys actions
-            if config.value == ConfigType.BIRTH_CERTIFICATE.value:
-                ret = self.__action_cert_keys(response)
-                return ret
+            # if config.value == ConfigType.BIRTH_CERTIFICATE.value:
+            #     ret = self.__action_cert_keys(response)
+            #     return ret
 
     @staticmethod
     def __read_config_from_file(config: str) -> Optional[str]:
@@ -703,7 +738,9 @@ class MdmAgent:
         with open(f"/opt/config_{config}.json", "w", encoding="utf-8") as f_handle:
             f_handle.write(response.text.strip())
 
-    def download_certificate_bundle(self) -> requests.Response:
+    def download_certificate_bundle(
+        self, certificate_type: str = ""
+    ) -> requests.Response:
         """
         Download certificate bundle
         :return: HTTP response
@@ -715,7 +752,7 @@ class MdmAgent:
             # Prepare the JSON data for the POST request
             data = {
                 "device_id": self.__device_id,
-                # "certificate_type": None,
+                "certificate_type": certificate_type,
             }
 
             __https_url = self.__url
@@ -723,7 +760,7 @@ class MdmAgent:
                 return requests.Response()  # empty response
 
             # Make the GET request
-            url = f"https://{__https_url}/{self.GET_DEVICE_CERTIFICATES}"
+            url = f"https://{__https_url}/{Constants.GET_DEVICE_CERTIFICATES.value}"
             return requests.get(
                 url,
                 params=data,
@@ -775,7 +812,7 @@ class MdmAgent:
                 return requests.Response()  # empty response
 
             # Make the POST request
-            url = f"https://{__https_url}/{self.PUT_DEVICE_CERTIFICATES}/{ConfigType.BIRTH_CERTIFICATE.value}"
+            url = f"https://{__https_url}/{Constants.PUT_DEVICE_CERTIFICATES.value}/{ConfigType.BIRTH_CERTIFICATE.value}"
             return requests.post(
                 url,
                 json=data,
@@ -974,7 +1011,7 @@ class MdmAgent:
         Check if CBMA feature is enabled
         :return: True if enabled, False otherwise
         """
-        with open(self.YAML_FILE, "r", encoding="utf-8") as stream:
+        with open(Constants.YAML_FILE, "r", encoding="utf-8") as stream:
             try:
                 features = yaml.safe_load(stream)
                 return bool(features["CBMA"])
@@ -1026,7 +1063,7 @@ class MdmAgent:
                     args=(
                         "lower",
                         interface_name,
-                        15001,
+                        Constants.CBMA_PORT_LOWER,
                         "bat0",
                         self.__cbm_certs_path,
                         self.__cbma_ca_cert_path,
@@ -1052,7 +1089,7 @@ class MdmAgent:
                     args=(
                         "lower",
                         interface_name,
-                        15001,
+                        Constants.CBMA_PORT_LOWER,
                         "bat0",
                         self.__cbm_certs_path,
                         self.__cbma_ca_cert_path,
@@ -1069,7 +1106,7 @@ class MdmAgent:
             args=(
                 "upper",
                 "bat0",
-                15002,
+                Constants.CBMA_PORT_UPPER,
                 "bat1",
                 self.__cbm_certs_path,
                 self.__cbma_ca_cert_path,
@@ -1107,6 +1144,8 @@ class MdmAgent:
             executor, self.__http_get_device_config, config
         )
 
+        status_type = self.__config_status_mapping.get(config, None)
+
         self.__comms_controller.logger.debug(
             "HTTP Request status: %s, config: %s", str(response.status_code), config
         )
@@ -1121,32 +1160,34 @@ class MdmAgent:
                 response.status_code == 200
                 and self.__previous_debug_config == response.text.strip()
             ):
-                self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
+                self.__debug_config_interval = Constants.OK_POLLING_TIME_SECONDS.value
                 self.__mesh_conf_request_processed = False
             elif response.text.strip() == "" or response.status_code != 200:
-                self.__debug_config_interval = self.FAIL_POLLING_TIME_SECONDS
+                self.__debug_config_interval = Constants.FAIL_POLLING_TIME_SECONDS.value
                 if response.status_code == 405:
                     self.__comms_controller.logger.debug(
                         "MDM Server has no support for debug mode"
                     )
-                    self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
+                    self.__debug_config_interval = (
+                        Constants.OK_POLLING_TIME_SECONDS.value
+                    )
                     self.__mesh_conf_request_processed = False
         else:
             if response.status_code == 200:
                 ret = self.__handle_received_config(response, config)
                 self.__comms_controller.logger.debug("config: %s, ret: %s", config, ret)
                 if ret == "OK":
-                    self.__status[config.value] = "OK"
+                    self.__status[status_type] = "OK"
                 if config.value == ConfigType.MESH_CONFIG.value and ret == "OK":
                     self.__mesh_conf_request_processed = True
             elif response.status_code != 200:
-                self.__status[config.value] = "FAIL"
+                self.__status[status_type] = "FAIL"
 
             # if all statuses are OK, then we can start the OK polling
             if all(value == "OK" for value in self.__status.values()):
-                self.__interval = self.OK_POLLING_TIME_SECONDS
+                self.__interval = Constants.OK_POLLING_TIME_SECONDS.value
             else:
-                self.__interval = self.FAIL_POLLING_TIME_SECONDS
+                self.__interval = Constants.FAIL_POLLING_TIME_SECONDS.value
 
             self.__comms_controller.logger.debug("status: %s", self.__status)
 
