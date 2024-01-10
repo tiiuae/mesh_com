@@ -96,11 +96,11 @@ def setup_macsec(
     )
     # Wait for wireless interface to be pingable before
     # starting mtls server, multicast
-    # utils.wait_for_interface_to_be_pingable(
-    #     mua.meshiface, mua.ipAddress, shutdown_event
-    # )
+    utils.wait_for_interface_to_be_pingable(
+        mua.meshiface, mua.ipAddress, shutdown_event
+    )
     # TODO Using sleep as in some cases the interface may never be pingable
-    time.sleep(3)
+    # time.sleep(3)
 
     if shutdown_event.is_set():
         return None
