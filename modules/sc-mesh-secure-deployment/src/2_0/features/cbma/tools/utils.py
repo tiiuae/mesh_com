@@ -413,24 +413,28 @@ def is_interface_pingable(interface_name, ip_address):
     # Return true if pingable
     try:
         if is_ipv4(ip_address):
-            ping_output = subprocess.check_output(
+            ping_output = subprocess.run(
                 ["ping", "-c", "1", "-w", "1", ip_address],
+                stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
+                text=True,
                 universal_newlines=True,
             )
-            return "1 packets transmitted, 1 received" in ping_output
+            return "1 packets transmitted, 1 received" in ping_output.stdout
         elif is_ipv6(ip_address):
-            ping_output = subprocess.check_output(
+            ping_output = subprocess.run(
                 [
                     "ping",
                     "-c", "1",
                     "-w", "1",
                     f"{ip_address}%{interface_name}",
                 ],
+                stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
+                text=True,
                 universal_newlines=True,
             )
-            return "1 packets transmitted, 1 received" in ping_output
+            return "1 packets transmitted, 1 received" in ping_output.stdout
         else:
             raise ValueError("Invalid IP address")
     except subprocess.CalledProcessError as e:
