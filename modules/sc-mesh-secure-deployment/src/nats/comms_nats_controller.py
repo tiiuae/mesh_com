@@ -23,6 +23,7 @@ import glob
 import base64
 from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Process
 from datetime import datetime
 from typing import Optional
 from typing import List, Dict
@@ -272,7 +273,7 @@ class MdmAgent:
 
         self.__cbm_certs_path = "/opt/crypto/ecdsa/birth/filebased"
         self.__cbma_ca_cert_path = "/opt/mspki/ecdsa/certificate_chain.crt"
-        self.__cbma_threads: Dict[str, str] = {}
+        self.__cbma_processes: Dict[str, Process] = {}
         self.__cbma_shutdown_event = threading.Event()
         self.running = False
 
@@ -379,8 +380,8 @@ class MdmAgent:
                     await self.__loop_run_executor(self.executor, ConfigType.DEBUG_CONFIG)
             if self.__is_cbma_feature_enabled() and not self.__cbma_set_up:
                 self.__setup_cbma()
-            if self.__cbma_threads:
-                self.__cbma_thread_alive_check()
+            if self.__cbma_processes:
+                self.__cbma_process_alive_check()
             await asyncio.sleep(
                 float(min(self.__interval, self.__debug_config_interval))
             )
@@ -820,18 +821,19 @@ class MdmAgent:
             self.__comms_controller.logger.debug("Stopping CBMA...")
             # Set shutdown event to signal CBMA threads to stop
             self.__cbma_shutdown_event.set()
-            # Waith for threads to stop
-            for thread_name, thread in self.__cbma_threads.items():
+            # TODO - Maybe add at timeout period for cbma threads to stop
+
+            for process in self.__cbma_processes.values():
                 try:
-                    if thread.is_alive():
-                        thread.join()
+                    if process.is_alive():
+                        process.terminate()
                 except Exception as e:
                     self.__comms_controller.logger.error(
-                        f"Thread join error: {e}"
+                        f"Terminating process error: {e}"
                     )
 
             self.__comms_controller.logger.debug(
-                "CBMA threads stopped, continue cleanup..."
+                "CBMA processes terminated, continue cleanup..."
             )
             self.__delete_macsec_links()
             self.__shutdown_interface("bat0")
@@ -885,7 +887,7 @@ class MdmAgent:
         self.__cleanup_default_batman()
         # Cleanup default bridge
         self.__remove_all_interfaces_from_bridge("br-lan")
-        
+
         # Fixme: Add usb0 interface to br-lan.
         # This is temporary to allow testing of MDM server via
         # ethernet over usb.
@@ -903,22 +905,18 @@ class MdmAgent:
                     )
                 except ValueError:
                     continue
-                thread = threading.Thread(
-                    target=setup_cbma.cbma,
-                    args=(
-                        "lower",
-                        interface_name,
-                        15001,
-                        "bat0",
-                        self.__cbm_certs_path,
-                        self.__cbma_ca_cert_path,
-                        "off",
-                        f"/var/run/wpa_supplicant_id{index}/{interface_name}",
-                        self.__cbma_shutdown_event,
-                    ),
+                process = setup_cbma.cbma(
+                    "lower",
+                    interface_name,
+                    15001,
+                    "bat0",
+                    self.__cbm_certs_path,
+                    self.__cbma_ca_cert_path,
+                    "off",
+                    f"/var/run/wpa_supplicant_id{index}/{interface_name}",
+                    self.__cbma_shutdown_event,
                 )
-                self.__cbma_threads[interface_name] = thread
-                thread.start()
+                self.__cbma_processes[interface_name] = process
 
         for interface in self.__interfaces:
             interface_name = interface.interface_name.lower()
@@ -929,54 +927,46 @@ class MdmAgent:
             ):
                 if not self.__has_certificate(interface.mac_address):
                     continue
-                thread = threading.Thread(
-                    target=setup_cbma.cbma,
-                    args=(
-                        "lower",
-                        interface_name,
-                        15001,
-                        "bat0",
-                        self.__cbm_certs_path,
-                        self.__cbma_ca_cert_path,
-                        "off",
-                        None,
-                        self.__cbma_shutdown_event,
-                    ),
+                process = setup_cbma.cbma(
+                    "lower",
+                    interface_name,
+                    15001,
+                    "bat0",
+                    self.__cbm_certs_path,
+                    self.__cbma_ca_cert_path,
+                    "off",
+                    None,
+                    self.__cbma_shutdown_event,
                 )
-                self.__cbma_threads[interface_name] = thread
-                thread.start()
+                self.__cbma_processes[interface_name] = process
 
-        thread = threading.Thread(
-            target=setup_cbma.cbma,
-            args=(
-                "upper",
-                "bat0",
-                15002,
-                "bat1",
-                self.__cbm_certs_path,
-                self.__cbma_ca_cert_path,
-                "off",
-                None,
-                self.__cbma_shutdown_event,
-            ),
+        process = setup_cbma.cbma(
+            "upper",
+            "bat0",
+            15002,
+            "bat1",
+            self.__cbm_certs_path,
+            self.__cbma_ca_cert_path,
+            "off",
+            None,
+            self.__cbma_shutdown_event,
         )
-        self.__cbma_threads[interface_name] = thread
-        thread.start()
+        self.__cbma_processes["bat0"] = process
 
         # TODO: Perhaps we need to maintain
         # list of interface specific statuses?
         self.__cbma_set_up = True
 
-    def __cbma_thread_alive_check(self):
+    def __cbma_process_alive_check(self):
         # Check if any of launched cbma threads have terminated
-        terminated_threads = []
-        for thread_name, thread in self.__cbma_threads.items():
-            if not thread.is_alive():
-                terminated_threads.append(thread_name)
+        terminated_processes = []
+        for process_name, process in self.__cbma_processes.items():
+            if not process.is_alive():
+                terminated_processes.append(process_name)
 
         # Remove terminated threads from the dictionary
-        for thread_name in terminated_threads:
-            del self.__cbma_threads[thread_name]
+        for process_name in terminated_processes:
+            del self.__cbma_processes[process_name]
 
     async def __loop_run_executor(self, executor, config: ConfigType) -> None:
         """
