@@ -7,7 +7,6 @@ import sys
 sys.path.insert(0, '../')
 from tools.verification_tools import *
 from tools.custom_logger import CustomLogger
-from tools.utils import wait_for_interface_to_be_pingable
 import glob
 
 logger_instance = CustomLogger("Server")

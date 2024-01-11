@@ -1,10 +1,8 @@
 import os
 import sys
 import time
-import subprocess
 import threading
 import queue
-import random
 import json
 
 path_to_cbma_dir = os.path.dirname(
@@ -25,11 +23,9 @@ from tools.utils import (  # noqa
     is_wpa_supplicant_running,
     run_wpa_supplicant,
     set_ipv6,
-    batman_exec,
     generate_random_bytes,
     xor_bytes,
     add_interface_to_bridge,
-    is_interface_up,
 )
 from tools.custom_logger import CustomLogger  # noqa
 from macsec import macsec  # noqa
