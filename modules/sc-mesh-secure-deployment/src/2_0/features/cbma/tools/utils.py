@@ -26,7 +26,7 @@ def batman(batman_interface):
     try:
         subprocess.run(["ip", "link", "add", "name", batman_interface, "type", "batadv"], check=True)
 
-        batman_exec(batman_interface,"batman-adv")
+        batman_exec(batman_interface, "batman-adv")
     except Exception as e:
         logger.error(f'Error setting up {batman_interface}: {e}')
         sys.exit(1)
@@ -226,10 +226,7 @@ def batman_exec(batman_interface, routing_algo):
     if routing_algo != "batman-adv":
         # TODO here should be OLSR
         return
-    try:
-        run_batman(batman_interface)
-    except subprocess.CalledProcessError as e:
-        logger.error("Error: %s", e)
+    run_batman(batman_interface)
 
 
 def run_batman(batman_interface):
