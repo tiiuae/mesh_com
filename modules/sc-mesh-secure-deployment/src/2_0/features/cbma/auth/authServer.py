@@ -14,7 +14,7 @@ logger = logger_instance.get_logger()
 
 
 class AuthServer:
-    CLIENT_TIMEOUT = 60
+    HANDLE_CLIENT_TIMEOUT = 60
 
     def __init__(self, interface, ip_address, port, cert_path, ca_path, mua):
         threading.Thread.__init__(self)
@@ -54,7 +54,7 @@ class AuthServer:
 
     def authenticate_client(self, client_connection, client_address, client_mac):
         secure_client_socket = self.context.wrap_socket(client_connection, server_side=True)
-        secure_client_socket.settimeout(self.CLIENT_TIMEOUT)
+        secure_client_socket.settimeout(self.HANDLE_CLIENT_TIMEOUT)
 
         try:
             client_cert = secure_client_socket.getpeercert(binary_form=True)
