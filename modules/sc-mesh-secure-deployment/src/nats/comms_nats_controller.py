@@ -384,32 +384,33 @@ class MdmAgent:
                 and self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "OK"
                 and self.mdm_service_available
             ):
-                # todo; for loop for all certificate types ConfigType.BIRTH_CERTIFICATE,
-                #  ConfigType.UPPER_CERTIFICATE, ConfigType.LOWER_CERTIFICATE ?? need to sync with mdm-server
-
-                resp = self.download_certificate_bundle(
-                    ConfigType.BIRTH_CERTIFICATE
-                )  # todo certificate type handling
-                self.__comms_controller.logger.debug(
-                    "Certificate download response: %s", resp
-                )
-                if resp.status_code == 200:
-                    self.__status[
-                        StatusType.DOWNLOAD_CERTIFICATES.value
-                    ] = self.__action_certificates(
-                        resp, ConfigType.BIRTH_CERTIFICATE
-                    )  # todo certificate type handling
-
-                    if self.__status[StatusType.DOWNLOAD_CERTIFICATES.value] == "OK":
-                        with open("/opt/certs_downloaded", "w", encoding="utf-8") as f:
-                            f.write("certs downloaded")
-                    else:
-                        self.__comms_controller.logger.debug(
-                            "Certificates action failed"
+                for certificate_type in [
+                    #ConfigType.BIRTH_CERTIFICATE,
+                    ConfigType.UPPER_CERTIFICATE,
+                    #ConfigType.LOWER_CERTIFICATE,
+                ]:
+                    resp = self.download_certificate_bundle(
+                        certificate_type.value
+                    )
+                    self.__comms_controller.logger.debug(
+                        "Certificate download response: %s", resp
+                    )
+                    if resp.status_code == 200:
+                        self.__status[
+                            StatusType.DOWNLOAD_CERTIFICATES.value
+                        ] = self.__action_certificates(
+                            resp, certificate_type.value
                         )
 
-                else:
-                    self.__comms_controller.logger.debug("Certificate download failed")
+                        if self.__status[StatusType.DOWNLOAD_CERTIFICATES.value] == "OK":
+                            with open("/opt/certs_downloaded", "w", encoding="utf-8") as f:
+                                f.write("certs downloaded")
+                        else:
+                            self.__comms_controller.logger.debug(
+                                "Certificates action failed"
+                            )
+                    else:
+                        self.__comms_controller.logger.debug("Certificate download failed: %s", certificate_type.value)
             elif self.mdm_service_available:
                 await self.__loop_run_executor(self.executor, ConfigType.FEATURES)
                 await self.__loop_run_executor(self.executor, ConfigType.MESH_CONFIG)
@@ -459,11 +460,11 @@ class MdmAgent:
         :return: -
         """
         try:
-            if certificate_type == ConfigType.BIRTH_CERTIFICATE:
+            if certificate_type == ConfigType.BIRTH_CERTIFICATE.value:
                 cert_path = Constants.DOWNLOADED_CBMA_BIRTHCERTS_PATH.value
-            elif certificate_type == ConfigType.UPPER_CERTIFICATE:
+            elif certificate_type == ConfigType.UPPER_CERTIFICATE.value:
                 cert_path = Constants.DOWNLOADED_CBMA_UPPER_PATH.value
-            elif certificate_type == ConfigType.LOWER_CERTIFICATE:
+            elif certificate_type == ConfigType.LOWER_CERTIFICATE.value:
                 cert_path = Constants.DOWNLOADED_CBMA_LOWER_PATH.value
             else:
                 self.__comms_controller.logger.error("Unknown certificate type")

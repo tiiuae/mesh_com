@@ -9,7 +9,7 @@ class ConfigType(str, Enum):
     """
 
     MESH_CONFIG: str = "mesh_conf"
-    BIRTH_CERTIFICATE: str = "birth_certificate"
+    BIRTH_CERTIFICATE: str = "birth_certificates"
     UPPER_CERTIFICATE: str = "upper_certificates"
     LOWER_CERTIFICATE: str = "lower_certificates"
     FEATURES: str = "features"
