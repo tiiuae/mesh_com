@@ -60,7 +60,7 @@ class MulticastHandler:
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
 
             # Set a timeout for the socket to ensure it is not blocking shutdown
-            timeout = 60
+            timeout = 2
             sock.settimeout(timeout)
 
             self.logger.info(f"Listening for messages on {self.multicast_group}:{self.port}...")
