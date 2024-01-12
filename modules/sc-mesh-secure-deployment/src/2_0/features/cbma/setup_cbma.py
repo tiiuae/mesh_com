@@ -115,7 +115,6 @@ def cbma(
     path_to_ca,
     macsec_encryption,
     wpa_supplicant_control_path=None,
-    shutdown_event=None,
 ):
     """
     Sets up macsec and batman for the specified interface and level
@@ -144,7 +143,7 @@ def cbma(
             path_to_ca,
             macsec_encryption,
             wpa_supplicant_control_path,
-            shutdown_event
+            _shutdown_event
         )
     )
 
@@ -190,8 +189,7 @@ def main(wlan: str, eth: str, cert_folder: str, cert_chain: str):
         cert_folder,
         cert_chain,
         "off", # macsec_encryption (can be "on" if required)
-        f"/var/run/wpa_supplicant_id0/{wlan}",  # wpa_supplicant ctrl path
-        _shutdown_event
+        f"/var/run/wpa_supplicant_id0/{wlan}"  # wpa_supplicant ctrl path
     )
 
     # Similarly, for eth1
@@ -203,8 +201,7 @@ def main(wlan: str, eth: str, cert_folder: str, cert_chain: str):
         cert_folder,
         cert_chain,
         "off",
-        None,
-        _shutdown_event
+        None
     )
 
     # Repeat the same for other interfaces/ radios by changing the interface
@@ -229,8 +226,7 @@ def main(wlan: str, eth: str, cert_folder: str, cert_chain: str):
         cert_folder,
         cert_chain,
         "on",
-        None,
-        _shutdown_event
+        None
     )
 
     global cbma_processes

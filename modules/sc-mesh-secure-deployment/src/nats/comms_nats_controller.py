@@ -277,7 +277,6 @@ class MdmAgent:
         self.__cbm_certs_path = "/opt/crypto/ecdsa/birth/filebased"
         self.__cbma_ca_cert_path = "/opt/mspki/ecdsa/certificate_chain.crt"
         self.__cbma_processes: Dict[str, Process] = {}
-        self.__cbma_shutdown_event = threading.Event()
         self.running = False
 
         try:
@@ -849,9 +848,6 @@ class MdmAgent:
     def stop_cbma(self):
         try:
             self.__comms_controller.logger.debug("Stopping CBMA...")
-            # Set shutdown event to signal CBMA threads to stop
-            self.__cbma_shutdown_event.set()
-            # TODO - Maybe add at timeout period for cbma threads to stop
 
             for process in self.__cbma_processes.values():
                 try:
@@ -954,8 +950,7 @@ class MdmAgent:
                     self.__cbm_certs_path,
                     self.__cbma_ca_cert_path,
                     "off",
-                    f"/var/run/wpa_supplicant_id{index}/{interface_name}",
-                    self.__cbma_shutdown_event,
+                    f"/var/run/wpa_supplicant_id{index}/{interface_name}"
                 )
                 self.__cbma_processes[interface_name] = process
 
@@ -976,8 +971,7 @@ class MdmAgent:
                     self.__cbm_certs_path,
                     self.__cbma_ca_cert_path,
                     "off",
-                    None,
-                    self.__cbma_shutdown_event,
+                    None
                 )
                 self.__cbma_processes[interface_name] = process
 
@@ -989,8 +983,7 @@ class MdmAgent:
             self.__cbm_certs_path,
             self.__cbma_ca_cert_path,
             "off",
-            None,
-            self.__cbma_shutdown_event,
+            None
         )
         self.__cbma_processes["bat0"] = process
 
