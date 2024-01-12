@@ -70,7 +70,8 @@ class SecMessageHandler:
                         macsec_param_q.put(data)
 
             except socket.timeout:
-                self.logger.warning("receive_message timeout.")
+                # self.logger.warning("receive_message timeout.")
+                pass
             except Exception as e:
                 self.logger.error("Error receiving message.", exc_info=True)
                 break
