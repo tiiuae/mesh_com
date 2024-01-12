@@ -862,6 +862,16 @@ class MdmAgent:
                         f"Terminating process error: {e}"
                     )
 
+            for process in self.__cbma_processes.values():
+                try:
+                    if process.is_alive():
+                        process.join(timeout=1.0)
+                        process.kill()
+                except Exception as e:
+                    self.__comms_controller.logger.error(
+                        f"Killing process error: {e}"
+                    )
+
             self.__comms_controller.logger.debug(
                 "CBMA processes terminated, continue cleanup..."
             )
