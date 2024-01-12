@@ -599,7 +599,7 @@ class MdmAgent:
                 features_yaml = yaml.dump(features_dict, default_flow_style=False)
 
                 with open(
-                    Constants.YAML_FILE,
+                    Constants.YAML_FILE.value,
                     "w",
                     encoding="utf-8",
                 ) as file_handle:
@@ -972,7 +972,7 @@ class MdmAgent:
         Check if CBMA feature is enabled
         :return: True if enabled, False otherwise
         """
-        with open(Constants.YAML_FILE, "r", encoding="utf-8") as stream:
+        with open(Constants.YAML_FILE.value, "r", encoding="utf-8") as stream:
             try:
                 features = yaml.safe_load(stream)
                 return bool(features["CBMA"])
@@ -1024,7 +1024,7 @@ class MdmAgent:
                     args=(
                         "lower",
                         interface_name,
-                        Constants.CBMA_PORT_LOWER,
+                        Constants.CBMA_PORT_LOWER.value,
                         "bat0",
                         self.__cbm_certs_path,
                         self.__cbma_ca_cert_path,
@@ -1050,7 +1050,7 @@ class MdmAgent:
                     args=(
                         "lower",
                         interface_name,
-                        Constants.CBMA_PORT_LOWER,
+                        Constants.CBMA_PORT_LOWER.value,
                         "bat0",
                         self.__cbm_certs_path,
                         self.__cbma_ca_cert_path,
@@ -1067,7 +1067,7 @@ class MdmAgent:
             args=(
                 "upper",
                 "bat0",
-                Constants.CBMA_PORT_UPPER,
+                Constants.CBMA_PORT_UPPER.value,
                 "bat1",
                 self.__cbm_certs_path,
                 self.__cbma_ca_cert_path,

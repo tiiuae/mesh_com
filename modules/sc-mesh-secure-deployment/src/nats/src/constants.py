@@ -28,7 +28,7 @@ class StatusType(str, Enum):
     UPLOAD_CERTIFICATES: str = "upload_certificates"
 
 # pylint: disable=too-few-public-methods, too-many-instance-attributes, disable=invalid-name
-class Constants(str, Enum):
+class Constants(Enum):
     """
     Constants class
     """
