@@ -237,7 +237,6 @@ class MdmAgent:
         self.__cbma_set_up = False  # Indicates whether CBMA has been configured
         try:
             with open("/opt/certs_uploaded", "r", encoding="utf-8") as f:
-                f.write("certs uploaded")
                 self.__certs_uploaded = True
                 self.__comms_controller.logger.debug("No need to upload certificates")
         except FileNotFoundError:
@@ -246,7 +245,6 @@ class MdmAgent:
 
         try:
             with open("/opt/certs_downloaded", "r", encoding="utf-8") as f:
-                f.write("certs downloaded")
                 self.__certs_downloaded = True
                 self.__comms_controller.logger.debug("No need to download certificates")
         except FileNotFoundError:
