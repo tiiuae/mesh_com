@@ -1,7 +1,7 @@
 """
 Comms NATS controller
 """
-from os import sys, path
+from os import sys, path, umask
 
 if __name__ == "__main__" and __package__ is None:
     PARENT_DIR = path.dirname(path.dirname(path.abspath(__file__)))
@@ -23,6 +23,7 @@ import os
 import glob
 import base64
 import tarfile
+import shutil
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -243,20 +244,24 @@ class MdmAgent:
             self.__certs_uploaded = False
             self.__comms_controller.logger.debug("Certificate upload needed")
 
-        try:
-            with open("/opt/certs_downloaded", "r", encoding="utf-8") as f:
-                self.__certs_downloaded = True
-                self.__comms_controller.logger.debug("No need to download certificates")
-        except FileNotFoundError:
-            self.__certs_downloaded = False
-            self.__comms_controller.logger.debug("Certificate download needed")
-
         self.__cbm_certs_path = "/opt/crypto/ecdsa/birth/filebased"
-        self.__cbm_certs_downloaded = "/opt"
+        self.__cbma_certs_downloaded = "/opt/mdm/certs"
         self.__cbma_ca_cert_path = "/opt/mspki/ecdsa/certificate_chain.crt"
         self.__cbma_threads: Dict[str, str] = {}
         self.__cbma_shutdown_event = threading.Event()
         self.running = False
+
+        try:
+            if not os.listdir(self.__cbma_certs_downloaded):
+                self.__certs_downloaded = False
+                self.__comms_controller.logger.debug("Certificate download needed")
+            else:
+                self.__certs_downloaded = True
+                self.__comms_controller.logger.debug("No need to download certificates")
+        except FileNotFoundError:
+            os.makedirs(self.__cbma_certs_downloaded, exist_ok=True)
+            self.__certs_downloaded = False
+            self.__comms_controller.logger.debug("Certificate download needed")
 
         self.__status: dict = {
             StatusType.DOWNLOAD_MESH_CONFIG.value: "FAIL",
@@ -383,32 +388,30 @@ class MdmAgent:
                 and self.mdm_service_available
             ):
                 for certificate_type in [
-                    #ConfigType.BIRTH_CERTIFICATE,
+                    # ConfigType.BIRTH_CERTIFICATE,
                     ConfigType.UPPER_CERTIFICATE,
-                    #ConfigType.LOWER_CERTIFICATE,
+                    # ConfigType.LOWER_CERTIFICATE,
                 ]:
-                    resp = self.download_certificate_bundle(
-                        certificate_type.value
-                    )
+                    resp = self.download_certificate_bundle(certificate_type.value)
                     self.__comms_controller.logger.debug(
                         "Certificate download response: %s", resp
                     )
                     if resp.status_code == 200:
                         self.__status[
                             StatusType.DOWNLOAD_CERTIFICATES.value
-                        ] = self.__action_certificates(
-                            resp, certificate_type.value
-                        )
+                        ] = self.__action_certificates(resp, certificate_type.value)
 
-                        if self.__status[StatusType.DOWNLOAD_CERTIFICATES.value] == "OK":
-                            with open("/opt/certs_downloaded", "w", encoding="utf-8") as f:
-                                f.write("certs downloaded")
-                        else:
+                        if (
+                            self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
+                            == "FAIL"
+                        ):
                             self.__comms_controller.logger.debug(
                                 "Certificates action failed"
                             )
                     else:
-                        self.__comms_controller.logger.debug("Certificate download failed: %s", certificate_type.value)
+                        self.__comms_controller.logger.debug(
+                            "Certificate download failed: %s", certificate_type.value
+                        )
             elif self.mdm_service_available:
                 await self.__loop_run_executor(self.executor, ConfigType.FEATURES)
                 await self.__loop_run_executor(self.executor, ConfigType.MESH_CONFIG)
@@ -479,31 +482,68 @@ class MdmAgent:
             certificates_dict = json.loads(response.text)["payload"]["certificates"]
 
             for certificate_name, certificate in certificates_dict.items():
+                certificate_name = os.path.basename(certificate_name)
                 if str(certificate_name).endswith(".tar.bz2"):
                     with open(
-                        f"{self.__cbm_certs_downloaded}/{certificate_name}", "wb"
+                        f"{self.__cbma_certs_downloaded}/{certificate_name}", "wb"
                     ) as cert_file:
                         cert_file.write(base64.b64decode(certificate))
                         self.__comms_controller.logger.debug(
                             "Certificate %s saved", certificate_name
                         )
-                        with tarfile.open(
-                            f"{self.__cbm_certs_downloaded}/{certificate_name}", "r:bz2"
-                        ) as tar:
-                            tar.extractall(path=cert_path)
-                            self.__comms_controller.logger.debug(
-                                "Certificate %s extracted to %s",
-                                certificate_name,
-                                cert_path,
+                        try:
+                            old_umask = umask(0o377)
+                            with tarfile.open(
+                                f"{self.__cbma_certs_downloaded}/{certificate_name}",
+                                "r:bz2",
+                            ) as tar:
+                                for member in tar.getmembers():
+                                    # Construct the full path where the file would be extracted
+                                    file_path = os.path.join(cert_path, member.name)
+
+                                    # Check if the file already exists, overwrite check
+                                    if os.path.exists(file_path):
+                                        raise FileExistsError(
+                                            f"File {file_path} already exists"
+                                        )
+
+                                self.__comms_controller.logger.debug(
+                                    "Extracting files (not overwriting)"
+                                )
+                                # todo: add filter="data" once python is updated
+                                tar.extractall(path=cert_path)
+                                self.__comms_controller.logger.debug(
+                                    "Certificate %s extracted to %s",
+                                    certificate_name,
+                                    cert_path,
+                                )
+                            umask(old_umask)
+                        except (
+                            tarfile.TarError,
+                            FileNotFoundError,
+                            FileExistsError,
+                        ) as exc:
+                            shutil.rmtree(cert_path)
+                            shutil.rmtree(self.__cbma_certs_downloaded)
+                            self.__comms_controller.logger.error(
+                                "Failed to extract certificate: %s", exc
                             )
+                            return "FAIL"
+                        finally:
+                            umask(old_umask)
+                            os.makedirs(cert_path, exist_ok=True)
+                            os.makedirs(self.__cbma_certs_downloaded, exist_ok=True)
+
                 elif str(certificate_name).endswith("-sig"):
+                    old_umask = umask(0o377)
                     with open(
-                        f"{self.__cbm_certs_downloaded}/{certificate_name}", "wb"
+                        f"{self.__cbma_certs_downloaded}/{certificate_name}", "wb"
                     ) as sig_file:
                         sig_file.write(base64.b64decode(certificate))
                         self.__comms_controller.logger.debug(
                             "Sig %s saved", certificate_name
                         )
+                    umask(old_umask)
             self.__comms_controller.logger.debug("Downloaded bundle saved")
 
         except Exception as e:
@@ -627,8 +667,6 @@ class MdmAgent:
         self.__comms_controller.logger.debug(
             f"HTTP Request Response: {response.text.strip()} {str(response.status_code).strip()}"
         )
-
-        # data = json.loads(response.text)
 
         if (
             self.__mesh_conf_request_processed
