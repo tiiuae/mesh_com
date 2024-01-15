@@ -18,6 +18,8 @@ logger_instance = CustomLogger("authClient")
 
 
 class AuthClient:
+    CLIENT_TIMEOUT = 60
+
     def __init__(self, interface, server_mac, server_port, cert_path, ca_path, mua):
         self.sslServerIP = mac_to_ipv6(server_mac)
         self.sslServerPort = server_port
@@ -32,13 +34,15 @@ class AuthClient:
 
     def establish_connection(self):
         # Create an SSL context
-        context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH,
+                                             cafile=glob.glob(self.ca)[0])
+        context.minimum_version = ssl.TLSVersion.TLSv1_3
+        context.check_hostname = False
         context.verify_mode = ssl.CERT_REQUIRED
 
         # Uncomment to enable Certificate Revocation List (CRL) check
         # context.verify_flags = ssl.VERIFY_CRL_CHECK_LEAF
 
-        context.load_verify_locations(glob.glob(self.ca)[0])
         context.load_cert_chain(
             certfile=glob.glob(f"{self.CERT_PATH}/MAC/{self.mymac}.crt")[0],
             keyfile=glob.glob(f"{self.CERT_PATH}/private.key")[0],
@@ -52,6 +56,7 @@ class AuthClient:
 
         # Make the client socket suitable for secure communication
         self.secure_client_socket = context.wrap_socket(clientSocket)
+        self.secure_client_socket.settimeout(self.CLIENT_TIMEOUT)
         try:
             result = self.connection(self.secure_client_socket)
             if result['authenticated']:
@@ -90,7 +95,7 @@ class AuthClient:
                 else:
                     secureClientSocket.connect((self.sslServerIP, self.sslServerPort))
                 break  # break out of loop if connection is successful
-            except ConnectionRefusedError:
+            except:
                 retries += 1
                 if retries < MAX_RETRIES:
                     wait_time = random.uniform(MIN_WAIT_TIME, MAX_WAIT_TIME)
@@ -106,22 +111,9 @@ class AuthClient:
             self.logger.error("Unable to get the server certificate", exc_info=True)
             #raise CertificateNoPresentError("Unable to get the server certificate")
             return
-
+        store_peer_certificate(peer_cert=server_cert, peer_mac=self.server_mac, logger=self.logger)
         result['authenticated'] = verify_cert(server_cert, self.ca, self.sslServerIP, self.interface, self.logger)
 
         # # Safe to proceed with the communication, even if the certificate is not authenticated
         # msgReceived = secureClientSocket.recv(1024)
         # logger.info(f"Secure communication received from server: {msgReceived.decode()}")
-
-
-if __name__ == "__main__":
-    # IP address and the port number of the server
-    sslServerIP = "127.0.0.1"
-    sslServerPort = 15001
-    CERT_PATH = '../../../certificates'  # Change this to the actual path of your certificates
-
-    auth_client = AuthClient(sslServerIP, sslServerPort, CERT_PATH)
-    auth_client.establish_connection()
-
-
-

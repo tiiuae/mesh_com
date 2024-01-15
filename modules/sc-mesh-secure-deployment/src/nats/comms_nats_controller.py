@@ -9,6 +9,7 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(MS20_FEATURES_PATH)
     # Make it possible to run this module also in other folder (e.g. /opt/nats):
     sys.path.append("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features")
+    sys.path.append("/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/cbma")
 
 # pylint: disable=wrong-import-position
 import argparse
@@ -26,6 +27,7 @@ import tarfile
 import shutil
 
 from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Process
 from datetime import datetime
 from typing import Optional
 from typing import List, Dict
@@ -36,6 +38,8 @@ import yaml
 from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
 from cbma import setup_cbma  # type: ignore[import-not-found]
 from nats.aio.client import Client as nats
+
+from cbma.tools.utils import batman  # type: ignore[import-not-found]
 
 from src import batadvvis
 from src import batstat
@@ -247,8 +251,7 @@ class MdmAgent:
         self.__cbm_certs_path = "/opt/crypto/ecdsa/birth/filebased"
         self.__cbma_certs_downloaded = "/opt/mdm/certs"
         self.__cbma_ca_cert_path = "/opt/mspki/ecdsa/certificate_chain.crt"
-        self.__cbma_threads: Dict[str, str] = {}
-        self.__cbma_shutdown_event = threading.Event()
+        self.__cbma_processes: Dict[str, Process] = {}
         self.running = False
 
         try:
@@ -421,9 +424,8 @@ class MdmAgent:
                     )
             if self.__is_cbma_feature_enabled() and not self.__cbma_set_up:
                 self.__setup_cbma()
-            if self.__cbma_threads:
-                self.__cbma_thread_alive_check()
-
+            if self.__cbma_processes:
+                self.__cbma_process_alive_check()
             await asyncio.sleep(
                 float(min(self.__interval, self.__debug_config_interval))
             )
@@ -901,6 +903,24 @@ class MdmAgent:
             ip.close()
 
     @staticmethod
+    def __delete_ebtables_rules():
+        command_ebtables = ["ebtables", "-t", "nat", "-L", "OUTPUT"]
+        command_sed = ["sed", "-n", "/OUTPUT/,/^$/{/^--/p}"]
+        command_xargs = ["xargs", "ebtables", "-t", "nat", "-D", "OUTPUT"]
+
+        proc_ebtables = subprocess.Popen(command_ebtables, stdout=subprocess.PIPE)
+        proc_sed = subprocess.Popen(
+            command_sed, stdin=proc_ebtables.stdout, stdout=subprocess.PIPE
+        )
+        proc_xargs = subprocess.Popen(command_xargs, stdin=proc_sed.stdout)
+        proc_xargs.wait()
+
+        subprocess.run(["ebtables", "--delete", "FORWARD",
+                        "--logical-in", "br-upper", "--jump", "ACCEPT"])
+        subprocess.run(["ebtables", "--delete", "FORWARD",
+                        "--logical-out", "br-upper", "--jump", "ACCEPT"])
+
+    @staticmethod
     def __delete_macsec_links():
         # Define the command as a list of arguments
         command_macsec = ["ip", "macsec", "show"]
@@ -967,28 +987,42 @@ class MdmAgent:
         finally:
             ip.close()
 
+    def __cleanup_cbma(self):
+        self.__shutdown_interface("bat0")
+        self.__shutdown_interface("bat1")
+        self.__delete_ebtables_rules()
+        self.__delete_macsec_links()
+        self.__destroy_batman_interface("bat0")
+        self.__destroy_batman_interface("bat1")
+        self.__shutdown_and_delete_bridge("br-upper")
+
     def stop_cbma(self):
         try:
             self.__comms_controller.logger.debug("Stopping CBMA...")
-            # Set shutdown event to signal CBMA threads to stop
-            self.__cbma_shutdown_event.set()
-            # Waith for threads to stop
-            for thread_name, thread in self.__cbma_threads.items():
+
+            for process in self.__cbma_processes.values():
                 try:
-                    if thread.is_alive():
-                        thread.join()
+                    if process.is_alive():
+                        process.terminate()
                 except Exception as e:
-                    self.__comms_controller.logger.error(f"Thread join error: {e}")
+                    self.__comms_controller.logger.error(
+                        f"Terminating process error: {e}"
+                    )
+
+            for process in self.__cbma_processes.values():
+                try:
+                    if process.is_alive():
+                        process.join(timeout=1.0)
+                        process.kill()
+                except Exception as e:
+                    self.__comms_controller.logger.error(
+                        f"Killing process error: {e}"
+                    )
 
             self.__comms_controller.logger.debug(
-                "CBMA threads stopped, continue cleanup..."
+                "CBMA processes terminated, continue cleanup..."
             )
-            self.__delete_macsec_links()
-            self.__shutdown_interface("bat0")
-            self.__shutdown_interface("bat1")
-            self.__destroy_batman_interface("bat0")
-            self.__destroy_batman_interface("bat1")
-            self.__shutdown_and_delete_bridge("br-upper")
+            self.__cleanup_cbma()
             self.__comms_controller.logger.debug("CBMA cleanup finished")
 
         except Exception as e:
@@ -1033,8 +1067,9 @@ class MdmAgent:
         print("mesh_if:", self.__comms_controller.settings.mesh_vif)
         print("radio index:", self.__comms_controller.settings.radio_index)
 
-        # Cleanup and delete bat0
-        self.__cleanup_default_batman()
+        # Cleanup CBMA before starting it
+        self.__cleanup_cbma()
+
         # Cleanup default bridge
         self.__remove_all_interfaces_from_bridge("br-lan")
 
@@ -1042,6 +1077,11 @@ class MdmAgent:
         # This is temporary to allow testing of MDM server via
         # ethernet over usb.
         self.__add_interface_to_bridge("br-lan", "usb0")
+
+        # TODO - Shall this be done differently?
+        # Create batman interfaces
+        batman("bat0")
+        batman("bat1")
 
         wlan_interfaces = ["wlp1s0", "wlp2s0", "wlp3s0", "halow1"]
         for interface in self.__interfaces:
@@ -1055,22 +1095,17 @@ class MdmAgent:
                     )
                 except ValueError:
                     continue
-                thread = threading.Thread(
-                    target=setup_cbma.cbma,
-                    args=(
-                        "lower",
-                        interface_name,
-                        Constants.CBMA_PORT_LOWER.value,
-                        "bat0",
-                        self.__cbm_certs_path,
-                        self.__cbma_ca_cert_path,
-                        "off",
-                        f"/var/run/wpa_supplicant_id{index}/{interface_name}",
-                        self.__cbma_shutdown_event,
-                    ),
+                process = setup_cbma.cbma(
+                    "lower",
+                    interface_name,
+                    Constants.CBMA_PORT_LOWER.value,
+                    "bat0",
+                    self.__cbm_certs_path,
+                    self.__cbma_ca_cert_path,
+                    "off",
+                    f"/var/run/wpa_supplicant_id{index}/{interface_name}"
                 )
-                self.__cbma_threads[interface_name] = thread
-                thread.start()
+                self.__cbma_processes[interface_name] = process
 
         for interface in self.__interfaces:
             interface_name = interface.interface_name.lower()
@@ -1081,54 +1116,44 @@ class MdmAgent:
             ):
                 if not self.__has_certificate(interface.mac_address):
                     continue
-                thread = threading.Thread(
-                    target=setup_cbma.cbma,
-                    args=(
-                        "lower",
-                        interface_name,
-                        Constants.CBMA_PORT_LOWER.value,
-                        "bat0",
-                        self.__cbm_certs_path,
-                        self.__cbma_ca_cert_path,
-                        "off",
-                        None,
-                        self.__cbma_shutdown_event,
-                    ),
+                process = setup_cbma.cbma(
+                    "lower",
+                    interface_name,
+                    Constants.CBMA_PORT_LOWER.value,
+                    "bat0",
+                    self.__cbm_certs_path,
+                    self.__cbma_ca_cert_path,
+                    "off",
+                    None
                 )
-                self.__cbma_threads[interface_name] = thread
-                thread.start()
+                self.__cbma_processes[interface_name] = process
 
-        thread = threading.Thread(
-            target=setup_cbma.cbma,
-            args=(
-                "upper",
-                "bat0",
-                Constants.CBMA_PORT_UPPER.value,
-                "bat1",
-                self.__cbm_certs_path,
-                self.__cbma_ca_cert_path,
-                "off",
-                None,
-                self.__cbma_shutdown_event,
-            ),
+        process = setup_cbma.cbma(
+            "upper",
+            "bat0",
+            Constants.CBMA_PORT_UPPER.value,
+            "bat1",
+            self.__cbm_certs_path,
+            self.__cbma_ca_cert_path,
+            "off",
+            None
         )
-        self.__cbma_threads[interface_name] = thread
-        thread.start()
+        self.__cbma_processes["bat0"] = process
 
         # TODO: Perhaps we need to maintain
         # list of interface specific statuses?
         self.__cbma_set_up = True
 
-    def __cbma_thread_alive_check(self):
+    def __cbma_process_alive_check(self):
         # Check if any of launched cbma threads have terminated
-        terminated_threads = []
-        for thread_name, thread in self.__cbma_threads.items():
-            if not thread.is_alive():
-                terminated_threads.append(thread_name)
+        terminated_processes = []
+        for process_name, process in self.__cbma_processes.items():
+            if not process.is_alive():
+                terminated_processes.append(process_name)
 
         # Remove terminated threads from the dictionary
-        for thread_name in terminated_threads:
-            del self.__cbma_threads[thread_name]
+        for process_name in terminated_processes:
+            del self.__cbma_processes[process_name]
 
     async def __loop_run_executor(self, executor, config: ConfigType) -> None:
         """

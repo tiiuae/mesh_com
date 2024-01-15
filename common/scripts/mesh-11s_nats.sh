@@ -330,7 +330,11 @@ EOF
       wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
       ;;
   "mesh")
-
+      if [ "$priority" ==  "high_throughput" ]; then
+    	ht=0
+      else
+	ht=1
+      fi
       cat <<EOF >/var/run/wpa_supplicant-11s_"$INDEX".conf
 ctrl_interface=DIR=/var/run/wpa_supplicant_$INDEX
 # use 'ap_scan=2' on all devices connected to the network
@@ -351,8 +355,8 @@ network={
     mesh_fwding=0
     # 11b rates dropped (for better performance)
     mesh_basic_rates=60 90 120 180 240 360 480 540
-    disable_vht=1
-    disable_ht40=1
+    disable_vht=$ht
+    disable_ht40=$ht
 }
 EOF
 
@@ -369,14 +373,17 @@ EOF
       echo "$wifidev down.."
       iw dev "$wifidev" del
       iw phy "$phyname" interface add "$wifidev" type mp
-  
-      echo "Longer range tweak.."
+        
       if [ "$priority" == "long_range" ]; then
+        echo "Long range config"
+        mount -t debugfs none /sys/kernel/debug
         iw phy "$phyname" set distance 8000
-      elif [ "$priority" == "low_latency" ]; then
+        echo 10 > /sys/kernel/debug/ieee80211/"$phyname"/ath9k/chanbw
+        echo 7 > /sys/kernel/debug/ieee80211/"$phyname"/ath9k/tii_mask
+        echo 4289724416 > /sys/kernel/debug/ieee80211/"$phyname"/rc/tii_rc
+      elif [ "$priority" == "high_throughput" ]; then
+        echo "High throughput config"
         iw phy "$phyname" set distance 0
-      else
-        iw phy "$phyname" set distance 1000
       fi
 
       echo "$wifidev create 11s.."

@@ -4,6 +4,9 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from .utils import get_mac_from_ipv6
 import re
+import ssl
+import os
+
 
 # Custom exceptions for certificate verification
 class CertificateExpiredError(Exception):
@@ -76,43 +79,38 @@ def validation(cert, ca_cert, IPaddress, interface, logging):
     san_extension = _cert.extensions.get_extension_for_class(
         x509.SubjectAlternativeName
     )
+    oid = x509.ObjectIdentifier("1.3.6.1.1.1.1.22")
     othername_values = [
         general_name.value
         for general_name in san_extension.value
-        if isinstance(general_name, x509.OtherName)
+        if isinstance(general_name, x509.OtherName) and general_name.type_id == oid
     ]
     mac_from_san = None
     for value in othername_values:
-        print("value:", value)
         try:
-            if isinstance(value, bytes) and san_extension.value[0].type_id == x509.ObjectIdentifier('1.3.6.1.1.1.1.22'):
-                mac_from_san = value[2:].decode('ascii')  # Skip the first 2 bytes
+            if isinstance(value, bytes):
+                if mac_from_san:
+                    logging.error(f"Multiple otherName values found in the SAN, continuing with the first one")
+                else:
+                    mac_from_san = value[2:].decode('ascii')  # Skip the first 2 bytes
         except Exception as e:
-            print(f"Error processing OtherName value: {e}")
-
-    print("mac_from_san:", mac_from_san)
-    print("mac_from_ipv6", get_mac_from_ipv6(IPaddress, interface))
+            logging.error(f"Error processing OtherName value: {e}")
 
     if mac_from_san != get_mac_from_ipv6(IPaddress, interface):
         logging.error(f"MAC in SAN otherName doesn't match MAC Address for {IPaddress}", exc_info=True)
         raise CertificateDifferentCN("MAC from SAN otherName does not match the interface MAC Address.")
 
     if _verify_certificate_chain(cert, ca_cert, logging):
-        # Extract the public key from the certificate
-        pub_key_der = crypto.dump_publickey(crypto.FILETYPE_ASN1, _x509.get_pubkey())
-
         # If the client certificate has passed all verifications, you can print or log a success message
         logging.info(f"Certificate verification successful for {IPaddress}.")
         return True
 
-    else:
-        raise CertificateVerificationError("Verification of certificate chain failed.")
+    raise CertificateVerificationError("Verification of certificate chain failed.")
 
 
 def _verify_certificate_chain(cert, trusted_certs, logging):
     try:
         x509 = crypto.load_certificate(crypto.FILETYPE_ASN1, cert)
-
         store = crypto.X509Store()
 
         # Check if trusted_certs is a list, if not make it a list
@@ -122,11 +120,11 @@ def _verify_certificate_chain(cert, trusted_certs, logging):
         _PEM_RE = re.compile(
             b'-----BEGIN CERTIFICATE-----\r?.+?\r?-----END CERTIFICATE-----\r?\n?', re.DOTALL
         )
+
         for _cert in trusted_certs:
             with open(_cert, 'rb') as f:
                 for c in _PEM_RE.finditer(f.read()):
-                    tc = c.group()
-                    cert_data = crypto.load_certificate(crypto.FILETYPE_PEM, tc)
+                    cert_data = crypto.load_certificate(crypto.FILETYPE_PEM, c.group())
                     store.add_cert(cert_data)
 
         store_ctx = crypto.X509StoreContext(store, x509)
@@ -136,3 +134,28 @@ def _verify_certificate_chain(cert, trusted_certs, logging):
     except Exception as e:
         logging.error(f"Certificate chain verification failed: {e}", exc_info=True)
         return False
+
+def store_peer_certificate(peer_cert, peer_mac, logger):
+    """
+    Store peer certificate to a file
+    """
+    try:
+        # Convert DER to PEM
+        peer_cert_pem = ssl.DER_cert_to_PEM_cert(peer_cert)
+
+        # Write the PEM certificate to a file
+        directory = '/tmp/peer_certificates/'
+        filename = f"{peer_mac}.pem"
+        file_path = os.path.join(directory, filename)
+
+        # Create the directory if it doesn't exist
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        # Write the PEM certificate to the file
+        with open(file_path, 'w') as cert_file:
+            cert_file.write(peer_cert_pem)
+
+        logger.info(f"Stored peer certificate for {peer_mac}")
+    except Exception as e:
+        logger.info(f"Error storing peer certificate for {peer_mac}: {e}")

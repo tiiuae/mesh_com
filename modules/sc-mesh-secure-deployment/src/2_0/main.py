@@ -1,75 +1,53 @@
 import yaml
-import threading
 import time
-
+import os
 # Import classes for features
-from features.PHY.PHY_CRA_scripts.SP_CRA_mainDE1 import PHYCRA
-from features.PHY.RSS_auth.F_RSS_Auth import RSS_Auth
-# from features.IDS.IDS import IDS
-# from features.jamming.jamming import Jamming
+# Needs to be replaced by actual features
+from features.sample_feature_classes.ids import IDS
+from features.sample_feature_classes.SP_CRA import PHYCRA
+from features.sample_feature_classes.RSS_auth import RSS_Auth
+from features.decision_engine.decision_engine import DecisionEngine
 
-def launch_PHY():
+# ************************************************************ Note **************************************************************************
+# The MBA module utilizes the certificates exchanged during CBMA to sign and verify messages
+# So CBMA must be setup before running this code. Refer to /opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/cbma/setup_cbma.py
+# ********************************************************************************************************************************************
+
+# Defining constants (these can be configured as needed)
+MBA_MULTICAST_ADDRESS = 'ff02::1'
+MBA_PORT = 12345
+MBA_INTERFACE = "bat1" # Should be br-lan if it is there
+QUARANTINE_PERIOD = 10 # Quarantine period in seconds
+PATH_TO_MY_CERT_DIR = "/opt/crypto/ecdsa/birth/filebased" # Path to the folder where private key is stored (Needs to be updated when we use HSM)
+PATH_TO_PEER_CERT_DIR = "/tmp/peer_certificates" # Path to the folder where peer certificates are stored by cbma/auth/authClient.py and cbma/auth/authServer.py
+
+def launch_PHY(decision_engine):
     # Place holder to launch PHY
-    phycra = PHYCRA()
+    phycra = PHYCRA(decision_engine)
     phycra.start()
     return phycra
 
-def launch_RSS():
+def launch_RSS(decision_engine):
     # Place holder to launch RSS
-    rss_authen = RSS_Auth()
+    rss_authen = RSS_Auth(decision_engine)
     rss_authen.start()
     return rss_authen
 
-def launch_IDS():
+def launch_IDS(decision_engine):
     # Place holder to launch IDS
-    # Currently, this function does nothing
-    pass
+    ids = IDS(decision_engine)
+    ids.start()
+    return ids
 
 def launch_jamming():
     # Place holder to launch jamming
     # Currently, this function does nothing
     pass
 
-def stop_PHY(phycra):
-    phycra.stop()
-
-def stop_RSS(rss_authn):
-    rss_authn.stop()
-
-def stop_jamming(jamming):
-    jamming.stop()
-
-def stop_IDS(ids):
-    ids.stop()
-
-def launch_decision_engine(sensors):
-    # Place holder to launch decision engine
-    collected_data = {}
-    # decision_engine = DecisionEngine(sensors)
-
-    # Periodically gets results from security sensors
-    while True:
-        print("Executing decision engine with collected data: ")
-        for sensor_name in sensors:
-            sensor_data = sensors[sensor_name].get_result()
-            if sensor_data:  # Check if there is new data
-                collected_data[sensor_name] = sensor_data
-            else:
-                collected_data[sensor_name] = {'Pass': [], 'Fail': []}  # Default to empty lists if no new data
-
-        for sensor_name in collected_data:
-            print(sensor_name)
-            print(collected_data)
-
-
-            # Process data with the decision engine
-            #decisions = decision_engine.make_decision(collected_data)
-
-            # Place holder to call quarantine/ MBA if necessary
-
-        time.sleep(40) # Period can be adjusted
-
-
+def stop(sensors, decision_engine):
+    for sensor in sensors.values():
+        sensor.stop()
+    decision_engine.stop()
 
 def readfile():
     with open("features.yaml", "r") as stream:
@@ -79,27 +57,28 @@ def readfile():
             print(exc)
             return None
 
-def initialize(feature):
+def initialize(feature, decision_engine):
     if feature == 'PHY':
-        phycra = launch_PHY()
+        phycra = launch_PHY(decision_engine)
         sensors[feature] = phycra
     if feature == 'RSS':
-        rss_authen = launch_RSS()
+        rss_authen = launch_RSS(decision_engine)
         sensors[feature] = rss_authen
     if feature == 'IDS':
-        ids = launch_IDS()
+        ids = launch_IDS(decision_engine)
         sensors[feature] = ids
     if feature == 'jamming':
-        launch_jamming()
+        jamming = launch_jamming()
+        sensors[feature] = jamming
 
 if __name__ == "__main__":
+    decision_engine = DecisionEngine(mba_multicast_group=MBA_MULTICAST_ADDRESS, mba_port=MBA_PORT, mba_interface=MBA_INTERFACE, quarantine_period=QUARANTINE_PERIOD, my_cert_dir=PATH_TO_MY_CERT_DIR, peer_cert_dir=PATH_TO_PEER_CERT_DIR)
     features = readfile()
     sensors = {} # Stores sensor_name: sensor_object for each sensor/ feature that publishes results for decision engine
 
     # Start features that are true in features.yaml
     for feature in features:
         if features[feature]:
-            initialize(feature)
-
-    # Call decision engine
-    launch_decision_engine(sensors)
+            initialize(feature, decision_engine)
+    time.sleep(15)
+    stop(sensors, decision_engine)
