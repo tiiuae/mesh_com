@@ -1,7 +1,8 @@
 """
 Comms NATS controller
 """
-from os import sys, path
+from os import sys, path, umask
+
 if __name__ == "__main__" and __package__ is None:
     PARENT_DIR = path.dirname(path.dirname(path.abspath(__file__)))
     MS20_FEATURES_PATH = path.join(PARENT_DIR, "2_0/features")
@@ -22,7 +23,9 @@ import threading
 import os
 import glob
 import base64
-from enum import Enum
+import tarfile
+import shutil
+
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Process
 from datetime import datetime
@@ -45,7 +48,7 @@ from src import comms_if_monitor
 from src import comms_service_discovery
 from src import comms_settings
 from src import comms_status
-
+from src.constants import Constants, ConfigType, StatusType
 
 # FMO_SUPPORTED_COMMANDS = [
 #     "GET_IDENTITY",
@@ -157,27 +160,18 @@ class CommsController:  # pylint: disable=too-few-public-methods
         self.logger = self.main_logger.getChild("controller")
 
 
-class ConfigType(str, Enum):
-    """
-    Config type
-    """
-
-    BASE = "base"
-    MESH_CONFIG = "mesh_conf"
-    CERTIFICATES = "certificates"
-    FEATURES = "features"
-    DEBUG_CONFIG = "debug_conf"
-
-
 # pylint: disable=too-few-public-methods
 class Interface:
     """
     Class to store interface name, operationstatus and MAC address
     """
+
     def __init__(self, interface_name, operstat, mac_address):
         self.interface_name = interface_name
         self.operstat = operstat
         self.mac_address = mac_address
+
+
 # pylint: enable=too-few-public-methods
 
 
@@ -185,16 +179,6 @@ class MdmAgent:
     """
     MDM Agent
     """
-
-    GET_CONFIG: str = "public/config"
-    GET_DEVICE_CONFIG: str = "public/get_device_config"  # + config_type
-    PUT_DEVICE_CONFIG: str = "public/put_device_config"  # + config_type
-
-    OK_POLLING_TIME_SECONDS: int = 600
-    FAIL_POLLING_TIME_SECONDS: int = 1
-    YAML_FILE: str = (
-        "/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features.yaml"
-    )
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -208,33 +192,25 @@ class MdmAgent:
         """
         Constructor
         """
-        self.__status: dict = {
-            ConfigType.MESH_CONFIG.value: "FAIL",
-            ConfigType.FEATURES.value: "FAIL",
-            ConfigType.CERTIFICATES.value: "FAIL",
-        }
         self.__previous_config_mesh: Optional[str] = self.__read_config_from_file(
             ConfigType.MESH_CONFIG.value
-        )
-        self.__previous_config_mesh_base: Optional[str] = self.__read_config_from_file(
-            ConfigType.BASE.value
         )
         self.__previous_config_features: Optional[str] = self.__read_config_from_file(
             ConfigType.FEATURES.value
         )
         self.__previous_config_certificates: Optional[
             str
-        ] = self.__read_config_from_file(ConfigType.CERTIFICATES.value)
+        ] = self.__read_config_from_file(ConfigType.BIRTH_CERTIFICATE.value)
         self.__previous_debug_config: Optional[
             str
         ] = self.__read_debug_config_from_file()
         self.__mesh_conf_request_processed = False
         self.__comms_controller: CommsController = comms_controller
         self.__interval: int = (
-            self.FAIL_POLLING_TIME_SECONDS
+            Constants.FAIL_POLLING_TIME_SECONDS.value
         )  # possible to update from MDM server?
         self.__debug_config_interval: int = (
-            self.FAIL_POLLING_TIME_SECONDS
+            Constants.FAIL_POLLING_TIME_SECONDS.value
         )  # possible to update from MDM server?
 
         self.__url: str = "defaultmdm.local:5000"  # mDNS callback updates this one
@@ -263,9 +239,7 @@ class MdmAgent:
             target=self.interface_monitor.monitor_interfaces
         )
 
-        self.__cbma_set_up = (
-            False  # Indicates whether CBMA has been configured
-        )
+        self.__cbma_set_up = False  # Indicates whether CBMA has been configured
         try:
             with open("/opt/certs_uploaded", "r", encoding="utf-8") as f:
                 self.__certs_uploaded = True
@@ -275,9 +249,41 @@ class MdmAgent:
             self.__comms_controller.logger.debug("Certificate upload needed")
 
         self.__cbm_certs_path = "/opt/crypto/ecdsa/birth/filebased"
+        self.__cbma_certs_downloaded = "/opt/mdm/certs"
         self.__cbma_ca_cert_path = "/opt/mspki/ecdsa/certificate_chain.crt"
         self.__cbma_processes: Dict[str, Process] = {}
         self.running = False
+
+        try:
+            if not os.listdir(self.__cbma_certs_downloaded):
+                self.__certs_downloaded = False
+                self.__comms_controller.logger.debug("Certificate download needed")
+            else:
+                self.__certs_downloaded = True
+                self.__comms_controller.logger.debug("No need to download certificates")
+        except FileNotFoundError:
+            os.makedirs(self.__cbma_certs_downloaded, exist_ok=True)
+            self.__certs_downloaded = False
+            self.__comms_controller.logger.debug("Certificate download needed")
+
+        self.__status: dict = {
+            StatusType.DOWNLOAD_MESH_CONFIG.value: "FAIL",
+            StatusType.DOWNLOAD_FEATURES.value: "FAIL",
+            StatusType.DOWNLOAD_CERTIFICATES.value: "OK"
+            if self.__certs_downloaded
+            else "FAIL",
+            StatusType.UPLOAD_CERTIFICATES.value: "OK"
+            if self.__certs_uploaded
+            else "FAIL",
+        }
+
+        self.__config_status_mapping = {
+            ConfigType.MESH_CONFIG: StatusType.DOWNLOAD_MESH_CONFIG,
+            ConfigType.FEATURES: StatusType.DOWNLOAD_FEATURES,
+            ConfigType.BIRTH_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
+            ConfigType.LOWER_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
+            ConfigType.UPPER_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
+        }
 
         try:
             with open("/opt/identity", "r", encoding="utf-8") as f:  # todo
@@ -302,16 +308,14 @@ class MdmAgent:
                            interface_name, operstate, mac_address.
         :return: -
         """
-        self.__comms_controller.logger.debug(
-            "Interface monitor cb: %s", interfaces
-        )
+        self.__comms_controller.logger.debug("Interface monitor cb: %s", interfaces)
         self.__interfaces.clear()
 
         for interface_data in interfaces:
             interface = Interface(
                 interface_name=interface_data["interface_name"],
                 operstat=interface_data["operstate"],
-                mac_address=interface_data["mac_address"]
+                mac_address=interface_data["mac_address"],
             )
             self.__interfaces.append(interface)
 
@@ -332,9 +336,7 @@ class MdmAgent:
         :return: -
         """
         if not self.service_monitor.running:
-            self.__comms_controller.logger.debug(
-                "Start service monitor thread"
-            )
+            self.__comms_controller.logger.debug("Start service monitor thread")
 
             self.__service_monitor_thread.start()
 
@@ -363,23 +365,63 @@ class MdmAgent:
         self.running = True
 
         while self.running:
-            if not self.__certs_uploaded and self.mdm_service_available:
+            self.__comms_controller.logger.debug(
+                "status: %s, mdm_available: %s",
+                self.__status,
+                self.mdm_service_available,
+            )
+
+            if (
+                self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "FAIL"
+                and self.mdm_service_available
+            ):
                 resp = self.upload_certificate_bundle()
                 self.__comms_controller.logger.debug(
                     "Certificate upload response: %s", resp
                 )
                 if resp.status_code == 200:
-                    self.__certs_uploaded = True
+                    self.__status[StatusType.UPLOAD_CERTIFICATES.value] = "OK"
                     with open("/opt/certs_uploaded", "w", encoding="utf-8") as f:
                         f.write("certs uploaded")
                 else:
                     self.__comms_controller.logger.debug("Certificate upload failed")
+            elif (
+                self.__status[StatusType.DOWNLOAD_CERTIFICATES.value] == "FAIL"
+                and self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "OK"
+                and self.mdm_service_available
+            ):
+                for certificate_type in [
+                    # ConfigType.BIRTH_CERTIFICATE,
+                    ConfigType.UPPER_CERTIFICATE,
+                    # ConfigType.LOWER_CERTIFICATE,
+                ]:
+                    resp = self.download_certificate_bundle(certificate_type.value)
+                    self.__comms_controller.logger.debug(
+                        "Certificate download response: %s", resp
+                    )
+                    if resp.status_code == 200:
+                        self.__status[
+                            StatusType.DOWNLOAD_CERTIFICATES.value
+                        ] = self.__action_certificates(resp, certificate_type.value)
+
+                        if (
+                            self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
+                            == "FAIL"
+                        ):
+                            self.__comms_controller.logger.debug(
+                                "Certificates action failed"
+                            )
+                    else:
+                        self.__comms_controller.logger.debug(
+                            "Certificate download failed: %s", certificate_type.value
+                        )
             elif self.mdm_service_available:
                 await self.__loop_run_executor(self.executor, ConfigType.FEATURES)
-                await self.__loop_run_executor(self.executor, ConfigType.CERTIFICATES)
                 await self.__loop_run_executor(self.executor, ConfigType.MESH_CONFIG)
                 if self.__mesh_conf_request_processed:
-                    await self.__loop_run_executor(self.executor, ConfigType.DEBUG_CONFIG)
+                    await self.__loop_run_executor(
+                        self.executor, ConfigType.DEBUG_CONFIG
+                    )
             if self.__is_cbma_feature_enabled() and not self.__cbma_set_up:
                 self.__setup_cbma()
             if self.__cbma_processes:
@@ -400,7 +442,7 @@ class MdmAgent:
                 return requests.Response()  # empty response
 
             return requests.get(
-                f"https://{__https_url}/{self.GET_DEVICE_CONFIG}/{config.value}",
+                f"https://{__https_url}/{Constants.GET_DEVICE_CONFIG.value}/{config.value}",
                 params={"device_id": self.__device_id},
                 cert=(self.__certificate_file, self.__keyfile),
                 verify=self.__ca,
@@ -411,6 +453,107 @@ class MdmAgent:
                 "HTTP request failed with error: %s", err
             )
             return requests.Response()
+
+    def __action_certificates(
+        self, response: requests.Response, certificate_type: str
+    ) -> str:
+        """
+        Action certificates
+        :param response: HTTP response
+        :return: -
+        """
+        try:
+            if certificate_type == ConfigType.BIRTH_CERTIFICATE.value:
+                cert_path = Constants.DOWNLOADED_CBMA_BIRTHCERTS_PATH.value
+            elif certificate_type == ConfigType.UPPER_CERTIFICATE.value:
+                cert_path = Constants.DOWNLOADED_CBMA_UPPER_PATH.value
+            elif certificate_type == ConfigType.LOWER_CERTIFICATE.value:
+                cert_path = Constants.DOWNLOADED_CBMA_LOWER_PATH.value
+            else:
+                self.__comms_controller.logger.error("Unknown certificate type")
+                return "FAIL"
+
+            payload_dict = json.loads(response.text)["payload"]
+            self.__comms_controller.logger.debug(
+                "payload_dict[role]: %s", payload_dict["role"]
+            )
+            self.__comms_controller.logger.debug(
+                "payload_dict[group]: %s", payload_dict["group"]
+            )
+
+            certificates_dict = json.loads(response.text)["payload"]["certificates"]
+
+            for certificate_name, certificate in certificates_dict.items():
+                certificate_name = os.path.basename(certificate_name)
+                if str(certificate_name).endswith(".tar.bz2"):
+                    with open(
+                        f"{self.__cbma_certs_downloaded}/{certificate_name}", "wb"
+                    ) as cert_file:
+                        cert_file.write(base64.b64decode(certificate))
+                        self.__comms_controller.logger.debug(
+                            "Certificate %s saved", certificate_name
+                        )
+                        try:
+                            old_umask = umask(0o377)
+                            with tarfile.open(
+                                f"{self.__cbma_certs_downloaded}/{certificate_name}",
+                                "r:bz2",
+                            ) as tar:
+                                for member in tar.getmembers():
+                                    # Construct the full path where the file would be extracted
+                                    file_path = os.path.join(cert_path, member.name)
+
+                                    # Check if the file already exists, overwrite check
+                                    if os.path.exists(file_path):
+                                        raise FileExistsError(
+                                            f"File {file_path} already exists"
+                                        )
+
+                                self.__comms_controller.logger.debug(
+                                    "Extracting files (not overwriting)"
+                                )
+                                # todo: add filter="data" once python is updated
+                                tar.extractall(path=cert_path)
+                                self.__comms_controller.logger.debug(
+                                    "Certificate %s extracted to %s",
+                                    certificate_name,
+                                    cert_path,
+                                )
+                            umask(old_umask)
+                        except (
+                            tarfile.TarError,
+                            FileNotFoundError,
+                            FileExistsError,
+                        ) as exc:
+                            shutil.rmtree(cert_path)
+                            shutil.rmtree(self.__cbma_certs_downloaded)
+                            self.__comms_controller.logger.error(
+                                "Failed to extract certificate: %s", exc
+                            )
+                            return "FAIL"
+                        finally:
+                            umask(old_umask)
+                            os.makedirs(cert_path, exist_ok=True)
+                            os.makedirs(self.__cbma_certs_downloaded, exist_ok=True)
+
+                elif str(certificate_name).endswith("-sig"):
+                    old_umask = umask(0o377)
+                    with open(
+                        f"{self.__cbma_certs_downloaded}/{certificate_name}", "wb"
+                    ) as sig_file:
+                        sig_file.write(base64.b64decode(certificate))
+                        self.__comms_controller.logger.debug(
+                            "Sig %s saved", certificate_name
+                        )
+                    umask(old_umask)
+            self.__comms_controller.logger.debug("Downloaded bundle saved")
+
+        except Exception as e:
+            self.__comms_controller.logger.error(
+                "Error saving certificates: %s", str(e)
+            )
+            return "FAIL"
+        return "OK"
 
     def __action_radio_configuration(self, response: requests.Response) -> str:
         """
@@ -496,14 +639,16 @@ class MdmAgent:
                 features_yaml = yaml.dump(features_dict, default_flow_style=False)
 
                 with open(
-                    self.YAML_FILE,
+                    Constants.YAML_FILE.value,
                     "w",
                     encoding="utf-8",
                 ) as file_handle:
                     file_handle.write(features_yaml)
 
                 self.__write_config_to_file(response, ConfigType.FEATURES.value)
-                self.__previous_config_features = self.__read_config_from_file(ConfigType.FEATURES.value)
+                self.__previous_config_features = self.__read_config_from_file(
+                    ConfigType.FEATURES.value
+                )
                 return "OK"
 
             self.__comms_controller.logger.error("No features field in config")
@@ -512,42 +657,9 @@ class MdmAgent:
 
         return "FAIL"
 
-    def __action_cert_keys(self, response: requests.Response) -> str:
-        """
-        Take cert/keys into use
-        :param config: config dict
-        :return: status
-        """
-        try:
-            config: dict = json.loads(response.text)
-
-            try:
-                if json.loads(self.__previous_config_certificates) == config:
-                    self.__comms_controller.logger.debug(
-                        "No changes in features config, not updating."
-                    )
-                    return "OK"
-            except TypeError:
-                self.__comms_controller.logger.debug("No previous certificates config")
-
-            if config["payload"] is not None:
-                data = config["payload"]["features"]  # todo implementation
-                self.__comms_controller.logger.debug("certs field in config")
-                self.__comms_controller.logger.debug(
-                    "__action_cert_keys: not implemented"
-                )
-                self.__write_config_to_file(response, ConfigType.CERTIFICATES.value)
-                return "OK"
-        except KeyError:
-            self.__comms_controller.logger.error(
-                "KeyError certificates field in config"
-            )
-
-        return "FAIL"
-
     def __handle_received_config(
         self, response: requests.Response, config: ConfigType
-    ) -> str:
+    ) -> (str, str):
         """
         Handle received config
         :param response: HTTP response
@@ -558,9 +670,10 @@ class MdmAgent:
             f"HTTP Request Response: {response.text.strip()} {str(response.status_code).strip()}"
         )
 
-        data = json.loads(response.text)
-
-        if self.__mesh_conf_request_processed and config.value == ConfigType.DEBUG_CONFIG.value:
+        if (
+            self.__mesh_conf_request_processed
+            and config.value == ConfigType.DEBUG_CONFIG.value
+        ):
             self.__previous_debug_config = response.text.strip()
 
             # save to file to use in fmo
@@ -569,13 +682,15 @@ class MdmAgent:
                     "/opt/debug_config.json", "w", encoding="utf-8"
                 ) as debug_conf_json:
                     debug_conf_json.write(self.__previous_debug_config)
-                    self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
+                    self.__debug_config_interval = (
+                        Constants.OK_POLLING_TIME_SECONDS.value
+                    )
                 return "OK"
             except:
                 self.__comms_controller.logger.debug(
                     "cannot store /opt/debug_config.json"
                 )
-                self.__debug_config_interval = self.FAIL_POLLING_TIME_SECONDS
+                self.__debug_config_interval = Constants.FAIL_POLLING_TIME_SECONDS.value
                 return "FAIL"
         else:
             # radio configuration actions
@@ -586,11 +701,6 @@ class MdmAgent:
             # feature.yaml actions
             if config.value == ConfigType.FEATURES.value:
                 ret = self.__action_feature_yaml(response)
-                return ret
-
-            # cert/keys actions
-            if config.value == ConfigType.CERTIFICATES.value:
-                ret = self.__action_cert_keys(response)
                 return ret
 
     @staticmethod
@@ -627,6 +737,44 @@ class MdmAgent:
         with open(f"/opt/config_{config}.json", "w", encoding="utf-8") as f_handle:
             f_handle.write(response.text.strip())
 
+    def download_certificate_bundle(
+        self, certificate_type: str = ""
+    ) -> requests.Response:
+        """
+        Download certificate bundle
+        :return: HTTP response
+        """
+
+        try:
+            self.__comms_controller.logger.debug("Downloading certificate bundle")
+
+            # Prepare the JSON data for the POST request
+            data = {
+                "device_id": self.__device_id,
+                "certificate_type": certificate_type,
+            }
+
+            __https_url = self.__url
+            if "None" in __https_url:
+                return requests.Response()  # empty response
+
+            # Make the GET request
+            url = f"https://{__https_url}/{Constants.GET_DEVICE_CERTIFICATES.value}"
+            return requests.get(
+                url,
+                params=data,
+                cert=(self.__certificate_file, self.__keyfile),
+                verify=self.__ca,
+                timeout=2,
+            )
+        except FileNotFoundError as e:
+            self.__comms_controller.logger.error("Certificate file not found: %s", e)
+        except requests.RequestException as e:
+            self.__comms_controller.logger.error(
+                "Post request failed with error: %s", e
+            )
+        return requests.Response()
+
     def upload_certificate_bundle(self) -> requests.Response:
         """
         Upload certificate bundle
@@ -655,6 +803,7 @@ class MdmAgent:
             data = {
                 "device_id": self.__device_id,
                 "payload": certificates_dict,
+                "format": "text",
             }
 
             __https_url = self.__url
@@ -662,7 +811,7 @@ class MdmAgent:
                 return requests.Response()  # empty response
 
             # Make the POST request
-            url = f"https://{__https_url}/{self.PUT_DEVICE_CONFIG}/{ConfigType.CERTIFICATES.value}"
+            url = f"https://{__https_url}/{Constants.PUT_DEVICE_CERTIFICATES.value}/{ConfigType.BIRTH_CERTIFICATE.value}"
             return requests.post(
                 url,
                 json=data,
@@ -688,9 +837,7 @@ class MdmAgent:
         interfaces_to_cleanup = ["bat0"]
 
         for interface in interfaces_to_cleanup:
-            if interface in [
-                link.get_attr("IFLA_IFNAME") for link in ip.get_links()
-            ]:
+            if interface in [link.get_attr("IFLA_IFNAME") for link in ip.get_links()]:
                 # If the interface exists, set it down, and then delete it
                 ip.link(
                     "set",
@@ -711,11 +858,15 @@ class MdmAgent:
             bridge_index = ip.link_lookup(ifname=bridge_name)[0]
 
             # Get the indices of all interfaces currently in the bridge
-            interfaces_indices = [link['index'] for link in ip.get_links(master=bridge_index)]
+            interfaces_indices = [
+                link["index"] for link in ip.get_links(master=bridge_index)
+            ]
 
             # Remove each interface from the bridge
             for interface_index in interfaces_indices:
-                ip.link("set", index=interface_index, master=0)  # Set the master to 0 (no bridge)
+                ip.link(
+                    "set", index=interface_index, master=0
+                )  # Set the master to 0 (no bridge)
 
         except Exception as e:
             self.__comms_controller.logger.debug(
@@ -886,17 +1037,19 @@ class MdmAgent:
 
         return True
 
-    def __is_cbma_feature_enabled(self):
-        with open(self.YAML_FILE, "r", encoding="utf-8") as stream:
+    def __is_cbma_feature_enabled(self) -> bool:
+        """
+        Check if CBMA feature is enabled
+        :return: True if enabled, False otherwise
+        """
+        with open(Constants.YAML_FILE.value, "r", encoding="utf-8") as stream:
             try:
                 features = yaml.safe_load(stream)
-                for feature in features:
-                    if features["CBMA"]:
-                        return True
-            except yaml.YAMLError as exc:
+                return bool(features["CBMA"])
+            except (yaml.YAMLError, KeyError, FileNotFoundError) as exc:
                 self.__comms_controller.logger.error(
-                        f"Error reading features file: {exc}"
-                    )
+                    f"CBMA disabled as feature configuration not found: {exc}"
+                )
             return False
 
     def __setup_cbma(self):
@@ -945,7 +1098,7 @@ class MdmAgent:
                 process = setup_cbma.cbma(
                     "lower",
                     interface_name,
-                    15001,
+                    Constants.CBMA_PORT_LOWER.value,
                     "bat0",
                     self.__cbm_certs_path,
                     self.__cbma_ca_cert_path,
@@ -966,7 +1119,7 @@ class MdmAgent:
                 process = setup_cbma.cbma(
                     "lower",
                     interface_name,
-                    15001,
+                    Constants.CBMA_PORT_LOWER.value,
                     "bat0",
                     self.__cbm_certs_path,
                     self.__cbma_ca_cert_path,
@@ -978,7 +1131,7 @@ class MdmAgent:
         process = setup_cbma.cbma(
             "upper",
             "bat0",
-            15002,
+            Constants.CBMA_PORT_UPPER.value,
             "bat1",
             self.__cbm_certs_path,
             self.__cbma_ca_cert_path,
@@ -1013,6 +1166,8 @@ class MdmAgent:
             executor, self.__http_get_device_config, config
         )
 
+        status_type = self.__config_status_mapping.get(config, None)
+
         self.__comms_controller.logger.debug(
             "HTTP Request status: %s, config: %s", str(response.status_code), config
         )
@@ -1027,37 +1182,34 @@ class MdmAgent:
                 response.status_code == 200
                 and self.__previous_debug_config == response.text.strip()
             ):
-                self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
+                self.__debug_config_interval = Constants.OK_POLLING_TIME_SECONDS.value
                 self.__mesh_conf_request_processed = False
             elif response.text.strip() == "" or response.status_code != 200:
-                self.__debug_config_interval = self.FAIL_POLLING_TIME_SECONDS
+                self.__debug_config_interval = Constants.FAIL_POLLING_TIME_SECONDS.value
                 if response.status_code == 405:
                     self.__comms_controller.logger.debug(
                         "MDM Server has no support for debug mode"
                     )
-                    self.__debug_config_interval = self.OK_POLLING_TIME_SECONDS
+                    self.__debug_config_interval = (
+                        Constants.OK_POLLING_TIME_SECONDS.value
+                    )
                     self.__mesh_conf_request_processed = False
         else:
             if response.status_code == 200:
                 ret = self.__handle_received_config(response, config)
                 self.__comms_controller.logger.debug("config: %s, ret: %s", config, ret)
                 if ret == "OK":
-                    self.__status[config.value] = "OK"
+                    self.__status[status_type] = "OK"
                 if config.value == ConfigType.MESH_CONFIG.value and ret == "OK":
                     self.__mesh_conf_request_processed = True
             elif response.status_code != 200:
-                self.__status[config.value] = "FAIL"
+                self.__status[status_type] = "FAIL"
 
             # if all statuses are OK, then we can start the OK polling
-            # todo remove this and leave all() check once certificate download is working
-            if all(value == "OK" for value in self.__status.values()) or (
-                self.__status[ConfigType.CERTIFICATES.value] == "FAIL"
-                and self.__status[ConfigType.FEATURES.value] == "OK"
-                and self.__status[ConfigType.MESH_CONFIG.value] == "OK"
-            ):
-                self.__interval = self.OK_POLLING_TIME_SECONDS
+            if all(value == "OK" for value in self.__status.values()):
+                self.__interval = Constants.OK_POLLING_TIME_SECONDS.value
             else:
-                self.__interval = self.FAIL_POLLING_TIME_SECONDS
+                self.__interval = Constants.FAIL_POLLING_TIME_SECONDS.value
 
             self.__comms_controller.logger.debug("status: %s", self.__status)
 
@@ -1291,16 +1443,6 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-
-    # test certificates location
-    # if args.ca is None or args.certfile is None or args.keyfile is None:
-    #     args.ca = \
-    #         "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/ca.crt"
-    #     args.certfile = \
-    #         "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/issued/csl1.local.crt"
-    #     args.keyfile = \
-    #         "/home/mika/work/tc_distro/nats-server/mesh_com_dev/mypki/pki/private/csl1.local.key"
-
     loop = asyncio.new_event_loop()
 
     try:
