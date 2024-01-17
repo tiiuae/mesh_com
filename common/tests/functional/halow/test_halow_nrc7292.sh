@@ -57,7 +57,7 @@ get_freq() {
   if [ -z "$freq_str" ]; then
     echo "Failed to retrieve frequency information"
   else
-    # Parse and retrieve mcs value
+    # Parse and retrieve freq value
     if (( $(echo "$nrc_formatted_version >= 1.5" | bc -l) )); then
       #Format is "Frequency			 : 9205 (37)"
       freq_str_1=${freq_str#*: }
@@ -82,7 +82,7 @@ get_country() {
   if [ -z "$country_str" ]; then
     echo "Failed to retrieve country information"
   else
-    # Parse and retrieve mcs value
+    # Parse and retrieve country value
     country=${country_str#*: }
   fi
 }
