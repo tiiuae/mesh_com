@@ -291,7 +291,7 @@ class MdmAgent:
         except FileNotFoundError:
             self.__device_id = "default"
 
-    def mdm_server_address_cb(self, address: str, status: bool) -> None:
+    def mdm_server_address_cb(self, address: str, status: bool, **kwargs) -> None:
         """
         Callback for MDM server address
         :param address: MDM server address

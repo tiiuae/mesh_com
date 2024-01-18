@@ -163,39 +163,15 @@ class CommsServiceMonitor:
                 if server:
                     server = server.rstrip(".")
 
-                if inspect.ismethod(self.service_callback):
-                    if self.service_callback.__code__.co_argcount == 3:
-                        url = f"{server}:{info.port}"
-                        self.service_callback(url, service_available)
-                    elif self.service_callback.__code__.co_argcount == 6:
-                        self.service_callback(
-                            name,
-                            info._ipv4_addresses,
-                            info._ipv6_addresses,
-                            info.port,
-                            service_available,
-                        )
-                    else:
-                        raise TypeError("Invalid callback type")
-                else:
-                    if self.service_callback.__code__.co_argcount == 2:
-                        url = f"{server}:{info.port}"
-                        self.service_callback(url, service_available)
-                    elif self.service_callback.__code__.co_argcount == 5:
-                        self.service_callback(
-                            name,
-                            info._ipv4_addresses,
-                            info._ipv6_addresses,
-                            info.port,
-                            service_available,
-                        )
-                    else:
-                        raise TypeError("Invalid callback type")
+                kwargs = {"address": f'{server}:{info.port}',"service_name": name,"ipv4_addresses": info.addresses,
+                          "ipv6_addresses": info.addresses,"port": info.port,"status": service_available}
+
+                self.service_callback(**kwargs)
 
 
 if __name__ == "__main__":
 
-    def service_discovery_cb(url, status):
+    def service_discovery_cb(address, status, **kwargs):
         """
         An example callback function.
 
@@ -204,21 +180,7 @@ if __name__ == "__main__":
                          For example "myservice.local:8000" or None.
             status (bool) -- Boolean to indicate is service available or not.
 
-        Returns:
-            None
-        """
-        print(f"Callback received, service url {url}, online: {status}")
-
-    def service_discovery_cb2(
-        service_name, ipv4_addresses, ipv6_addresses, port, status
-    ):
-        """
-        Secondary callback type example. You can use either one.
-        REMARK: ip addresses and port are None when service is unregistered,
-        only service_name and status are given so calling client must identify
-        the services by service_name.
-
-        Arguments:
+        Arguments kwargs:
             service_name (str) -- Registered service name, 'myservice'
             ipv4_addresses (List(IPv4Address)) -- List of ipv4 addresses published for service.
             ipv6_addresses (List(IPv6Address)) -- List of ipv6 addresses published for service.
@@ -228,9 +190,8 @@ if __name__ == "__main__":
         Returns:
             None
         """
-        print(
-            f"Callback received, service name:{service_name}, ipv4_addresses:{ipv4_addresses}, ipv6_addresses:{ipv6_addresses}, port:{port}, online: {status}"
-        )
+        print(f"Callback received, service url {address}, online: {status}")
+        print(f"{kwargs}")
 
     monitor = CommsServiceMonitor(
         service_name="MDM Service",
