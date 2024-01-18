@@ -16,19 +16,19 @@ Usage:
 import argparse
 import asyncio
 import os
-import requests
 import time
 import subprocess
+import threading
 import logging
 from datetime import datetime
-from hw_control import LedControl
-
+import requests
 from cryptography.x509 import load_pem_x509_certificate
 
 from comms_hsm_controller import CommsHSMController
 from comms_hsm_controller import KeyParams
 from comms_hsm_controller import CsrParams
-
+from hw_control import LedControl
+import comms_service_discovery
 
 class CommsProvisioning:
     """
@@ -41,7 +41,9 @@ class CommsProvisioning:
         self.__device_id_file = self.__outdir + "/identity"
         self.__client_csr_file = self.__outdir + "/csr/client_csr.csr"
         self.__server_csr_file = self.__outdir + "/csr/server_csr.csr"
-        self.__server_url = "http://" + server + ":" + port + "/api/mesh/provision"
+        self.__server_api = "/api/mesh/provision"
+        self.__server_url = "http://" + server + ":" + port + self.__server_api
+        self.__server_available = False
 
         # Base logger for all provisioning related modules
         self.__main_logger = logging.getLogger("provisioning")
@@ -75,6 +77,16 @@ class CommsProvisioning:
             public_key=self.__crypto_files_location + "/public/comms_auth_public_key.pem",
             algorithm=algorithm,
             use_openssl=True  # This is needed in order to write keys to filesystem.
+        )
+
+        self.service_monitor = comms_service_discovery.CommsServiceMonitor(
+            service_name="TII Provisioning server",
+            service_type="_provisioning._tcp.local.",
+            service_cb=self.__provisioning_server_address_cb,
+            logger=self.__main_logger,
+        )
+        self.__service_monitor_thread = threading.Thread(
+            target=self.service_monitor.run
         )
 
         # Openssl needs to be used to create CSR with EC keys as SoftHSM signing
@@ -126,6 +138,37 @@ class CommsProvisioning:
         except FileNotFoundError:
             return float(version)
 
+    def __provisioning_server_address_cb(self, address: str, status: bool) -> None:
+        """
+        Callback for provisionign server address
+        :param address: Provisionign server address
+        :param status: Provisioning server connection status
+        :return: -
+        """
+        self.__server_url = "http://" + address + self.__server_api
+        self.__server_available = status
+
+    def start_service_discovery(self):
+        """
+        Starts service monitor thread
+        :param: -
+        :return: -
+        """
+        if not self.service_monitor.running:
+            self.log.debug("Start service monitor thread")
+            self.__service_monitor_thread.start()
+
+    def stop_service_discovery(self):
+        """
+        Stops service monitor thread
+        :param: -
+        :return: -
+        """
+        if self.service_monitor.running:
+            self.log.debug("Stop service monitor thread")
+            self.service_monitor.close()
+            self.__service_monitor_thread.join()
+
     def do_provisioning(self):
         """
         Creates and sends a CSR to the provisioning server.
@@ -151,7 +194,7 @@ class CommsProvisioning:
             if not client_csr_created:
                 self.log.debug("Problem creating client CSR")
                 return False
-            else:
+            if self.__server_available:
                 client_req_status = self.__request_client_certificate()
                 if not client_req_status:
                     self.log.debug("Problem getting client certificate")
@@ -164,7 +207,7 @@ class CommsProvisioning:
             if not server_csr_created:
                 self.log.debug("Problem creating server CSR")
                 return False
-            else:
+            if self.__server_available:
                 server_req_status = self.__request_server_certificate()
                 if not server_req_status:
                     self.log.debug("Problem getting server certificate")
@@ -320,8 +363,15 @@ async def main(server, port, outdir, timeout=None, algorithm=None):
         timeout = 0
     if algorithm is None:
         algorithm = "rsa"
+    if server is None:
+        server = "localhost"
+    if port is None:
+        port = "80"
+    if outdir is None:
+        outdir = "/opt"
 
     prov_agent = CommsProvisioning(server, port, outdir, algorithm)
+    prov_agent.start_service_discovery()
 
     while True:
         led_status.provisioning_led_control("active")
@@ -339,6 +389,8 @@ async def main(server, port, outdir, timeout=None, algorithm=None):
             break
 
         time.sleep(5)
+    prov_agent.stop_service_discovery()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Provisioning agent settings')
