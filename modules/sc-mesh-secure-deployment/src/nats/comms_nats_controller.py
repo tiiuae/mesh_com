@@ -25,6 +25,7 @@ import glob
 import base64
 import tarfile
 import shutil
+import time
 
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Process
@@ -412,9 +413,9 @@ class MdmAgent:
                             self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
                             == "OK"
                         ):
-                            # Stop CBMA with old certificates. CBMA will be setup
-                            # later with new ones.
+                            # Restart CBMA with new certificates
                             self.stop_cbma()
+                            self.setup_cbma()
                         if (
                             self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
                             == "FAIL"
@@ -865,12 +866,26 @@ class MdmAgent:
 
         try:
             # Get the index of the bridge
-            bridge_index = ip.link_lookup(ifname=bridge_name)[0]
-
+            bridge_indices = ip.link_lookup(ifname=bridge_name)
+            if bridge_indices:
+                bridge_index = bridge_indices[0]
+            else:
+                self.__comms_controller.logger.debug(
+                    "Cannot remove interfaces from %s as it was not found!",
+                    bridge_name,
+                )
+                return
             # Get the indices of all interfaces currently in the bridge
             interfaces_indices = [
                 link["index"] for link in ip.get_links(master=bridge_index)
             ]
+
+            if not interfaces_indices:
+                self.__comms_controller.logger.debug(
+                    "No interfaces to remove from the bridge %s!",
+                    bridge_name,
+                )
+                return
 
             # Remove each interface from the bridge
             for interface_index in interfaces_indices:
@@ -893,12 +908,28 @@ class MdmAgent:
         ip = IPRoute()
 
         try:
-            # Get the index of the bridge
-            bridge_index = ip.link_lookup(ifname=bridge_name)[0]
+            bridge_indices = ip.link_lookup(ifname=bridge_name)
+            if bridge_indices:
+                bridge_index = bridge_indices[0]
+            else:
+                self.__comms_controller.logger.debug(
+                    "Cannot remove interfaces from %s as it was not found!",
+                    bridge_name,
+                )
+                return
 
             # Get the index of the interface to add
-            interface_index = ip.link_lookup(ifname=interface_to_add)[0]
+            interface_indices = ip.link_lookup(ifname=interface_to_add)
 
+            if not interface_indices:
+                self.__comms_controller.logger.debug(
+                    "Cannot add interfaces %s to bridge %s!",
+                    interface_to_add,
+                    bridge_name,
+                )
+                return
+
+            interface_index = interface_indices[0]
             # Add the interface to the bridge
             ip.link("set", index=interface_index, master=bridge_index)
 
@@ -1014,8 +1045,13 @@ class MdmAgent:
         try:
             self.__comms_controller.logger.debug("Stopping CBMA...")
 
-            for process in self.__lower_cbma_processes.values():
+            for if_name, process in self.__lower_cbma_processes.items():
                 try:
+                    self.__comms_controller.logger.debug(
+                        "Stopping lower CBMA process %s for interface %s",
+                        process,
+                        if_name
+                    )
                     if process.is_alive():
                         process.terminate()
                 except Exception as e:
@@ -1033,8 +1069,13 @@ class MdmAgent:
                         f"Killing lower CBMA process error: {e}"
                     )
 
-            for process in self.__upper_cbma_processes.values():
+            for if_name, process in self.__upper_cbma_processes.items():
                 try:
+                    self.__comms_controller.logger.debug(
+                        "Stopping upper CBMA process %s for interface %s",
+                        process,
+                        if_name
+                    )
                     if process.is_alive():
                         process.terminate()
                 except Exception as e:
@@ -1092,26 +1133,55 @@ class MdmAgent:
         self.__lower_cbma_interfaces = deepcopy(self.__interfaces)
         self.__upper_cbma_interfaces.clear()
 
+        # Another copy of all interfaces to allow manipulating
+        # lower/upper cbma lists. This is temporary until
+        # locking is used protect self.__interfaces.
+        all_interfaces = deepcopy(self.__interfaces)
+
         # Get list of interfaces that doesn't have lower CBMA certificate
+        for interface in self.__lower_cbma_interfaces:
+            print("lower interfaces1:", interface.interface_name)
+
         interfaces_without_certificate = []
         for interface in self.__lower_cbma_interfaces:
             if not self.__has_certificate(self.__cbma_certs_path, interface.mac_address):
                 interfaces_without_certificate.append(interface)
-
+        
         # Remove interfaces without certificates lower CBMA interface list
         for interface in interfaces_without_certificate:
+            print("interface without certificate:", interface.interface_name)
             if interface in self.__lower_cbma_interfaces:
                 self.__lower_cbma_interfaces.remove(interface)
 
+        for interface in self.__lower_cbma_interfaces:
+            print("lower interfaces2:", interface.interface_name)
+
+        not_allowed_lower_cbma_interfaces = []
+        for interface in self.__lower_cbma_interfaces:
+            interface_name = interface.interface_name.lower()
+            if any(prefix in interface_name for prefix in ["eth", "usb", "wlan", "br-lan", "bat", "lan"]):
+                not_allowed_lower_cbma_interfaces.append(interface)
+
+        # Remove not allowed interfaces from lower CBMA interface list
+        for interface in not_allowed_lower_cbma_interfaces:
+            if interface in self.__lower_cbma_interfaces:
+                self.__lower_cbma_interfaces.remove(interface)
+
+        for interface in self.__lower_cbma_interfaces:
+            print("lower interfaces3:", interface.interface_name)
+
         # FIXME: Hard coded upper CBMA interfaces for testing purposes
-        test_upper_cbma_interfaces = ["bat0", "halow1", "wlp3s0"]
+        allowed_upper_cbma_interfaces = ["bat0", "halow1", "wlp3s0"]
         for interface in self.__interfaces:
             interface_name = interface.interface_name.lower()
-            if any(prefix in interface_name for prefix in test_upper_cbma_interfaces):
+            if any(prefix in interface_name for prefix in allowed_upper_cbma_interfaces):
                 # TODO: Reminder to make sure not to add bat1 ever to upper CBMA
                 if interface.interface_name == "bat1":
                     continue
                 self.__upper_cbma_interfaces.append(interface)
+
+        for interface in self.__upper_cbma_interfaces:
+            print("upper interfaces1:", interface.interface_name)
 
         # Lower and upper CBMA interfaces are mutually exclusive so remove
         # upper CBMA interfaces from lower CBMA interface list
@@ -1119,15 +1189,8 @@ class MdmAgent:
             if interface in self.__lower_cbma_interfaces:
                 self.__lower_cbma_interfaces.remove(interface)
 
-        # FIXME: Temporary loopholes for R&D work. To be removed.
-        # Do not apply CBMA for ethernet interfaces (ethX, usb0)
         for interface in self.__lower_cbma_interfaces:
-            interface_name = interface.interface_name.lower()
-            if any(prefix in interface_name for prefix in ["eth", "usb0"]):
-                if interface in self.__lower_cbma_interfaces:
-                    self.__lower_cbma_interfaces.remove(interface)
-                if interface in self.__upper_cbma_interfaces:
-                    self.__upper_cbma_interfaces.remove(interface)
+            print("lower interfaces4:", interface.interface_name)
 
     def setup_cbma(self):
         # Cleanup CBMA before starting it
@@ -1169,46 +1232,32 @@ class MdmAgent:
         self.__cbma_set_up = True
 
     def __setup_lower_cbma(self):
-
-        wlan_interfaces = ["wlp1s0", "wlp2s0", "wlp3s0", "halow1"]
-        other_interfaces = deepcopy(self.__lower_cbma_interfaces)
-
         for interface in self.__lower_cbma_interfaces:
             interface_name = interface.interface_name.lower()
-            if any(prefix in interface_name for prefix in wlan_interfaces):
-                try:
-                    other_interfaces.remove(interface)
-                    index = self.__comms_controller.settings.mesh_vif.index(
-                        interface_name
-                    )
-                except ValueError:
-                    continue
-                process = setup_cbma.cbma(
-                    "lower",
-                    interface_name,
-                    Constants.CBMA_PORT_LOWER.value,
-                    "bat0",
-                    self.__cbma_certs_path,
-                    self.__cbma_ca_cert_path,
-                    "off",
-                    f"/var/run/wpa_supplicant_id{index}/{interface_name}"
+            try:
+                index = self.__comms_controller.settings.mesh_vif.index(
+                    interface_name
                 )
-                self.__lower_cbma_processes[interface_name] = process
-
-        for interface in other_interfaces:
-            interface_name = interface.interface_name.lower()
-            if any(prefix in interface_name for prefix in ["eth"]):
-                process = setup_cbma.cbma(
-                    "lower",
-                    interface_name,
-                    Constants.CBMA_PORT_LOWER.value,
-                    "bat0",
-                    self.__cbma_certs_path,
-                    self.__cbma_ca_cert_path,
-                    "off",
-                    None
-                )
-                self.__lower_cbma_processes[interface_name] = process
+                wpa_supplicant_ctrl_path = f"/var/run/wpa_supplicant_id{index}/{interface_name}"
+            except ValueError:
+                wpa_supplicant_ctrl_path = None
+            
+            self.__comms_controller.logger.debug(
+                "Setup lower CBMA for interface: %s, wpa_supplicant_ctrl_path: %s", 
+                interface_name, 
+                wpa_supplicant_ctrl_path
+            )
+            process = setup_cbma.cbma(
+                "lower",
+                interface_name,
+                Constants.CBMA_PORT_LOWER.value,
+                "bat0",
+                self.__cbma_certs_path,
+                self.__cbma_ca_cert_path,
+                "off",
+                wpa_supplicant_ctrl_path
+            )
+            self.__lower_cbma_processes[interface_name] = process
 
     def __setup_upper_cbma(self):
         for interface in self.__upper_cbma_interfaces:
@@ -1234,6 +1283,12 @@ class MdmAgent:
                     cbma_ca_cert_path = self.__cbma_ca_cert_path
                 else:
                     continue
+
+            self.__comms_controller.logger.debug(
+                "Setup upper CBMA for interface: %s, wpa_supplicant_ctrl_path: %s", 
+                interface_name,
+                wpa_supplicant_ctrl_path
+            )
 
             process = setup_cbma.cbma(
                 "upper",
