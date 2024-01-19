@@ -138,7 +138,7 @@ class CommsProvisioning:
         except FileNotFoundError:
             return float(version)
 
-    def __provisioning_server_address_cb(self, address: str, status: bool) -> None:
+    def __provisioning_server_address_cb(self, address: str, status: bool, **kwargs) -> None:
         """
         Callback for provisionign server address
         :param address: Provisionign server address
