@@ -17,7 +17,7 @@ from features.decision_engine.decision_engine import DecisionEngine
 MBA_MULTICAST_ADDRESS = 'ff02::1'
 MBA_PORT = 12345
 MBA_INTERFACE = "bat1" # Should be br-lan if it is there
-QUARANTINE_PERIOD = 10 # Quarantine period in seconds
+QUARANTINE_PERIOD = 30 # Quarantine period in seconds
 PATH_TO_MY_CERT_DIR = "/opt/crypto/ecdsa/birth/filebased" # Path to the folder where private key is stored (Needs to be updated when we use HSM)
 PATH_TO_PEER_CERT_DIR = "/tmp/peer_certificates" # Path to the folder where peer certificates are stored by cbma/auth/authClient.py and cbma/auth/authServer.py
 
