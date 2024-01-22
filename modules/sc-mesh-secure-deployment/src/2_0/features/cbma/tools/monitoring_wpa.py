@@ -34,7 +34,6 @@ class WPAMonitor:
                     response = ctrl.recv()
                     decoded_response = response.decode().strip()
                     self._handle_event(decoded_response, queue)
-                time.sleep(1)
 
     def _handle_event(self, decoded_response, queue):
         # Check for the MESH-PEER-CONNECTED event
