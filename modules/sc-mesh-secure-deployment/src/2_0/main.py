@@ -83,5 +83,4 @@ if __name__ == "__main__":
     for feature in features:
         if features[feature]:
             initialize(feature, decision_engine)
-    time.sleep(15)
-    stop(sensors, decision_engine)
+    #stop(sensors, decision_engine) # Call this to stop features and decision engine
