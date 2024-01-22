@@ -1,52 +1,51 @@
 import time
+import threading
 from typing import NoReturn
+import os
+import sys
 
+# Update imports path
+ldpi_directory = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(ldpi_directory)
 from ldpi.inference import LightDeepPacketInspection
 from options import SnifferOptions
 from sniffer.sniffer import Sniffer
+from ..decision_engine.observable_module import ObservableModule
 
 
-def main() -> NoReturn:
+class IDS(ObservableModule):
     """
-    Main function to initialize and run the packet sniffer and light deep packet inspection.
-
-    This function initializes the `Sniffer` and `LightDeepPacketInspection` classes, starts the packet sniffer,
-    and runs a decision engine loop that keeps the program running until interrupted.
-
-    Raises:
-        Exception: If 'pypcap' library is not available in the HardenedOS environment.
-
-    TODO:
-    - Replace the while True loop with a decision engine loop.
+    This class initializes and run the packet sniffer and light deep packet inspection.
     """
-    # Raise exception meanwhile libraries are not available
-    raise Exception("Execution is blocked due to missing dependencies.")
+    def __init__(self, decision_engine):
+        super().__init__(decision_engine)
+        self.stop_event = threading.Event()
+        # Initialize command line arguments
+        self.args = SnifferOptions()
+        self.args.parse_options()
+        # Initialize Sniffer and LightDeepPacketInspection instances
+        self.snf = Sniffer(self.args)
+        # Initialize LightDeepPacketInspection
+        self.ldpi = LightDeepPacketInspection(decision_engine)
+    def start(self):
+        """
+        This function initializes the `Sniffer` and `LightDeepPacketInspection` classes, starts the packet sniffer,
+        and runs a decision engine loop that keeps the program running until interrupted.
+        """
+        # Register LDPI as a subscriber to the Sniffer
+        self.snf.add_subscriber(self.ldpi)
+        # Start the sniffer
+        self.snf.run()
+        # Decision engine loop - Keeps running until interrupted
+        try:
+            while True:
+                time.sleep(1.0)
+        except (KeyboardInterrupt, SystemExit):
+            print("Shutting down...")
+            self.stop()
 
-    # Initialize command line arguments
-    args = SnifferOptions()
-    args.parse_options()
-
-    # Initialize Sniffer and LightDeepPacketInspection instances
-    snf = Sniffer(args)
-
-    # Initialize LightDeepPacketInspection
-    ldpi = LightDeepPacketInspection()
-
-    # Register LDPI as a subscriber to the Sniffer
-    snf.add_subscriber(ldpi)
-
-    # Start the sniffer
-    snf.run()
-
-    # Decision engine loop (placeholder) - Keeps running until interrupted
-    try:
-        while True:
-            time.sleep(1.0)
-    except (KeyboardInterrupt, SystemExit):
+    def stop(self):
         print("Shutting down...")
-        snf.stop()
-        ldpi.stop()
-
-
-if __name__ == '__main__':
-    main()
+        self.stop_event.set()
+        self.snf.stop()
+        self.ldpi.stop()
