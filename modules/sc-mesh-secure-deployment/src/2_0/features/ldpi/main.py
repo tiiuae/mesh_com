@@ -10,15 +10,13 @@ sys.path.append(ldpi_directory)
 from ldpi.inference import LightDeepPacketInspection
 from options import SnifferOptions
 from sniffer.sniffer import Sniffer
-from ..decision_engine.observable_module import ObservableModule
 
 
-class IDS(ObservableModule):
+class IDS:
     """
     This class initializes and run the packet sniffer and light deep packet inspection.
     """
     def __init__(self, decision_engine):
-        super().__init__(decision_engine)
         self.stop_event = threading.Event()
         # Initialize command line arguments
         self.args = SnifferOptions()
@@ -27,6 +25,7 @@ class IDS(ObservableModule):
         self.snf = Sniffer(self.args)
         # Initialize LightDeepPacketInspection
         self.ldpi = LightDeepPacketInspection(decision_engine)
+
     def start(self):
         """
         This function initializes the `Sniffer` and `LightDeepPacketInspection` classes, starts the packet sniffer,
