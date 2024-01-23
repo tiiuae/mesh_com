@@ -4,12 +4,13 @@ import time
 from typing import List, Optional, Tuple, Dict, NoReturn
 
 import dpkt
+import binascii
 import netifaces as ni
 import pcap
 from tqdm import tqdm
 
 from options import SnifferOptions
-from utils import ModuleInterface, SnifferSubscriber, FlowKeyType, Color, get_flow_key, sec_to_ns
+from utils import ModuleInterface, SnifferSubscriber, FlowKeyType, Color, get_flow_key, sec_to_ns, mac_addr
 
 # pcap library: comes from pypcap https://github.com/pynetwork/pypcap (requires sudo apt-get install libpcap-dev)
 
@@ -87,6 +88,7 @@ class Sniffer(ModuleInterface):
         """
         try:
             eth = dpkt.ethernet.Ethernet(buf)
+
             if eth.type == 17157:  # batman type
                 if eth.dst == b'\xff\xff\xff\xff\xff\xff':  # ignore OGM
                     return
@@ -94,18 +96,24 @@ class Sniffer(ModuleInterface):
                 len_bat = 10
                 eth = dpkt.ethernet.Ethernet(buf[len_eth + len_bat:])  # unwrap batman eth
 
+            # Extracting MAC addresses
+            src_mac = mac_addr(eth.src)
+            dst_mac = mac_addr(eth.dst)
+
             if eth.type in [dpkt.ethernet.ETH_TYPE_IP, dpkt.ethernet.ETH_TYPE_IP6]:
-                self.unpack_ip(eth, ts)
+                self.unpack_ip(eth, ts, src_mac, dst_mac)
 
         except dpkt.dpkt.NeedData:
             logging.warning(f'Packet {index} in PCAP file is truncated')
 
-    def unpack_ip(self, eth: dpkt.ethernet.Ethernet, timestamp) -> NoReturn:
+    def unpack_ip(self, eth: dpkt.ethernet.Ethernet, timestamp, src_mac: str, dst_mac: str) -> NoReturn:
         """Unpacks IP packets and handles different protocols.
 
         Args:
             eth (dpkt.ethernet.Ethernet): Ethernet frame containing the IP packet.
             timestamp: Timestamp associated with the packet.
+            src_mac (str): Source mac address of packet.
+            dst_mac (str): Destination mac address of packet.
         """
         ip: Optional[dpkt.ip.IP, dpkt.ip6.IP6] = eth.data
 
@@ -150,7 +158,7 @@ class Sniffer(ModuleInterface):
             src_port: int = 0
             dst_port: int = 0
         # Compute unidirectional flow id
-        flow_id: Tuple[bytes, int, bytes, int, int] = (src_ip, src_port, dst_ip, dst_port, protocol)
+        flow_id: Tuple[bytes, int, bytes, int, int, str, str] = (src_ip, src_port, dst_ip, dst_port, protocol, src_mac, dst_mac)
 
         # Get traffic id (same if unidirectional, sorted if bidirectional)
         traffic_id = get_flow_key(*flow_id, self.args.session)

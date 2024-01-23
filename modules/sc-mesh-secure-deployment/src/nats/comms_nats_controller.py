@@ -297,7 +297,7 @@ class MdmAgent:
         except FileNotFoundError:
             self.__device_id = "default"
 
-    def mdm_server_address_cb(self, address: str, status: bool) -> None:
+    def mdm_server_address_cb(self, address: str, status: bool, **kwargs) -> None:
         """
         Callback for MDM server address
         :param address: MDM server address
@@ -1426,7 +1426,14 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
 
     mdm = MdmAgent(cc, keyfile, certfile, ca_file, interface)
     mdm.start_interface_monitor()
-    await asyncio.gather(mdm.execute())
+
+    try:
+        results = await asyncio.gather(mdm.execute())
+        cc.logger.debug("Results: %s:", results)
+    except Exception as e:
+        cc.logger.exception("Exception:")
+    finally:
+        signal_handler()
 
 
 # pylint: disable=too-many-arguments, too-many-locals, too-many-statements
@@ -1592,15 +1599,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     loop = asyncio.new_event_loop()
 
-    try:
-        if args.agent == "mdm":
-            loop.run_until_complete(
-                main_mdm(args.keyfile, args.certfile, args.ca, args.interface)
-            )
-        else:
-            loop.run_until_complete(
-                main_fmo(args.server, args.port, args.keyfile, args.certfile)
-            )
-    except Exception as e:
-        pass
+    if args.agent == "mdm":
+        loop.run_until_complete(
+            main_mdm(args.keyfile, args.certfile, args.ca, args.interface)
+        )
+    else:
+        loop.run_until_complete(
+            main_fmo(args.server, args.port, args.keyfile, args.certfile)
+        )
     loop.close()

@@ -208,7 +208,7 @@ class NatsSeedDiscovery:
         self.__seeds = {}
 
     # callback handler called when CommsServiceDiscovery receives seed service update
-    def __seed_service_callback(self, service_name, ipv4_addresses, ipv6_addresses, port, status):
+    def __seed_service_callback(self, service_name, ipv4_addresses, ipv6_addresses, port, status, **kwargs):
         self.__logger.debug(f"Seed service callback: name:{service_name}, ip:{ipv4_addresses}, ip6:{ipv6_addresses}, port:{port}, online: {status}")
 
         # add new leaf

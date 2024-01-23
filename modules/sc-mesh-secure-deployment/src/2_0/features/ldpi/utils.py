@@ -7,7 +7,7 @@ from typing import Tuple, Union, Optional, NoReturn
 import dpkt
 
 # Define a type for the flow key
-FlowKeyType = Tuple[bytes, int, bytes, int]  # (src_ip, src_port, dst_ip, dst_port)
+FlowKeyType = Tuple[bytes, int, bytes, int, str, str]  # (src_ip, src_port, dst_ip, dst_port, src_mac, dst_mac)
 
 
 class ModuleInterface(ABC, threading.Thread):
@@ -96,7 +96,7 @@ class SnifferSubscriber(ModuleInterface):
         """
 
 
-def get_flow_key(src_ip: bytes, src_port: int, dst_ip: bytes, dst_port: int, protocol: int, session: bool) -> tuple:
+def get_flow_key(src_ip: bytes, src_port: int, dst_ip: bytes, dst_port: int, protocol: int, session: bool, src_mac: str, dst_mac: str) -> tuple:
     """
     Generate a flow key based on source and destination IP addresses, ports, and protocol.
 
@@ -111,28 +111,30 @@ def get_flow_key(src_ip: bytes, src_port: int, dst_ip: bytes, dst_port: int, pro
         dst_port (int): The destination port number.
         protocol (int): The protocol number.
         session (bool): Indicates if the flow is bidirectional (True) or unidirectional (False).
+        src_mac (str): The source MAC address.
+        dst_mac (str): The destination MAC address.
 
     Returns:
         tuple: A tuple representing the flow key.
 
     Example:
-        >>> get_flow_key(b'192.168.1.1', 80, b'192.168.1.2', 443, 6, True)
+        >>> get_flow_key(b'192.168.1.1', 80, b'192.168.1.2', 443, 6, True, '00:1A:2B:3C:4D:5E', 'A1:B2:C3:D4:E5:F6')
         (b'192.168.1.1', 80, b'192.168.1.2', 443, 6)
     """
 
     # Handling bidirectional flow
     if session:
         # Sorting endpoints to ensure consistent ordering for bidirectional flow
-        sorted_endpoints = sorted([(src_ip, src_port), (dst_ip, dst_port)])
+        sorted_endpoints = sorted([(src_ip, src_port, src_mac), (dst_ip, dst_port, dst_mac)])
 
         # Unpacking sorted endpoints to create a flow key
-        ip1, port1 = sorted_endpoints[0]
-        ip2, port2 = sorted_endpoints[1]
+        ip1, port1, mac1 = sorted_endpoints[0]
+        ip2, port2, mac2 = sorted_endpoints[1]
 
-        flow_key = (ip1, port1, ip2, port2, protocol)
+        flow_key = (ip1, port1, ip2, port2, protocol, mac1, mac2)
     else:
         # Handling unidirectional flow
-        flow_key = (src_ip, src_port, dst_ip, dst_port, protocol)
+        flow_key = (src_ip, src_port, dst_ip, dst_port, protocol, src_mac, dst_mac)
 
     return flow_key
 
@@ -187,13 +189,13 @@ def flow_key_to_str(flow_key: tuple) -> tuple:
     Convert a flow key to a string representation.
 
     Args:
-        flow_key (tuple): The flow key consisting of IP addresses and port numbers.
+        flow_key (tuple): The flow key consisting of IP addresses, port numbers, MAC addresses.
 
     Returns:
-        tuple: The flow key with IP addresses in string format and port numbers.
+        tuple: The flow key with IP and MAC addresses in string format and port numbers.
     """
     # Converting IP addresses to string format and keeping other elements unchanged
-    value = (inet_to_str(flow_key[0]), flow_key[1], inet_to_str(flow_key[2]), flow_key[3], flow_key[4])
+    value = (inet_to_str(flow_key[0]), flow_key[1], inet_to_str(flow_key[2]), flow_key[3], flow_key[4], flow_key[5], flow_key[6])
     return value
 
 

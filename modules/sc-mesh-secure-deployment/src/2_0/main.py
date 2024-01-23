@@ -1,9 +1,12 @@
 import yaml
 import time
 import os
+import sys
+
 # Import classes for features
+from features.ldpi.main import IDS
+
 # Needs to be replaced by actual features
-from features.sample_feature_classes.ids import IDS
 from features.sample_feature_classes.SP_CRA import PHYCRA
 from features.sample_feature_classes.RSS_auth import RSS_Auth
 from features.decision_engine.decision_engine import DecisionEngine
@@ -17,7 +20,7 @@ from features.decision_engine.decision_engine import DecisionEngine
 MBA_MULTICAST_ADDRESS = 'ff02::1'
 MBA_PORT = 12345
 MBA_INTERFACE = "bat1" # Should be br-lan if it is there
-QUARANTINE_PERIOD = 10 # Quarantine period in seconds
+QUARANTINE_PERIOD = 30 # Quarantine period in seconds
 PATH_TO_MY_CERT_DIR = "/opt/crypto/ecdsa/birth/filebased" # Path to the folder where private key is stored (Needs to be updated when we use HSM)
 PATH_TO_PEER_CERT_DIR = "/tmp/peer_certificates" # Path to the folder where peer certificates are stored by cbma/auth/authClient.py and cbma/auth/authServer.py
 
@@ -80,5 +83,4 @@ if __name__ == "__main__":
     for feature in features:
         if features[feature]:
             initialize(feature, decision_engine)
-    time.sleep(15)
-    stop(sensors, decision_engine)
+    #stop(sensors, decision_engine) # Call this to stop features and decision engine

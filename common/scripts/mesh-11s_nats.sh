@@ -440,7 +440,7 @@ EOF
           echo "batadv-vis started."
         fi
       fi
-      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
+      wpa_supplicant -dd -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
       ;;
   "ap+mesh_mcc")
       wait_for_intf "$bridge_name"

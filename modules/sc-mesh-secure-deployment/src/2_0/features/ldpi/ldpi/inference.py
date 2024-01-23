@@ -1,4 +1,5 @@
 import os
+import sys
 import threading
 import time
 from typing import Dict, Set, Optional, Tuple, List, NoReturn
@@ -9,7 +10,12 @@ import torch
 
 from ldpi.training.preprocessing import anonymize_packet, trim_or_pad_packet
 from options import LDPIOptions
-from utils import FlowKeyType, SnifferSubscriber, Color, flow_key_to_str
+from utils import FlowKeyType, SnifferSubscriber, Color, flow_key_to_str, inet_to_str
+
+# Add the parent directory of 'features' to the Python path
+parent_dir_of_features = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, parent_dir_of_features)
+from decision_engine.observable_module import ObservableModule
 
 
 class TrainedModel:
@@ -54,7 +60,7 @@ class TrainedModel:
         self.hundred_one_threshold: Optional[float] = None
 
         # Load trained model
-        self.store_models_path: str = f'ldpi/training/output/{self.args.model_name}/'
+        self.store_models_path: str = f'features/ldpi/ldpi/training/output/{self.args.model_name}/'
         self._init_model()
 
         self.chosen_threshold: float = self._initialize_threshold()
@@ -198,7 +204,7 @@ class LightDeepPacketInspection(SnifferSubscriber):
         thread (threading.Thread): The thread running the analyze_flows method.
     """
 
-    def __init__(self) -> NoReturn:
+    def __init__(self, decision_engine=None) -> NoReturn:
         """
         Initializes the LightDeepPacketInspection instance.
         """
@@ -222,6 +228,9 @@ class LightDeepPacketInspection(SnifferSubscriber):
         # Set up threading to run sniff() in a separate thread
         self.thread = threading.Thread(target=self.analyze_flows)
         self.thread.daemon = True
+
+        # Instantiate Observable Module
+        self.observable_module = ObservableModule(decision_engine)
 
     def run(self) -> NoReturn:
         """
@@ -255,6 +264,12 @@ class LightDeepPacketInspection(SnifferSubscriber):
         # Process each key and corresponding anomaly detection result
         for key, is_anomaly in zip(keys, is_anomaly):
             if is_anomaly:
+                # Report anomaly to decision engine
+                src_ip = inet_to_str(key[0])
+                src_mac = key[5]
+                data = {"feature": "IDS", "module": "DPI", "malicious": True, "ip": src_ip, "mac": src_mac}
+                self.observable_module.notify(data)
+
                 # If anomaly detected, add the source IP to the blacklist
                 self.black_list.add(key[0])
                 print(Color.FAIL + f'Anomaly detected in flow {flow_key_to_str(key)}, LDPI blacklisted (ignoring packets from): {key[0]}' + Color.ENDC)

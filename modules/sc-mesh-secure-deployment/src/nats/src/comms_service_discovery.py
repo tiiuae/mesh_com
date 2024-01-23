@@ -6,6 +6,8 @@ and to be run in separate thread to get service url and its status changes.
 
 import time
 from typing import Optional, Callable
+import logging
+import inspect
 
 import netifaces
 from zeroconf import ServiceStateChange, Zeroconf
@@ -30,12 +32,14 @@ class CommsServiceMonitor:
         interface (str) -- Network interface name to use in service
                            discovery.
     """
+
     def __init__(
         self,
         service_name: str,
         service_type: str,
         service_cb: Optional[Callable] = None,
-        interface: Optional[str] = None
+        interface: Optional[str] = None,
+        logger: Optional[logging.Logger] = None,
     ) -> None:
         self.service_name = service_name
         self.service_type = service_type
@@ -44,6 +48,18 @@ class CommsServiceMonitor:
         self.service_callback = service_cb
         self.interface = interface
         self.running = False
+        if logger is None:
+            self.__logger = logging.getLogger("service_monitor")
+            self.__logger.setLevel(logging.DEBUG)
+            log_formatter = logging.Formatter(
+                fmt="%(asctime)s :: %(name)-18s :: %(levelname)-8s :: %(message)s"
+            )
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(log_formatter)
+            self.__logger.addHandler(console_handler)
+
+        else:
+            self.__logger = logger.getChild("service_monitor")
 
     @staticmethod
     def __get_ip_addresses(interface):
@@ -56,12 +72,12 @@ class CommsServiceMonitor:
             # Get IPv4 addresses
             if netifaces.AF_INET in addrs:
                 for addr_info in addrs[netifaces.AF_INET]:
-                    addresses.append(addr_info['addr'])
+                    addresses.append(addr_info["addr"])
 
             # Get IPv6 addresses
             if netifaces.AF_INET6 in addrs:
                 for addr_info in addrs[netifaces.AF_INET6]:
-                    addresses.append(addr_info['addr'])
+                    addresses.append(addr_info["addr"])
 
         return addresses
 
@@ -85,7 +101,7 @@ class CommsServiceMonitor:
         self.service_browser = ServiceBrowser(
             self.zeroconf,
             self.service_type,
-            handlers=[self.__on_service_state_change]
+            handlers=[self.__on_service_state_change],
         )
 
         try:
@@ -105,10 +121,10 @@ class CommsServiceMonitor:
             None
         """
         self.running = False
-        assert self.zeroconf is not None
-        assert self.service_browser is not None
-        self.service_browser.cancel()
-        self.zeroconf.close()
+        if self.zeroconf is not None:
+            if self.service_browser is not None:
+                self.service_browser.cancel()
+            self.zeroconf.close()
 
     def __on_service_state_change(
         self,
@@ -117,8 +133,11 @@ class CommsServiceMonitor:
         name: str,
         state_change: ServiceStateChange,
     ) -> None:
-        print(
-            f"Service {name} of type {service_type} state changed: {state_change}"
+        self.__logger.debug(
+            "Service %s of type %s state changed: %s",
+            name,
+            service_type,
+            state_change,
         )
         if not self.running:
             return
@@ -144,18 +163,15 @@ class CommsServiceMonitor:
                 if server:
                     server = server.rstrip(".")
 
-                if self.service_callback.__code__.co_argcount == 3:
-                    url = f'{server}:{info.port}'
-                    self.service_callback(url, service_available)
-                elif self.service_callback.__code__.co_argcount == 6:
-                    self.service_callback(name, info._ipv4_addresses, info._ipv6_addresses, info.port, service_available)
-                else:
-                    raise TypeError("Invalid callback type")
+                kwargs = {"address": f'{server}:{info.port}',"service_name": name,"ipv4_addresses": info.addresses,
+                          "ipv6_addresses": info.addresses,"port": info.port,"status": service_available}
+
+                self.service_callback(**kwargs)
 
 
 if __name__ == "__main__":
 
-    def service_discovery_cb(url, status):
+    def service_discovery_cb(address, status, **kwargs):
         """
         An example callback function.
 
@@ -164,17 +180,7 @@ if __name__ == "__main__":
                          For example "myservice.local:8000" or None.
             status (bool) -- Boolean to indicate is service available or not.
 
-        Returns:
-            None
-        """
-        print(f"Callback received, service url {url}, online: {status}")
-
-        """
-        Secondary callback type example. You can use either one.
-        REMARK: ip addresses and port are None when service is unregistered, only service_name and status are given so
-        calling client must identify the services by service_name.
-
-        Arguments:
+        Arguments kwargs:
             service_name (str) -- Registered service name, 'myservice'
             ipv4_addresses (List(IPv4Address)) -- List of ipv4 addresses published for service.
             ipv6_addresses (List(IPv6Address)) -- List of ipv6 addresses published for service.
@@ -184,15 +190,14 @@ if __name__ == "__main__":
         Returns:
             None
         """
-    def service_discovery_cb2(service_name, ipv4_addresses, ipv6_addresses, port, status):
-        print(f"Callback received, service name:{service_name}, ipv4_addresses:{ipv4_addresses}, ipv6_addresses:{ipv6_addresses}, port:{port}, online: {status}")
-
+        print(f"Callback received, service url {address}, online: {status}")
+        print(f"{kwargs}")
 
     monitor = CommsServiceMonitor(
         service_name="MDM Service",
         service_type="_mdm._tcp.local.",
         service_cb=service_discovery_cb,
-        #interface="br-lan"
+        # interface="br-lan"
     )
     try:
         monitor.run()

@@ -81,7 +81,7 @@ class DecisionEngine:
         if ip not in self.blocked_ips:
             self.blocked_ips.add(ip)
             mal_peer = Quarantine(mal_mac=mac, mal_ip=ip, quarantine_period=self.quarantine_period,
-                                  blacklist_lock=blacklist_lock, blacklist_dir='./blacklist',
+                                  blacklist_lock=blacklist_lock, blacklist_dir='/tmp/blacklist',
                                   blacklist_filename='blacklist.csv', blocked_ips=self.blocked_ips)
             # Start quarantine
             quarantine_timer_thread = mal_peer.start_quarantine()
