@@ -1157,16 +1157,14 @@ class MdmAgent:
             del self.__cbma_processes[process_name]
 
     def __validate_response(
-        self, response: requests.Response, config: ConfigType, status_type: StatusType
+        self, response: requests.Response, config: ConfigType
     ) -> str:
         """
         Validate response
         :param response: HTTP response
         :param config: config
-        :param status_type: status type
         """
         # validation for response parameters
-
         self.__comms_controller.logger.debug(
             "validating response: %s, Config %s", response.text.strip(), config
         )
@@ -1197,6 +1195,8 @@ class MdmAgent:
                     self.__comms_controller.logger.error(
                         "Debug config field not found in config"
                     )
+            else:
+                self.__comms_controller.logger.error("Validation not implemented, unknown config")
         else:
             status = "FAIL"
 
@@ -1221,7 +1221,7 @@ class MdmAgent:
         )
 
         # validate response
-        if self.__validate_response(response, config, status_type) == "FAIL":
+        if self.__validate_response(response, config) == "FAIL":
             self.__comms_controller.logger.debug(
                 "Validation status: %s", self.__status[status_type]
             )
