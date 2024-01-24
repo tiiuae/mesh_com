@@ -4,6 +4,7 @@ import subprocess
 import logging
 
 from typing import List
+from glob import glob
 
 from setup_cbma import cbma, cbma_processes
 from cbma.tools.utils import batman
@@ -108,8 +109,12 @@ def main(interfaces: List [str],
     batman(bat_iface)
 
     for iface in interfaces:
-        with open(f"/sys/class/net/{iface}/phy80211/index") as f:
-            index = f.read()
+        try:
+            with open(f"/sys/class/net/{iface}/phy80211/index") as f:
+                index = f.read()
+                wpa_supplicant_control_path = f"/var/run/wpa_supplicant_id{index}/{iface}"
+        except FileNotFoundError:
+            wpa_supplicant_control_path = False
 
         process = cbma(
             "lower",
@@ -119,7 +124,7 @@ def main(interfaces: List [str],
             cert_folder,
             cert_chain,
             "off",
-            f"/var/run/wpa_supplicant_id{index}/{iface}"
+            wpa_supplicant_control_path
         )
         cbma_processes.append(process)
 
@@ -133,9 +138,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "-i",
         "--interfaces",
-        default="wlp1s0",
-        action="append",
-        help="Interfaces to launch CBMA into. Can be specified multiple times",
+        default="all",
+        nargs="+",
+        help="Interfaces to launch CBMA into. Accepts multiple values",
         required=False
     )
     parser.add_argument(
@@ -169,7 +174,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    interfaces = args.interfaces if isinstance(args.interfaces, List) else [args.interfaces]
+    if args.interfaces == "all":
+        # TODO - Only matching common interfaces such as wlp1s0, eth1, usb0 and halow1
+        interfaces = [i.split('/')[-1] for i in glob("/sys/class/net/[!bdls][tals][!a]*")]
+    else:
+        interfaces = args.interfaces if isinstance(args.interfaces, List) else [args.interfaces]
 
     try:
         setup_logger()
@@ -177,7 +186,7 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(e)
     except KeyboardInterrupt:
-        logger.warning("Interrupting...")
+        logger.info("Interrupting...")
     finally:
         stop_cbma(args.batman)
 
