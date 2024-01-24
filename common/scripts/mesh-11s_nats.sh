@@ -314,6 +314,8 @@ EOF
       # Radio parameters
       echo "set radio parameters"
       # /usr/local/bin/cli_app set txpwr fixed 23
+      /usr/local/bin/cli_app set gi long
+      /usr/local/bin/cli_app set support_ch_width 1
 
       # Batman parameters
       batctl "$wifidev" hop_penalty 30
