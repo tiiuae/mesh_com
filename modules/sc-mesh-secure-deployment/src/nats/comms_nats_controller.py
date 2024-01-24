@@ -563,17 +563,18 @@ class MdmAgent:
         """
         config: dict = json.loads(response.text)
 
-        try:
+        if self.__previous_config_mesh is not None:
             self.__comms_controller.logger.debug(
                 f"config: {config} previous: {json.loads(self.__previous_config_mesh)}"
             )
+
             if json.loads(self.__previous_config_mesh) == config:
                 self.__comms_controller.logger.debug(
                     "No changes in mesh config, not updating."
                 )
                 return "OK"
-        except TypeError:
-            self.__comms_controller.logger.debug("No previous mesh config")
+
+        self.__comms_controller.logger.debug("No previous mesh config")
 
         ret, info = self.__comms_controller.settings.handle_mesh_settings(
             json.dumps(config["payload"])
@@ -1155,10 +1156,57 @@ class MdmAgent:
         for process_name in terminated_processes:
             del self.__cbma_processes[process_name]
 
+    def __validate_response(
+        self, response: requests.Response, config: ConfigType
+    ) -> str:
+        """
+        Validate response
+        :param response: HTTP response
+        :param config: config
+        """
+        # validation for response parameters
+        self.__comms_controller.logger.debug(
+            "validating response: %s, Config %s", response.text.strip(), config
+        )
+        status: str = "FAIL"
+
+        if response.status_code == 200:
+            if config == ConfigType.FEATURES:
+                try:
+                    if json.loads(response.text)["payload"]["features"]:
+                        status = "OK"
+                except KeyError:
+                    self.__comms_controller.logger.error(
+                        "Features field not found in config"
+                    )
+            elif config == ConfigType.MESH_CONFIG:
+                try:
+                    if json.loads(response.text)["payload"]["radios"]:
+                        status = "OK"
+                except KeyError:
+                    self.__comms_controller.logger.error(
+                        "Radios field not found in config"
+                    )
+            elif config == ConfigType.DEBUG_CONFIG:
+                try:
+                    if json.loads(response.text)["payload"]["debug_config"]:
+                        status = "OK"
+                except KeyError:
+                    self.__comms_controller.logger.error(
+                        "Debug config field not found in config"
+                    )
+            else:
+                self.__comms_controller.logger.error("Validation not implemented, unknown config")
+        else:
+            status = "FAIL"
+
+        return status
+
     async def __loop_run_executor(self, executor, config: ConfigType) -> None:
         """
         Loop run executor
         :param executor: executor
+        :param config: configType
         """
         # This function makes a synchronous HTTP request using ThreadPoolExecutor
         https_loop = asyncio.get_event_loop()
@@ -1171,6 +1219,14 @@ class MdmAgent:
         self.__comms_controller.logger.debug(
             "HTTP Request status: %s, config: %s", str(response.status_code), config
         )
+
+        # validate response
+        if self.__validate_response(response, config) == "FAIL":
+            self.__comms_controller.logger.debug(
+                "Validation status: %s", self.__status[status_type]
+            )
+            return "FAIL"
+
         if self.__mesh_conf_request_processed:
             if (
                 response.status_code == 200
