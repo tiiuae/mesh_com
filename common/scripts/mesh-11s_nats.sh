@@ -401,7 +401,7 @@ EOF
         echo "$batman_iface ip address.."
         ifconfig "$batman_iface" "$ipaddr" netmask "$nmask"
         echo "$batman_iface mtu size"
-        ifconfig "$batman_iface" mtu 1460
+        ifconfig "$batman_iface" mtu 1500
         echo
         ifconfig "$batman_iface"
         if [[ -n $bridge_name ]]; then
