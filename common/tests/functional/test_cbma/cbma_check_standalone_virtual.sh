@@ -172,7 +172,7 @@ check_dependencies() {
         exit 1
     fi
 
-    for t in brctl ebtables batctl; do
+    for t in brctl ebtables batctl openssl; do
         if ! type $t &>/dev/null; then
             echo -e "\n[!] FATAL: $t is missing!"
             exit 1

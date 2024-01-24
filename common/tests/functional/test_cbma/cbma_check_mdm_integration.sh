@@ -22,7 +22,7 @@ shift
 MDM_AGENT_IPS="$@"
 
 
-[ "$DEBUG" != "1" ] || unset DEBUG
+[ "$DEBUG" = "0" ] && unset DEBUG || DEBUG=/dev/fd/1
 
 
 usage() {
@@ -49,7 +49,7 @@ setup_ssh() {
 launch_server() {
     echo -n "[+] Launching the MDM server on ${MDM_SERVER_IP}... "
 
-    command ssh -t -t "root@${MDM_SERVER_IP}" sh <<- EOF ${DEBUG+>/dev/null 2>&1} &
+    command ssh -t -t "root@${MDM_SERVER_IP}" sh <<- EOF > ${DEBUG:-/dev/null} 2>&1 &
         unset PS1
 
 				cd "$MDM_SERVER_DIR"
@@ -75,7 +75,7 @@ launch_client() {
 
     echo -n "[+] Launching the MDM client on ${ip}... "
 
-    command ssh -t -t "root@${ip}" sh <<- EOF ${DEBUG+>/dev/null 2>&1} &
+    command ssh -t -t "root@${ip}" sh <<- EOF > ${DEBUG:-/dev/null} 2>&1 &
         unset PS1
 
 				cd "$MDM_AGENT_DIR"
