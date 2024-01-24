@@ -4,6 +4,7 @@ to be used by MDM agent to get network interface statuss.
 """
 
 # pylint: disable=too-few-public-methods, too-many-nested-blocks
+from typing import Callable, List, Dict
 from copy import deepcopy
 from pyroute2 import IPRoute
 
@@ -13,7 +14,7 @@ class CommsInterfaceMonitor:
     A class to get network interfaces status.
     """
 
-    def __init__(self, callback) -> None:
+    def __init__(self, callback: Callable[[List[Dict]], None]) -> None:
         self.__interfaces = []
         self.__previous_interfaces = []
         self.__callback = callback
@@ -84,6 +85,7 @@ class CommsInterfaceMonitor:
                                     self.__interfaces.append(interface_info)
                             if (
                                 self.__callback
+                                and self.__running
                                 and self.__interfaces != self.__previous_interfaces
                             ):
                                 self.__callback(self.__interfaces)
@@ -93,5 +95,14 @@ class CommsInterfaceMonitor:
         self.__ipr.close()
 
     def stop(self):
+        """
+        Stop monitoring at latest after any waited RTNL message.
+        No callbacks are provided after calling this method.
+
+        Arguments:
+            None
+
+        Returns:
+            None
+        """
         self.__running = False
-        self.__ipr.close()
