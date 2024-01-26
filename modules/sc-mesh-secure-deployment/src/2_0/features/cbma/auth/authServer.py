@@ -22,6 +22,8 @@ class AuthServer:
         self.ipAddress = ip_address
         self.port = port
         self.CERT_PATH = cert_path
+        # FIXME: temporary hard coding for key path
+        self.KEY_PATH = "/opt/crypto/ecdsa/birth/filebased"
         self.ca = ca_path
         self.interface = interface
         self.mymac = get_mac_addr(self.interface)
@@ -33,7 +35,7 @@ class AuthServer:
         self.context.verify_mode = ssl.CERT_REQUIRED
         self.context.load_cert_chain(
             certfile=glob.glob(f"{self.CERT_PATH}/MAC/{self.mymac}.crt")[0],
-            keyfile=glob.glob(f"{self.CERT_PATH}/private.key")[0],
+            keyfile=glob.glob(f"{self.KEY_PATH}/private.key")[0],
         )
         self.client_auth_results = {}
         self.active_sockets = {}
