@@ -24,6 +24,8 @@ class AuthClient:
         self.sslServerIP = mac_to_ipv6(server_mac)
         self.sslServerPort = server_port
         self.CERT_PATH = cert_path
+        # FIXME: temporary hard coding for key path
+        self.KEY_PATH = "/opt/crypto/ecdsa/birth/filebased"
         self.interface = interface
         self.secure_client_socket = None
         self.logger = logger_instance.get_logger()
@@ -45,7 +47,7 @@ class AuthClient:
 
         context.load_cert_chain(
             certfile=glob.glob(f"{self.CERT_PATH}/MAC/{self.mymac}.crt")[0],
-            keyfile=glob.glob(f"{self.CERT_PATH}/private.key")[0],
+            keyfile=glob.glob(f"{self.KEY_PATH}/private.key")[0],
         )
 
         # Detect if the server IP is IPv4 or IPv6 and create a socket accordingly
