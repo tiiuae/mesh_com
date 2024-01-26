@@ -45,13 +45,9 @@ from nats.aio.client import Client as nats
 
 from cbma.tools.utils import batman  # type: ignore[import-not-found]
 
-from src import batadvvis
-from src import batstat
-from src import comms_command
 from src import comms_if_monitor
+from src import comms_controller
 from src import comms_service_discovery
-from src import comms_settings
-from src import comms_status
 from src.constants import Constants, ConfigType, StatusType
 
 # FMO_SUPPORTED_COMMANDS = [
@@ -59,110 +55,6 @@ from src.constants import Constants, ConfigType, StatusType
 #     "ENABLE_VISUALISATION",
 #     "DISABLE_VISUALISATION",
 # ]
-
-
-class MeshTelemetry:
-    """
-    Mesh network telemetry collector
-    """
-
-    def __init__(self, loop_interval: int = 1000, logger: logging.Logger = None):
-        self.thread_visual = None
-        self.thread_stats = None
-        # milliseconds to seconds
-        self.interval = float(loop_interval / 1000.0)
-        self.logger = logger
-        self.batman_visual = batadvvis.BatAdvVis(self.interval * 0.2)
-        self.batman = batstat.Batman(self.interval * 0.2)
-        self.visualisation_enabled = False
-
-    def mesh_visual(self):
-        """
-        Get mesh visualisation
-
-        :return: mesh visualisation
-        """
-        return (
-            f"[{self.batman_visual.latest_topology},"
-            f"{self.batman.latest_stat}]".replace(": ", ":").replace(", ", ",")
-        )
-
-    def run(self):
-        """
-        Run method to start collecting visualisation telemetry
-
-        :return: -
-        """
-        self.thread_visual = threading.Thread(
-            target=self.batman_visual.run
-        )  # create thread
-        self.thread_visual.start()  # start thread
-        self.thread_stats = threading.Thread(target=self.batman.run)  # create thread
-        self.thread_stats.start()  # start thread
-        self.visualisation_enabled = True  # publisher enabled
-
-    def stop(self):
-        """
-        Stop method for collecting telemetry
-
-        :return: -
-        """
-        self.visualisation_enabled = False  # publisher disabled
-        if self.batman_visual.thread_running:
-            self.batman_visual.thread_running = False  # thread loop disabled
-            self.thread_visual.join()  # wait for thread to finish
-        if self.batman.thread_running:
-            self.batman.thread_running = False  # thread loop disabled
-            self.thread_stats.join()  # wait for thread to finish
-
-
-# pylint: disable=too-many-instance-attributes
-class CommsController:  # pylint: disable=too-few-public-methods
-    """
-    Mesh network
-    """
-
-    def __init__(self, interval: int = 1000):
-        self.interval = interval
-        self.debug_mode_enabled = False
-
-        # base logger for comms and which is used by all other modules
-        self.main_logger = logging.getLogger("comms")
-        self.main_logger.setLevel(logging.DEBUG)
-        log_formatter = logging.Formatter(
-            fmt="%(asctime)s :: %(name)-18s :: %(levelname)-8s :: %(message)s"
-        )
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(log_formatter)
-        self.main_logger.addHandler(console_handler)
-
-        self.c_status = []
-        # TODO how many radios?
-        for i in range(0, 3):
-            self.c_status.append(
-                comms_status.CommsStatus(
-                    self.main_logger.getChild(f"status {str(i)}"), i
-                )
-            )
-
-        self.settings = comms_settings.CommsSettings(
-            self.c_status, self.main_logger.getChild("settings")
-        )
-
-        for cstat in self.c_status:
-            if cstat.index < len(self.settings.mesh_vif):
-                cstat.wifi_interface = self.settings.mesh_vif[cstat.index]
-
-        self.command = comms_command.Command(
-            self.c_status, self.main_logger.getChild("command")
-        )
-        self.telemetry = MeshTelemetry(
-            self.interval, self.main_logger.getChild("telemetry")
-        )
-
-        # logger for this module and derived from main logger
-        self.logger = self.main_logger.getChild("controller")
-
 
 # pylint: disable=too-few-public-methods
 class Interface:
@@ -177,8 +69,6 @@ class Interface:
 
 
 # pylint: enable=too-few-public-methods
-
-
 class MdmAgent:
     """
     MDM Agent
@@ -187,7 +77,7 @@ class MdmAgent:
     # pylint: disable=too-many-arguments
     def __init__(
         self,
-        comms_controller,
+        comms_ctrl: comms_controller.CommsController,
         keyfile: str = None,
         certificate_file: str = None,
         ca_file: str = None,
@@ -209,7 +99,8 @@ class MdmAgent:
             str
         ] = self.__read_debug_config_from_file()
         self.__mesh_conf_request_processed = False
-        self.__comms_controller: CommsController = comms_controller
+        self.__comms_ctrl: comms_controller.CommsController = comms_ctrl
+        self.logger: logging = self.__comms_ctrl.logger.getChild("mdm_agent")
         self.__interval: int = (
             Constants.FAIL_POLLING_TIME_SECONDS.value
         )  # possible to update from MDM server?
@@ -223,7 +114,7 @@ class MdmAgent:
         self.__ca: str = ca_file
         self.__config_version: int = 0
         self.mdm_service_available: bool = False
-        self.__if_to_monitor = interface
+        self.__if_to_monitor: str = interface
         self.__interfaces: List[Interface] = []
         self.executor = ThreadPoolExecutor(1)
         self.__lock = threading.Lock()
@@ -248,10 +139,10 @@ class MdmAgent:
         try:
             with open("/opt/certs_uploaded", "r", encoding="utf-8") as f:
                 self.__certs_uploaded = True
-                self.__comms_controller.logger.debug("No need to upload certificates")
+                self.logger.debug("No need to upload certificates")
         except FileNotFoundError:
             self.__certs_uploaded = False
-            self.__comms_controller.logger.debug("Certificate upload needed")
+            self.logger.debug("Certificate upload needed")
 
         self.__cbma_certs_downloaded = "/opt/mdm/certs"
         self.__cbma_certs_path = "/opt/crypto/ecdsa/birth/filebased"
@@ -270,16 +161,14 @@ class MdmAgent:
         self.running = False
 
         try:
-            if not os.listdir(self.__cbma_certs_downloaded):
-                self.__certs_downloaded = False
-                self.__comms_controller.logger.debug("Certificate download needed")
-            else:
-                self.__certs_downloaded = True
-                self.__comms_controller.logger.debug("No need to download certificates")
+            self.__certs_downloaded = bool(os.listdir(self.__cbma_certs_downloaded))
         except FileNotFoundError:
-            os.makedirs(self.__cbma_certs_downloaded, exist_ok=True)
             self.__certs_downloaded = False
-            self.__comms_controller.logger.debug("Certificate download needed")
+            os.makedirs(self.__cbma_certs_downloaded, exist_ok=True)
+        finally:
+            self.logger.debug(
+                f"Certificate download {'not ' if self.__certs_downloaded else ''}needed"
+            )
 
         self.__status: dict = {
             StatusType.DOWNLOAD_MESH_CONFIG.value: "FAIL",
@@ -324,7 +213,7 @@ class MdmAgent:
         :return: -
         """
         with self.__lock:
-            self.__comms_controller.logger.debug("Interface monitor cb: %s", interfaces)
+            self.logger.debug("Interface monitor cb: %s", interfaces)
             self.__interfaces.clear()
 
             for interface_data in interfaces:
@@ -352,7 +241,7 @@ class MdmAgent:
         :return: -
         """
         if not self.service_monitor.running:
-            self.__comms_controller.logger.debug("Start service monitor thread")
+            self.logger.debug("Start service monitor thread")
 
             self.__service_monitor_thread.start()
 
@@ -363,7 +252,7 @@ class MdmAgent:
         :return: -
         """
         if self.service_monitor.running:
-            self.__comms_controller.logger.debug("Stop service monitor thread")
+            self.logger.debug("Stop service monitor thread")
             self.service_monitor.close()
             self.__service_monitor_thread.join()
 
@@ -381,7 +270,7 @@ class MdmAgent:
         self.running = True
 
         while self.running:
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "status: %s, mdm_available: %s",
                 self.__status,
                 self.mdm_service_available,
@@ -392,7 +281,7 @@ class MdmAgent:
                 and self.mdm_service_available
             ):
                 resp = self.upload_certificate_bundle()
-                self.__comms_controller.logger.debug(
+                self.logger.debug(
                     "Certificate upload response: %s", resp
                 )
                 if resp.status_code == 200:
@@ -400,7 +289,7 @@ class MdmAgent:
                     with open("/opt/certs_uploaded", "w", encoding="utf-8") as f:
                         f.write("certs uploaded")
                 else:
-                    self.__comms_controller.logger.debug("Certificate upload failed")
+                    self.logger.debug("Certificate upload failed")
             elif (
                 self.__status[StatusType.DOWNLOAD_CERTIFICATES.value] == "FAIL"
                 and self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "OK"
@@ -412,7 +301,7 @@ class MdmAgent:
                     # ConfigType.LOWER_CERTIFICATE,
                 ]:
                     resp = self.download_certificate_bundle(certificate_type.value)
-                    self.__comms_controller.logger.debug(
+                    self.logger.debug(
                         "Certificate download response: %s", resp
                     )
                     if resp.status_code == 200:
@@ -430,11 +319,11 @@ class MdmAgent:
                             self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
                             == "FAIL"
                         ):
-                            self.__comms_controller.logger.debug(
+                            self.logger.debug(
                                 "Certificates action failed"
                             )
                     else:
-                        self.__comms_controller.logger.debug(
+                        self.logger.debug(
                             "Certificate download failed: %s", certificate_type.value
                         )
             elif self.mdm_service_available:
@@ -469,7 +358,7 @@ class MdmAgent:
                 timeout=2,
             )
         except requests.exceptions.ConnectionError as err:
-            self.__comms_controller.logger.error(
+            self.logger.error(
                 "HTTP request failed with error: %s", err
             )
             return requests.Response()
@@ -490,14 +379,14 @@ class MdmAgent:
             elif certificate_type == ConfigType.LOWER_CERTIFICATE.value:
                 cert_path = Constants.DOWNLOADED_CBMA_LOWER_PATH.value
             else:
-                self.__comms_controller.logger.error("Unknown certificate type")
+                self.logger.error("Unknown certificate type")
                 return "FAIL"
 
             payload_dict = json.loads(response.text)["payload"]
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "payload_dict[role]: %s", payload_dict["role"]
             )
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "payload_dict[group]: %s", payload_dict["group"]
             )
 
@@ -510,7 +399,7 @@ class MdmAgent:
                         f"{self.__cbma_certs_downloaded}/{certificate_name}", "wb"
                     ) as cert_file:
                         cert_file.write(base64.b64decode(certificate))
-                        self.__comms_controller.logger.debug(
+                        self.logger.debug(
                             "Certificate %s saved", certificate_name
                         )
                         try:
@@ -520,6 +409,10 @@ class MdmAgent:
                                 "r:bz2",
                             ) as tar:
                                 for member in tar.getmembers():
+                                    # Only extract regular files that don't contain relative paths
+                                    if not member.isfile() or ".." in member.name:
+                                        raise tarfile.TarError("Invalid/Malicious file in archive")
+
                                     # Construct the full path where the file would be extracted
                                     file_path = os.path.join(cert_path, member.name)
 
@@ -528,13 +421,9 @@ class MdmAgent:
                                         raise FileExistsError(
                                             f"File {file_path} already exists"
                                         )
+                                    tar.extract(member, cert_path)
 
-                                self.__comms_controller.logger.debug(
-                                    "Extracting files (not overwriting)"
-                                )
-                                # todo: add filter="data" once python is updated
-                                tar.extractall(path=cert_path)
-                                self.__comms_controller.logger.debug(
+                                self.logger.debug(
                                     "Certificate %s extracted to %s",
                                     certificate_name,
                                     cert_path,
@@ -547,7 +436,7 @@ class MdmAgent:
                         ) as exc:
                             shutil.rmtree(cert_path)
                             shutil.rmtree(self.__cbma_certs_downloaded)
-                            self.__comms_controller.logger.error(
+                            self.logger.error(
                                 "Failed to extract certificate: %s", exc
                             )
                             return "FAIL"
@@ -562,14 +451,14 @@ class MdmAgent:
                         f"{self.__cbma_certs_downloaded}/{certificate_name}", "wb"
                     ) as sig_file:
                         sig_file.write(base64.b64decode(certificate))
-                        self.__comms_controller.logger.debug(
+                        self.logger.debug(
                             "Sig %s saved", certificate_name
                         )
                     umask(old_umask)
-            self.__comms_controller.logger.debug("Downloaded bundle saved")
+            self.logger.debug("Downloaded bundle saved")
 
         except Exception as e:
-            self.__comms_controller.logger.error(
+            self.logger.error(
                 "Error saving certificates: %s", str(e)
             )
             return "FAIL"
@@ -584,23 +473,23 @@ class MdmAgent:
         config: dict = json.loads(response.text)
 
         if self.__previous_config_mesh is not None:
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 f"config: {config} previous: {json.loads(self.__previous_config_mesh)}"
             )
 
             if json.loads(self.__previous_config_mesh) == config:
-                self.__comms_controller.logger.debug(
+                self.logger.debug(
                     "No changes in mesh config, not updating."
                 )
                 return "OK"
 
-        self.__comms_controller.logger.debug("No previous mesh config")
+        self.logger.debug("No previous mesh config")
 
-        ret, info = self.__comms_controller.settings.handle_mesh_settings(
+        ret, info = self.__comms_ctrl.settings.handle_mesh_settings(
             json.dumps(config["payload"])
         )
 
-        self.__comms_controller.logger.debug("ret: %s info: %s", ret, info)
+        self.logger.debug("ret: %s info: %s", ret, info)
 
         if ret == "OK":
             for radio in config["payload"]["radios"]:
@@ -616,10 +505,10 @@ class MdmAgent:
                     }
                 )
 
-                ret, info, _ = self.__comms_controller.command.handle_command(
-                    cmd, self.__comms_controller
+                ret, info, _ = self.__comms_ctrl.command.handle_command(
+                    cmd, self.__comms_ctrl
                 )
-                self.__comms_controller.logger.debug("ret: %s info: %s", ret, info)
+                self.logger.debug("ret: %s info: %s", ret, info)
 
             if ret == "OK":
                 self.__config_version = int(config["version"])
@@ -634,7 +523,7 @@ class MdmAgent:
     def __action_feature_yaml(self, response: requests.Response) -> str:
         """
         Take feature.yaml into use
-        :param config: config dict
+        :param response: https response
         :return: status
         """
         # check if features field exists
@@ -643,16 +532,16 @@ class MdmAgent:
             config: dict = json.loads(response.text)
 
             try:
-                self.__comms_controller.logger.debug(
+                self.logger.debug(
                     f"config: {config} previous: {json.loads(self.__previous_config_features)}"
                 )
                 if json.loads(self.__previous_config_features) == config:
-                    self.__comms_controller.logger.debug(
+                    self.logger.debug(
                         "No changes in features config, not updating."
                     )
                     return "OK"
             except TypeError:
-                self.__comms_controller.logger.debug("No previous features config")
+                self.logger.debug("No previous features config")
 
             if config["payload"] is not None:
                 features_dict = config["payload"]["features"]
@@ -672,9 +561,9 @@ class MdmAgent:
                 )
                 return "OK"
 
-            self.__comms_controller.logger.error("No features field in config")
+            self.logger.error("No features field in config")
         except KeyError:
-            self.__comms_controller.logger.error("KeyError features field in config")
+            self.logger.error("KeyError features field in config")
 
         return "FAIL"
 
@@ -687,7 +576,7 @@ class MdmAgent:
         :return: -
         """
 
-        self.__comms_controller.logger.debug(
+        self.logger.debug(
             f"HTTP Request Response: {response.text.strip()} {str(response.status_code).strip()}"
         )
 
@@ -708,7 +597,7 @@ class MdmAgent:
                     )
                 return "OK"
             except:
-                self.__comms_controller.logger.debug(
+                self.logger.debug(
                     "cannot store /opt/debug_config.json"
                 )
                 self.__debug_config_interval = Constants.FAIL_POLLING_TIME_SECONDS.value
@@ -767,7 +656,7 @@ class MdmAgent:
         """
 
         try:
-            self.__comms_controller.logger.debug("Downloading certificate bundle")
+            self.logger.debug("Downloading certificate bundle")
 
             # Prepare the JSON data for the POST request
             data = {
@@ -789,9 +678,9 @@ class MdmAgent:
                 timeout=2,
             )
         except FileNotFoundError as e:
-            self.__comms_controller.logger.error("Certificate file not found: %s", e)
+            self.logger.error("Certificate file not found: %s", e)
         except requests.RequestException as e:
-            self.__comms_controller.logger.error(
+            self.logger.error(
                 "Post request failed with error: %s", e
             )
         return requests.Response()
@@ -807,7 +696,7 @@ class MdmAgent:
             files = glob.glob("/opt/at_birth.tar.bz2*")
 
             if len(files) == 0:
-                self.__comms_controller.logger.debug("No certificates found")
+                self.logger.debug("No certificates found")
                 return requests.Response()
 
             for file in files:
@@ -818,7 +707,7 @@ class MdmAgent:
                         "utf-8"
                     )
 
-            self.__comms_controller.logger.debug("Uploading certificate bundle")
+            self.logger.debug("Uploading certificate bundle")
 
             # Prepare the JSON data for the POST request
             data = {
@@ -841,9 +730,9 @@ class MdmAgent:
                 timeout=2,
             )
         except FileNotFoundError as e:
-            self.__comms_controller.logger.error("Certificate file not found: %s", e)
+            self.logger.error("Certificate file not found: %s", e)
         except requests.RequestException as e:
-            self.__comms_controller.logger.error(
+            self.logger.error(
                 "Post request failed with error: %s", e
             )
         return requests.Response()
@@ -880,7 +769,7 @@ class MdmAgent:
             if bridge_indices:
                 bridge_index = bridge_indices[0]
             else:
-                self.__comms_controller.logger.debug(
+                self.logger.debug(
                     "Cannot remove interfaces from %s as it was not found!",
                     bridge_name,
                 )
@@ -891,7 +780,7 @@ class MdmAgent:
             ]
 
             if not interfaces_indices:
-                self.__comms_controller.logger.debug(
+                self.logger.debug(
                     "No interfaces to remove from the bridge %s!",
                     bridge_name,
                 )
@@ -904,7 +793,7 @@ class MdmAgent:
                 )  # Set the master to 0 (no bridge)
 
         except Exception as e:
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "Error removing interfaces from bridge %s!",
                 e,
             )
@@ -922,7 +811,7 @@ class MdmAgent:
             if bridge_indices:
                 bridge_index = bridge_indices[0]
             else:
-                self.__comms_controller.logger.debug(
+                self.logger.debug(
                     "Cannot remove interfaces from %s as it was not found!",
                     bridge_name,
                 )
@@ -932,7 +821,7 @@ class MdmAgent:
             interface_indices = ip.link_lookup(ifname=interface_to_add)
 
             if not interface_indices:
-                self.__comms_controller.logger.debug(
+                self.logger.debug(
                     "Cannot add interfaces %s to bridge %s!",
                     interface_to_add,
                     bridge_name,
@@ -944,7 +833,7 @@ class MdmAgent:
             ip.link("set", index=interface_index, master=bridge_index)
 
         except Exception as e:
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "Error adding interface %s to bridge %s! Error: %s",
                 interface_to_add,
                 bridge_name,
@@ -1024,7 +913,7 @@ class MdmAgent:
             index = ip.link_lookup(ifname=interface_name)[0]
             ip.link("set", index=index, state="down")
         except IndexError:
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "Not able to shutdown interface %s! Interface not found!",
                 interface_name,
             )
@@ -1038,10 +927,10 @@ class MdmAgent:
         try:
             ip.link("delete", ifname=mesh_interface)
         except Exception as e:
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 f"Error: Unable to destroy interface {mesh_interface}."
             )
-            self.__comms_controller.logger.debug(f"Exception: {str(e)}")
+            self.logger.debug(f"Exception: {str(e)}")
         finally:
             ip.close()
 
@@ -1052,7 +941,7 @@ class MdmAgent:
             ip.link("set", index=index, state="down")
             ip.link("delete", index=index)
         except IndexError:
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "Not able to delete bridge %s! Bridge not found!", bridge_name
             )
         finally:
@@ -1071,11 +960,11 @@ class MdmAgent:
         if not self.__cbma_set_up:
             return
         try:
-            self.__comms_controller.logger.debug("Stopping CBMA...")
+            self.logger.debug("Stopping CBMA...")
 
             for if_name, process in self.__lower_cbma_processes.items():
                 try:
-                    self.__comms_controller.logger.debug(
+                    self.logger.debug(
                         "Stopping lower CBMA process %s for interface %s",
                         process,
                         if_name,
@@ -1083,7 +972,7 @@ class MdmAgent:
                     if process.is_alive():
                         process.terminate()
                 except Exception as e:
-                    self.__comms_controller.logger.error(
+                    self.logger.error(
                         f"Terminating lower CBMA process error: {e}"
                     )
 
@@ -1093,13 +982,13 @@ class MdmAgent:
                         process.join(timeout=1.0)
                         process.kill()
                 except Exception as e:
-                    self.__comms_controller.logger.error(
+                    self.logger.error(
                         f"Killing lower CBMA process error: {e}"
                     )
 
             for if_name, process in self.__upper_cbma_processes.items():
                 try:
-                    self.__comms_controller.logger.debug(
+                    self.logger.debug(
                         "Stopping upper CBMA process %s for interface %s",
                         process,
                         if_name,
@@ -1107,7 +996,7 @@ class MdmAgent:
                     if process.is_alive():
                         process.terminate()
                 except Exception as e:
-                    self.__comms_controller.logger.error(
+                    self.logger.error(
                         f"Terminating upper CBMA process error: {e}"
                     )
 
@@ -1117,17 +1006,17 @@ class MdmAgent:
                         process.join(timeout=1.0)
                         process.kill()
                 except Exception as e:
-                    self.__comms_controller.logger.error(
+                    self.logger.error(
                         f"Killing upper CBMA process error: {e}"
                     )
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "CBMA processes terminated, continue cleanup..."
             )
             self.__cleanup_cbma()
-            self.__comms_controller.logger.debug("CBMA cleanup finished")
+            self.logger.debug("CBMA cleanup finished")
 
         except Exception as e:
-            self.__comms_controller.logger.error(f"Stop CBMA error: {e}")
+            self.logger.error(f"Stop CBMA error: {e}")
         finally:
             self.__cbma_set_up = False
 
@@ -1135,12 +1024,12 @@ class MdmAgent:
         certificate_path = f"{cert_path}/MAC/{mac}.crt"
 
         if not path.exists(certificate_path):
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "Certificate not found: %s", certificate_path
             )
             return False
 
-        self.__comms_controller.logger.debug("Certificate found: %s", certificate_path)
+        self.logger.debug("Certificate found: %s", certificate_path)
         return True
 
     def __is_cbma_feature_enabled(self) -> bool:
@@ -1153,7 +1042,7 @@ class MdmAgent:
                 features = yaml.safe_load(stream)
                 return bool(features["CBMA"])
             except (yaml.YAMLError, KeyError, FileNotFoundError) as exc:
-                self.__comms_controller.logger.error(
+                self.logger.error(
                     f"CBMA disabled as feature configuration not found: {exc}"
                 )
             return False
@@ -1175,7 +1064,7 @@ class MdmAgent:
 
         # Remove interfaces without certificates lower CBMA interface list
         for interface in interfaces_without_certificate:
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "Interface %s doesn't have certificate!", interface.interface_name
             )
             if interface in self.__lower_cbma_interfaces:
@@ -1251,7 +1140,7 @@ class MdmAgent:
         self.__setup_upper_cbma()
 
         # Add interfaces to the bridge
-        bridge_setting = self.__comms_controller.settings.bridge[0]
+        bridge_setting = self.__comms_ctrl.settings.bridge[0]
         bridge_setting = bridge_setting.strip('"')
         components = bridge_setting.split()
         bridge_name = components[0]
@@ -1277,14 +1166,14 @@ class MdmAgent:
         for interface in self.__lower_cbma_interfaces:
             interface_name = interface.interface_name.lower()
             try:
-                index = self.__comms_controller.settings.mesh_vif.index(interface_name)
+                index = self.__comms_ctrl.settings.mesh_vif.index(interface_name)
                 wpa_supplicant_ctrl_path = (
                     f"/var/run/wpa_supplicant_id{index}/{interface_name}"
                 )
             except ValueError:
                 wpa_supplicant_ctrl_path = None
 
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "Setup lower CBMA for interface: %s, wpa_supplicant_ctrl_path: %s",
                 interface_name,
                 wpa_supplicant_ctrl_path,
@@ -1305,7 +1194,7 @@ class MdmAgent:
         for interface in self.__upper_cbma_interfaces:
             interface_name = interface.interface_name.lower()
             try:
-                index = self.__comms_controller.settings.mesh_vif.index(interface_name)
+                index = self.__comms_ctrl.settings.mesh_vif.index(interface_name)
                 wpa_supplicant_ctrl_path = (
                     f"/var/run/wpa_supplicant_id{index}/{interface_name}"
                 )
@@ -1315,7 +1204,7 @@ class MdmAgent:
             if self.__has_certificate(
                 self.__upper_cbma_certs_path, interface.mac_address
             ):
-                self.__comms_controller.logger.debug(
+                self.logger.debug(
                     "Using upper cbma certificate for interface %s", interface_name
                 )
                 cbma_certs_path = self.__upper_cbma_certs_path
@@ -1325,19 +1214,19 @@ class MdmAgent:
                 if self.__has_certificate(
                     self.__cbma_certs_path, interface.mac_address
                 ):
-                    self.__comms_controller.logger.debug(
+                    self.logger.debug(
                         "Using lower cbma certificate as a backup for interface %s",
                         interface_name,
                     )
                     cbma_certs_path = self.__cbma_certs_path
                     cbma_ca_cert_path = self.__cbma_ca_cert_path
                 else:
-                    self.__comms_controller.logger.debug(
+                    self.logger.debug(
                         "No cbma certificate for interface %s", interface_name
                     )
                     continue
 
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "Setup upper CBMA for interface: %s, wpa_supplicant_ctrl_path: %s",
                 interface_name,
                 wpa_supplicant_ctrl_path,
@@ -1364,7 +1253,7 @@ class MdmAgent:
         :param config: config
         """
         # validation for response parameters
-        self.__comms_controller.logger.debug(
+        self.logger.debug(
             "validating response: %s, Config %s", response.text.strip(), config
         )
         status: str = "FAIL"
@@ -1375,7 +1264,7 @@ class MdmAgent:
                     if json.loads(response.text)["payload"]["features"]:
                         status = "OK"
                 except KeyError:
-                    self.__comms_controller.logger.error(
+                    self.logger.error(
                         "Features field not found in config"
                     )
             elif config == ConfigType.MESH_CONFIG:
@@ -1383,7 +1272,7 @@ class MdmAgent:
                     if json.loads(response.text)["payload"]["radios"]:
                         status = "OK"
                 except KeyError:
-                    self.__comms_controller.logger.error(
+                    self.logger.error(
                         "Radios field not found in config"
                     )
             elif config == ConfigType.DEBUG_CONFIG:
@@ -1391,11 +1280,11 @@ class MdmAgent:
                     if json.loads(response.text)["payload"]["debug_config"]:
                         status = "OK"
                 except KeyError:
-                    self.__comms_controller.logger.error(
+                    self.logger.error(
                         "Debug config field not found in config"
                     )
             else:
-                self.__comms_controller.logger.error("Validation not implemented, unknown config")
+                self.logger.error("Validation not implemented, unknown config")
         else:
             status = "FAIL"
 
@@ -1415,13 +1304,13 @@ class MdmAgent:
 
         status_type = self.__config_status_mapping.get(config, None)
 
-        self.__comms_controller.logger.debug(
+        self.logger.debug(
             "HTTP Request status: %s, config: %s", str(response.status_code), config
         )
 
         # validate response
         if self.__validate_response(response, config) == "FAIL":
-            self.__comms_controller.logger.debug(
+            self.logger.debug(
                 "Validation status: %s", self.__status[status_type]
             )
             return "FAIL"
@@ -1442,7 +1331,7 @@ class MdmAgent:
             elif response.text.strip() == "" or response.status_code != 200:
                 self.__debug_config_interval = Constants.FAIL_POLLING_TIME_SECONDS.value
                 if response.status_code == 405:
-                    self.__comms_controller.logger.debug(
+                    self.logger.debug(
                         "MDM Server has no support for debug mode"
                     )
                     self.__debug_config_interval = (
@@ -1452,7 +1341,7 @@ class MdmAgent:
         else:
             if response.status_code == 200:
                 ret = self.__handle_received_config(response, config)
-                self.__comms_controller.logger.debug("config: %s, ret: %s", config, ret)
+                self.logger.debug("config: %s, ret: %s", config, ret)
                 if ret == "OK":
                     self.__status[status_type] = "OK"
                 if config.value == ConfigType.MESH_CONFIG.value and ret == "OK":
@@ -1466,7 +1355,7 @@ class MdmAgent:
             else:
                 self.__interval = Constants.FAIL_POLLING_TIME_SECONDS.value
 
-            self.__comms_controller.logger.debug("status: %s", self.__status)
+            self.logger.debug("status: %s", self.__status)
 
 
 async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) -> None:
@@ -1477,7 +1366,7 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
     param: ca_file: ca_file
     return: -
     """
-    cc = CommsController()
+    cc = comms_controller.CommsController()
 
     if keyfile is None or certfile is None or ca_file is None:
         cc.logger.debug("MDM: Closing as no certificates provided")
@@ -1555,7 +1444,7 @@ async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000) -> 
     param: interval: interval
     return: -
     """
-    cc = CommsController(interval)
+    cc = comms_controller.CommsController(interval)
 
     nats_client = nats()
     status, _, identity_dict = cc.command.get_identity()
