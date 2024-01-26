@@ -101,6 +101,20 @@ calculate_network_address() {
   done
 }
 
+remove_hostapd_socket() {
+   # cleanup for old socket, WAR for following error:
+   #     ctrl_iface exists and seems to be in use - cannot override it
+   #     Delete '/var/run/hostapd/wlan1' manually if it is not used anymore
+   #     Failed to setup control interface for wlan1
+
+   # $1 = interface name
+   INTERFACE_NAME=$1
+
+   if [ -f /var/run/hostapd/"$INTERFACE_NAME" ]; then
+      rm -fr /var/run/hostapd/"$INTERFACE_NAME"
+   fi
+}
+
 find_ethernet_port() {
   # for HW detection
   COMMS_PCB_VERSION_FILE="/opt/hardware/comms_pcb_version"
@@ -500,6 +514,9 @@ EOF
       #SLAAC immediately after basic setup
       slaac "$slaac"
 
+      # cleanup for old socket WAR:
+      remove_hostapd_socket "$ifname_ap"
+
       # Start AP
       /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX".conf -f /tmp/hostapd_"$INDEX".log
       ;;
@@ -570,6 +587,9 @@ EOF
 
       #SLAAC immediately after basic setup
       slaac "$slaac"
+
+      # cleanup for old socket WAR:
+      remove_hostapd_socket "$ifname_ap"
 
       # Start AP
       /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX".conf  -f /tmp/hostapd_"$INDEX".log
