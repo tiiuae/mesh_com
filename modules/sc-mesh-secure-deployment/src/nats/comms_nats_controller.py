@@ -463,7 +463,7 @@ class MdmAgent:
                 )
                 return "OK"
 
-            self.logger.debug("No previous mesh config")
+        self.logger.debug("No previous mesh config")
 
         ret, info = self.__comms_ctrl.settings.handle_mesh_settings(
             json.dumps(config["payload"])
