@@ -5,7 +5,7 @@ name="mdm_agent"
 
 # The path of the Python executable
 python_exec="/usr/bin/python"
-exec="/opt/nats/comms_nats_controller.py"
+exec="/opt/nats/mdm_agent.py"
 
 [ -x "$python_exec" ] || exit 0
 [ -f "$exec" ] || exit 0
@@ -25,11 +25,11 @@ CBMA_CA_FILE="/opt/certs/CBMA/LowerCBMA/ca.crt"
 
 
 if [ -e "$BC_CA_FILE" ] && [ -e "$BC_KEY_FILE" ] && [ -e "$BC_CERT_FILE" ]; then
-  command_args="-k $BC_KEY_FILE -c $BC_CERT_FILE -r $BC_CA_FILE --agent mdm"
+  command_args="-k $BC_KEY_FILE -c $BC_CERT_FILE -r $BC_CA_FILE"
 elif [ -e "$CBMA_KEY_FILE" ] && [ -e "$CBMA_CERT_FILE" ] && [ -e "$CBMA_CA_FILE" ]; then
-  command_args="-k $CBMA_KEY_FILE -c $CBMA_CERT_FILE -r $CBMA_CA_FILE --agent mdm"
+  command_args="-k $CBMA_KEY_FILE -c $CBMA_CERT_FILE -r $CBMA_CA_FILE"
 else
-  command_args="--agent mdm"
+  command_args=""
 fi
 
 LOG_FILE=/opt/mdm_agent.log

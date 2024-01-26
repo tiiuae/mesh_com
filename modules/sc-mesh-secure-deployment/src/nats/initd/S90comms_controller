@@ -5,15 +5,15 @@ name="comms_controller"
 
 # The path of the Python executable
 python_exec="/usr/bin/python"
-exec="/opt/nats/comms_nats_controller.py"
+exec="/opt/nats/fmo_agent.py"
 
 KEY_FILE="/etc/ssl/private/comms_auth_private_key.pem"
 CERT_FILE="/etc/ssl/certs/comms_auth_cert.pem"
 
 if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
-  command_args="-s 0.0.0.0 -p 4222 -k $KEY_FILE -c $CERT_FILE --agent fmo"
+  command_args="-s 0.0.0.0 -p 4222 -k $KEY_FILE -c $CERT_FILE"
 else
-  command_args="-s 0.0.0.0 -p 4222 --agent fmo"
+  command_args="-s 0.0.0.0 -p 4222"
 fi
 
 [ -x "$python_exec" ] || exit 0
