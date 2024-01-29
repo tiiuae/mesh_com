@@ -347,9 +347,9 @@ EOF
       ;;
   "mesh")
       if [ "$priority" ==  "high_throughput" ]; then
-    	ht=0
+        ht=0
       else
-	ht=1
+        ht=1
       fi
       cat <<EOF >/var/run/wpa_supplicant-11s_"$INDEX".conf
 ctrl_interface=DIR=/var/run/wpa_supplicant_$INDEX
@@ -364,6 +364,8 @@ network={
     bssid=$mac
     mode=5
     frequency=$freq
+    freq_list=$freq
+    scan_freq=$freq
     psk="$psk"
     key_mgmt=SAE
     ieee80211w=2
