@@ -1,5 +1,5 @@
 """
-Comms NATS controller
+MDM agent
 """
 from os import sys, path, umask
 
@@ -47,7 +47,7 @@ from src import comms_if_monitor
 from src import comms_controller
 from src import comms_service_discovery
 from src.constants import Constants, ConfigType, StatusType
-
+from src import comms_config_store
 
 # pylint: disable=too-few-public-methods
 class Interface:
@@ -79,27 +79,16 @@ class MdmAgent:
         """
         Constructor
         """
-        self.__previous_config_mesh: Optional[str] = self.__read_config_from_file(
-            ConfigType.MESH_CONFIG.value
-        )
-        self.__previous_config_features: Optional[str] = self.__read_config_from_file(
-            ConfigType.FEATURES.value
-        )
-        self.__previous_config_certificates: Optional[
-            str
-        ] = self.__read_config_from_file(ConfigType.BIRTH_CERTIFICATE.value)
-        self.__previous_debug_config: Optional[
-            str
-        ] = self.__read_debug_config_from_file()
+        self.__config_store = comms_config_store.ConfigStore("/opt/dl_configs_store.yaml")
+        self.__previous_config_mesh: Optional[str] = self.__config_store.read(ConfigType.MESH_CONFIG.value)
+        self.__previous_config_features: Optional[str] = self.__config_store.read(ConfigType.FEATURES.value)
+        self.__previous_config_certificates: Optional[str] = self.__config_store.read(ConfigType.BIRTH_CERTIFICATE.value)
+        self.__previous_debug_config: Optional[str] = self.__config_store.read(ConfigType.DEBUG_CONFIG.value)
         self.__mesh_conf_request_processed = False
         self.__comms_ctrl: comms_controller.CommsController = comms_ctrl
         self.logger: logging.Logger = self.__comms_ctrl.logger.getChild("mdm_agent")
-        self.__interval: int = (
-            Constants.FAIL_POLLING_TIME_SECONDS.value
-        )  # possible to update from MDM server?
-        self.__debug_config_interval: int = (
-            Constants.FAIL_POLLING_TIME_SECONDS.value
-        )  # possible to update from MDM server?
+        self.__interval: int = Constants.FAIL_POLLING_TIME_SECONDS.value  # TODO: possible to update from MDM server?
+        self.__debug_config_interval: int = Constants.FAIL_POLLING_TIME_SECONDS.value  # TODO: possible to update from MDM server?
 
         self.__url: str = "defaultmdm.local:5000"  # mDNS callback updates this one
         self.__keyfile: str = keyfile
@@ -505,11 +494,8 @@ class MdmAgent:
 
             if ret == "OK":
                 self.__config_version = int(config["version"])
-                self.__write_config_to_file(response, ConfigType.MESH_CONFIG.value)
-
-                self.__previous_config_mesh = self.__read_config_from_file(
-                    ConfigType.MESH_CONFIG.value
-                )
+                self.__config_store.store(ConfigType.MESH_CONFIG.value, response.text.strip())
+                self.__previous_config_mesh = self.__config_store.read(ConfigType.MESH_CONFIG.value)
 
         return ret
 
@@ -548,10 +534,8 @@ class MdmAgent:
                 ) as file_handle:
                     file_handle.write(features_yaml)
 
-                self.__write_config_to_file(response, ConfigType.FEATURES.value)
-                self.__previous_config_features = self.__read_config_from_file(
-                    ConfigType.FEATURES.value
-                )
+                self.__config_store.store(ConfigType.FEATURES.value, response.text.strip())
+                self.__previous_config_features = self.__config_store.read(ConfigType.FEATURES.value)
                 return "OK"
 
             self.logger.error("No features field in config")
@@ -578,23 +562,9 @@ class MdmAgent:
             and config.value == ConfigType.DEBUG_CONFIG.value
         ):
             self.__previous_debug_config = response.text.strip()
-
-            # save to file to use in fmo
-            try:
-                with open(
-                    "/opt/debug_config.json", "w", encoding="utf-8"
-                ) as debug_conf_json:
-                    debug_conf_json.write(self.__previous_debug_config)
-                    self.__debug_config_interval = (
-                        Constants.OK_POLLING_TIME_SECONDS.value
-                    )
-                return "OK"
-            except:
-                self.logger.debug(
-                    "cannot store /opt/debug_config.json"
-                )
-                self.__debug_config_interval = Constants.FAIL_POLLING_TIME_SECONDS.value
-                return "FAIL"
+            self.__config_store.store(ConfigType.DEBUG_CONFIG.value, self.__previous_debug_config)
+            self.__debug_config_interval = Constants.OK_POLLING_TIME_SECONDS.value
+            return "OK"
         else:
             # radio configuration actions
             if config.value == ConfigType.MESH_CONFIG.value:
@@ -605,40 +575,6 @@ class MdmAgent:
             if config.value == ConfigType.FEATURES.value:
                 ret = self.__action_feature_yaml(response)
                 return ret
-
-    @staticmethod
-    def __read_config_from_file(config: str) -> Optional[str]:
-        """
-        Read config from file
-        :return: config
-        """
-        try:
-            with open(f"/opt/config_{config}.json", "r", encoding="utf-8") as f_handle:
-                return f_handle.read().strip()
-        except FileNotFoundError:
-            return None
-
-    @staticmethod
-    def __read_debug_config_from_file() -> Optional[str]:
-        """
-        Read config from file
-        :return: config
-        """
-        try:
-            with open("/opt/debug_config.json", "r", encoding="utf-8") as f:
-                return f.read().strip()
-        except FileNotFoundError:
-            return None
-
-    @staticmethod
-    def __write_config_to_file(response: requests.Response, config: str) -> None:
-        """
-        Write config to file
-        :param response: HTTP response
-        :return: -
-        """
-        with open(f"/opt/config_{config}.json", "w", encoding="utf-8") as f_handle:
-            f_handle.write(response.text.strip())
 
     def download_certificate_bundle(
         self, certificate_type: str = ""
@@ -1303,9 +1239,12 @@ class MdmAgent:
 
         # validate response
         if self.__validate_response(response, config) == "FAIL":
-            self.logger.debug(
+            if config == ConfigType.DEBUG_CONFIG.value and response.status_code == 405:
+                self.logger.debug("Validation status: FAIL,  DEBUG_CONFIG not supported")
+            else:
+                self.logger.debug(
                 "Validation status: %s", self.__status[status_type]
-            )
+                )
             return "FAIL"
 
         if self.__mesh_conf_request_processed:

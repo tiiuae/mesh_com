@@ -1,14 +1,12 @@
 """
-Comms NATS controller
+Comms NATS controller for FMO
 """
-# pylint: disable=wrong-import-position
 import argparse
 import asyncio
 import json
 import signal
 import ssl
 
-from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
 from nats.aio.client import Client as nats
 
 from src import comms_controller
