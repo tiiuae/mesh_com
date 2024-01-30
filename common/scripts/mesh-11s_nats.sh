@@ -43,6 +43,9 @@ add_network_intf_to_bridge() {
   if ip link show lan1 &> /dev/null; then
     _lan1=1
   fi
+
+  ifconfig "$_bridge_name" down
+
   # Loop through the interface names and add them to the bridge if available
   for _interface in $_interfaces; do
     # Check if the interface exists
@@ -58,27 +61,6 @@ add_network_intf_to_bridge() {
     # Add lan1 to bridge
     brctl delif "$_bridge_name" eth0 2>/dev/null
   fi
-}
-
-fix_iface_mac_addresses() {
-      # handles the case when the mac address of the batman interface the same as the eth0.
-      # For batman interface, the mac address is set to 00:0Y:XX:XX:XX:XX by utilizing eth0 mac address.
-      # from 00:0Y:XX:XX:XX:XX Y is the batman interface index
-
-      # batman interface is bat0, take the last char for the numbering
-      batman_iface_index="$(echo "$batman_iface" | cut -b 4)"
-
-      #Create static mac addr for Batman if
-      eth0_mac="$(ip -brief link | grep eth0 | awk '{print $3; exit}')"
-      batif_mac="00:0${batman_iface_index}:$(echo "$eth0_mac" | cut -b 7-17)"
-      ifconfig "$batman_iface" down
-      ifconfig "$batman_iface" hw ether "$batif_mac"
-      ifconfig "$batman_iface" up
-      if [[ -n $bridge_name ]]; then
-        ifconfig "$bridge_name" down
-        ifconfig "$bridge_name" hw ether "$eth0_mac"
-        ifconfig "$bridge_name" up
-      fi
 }
 
 calculate_network_address() {
@@ -303,7 +285,6 @@ EOF
             iptables --table nat -A POSTROUTING --out-interface "$bridge_ip" -j MASQUERADE
             sleep 5
         fi
-        fix_iface_mac_addresses
 
       elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
@@ -434,7 +415,6 @@ EOF
             iptables --table nat -A POSTROUTING --out-interface "$bridge_ip" -j MASQUERADE
             sleep 5
         fi
-        fix_iface_mac_addresses
       elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
         # Enable debug level as necessary
@@ -498,15 +478,12 @@ EOF
             ##batman-adv###
             ifconfig "$bridge_name" down
             add_network_intf_to_bridge "$bridge_name" "$ifname_ap"
-            ifconfig "$bridge_name" down
             iptables -A FORWARD --in-interface "$batman_iface" -j ACCEPT
       fi
       ifconfig "$bridge_name" "$bridge_ip" netmask "$nmask"
       ifconfig "$bridge_name" up
       echo
       ifconfig "$bridge_name"
-      # Create static mac addr for Batman if and br-lan
-      fix_iface_mac_addresses
       # Add forwading rules from AP to "$batman_iface" interface
       iptables -P FORWARD ACCEPT
       route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
@@ -532,9 +509,6 @@ EOF
 
       # RPi activity led config
       echo "phy0tx" > /sys/class/leds/led0/trigger
-
-      #Create static mac addr for Batman if and br-lan
-      fix_iface_mac_addresses
 
       # Radio parameters
       iw dev "$wifidev" set txpower limit "$txpwr"00
