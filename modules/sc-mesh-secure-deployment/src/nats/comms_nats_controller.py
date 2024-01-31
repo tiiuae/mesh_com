@@ -1372,22 +1372,31 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
         cc.logger.debug("MDM: Closing as no certificates provided")
         return
 
+    # TODO Use one of the certs in the params when we stop using the csl1.local ones
+    pkey="/opt/crypto/ecdsa/birth/filebased/private.key"
+
+    if os.path.isfile(pkey):
+        pkey_mtime = os.path.getmtime(pkey)
+        pkey_datetime = datetime.fromtimestamp(pkey_mtime)
+
+        if datetime.now() < pkey_datetime:
+            cc.logger.info("Updating system time (new way)")
+            time_formatted = pkey_datetime.strftime("%Y-%m-%d %H:%M:%S")
+            subprocess.run(["date", "-s", time_formatted], check=True)
+            subprocess.run(["hwclock", "--systohc"], check=True)
+
+    # TODO Old way of updating the system time, kept temporarily
+    with open(certfile, "rb") as file:
+        cert_data = file.read()
+
+    cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert_data)
+    creation_time = cert.get_notBefore()
+    creation_time = creation_time.decode("utf-8")
+    new_time_str = datetime.strptime(creation_time, "%Y%m%d%H%M%SZ")
+
     # if system clock is reset, set it to the certificate creation time
-    if datetime.now() < datetime(2023, 9, 1):
-        # Read the certificate file
-        with open(certfile, "rb") as file:
-            cert_data = file.read()
-
-        # Load the certificate
-        cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert_data)
-
-        # Get the 'notBefore' time
-        creation_time = cert.get_notBefore()
-
-        # The time is in bytes, so decode it to a string
-        creation_time = creation_time.decode("utf-8")
-
-        new_time_str = datetime.strptime(creation_time, "%Y%m%d%H%M%SZ")
+    if datetime.now() < new_time_str:
+        cc.logger.info("Updating system time (old way)")
         # Format the datetime object for the 'date' command
         # Format: MMDDhhmmYYYY.ss
         time_formatted = new_time_str.strftime("%Y-%m-%d %H:%M:%S")
