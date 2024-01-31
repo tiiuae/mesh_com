@@ -470,6 +470,11 @@ class MdmAgent:
         :param response: https response
         :return: status
         """
+
+        # we do not need for UTM branch
+        # so just skip this step and return OK status
+        return "OK"
+
         config: dict = json.loads(response.text)
 
         if self.__previous_config_mesh is not None:
