@@ -26,6 +26,7 @@ class StatusType(str, Enum):
     DOWNLOAD_FEATURES: str = "download_features"
     DOWNLOAD_CERTIFICATES: str = "download_certificates"
     UPLOAD_CERTIFICATES: str = "upload_certificates"
+    DOWNLOAD_DEBUG_CONFIG: str = "download_debug_config"
 
 # pylint: disable=too-few-public-methods, too-many-instance-attributes, disable=invalid-name
 class Constants(Enum):

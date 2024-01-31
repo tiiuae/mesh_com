@@ -179,6 +179,7 @@ class MdmAgent:
             StatusType.UPLOAD_CERTIFICATES.value: "OK"
             if self.__certs_uploaded
             else "FAIL",
+            StatusType.DOWNLOAD_DEBUG_CONFIG.value: "FAIL",
         }
 
         self.__config_status_mapping = {
@@ -187,6 +188,7 @@ class MdmAgent:
             ConfigType.BIRTH_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
             ConfigType.LOWER_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
             ConfigType.UPPER_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
+            ConfigType.DEBUG_CONFIG: StatusType.DOWNLOAD_DEBUG_CONFIG,
         }
 
         try:
@@ -1290,6 +1292,12 @@ class MdmAgent:
                     )
             else:
                 self.logger.error("Validation not implemented, unknown config")
+        elif response.status_code == 405:
+            if config == ConfigType.DEBUG_CONFIG:
+                # It is OK: server do not support debug mode
+                status = "OK"
+            else:
+                status = "FAIL"
         else:
             status = "FAIL"
 
@@ -1325,14 +1333,17 @@ class MdmAgent:
                 response.status_code == 200
                 and self.__previous_debug_config != response.text.strip()
             ):
-                self.__handle_received_config(response, ConfigType.DEBUG_CONFIG)
+                ret = self.__handle_received_config(response, ConfigType.DEBUG_CONFIG)
                 self.__mesh_conf_request_processed = False
+                if ret == "OK":
+                    self.__status[status_type] = "OK"
             elif (
                 response.status_code == 200
                 and self.__previous_debug_config == response.text.strip()
             ):
                 self.__debug_config_interval = Constants.OK_POLLING_TIME_SECONDS.value
                 self.__mesh_conf_request_processed = False
+                self.__status[status_type] = "OK"
             elif response.text.strip() == "" or response.status_code != 200:
                 self.__debug_config_interval = Constants.FAIL_POLLING_TIME_SECONDS.value
                 if response.status_code == 405:
@@ -1343,6 +1354,7 @@ class MdmAgent:
                         Constants.OK_POLLING_TIME_SECONDS.value
                     )
                     self.__mesh_conf_request_processed = False
+                    self.__status[status_type] = "OK"
         else:
             if response.status_code == 200:
                 ret = self.__handle_received_config(response, config)
