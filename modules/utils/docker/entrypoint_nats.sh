@@ -33,10 +33,6 @@ else
       sleep 1
   done
 
-  # TODO: remove as SLAAC?
-  echo "set bridge ip"
-  generate_lan_bridge_ip
-
   echo "Starting 11s mesh service"
   # Loop for mesh service
   for i in {0..2}; do
@@ -58,7 +54,6 @@ else
   #######################################
   # Enable MDM stuff                    #
   #######################################
-  # TODO start mdm agent earlier? and wait in first boot?
   echo "starting mdm agent for testing purposes"
   /opt/S90mdm_agent start
 
@@ -80,11 +75,10 @@ else
 
     echo "starting provisioning agent"
     # blocks execution until provisioning is done or timeout (30s)
-    # IP address and port are passed as arguments and hardcoded. TODO: mDNS
+    # IP address and port are passed as arguments and hardcoded.
     python /opt/nats/src/comms_provisioning.py -t 30 -s 192.168.1.254 -p 8080 -o /opt > /opt/comms_provisioning.log 2>&1
 
     echo "Start nats server and client nodes"
-    # todo: mDNS based
     /opt/S90nats_discovery start
 
     echo "wait for nats.conf to be created"
