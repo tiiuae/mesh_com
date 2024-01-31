@@ -69,7 +69,7 @@ class CBMAControl:
             }
 
             if interface_info:
-                self.__interfaces.append(interface_info)
+                interfaces.append(interface_info)
 
         self.__interfaces.clear()
 
