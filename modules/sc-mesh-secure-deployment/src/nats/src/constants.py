@@ -58,7 +58,7 @@ class Constants(Enum):
     PUT_DEVICE_CERTIFICATES: str = "public/put_device_certificates"
 
     OK_POLLING_TIME_SECONDS: int = 600
-    FAIL_POLLING_TIME_SECONDS: int = 60
+    FAIL_POLLING_TIME_SECONDS: int = 1
 
 if __name__ == "__main__":
     # Usage
