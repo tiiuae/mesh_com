@@ -481,7 +481,7 @@ class MdmAgent:
 
         config: dict = json.loads(response.text)
 
-        if self.__previous_config_utm not None:
+        if self.__previous_config_utm is not None:
             self.logger.debug(
                 f"config: {config} previous: {json.loads(self.__previous_config_utm)}"
             )
