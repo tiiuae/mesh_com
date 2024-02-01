@@ -98,6 +98,9 @@ class MdmAgent:
         self.__previous_debug_config: Optional[
             str
         ] = self.__read_debug_config_from_file()
+        self.__previous_config_utm: Optional[str] = self.__read_config_from_file(
+            ConfigType.UTM_CONFIG.value
+        )
         self.__mesh_conf_request_processed = False
         self.__comms_ctrl: comms_controller.CommsController = comms_ctrl
         self.logger: logging = self.__comms_ctrl.logger.getChild("mdm_agent")
@@ -180,6 +183,7 @@ class MdmAgent:
             if self.__certs_uploaded
             else "FAIL",
             StatusType.DOWNLOAD_DEBUG_CONFIG.value: "FAIL",
+            StatusType.DOWNLOAD_UTM_CONFIG.value: "FAIL",
         }
 
         self.__config_status_mapping = {
@@ -189,6 +193,7 @@ class MdmAgent:
             ConfigType.LOWER_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
             ConfigType.UPPER_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
             ConfigType.DEBUG_CONFIG: StatusType.DOWNLOAD_DEBUG_CONFIG,
+            ConfigType.UTM_CONFIG: StatusType.DOWNLOAD_UTM_CONFIG,
         }
 
         try:
@@ -331,6 +336,7 @@ class MdmAgent:
             elif self.mdm_service_available:
                 await self.__loop_run_executor(self.executor, ConfigType.FEATURES)
                 await self.__loop_run_executor(self.executor, ConfigType.MESH_CONFIG)
+                await self.__loop_run_executor(self.executor, ConfigType.UTM_CONFIG)
                 if self.__mesh_conf_request_processed:
                     await self.__loop_run_executor(
                         self.executor, ConfigType.DEBUG_CONFIG
@@ -465,6 +471,38 @@ class MdmAgent:
             )
             return "FAIL"
         return "OK"
+
+    def __action_utm_configuration(self, response: requests.Response) -> str:
+        """
+        Take utm configuration into use
+        :param response: https response
+        :return: status
+        """
+
+        config: dict = json.loads(response.text)
+
+        if self.__previous_config_utm not None:
+            self.logger.debug(
+                f"config: {config} previous: {json.loads(self.__previous_config_utm)}"
+            )
+
+            if json.loads(self.__previous_config_utm) == config:
+                self.logger.debug(
+                    "No changes in UTM config, not updating."
+                )
+                return "OK"
+
+        self.logger.debug("No previous UTM config")
+
+        self.__config_version = int(config["version"])
+        self.__write_config_to_file(response, ConfigType.UTM_CONFIG.value)
+
+        self.__previous_config_utm = self.__read_config_from_file(
+            ConfigType.UTM_CONFIG.value
+        )
+
+        return "OK"
+
 
     def __action_radio_configuration(self, response: requests.Response) -> str:
         """
@@ -618,6 +656,11 @@ class MdmAgent:
             # feature.yaml actions
             if config.value == ConfigType.FEATURES.value:
                 ret = self.__action_feature_yaml(response)
+                return ret
+
+            # UTM configuration actions
+            if config.value == ConfigType.UTM_CONFIG.value:
+                ret = self.__action_utm_configuration(response)
                 return ret
 
     @staticmethod
@@ -1289,6 +1332,14 @@ class MdmAgent:
                 except KeyError:
                     self.logger.error(
                         "Debug config field not found in config"
+                    )
+            elif config == ConfigType.UTM_CONFIG:
+                try:
+                    if json.loads(response.text)["payload"]["utm_config"]:
+                        status = "OK"
+                except KeyError:
+                    self.logger.error(
+                        "UTM config field not found in config"
                     )
             else:
                 self.logger.error("Validation not implemented, unknown config")

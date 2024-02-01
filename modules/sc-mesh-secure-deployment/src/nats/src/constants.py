@@ -14,6 +14,7 @@ class ConfigType(str, Enum):
     LOWER_CERTIFICATE: str = "lower_certificates"
     FEATURES: str = "features"
     DEBUG_CONFIG: str = "debug_conf"
+    UTM_CONFIG: str = "utm_conf"
 
 
 class StatusType(str, Enum):
@@ -27,6 +28,7 @@ class StatusType(str, Enum):
     DOWNLOAD_CERTIFICATES: str = "download_certificates"
     UPLOAD_CERTIFICATES: str = "upload_certificates"
     DOWNLOAD_DEBUG_CONFIG: str = "download_debug_config"
+    DOWNLOAD_UTM_CONFIG: str = "download_utm_config"
 
 # pylint: disable=too-few-public-methods, too-many-instance-attributes, disable=invalid-name
 class Constants(Enum):
