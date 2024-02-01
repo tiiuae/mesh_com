@@ -4,7 +4,7 @@ source ../common/common.sh   # common tools
 source ./osf_common.sh       # common osf tools
 
 test_case="OSF"
-description="Test OSF interface"
+description="Start iperf3 server"
 
 # define globals
 PASS=0
@@ -28,49 +28,31 @@ _init() {
   fi
 }
 
+
 #######################################
 # Test
 # Globals:
 #  result
 # Arguments:
 #######################################
-_test() {
+_tests() {
   echo "$0, test called" | print_log
 
-  # Extract the raw output from slipcmd to get the IPv6 address of the node. We need to stop and start OSF as slipcmd 
-  # uses the same serial ports as tunslip6, and doesn't release them until after the script ends, so jams tunslip6.
-  /etc/init.d/S98osf52setup stop
-  sleep 3
-  slip_output=$(timeout --preserve-status 2s slipcmd -H -b"$BAUDRATE" -sn -R'?Y' "$SERIALPORT")
-  /etc/init.d/S98osf52setup start
-  sleep 4
-
-  # Check if slipcmd returned any output
-  if [ -z "$slip_output" ]; then
-    echo "slipcmd did not return an IPv6 address." | print_log
-    result=$FAIL
-    return
+ # kill old instances of iperf3 servers
+ killall iperf3 &>/dev/null
+ sleep 0.5
+ killall iperf3 &>/dev/null
+ sleep 0.5
+ 
+ # check if iperf3 is installed
+ if ! [ -x "$(type -P iperf3)" ]; then
+  echo "ERROR: script requires iperf3"
+  result=$FAIL
+  return
   fi
-
-  # Extract the IPv6 address from slip_output
-  ip_address=$(echo "$slip_output" | grep -oE "$OSF_IPV6_PREFIX"[0-9a-fA-F:]+)
-
-  # Check if ip_address is empty after extraction
-  if [ -z "$ip_address" ]; then
-    echo "Failed to extract IPv6 address from slipcmd output." | print_log
-    result=$FAIL
-    return
-  fi
-
-  # Use ping6 to ping the IP address over the osf interface
-  ping6 -c 3 "$ip_address" &>/dev/null
-  if [ "$?" -ne 0 ]; then
-    echo "ping6 test to $ip_address over osf failed." | print_log
-    result=$FAIL
-    return
-  fi
-
-  result=$PASS
+  
+ # start iperf3 server underground
+ iperf3 -s&
 }
 
 #######################################
@@ -88,9 +70,9 @@ _result() {
   # Make decision ($PASS or $FAIL)
   # ... (this is a placeholder, adjust as needed)
   #if [ 1 -gt 0 ]; then
-  #  result=$PASS
+    #result=$PASS
   #else
-  #  result=$FAIL
+    #result=$FAIL
   #fi
 }
 
@@ -126,10 +108,11 @@ main() {
     exit 0
   fi
 
-  _test
+  # starts iperf3 server
+  _tests
   if [ "$result" -eq "$FAIL" ]; then
     echo "FAILED  _test: $test_case" | print_log result
-    exit 0
+    #exit 0
   fi
 
   _result
