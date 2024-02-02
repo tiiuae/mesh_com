@@ -1412,14 +1412,16 @@ class MdmAgent:
                 self.logger.debug("config: %s, ret: %s", config, ret)
                 if ret == "OK":
                     self.__status[status_type] = "OK"
-                if config.value == ConfigType.MESH_CONFIG.value and ret == "OK":
-                    self.__mesh_conf_request_processed = True
             elif response.status_code != 200:
                 self.__status[status_type] = "FAIL"
 
             # if all statuses are OK, then we can start the OK polling
             if all(value == "OK" for value in self.__status.values()):
                 self.__interval = Constants.OK_POLLING_TIME_SECONDS.value
+                self.__mesh_conf_request_processed = True
+                self.logger.debug(
+                    "************ all statuses are OK !!!"
+                )
             else:
                 self.__interval = Constants.FAIL_POLLING_TIME_SECONDS.value
 
