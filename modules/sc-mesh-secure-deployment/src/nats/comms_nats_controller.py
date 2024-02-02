@@ -182,7 +182,7 @@ class MdmAgent:
             StatusType.UPLOAD_CERTIFICATES.value: "OK"
             if self.__certs_uploaded
             else "FAIL",
-            StatusType.DOWNLOAD_DEBUG_CONFIG.value: "FAIL",
+            #StatusType.DOWNLOAD_DEBUG_CONFIG.value: "FAIL",
             StatusType.DOWNLOAD_UTM_CONFIG.value: "FAIL",
         }
 
@@ -192,7 +192,7 @@ class MdmAgent:
             ConfigType.BIRTH_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
             ConfigType.LOWER_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
             ConfigType.UPPER_CERTIFICATE: StatusType.DOWNLOAD_CERTIFICATES,
-            ConfigType.DEBUG_CONFIG: StatusType.DOWNLOAD_DEBUG_CONFIG,
+            #ConfigType.DEBUG_CONFIG: StatusType.DOWNLOAD_DEBUG_CONFIG,
             ConfigType.UTM_CONFIG: StatusType.DOWNLOAD_UTM_CONFIG,
         }
 
