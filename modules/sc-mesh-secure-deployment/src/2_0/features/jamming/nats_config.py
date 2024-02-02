@@ -1,4 +1,6 @@
 from log_config import logger
+from options import Options
+args = Options()
 
 """
 This file contains the configuration for the NATS client.
@@ -9,7 +11,7 @@ except ImportError:
     IDENTITY = "no_identity"
     logger.error("No identity found!")
 
-MODULE_IP = "10.10.20.2"  # or 192.168.1.x - brlan ip address
+MODULE_IP = args.module_ip  # or 192.168.1.x - brlan ip address
 MODULE_PORT = "4222"
 
 MODULE_ROLE = "sleeve"  # drone, sleeve or gcs
