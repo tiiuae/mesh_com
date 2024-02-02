@@ -29,10 +29,7 @@ class Spectral:
         """
         Get device driver.
         """
-        drivers = ["ath10k"]
-        driver = os.popen('ls /sys/kernel/debug/ieee80211/phy* | grep ath').read().strip()
-        if driver not in drivers:
-            sys.exit(1)
+        driver = "ath10k"
 
         return driver
 
@@ -41,7 +38,7 @@ class Spectral:
         Initialize spectral scan.
         """
         if driver == "ath10k":
-            output_file = "/sys/kernel/debug/ieee80211/phy0/ath10k/spectral_scan_ctl"
+            output_file = f"/sys/kernel/debug/ieee80211/phy{self.args.phy_interface}/ath10k/spectral_scan_ctl"
 
             cmd_background = ["echo", "background"]
             with open(output_file, "w") as file:
@@ -84,7 +81,7 @@ class Spectral:
 
         # Pass command to stop spectral scan
         cmd_disable = ["echo", "disable"]
-        spectral_scan_ctl_file = f"/sys/kernel/debug/ieee80211/phy0/{driver}/spectral_scan_ctl"
+        spectral_scan_ctl_file = f"/sys/kernel/debug/ieee80211/phy{self.args.phy_interface}/{driver}/spectral_scan_ctl"
         try:
             with open(spectral_scan_ctl_file, "w") as file:
                 subprocess.call(cmd_disable, stdout=file, stderr=subprocess.PIPE, shell=False)
@@ -92,7 +89,7 @@ class Spectral:
             print(f"Error: {e}")
 
         # Dump scan output in spectral_scan0 to scan binary file
-        cmd_dump = ["cat", f"/sys/kernel/debug/ieee80211/phy0/{driver}/spectral_scan0"]
+        cmd_dump = ["cat", f"/sys/kernel/debug/ieee80211/phy{self.args.phy_interface}/{driver}/spectral_scan0"]
         try:
             with open(bin_file, "wb") as output_file:
                 subprocess.call(cmd_dump, stdout=output_file, stderr=subprocess.PIPE, shell=False)

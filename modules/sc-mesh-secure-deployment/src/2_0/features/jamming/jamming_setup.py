@@ -212,8 +212,9 @@ def validate_configuration(args) -> bool:
     valid = True
 
     # Check device driver
+    command = f'ls /sys/kernel/debug/ieee80211/phy{args.phy_interface} | grep ath'
+    driver = os.popen(command).read().strip()
     valid_drivers = ["ath10k"]
-    driver = os.popen('ls /sys/kernel/debug/ieee80211/phy* | grep ath').read().strip()
     if driver not in valid_drivers:
         logger.error("Please use ath10k driver.")
         valid = False
