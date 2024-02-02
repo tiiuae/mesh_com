@@ -4,7 +4,8 @@ to be used by MDM agent to get network interface statuss.
 """
 
 # pylint: disable=too-few-public-methods, too-many-nested-blocks
-
+from typing import Callable, List, Dict
+from copy import deepcopy
 from pyroute2 import IPRoute
 
 
@@ -12,11 +13,12 @@ class CommsInterfaceMonitor:
     """
     A class to get network interfaces status.
     """
-    def __init__(self, callback) -> None:
+
+    def __init__(self, callback: Callable[[List[Dict]], None]) -> None:
         self.__interfaces = []
         self.__previous_interfaces = []
         self.__callback = callback
-        self.running = False
+        self.__running = False
         self.__ipr = IPRoute()
 
     def __get_initial_interfaces(self):
@@ -29,9 +31,9 @@ class CommsInterfaceMonitor:
             self.__callback(self.__interfaces)
 
     def __get_interface_info(self, link):
-        ifname = link.get_attr('IFLA_IFNAME')
-        ifstate = link.get_attr('IFLA_OPERSTATE')
-        mac_address = link.get_attr('IFLA_ADDRESS')
+        ifname = link.get_attr("IFLA_IFNAME")
+        ifstate = link.get_attr("IFLA_OPERSTATE")
+        mac_address = link.get_attr("IFLA_ADDRESS")
 
         interface_info = {
             "interface_name": ifname,
@@ -53,48 +55,54 @@ class CommsInterfaceMonitor:
             None
         """
         self.__get_initial_interfaces()
-
-        self.running = True
+        self.__running = True
         self.__ipr.bind()
 
-        while self.running:
+        while self.__running:
             try:
+                # Hox! get() is a blocking call thus stop() doesn't
+                # have much affect when execution is blocked within get().
                 messages = self.__ipr.get()
                 for msg in messages:
-                    if msg['event'] == 'RTM_NEWLINK' or msg['event'] == 'RTM_DELLINK':
+                    if msg["event"] == "RTM_NEWLINK" or msg["event"] == "RTM_DELLINK":
                         interface_info = self.__get_interface_info(msg)
                         if interface_info:
                             existing_interface = next(
-                                (iface for iface in self.__interfaces if iface['interface_name'] == interface_info['interface_name']),
-                                None
+                                (
+                                    iface
+                                    for iface in self.__interfaces
+                                    if iface["interface_name"]
+                                    == interface_info["interface_name"]
+                                ),
+                                None,
                             )
-                            if msg['event'] == 'RTM_DELLINK' and existing_interface:
+                            if msg["event"] == "RTM_DELLINK" and existing_interface:
                                 self.__interfaces.remove(existing_interface)
                             else:
                                 if existing_interface:
-                                    # Update existing interface settings
                                     existing_interface.update(interface_info)
                                 else:
                                     self.__interfaces.append(interface_info)
-                            if self.__callback and self.__interfaces != self.__previous_interfaces:
+                            if (
+                                self.__callback
+                                and self.__running
+                                and self.__interfaces != self.__previous_interfaces
+                            ):
                                 self.__callback(self.__interfaces)
-                                self.__previous_interfaces = self.__interfaces.copy()
+                                self.__previous_interfaces = deepcopy(self.__interfaces)
             except KeyboardInterrupt:
                 break
         self.__ipr.close()
 
+    def stop(self):
+        """
+        Stop monitoring at latest after any waited RTNL message.
+        No callbacks are provided after calling this method.
 
-def main():
-    """
-    Function to test interface monitoring
-    by running module locally.
-    """
-    def callback(interfaces):
-        print("Callback received:", interfaces)
+        Arguments:
+            None
 
-    monitor = CommsInterfaceMonitor(callback)
-    monitor.monitor_interfaces()
-
-
-if __name__ == "__main__":
-    main()
+        Returns:
+            None
+        """
+        self.__running = False

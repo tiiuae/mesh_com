@@ -43,6 +43,9 @@ add_network_intf_to_bridge() {
   if ip link show lan1 &> /dev/null; then
     _lan1=1
   fi
+
+  ifconfig "$_bridge_name" down
+
   # Loop through the interface names and add them to the bridge if available
   for _interface in $_interfaces; do
     # Check if the interface exists
@@ -58,27 +61,6 @@ add_network_intf_to_bridge() {
     # Add lan1 to bridge
     brctl delif "$_bridge_name" eth0 2>/dev/null
   fi
-}
-
-fix_iface_mac_addresses() {
-      # handles the case when the mac address of the batman interface the same as the eth0.
-      # For batman interface, the mac address is set to 00:0Y:XX:XX:XX:XX by utilizing eth0 mac address.
-      # from 00:0Y:XX:XX:XX:XX Y is the batman interface index
-
-      # batman interface is bat0, take the last char for the numbering
-      batman_iface_index="$(echo "$batman_iface" | cut -b 4)"
-
-      #Create static mac addr for Batman if
-      eth0_mac="$(ip -brief link | grep eth0 | awk '{print $3; exit}')"
-      batif_mac="00:0${batman_iface_index}:$(echo "$eth0_mac" | cut -b 7-17)"
-      ifconfig "$batman_iface" down
-      ifconfig "$batman_iface" hw ether "$batif_mac"
-      ifconfig "$batman_iface" up
-      if [[ -n $bridge_name ]]; then
-        ifconfig "$bridge_name" down
-        ifconfig "$bridge_name" hw ether "$eth0_mac"
-        ifconfig "$bridge_name" up
-      fi
 }
 
 calculate_network_address() {
@@ -99,6 +81,20 @@ calculate_network_address() {
       network="${network}."
     fi
   done
+}
+
+remove_hostapd_socket() {
+   # cleanup for old socket, WAR for following error:
+   #     ctrl_iface exists and seems to be in use - cannot override it
+   #     Delete '/var/run/hostapd/wlan1' manually if it is not used anymore
+   #     Failed to setup control interface for wlan1
+
+   # $1 = interface name
+   INTERFACE_NAME=$1
+
+   if [ -f /var/run/hostapd/"$INTERFACE_NAME" ]; then
+      rm -fr /var/run/hostapd/"$INTERFACE_NAME"
+   fi
 }
 
 find_ethernet_port() {
@@ -204,19 +200,38 @@ EOF
 
       modprobe mac80211
 
-      # Radio spi bus number
-      BUSNO=$(for i in /sys/class/spi_master/*/; do
-      if [ -e "$i/device" ] && [ "$(basename "$(readlink "$i/device")")" == "spi-ft232h.0" ]; then
-        echo "${i//[^0-9]/}"
-      fi
-      done)
-
-      # /usr/local/bin/init_halow.sh will take care of the firmware copy to /lib/firmware
-      if [ "$BUSNO" -gt 0 ]; then
-          command="insmod /lib/modules/$KERNEL_VERSION/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat spi_bus_num=$BUSNO spi_polling_interval=3 hifspeed=20000000 spi_gpio_irq=-1 power_save=0 sw_enc=0"
+    command=
+      # read halow cfg written by init_halow.sh if found
+      if [ -f /var/run/halow_init.conf ]; then
+        source /var/run/halow_init.conf
+        if [ $SPI_BUS_NO ]; then
+          command="insmod /lib/modules/$KERNEL_VERSION/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat hifspeed=${DRV_SPI_SPEED} power_save=${DRV_POWER_SAVE} sw_enc=${DRV_SW_ENC} spi_gpio_irq=${DRV_GPIO_IRQ} spi_bus_num=${SPI_BUS_NO}"
+          if [ $DRV_POLLING_INTERVAL ]; then
+            command="${command}  spi_polling_interval=${DRV_POLLING_INTERVAL}"
+          fi
+        else
+          echo "ERROR: HaLoW radio not found."
+          logger "ERROR: HaLoW radio not found."
+          return 1
+        fi
+      # otherwise use the old detection code.
       else
-          command="insmod /lib/modules/$KERNEL_VERSION/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat hifspeed=20000000 power_save=0 sw_enc=1 spi_bus_num=0 spi_gpio_irq=5"
+        # Radio spi bus number
+        BUSNO=$(for i in /sys/class/spi_master/*/; do
+        if [ -e "$i/device" ] && [ "$(basename "$(readlink "$i/device")")" == "spi-ft232h.0" ]; then
+          echo "${i//[^0-9]/}"
+        fi
+        done)
+
+        # /usr/local/bin/init_halow.sh will take care of the firmware copy to /lib/firmware
+        if [ "$BUSNO" -gt 0 ]; then
+            command="insmod /lib/modules/$KERNEL_VERSION/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat spi_bus_num=$BUSNO spi_polling_interval=3 hifspeed=20000000 spi_gpio_irq=-1 power_save=0 sw_enc=0"
+        else
+            command="insmod /lib/modules/$KERNEL_VERSION/kernel/drivers/staging/nrc/nrc.ko fw_name=nrc7292_cspi.bin bd_name=nrc7292_bd.dat hifspeed=20000000 power_save=0 sw_enc=1 spi_bus_num=0 spi_gpio_irq=5"
+        fi
       fi
+
+      # load the kernel driver.
 
       # remove nrc module before init
       rmmod nrc.ko
@@ -270,7 +285,6 @@ EOF
             iptables --table nat -A POSTROUTING --out-interface "$bridge_ip" -j MASQUERADE
             sleep 5
         fi
-        fix_iface_mac_addresses
 
       elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
@@ -295,6 +309,8 @@ EOF
       # Radio parameters
       echo "set radio parameters"
       # /usr/local/bin/cli_app set txpwr fixed 23
+      /usr/local/bin/cli_app set gi long
+      /usr/local/bin/cli_app set support_ch_width 1
 
       # Batman parameters
       batctl "$wifidev" hop_penalty 30
@@ -311,7 +327,11 @@ EOF
       wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
       ;;
   "mesh")
-
+      if [ "$priority" ==  "high_throughput" ]; then
+        ht=0
+      else
+        ht=1
+      fi
       cat <<EOF >/var/run/wpa_supplicant-11s_"$INDEX".conf
 ctrl_interface=DIR=/var/run/wpa_supplicant_$INDEX
 # use 'ap_scan=2' on all devices connected to the network
@@ -325,6 +345,8 @@ network={
     bssid=$mac
     mode=5
     frequency=$freq
+    freq_list=$freq
+    scan_freq=$freq
     psk="$psk"
     key_mgmt=SAE
     ieee80211w=2
@@ -332,8 +354,8 @@ network={
     mesh_fwding=0
     # 11b rates dropped (for better performance)
     mesh_basic_rates=60 90 120 180 240 360 480 540
-    disable_vht=1
-    disable_ht40=1
+    disable_vht=$ht
+    disable_ht40=$ht
 }
 EOF
 
@@ -350,14 +372,17 @@ EOF
       echo "$wifidev down.."
       iw dev "$wifidev" del
       iw phy "$phyname" interface add "$wifidev" type mp
-  
-      echo "Longer range tweak.."
+        
       if [ "$priority" == "long_range" ]; then
+        echo "Long range config"
+        mount -t debugfs none /sys/kernel/debug
         iw phy "$phyname" set distance 8000
-      elif [ "$priority" == "low_latency" ]; then
+        echo 10 > /sys/kernel/debug/ieee80211/"$phyname"/ath9k/chanbw
+        echo 7 > /sys/kernel/debug/ieee80211/"$phyname"/ath9k/tii_mask
+        echo 4289724416 > /sys/kernel/debug/ieee80211/"$phyname"/rc/tii_rc
+      elif [ "$priority" == "high_throughput" ]; then
+        echo "High throughput config"
         iw phy "$phyname" set distance 0
-      else
-        iw phy "$phyname" set distance 1000
       fi
 
       echo "$wifidev create 11s.."
@@ -373,7 +398,7 @@ EOF
         echo "$batman_iface ip address.."
         ifconfig "$batman_iface" "$ipaddr" netmask "$nmask"
         echo "$batman_iface mtu size"
-        ifconfig "$batman_iface" mtu 1460
+        ifconfig "$batman_iface" mtu 1500
         echo
         ifconfig "$batman_iface"
         if [[ -n $bridge_name ]]; then
@@ -390,7 +415,6 @@ EOF
             iptables --table nat -A POSTROUTING --out-interface "$bridge_ip" -j MASQUERADE
             sleep 5
         fi
-        fix_iface_mac_addresses
       elif [ "$routing_algo" == "olsr" ]; then
         ifconfig "$wifidev" "$ipaddr" netmask "$nmask"
         # Enable debug level as necessary
@@ -414,7 +438,7 @@ EOF
           echo "batadv-vis started."
         fi
       fi
-      wpa_supplicant -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
+      wpa_supplicant -dd -i "$wifidev" -c /var/run/wpa_supplicant-11s_"$INDEX".conf -D nl80211 -C /var/run/wpa_supplicant_"$INDEX"/ -f /tmp/wpa_supplicant_11s_"$INDEX".log
       ;;
   "ap+mesh_mcc")
       wait_for_intf "$bridge_name"
@@ -454,15 +478,12 @@ EOF
             ##batman-adv###
             ifconfig "$bridge_name" down
             add_network_intf_to_bridge "$bridge_name" "$ifname_ap"
-            ifconfig "$bridge_name" down
             iptables -A FORWARD --in-interface "$batman_iface" -j ACCEPT
       fi
       ifconfig "$bridge_name" "$bridge_ip" netmask "$nmask"
       ifconfig "$bridge_name" up
       echo
       ifconfig "$bridge_name"
-      # Create static mac addr for Batman if and br-lan
-      fix_iface_mac_addresses
       # Add forwading rules from AP to "$batman_iface" interface
       iptables -P FORWARD ACCEPT
       route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
@@ -471,6 +492,9 @@ EOF
 
       #SLAAC immediately after basic setup
       slaac "$slaac"
+
+      # cleanup for old socket WAR:
+      remove_hostapd_socket "$ifname_ap"
 
       # Start AP
       /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX".conf -f /tmp/hostapd_"$INDEX".log
@@ -485,9 +509,6 @@ EOF
 
       # RPi activity led config
       echo "phy0tx" > /sys/class/leds/led0/trigger
-
-      #Create static mac addr for Batman if and br-lan
-      fix_iface_mac_addresses
 
       # Radio parameters
       iw dev "$wifidev" set txpower limit "$txpwr"00
@@ -542,6 +563,9 @@ EOF
 
       #SLAAC immediately after basic setup
       slaac "$slaac"
+
+      # cleanup for old socket WAR:
+      remove_hostapd_socket "$ifname_ap"
 
       # Start AP
       /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX".conf  -f /tmp/hostapd_"$INDEX".log

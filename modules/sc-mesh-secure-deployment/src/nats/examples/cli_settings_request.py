@@ -21,7 +21,7 @@ async def main():
                 "frequency_mcc": "2412",  # multiradio not supporting
                 "routing": "batman-adv",
                 "mptcp": "disable",          # MPTCP support feature flag, enable/disable
-                "priority": "long_range",
+                "priority": "high_throughput",
                 "ip": "10.20.15.3",
                 "subnet": "255.255.255.0",
                 "tx_power": "15",
@@ -41,7 +41,7 @@ async def main():
                 "frequency_mcc": "2412",  # multiradio not supporting
                 "routing": "batman-adv",
                 "mptcp": "disable",          # MPTCP support feature flag, enable/disable
-                "priority": "long_range",
+                "priority": "high_throughput",
                 "ip": "10.20.15.3",
                 "subnet": "255.255.255.0",
                 "tx_power": "15",
@@ -61,7 +61,7 @@ async def main():
                 "frequency_mcc": "2412",  # multiradio not supporting
                 "routing": "batman-adv",
                 "mptcp": "disable",          # MPTCP support feature flag, enable/disable
-                "priority": "long_range",
+                "priority": "high_throughput",
                 "ip": "10.20.15.3",
                 "subnet": "255.255.255.0",
                 "tx_power": "30",

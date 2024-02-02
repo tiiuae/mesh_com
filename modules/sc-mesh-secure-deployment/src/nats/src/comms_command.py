@@ -438,7 +438,7 @@ class Command:  # pylint: disable=too-many-instance-attributes
                 return "FAIL", "Parameter not supported", ""
 
         except Exception as e:
-            self.logger.error("Not able to get identity, %s", e)
+            self.logger.error("Not able to get configs, %s", e)
             return "FAIL", "Not able to get config file", ""
 
         self.logger.debug("__get_configs done")
@@ -460,10 +460,9 @@ class Command:  # pylint: disable=too-many-instance-attributes
         identity_dict = {}
         try:
             files = ConfigFiles()
-            self.comms_status[0].refresh_status()
-            self.comms_status[1].refresh_status()
-            self.comms_status[2].refresh_status()
-
+            for status in self.comms_status:
+                status.refresh_status()
+  
             with open(files.IDENTITY, "rb") as file:
                 identity = file.read()
             identity_dict["identity"] = identity.decode().strip()

@@ -37,7 +37,7 @@ echo " target host .... $host"
 echo "------------------------------------------------------------------"
 
 for run in $(seq 1 $runs); do
-  iperf3 -c $host -f m >> $log
+  iperf3 -c $host -f m -u -i1 -t 1000 -b 30M >> $log
   echo -e " run $run: \t $(awk '/Bitrate/ {getline}; END{print $7, $8}' $log)"
 done
 
