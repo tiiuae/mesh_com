@@ -1335,7 +1335,7 @@ class MdmAgent:
                     )
             elif config == ConfigType.UTM_CONFIG:
                 try:
-                    if json.loads(response.text)["payload"]["utm_config"]:
+                    if json.loads(response.text)["payload"]["utm_conf"]:
                         status = "OK"
                 except KeyError:
                     self.logger.error(
