@@ -10,6 +10,7 @@ from multiprocessing import Process
 from typing import List, Dict
 from copy import deepcopy
 from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
+import json
 
 from src import cbma_paths
 from src.comms_controller import CommsController
@@ -167,10 +168,12 @@ class CBMAControl:
                 address=bridge_ip,
                 mask=24,
             )
+
         except Exception as e:
             self.logger.debug(
                 "Error setting bridge IP for %s! Error: %s", bridge_name, e
             )
+
         finally:
             ip.close()
 
@@ -520,6 +523,23 @@ class CBMAControl:
         """
         Sets up both upper and lower CBMA.
         """
+        # Create command to start all radios
+        cmd = json.dumps(
+            {
+                "api_version": 1,
+                "cmd": "UP",
+                "radio_index": "*",
+            }
+        )
+
+        ret, _, _ = self.__comms_ctrl.command.handle_command(
+            cmd, self.__comms_ctrl
+        )
+
+        if ret != "OK":
+            self.logger.debug("Error: Unable to bring up the radio interfaces!")
+            return False
+
         self.__cleanup_cbma()
         self.__init_batman_and_bridge()
 

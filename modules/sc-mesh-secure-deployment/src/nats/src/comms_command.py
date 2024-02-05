@@ -108,9 +108,15 @@ class Command:  # pylint: disable=too-many-instance-attributes
         elif self.command == COMMAND.apply:
             ret, info = self.__apply_mission_config()
         elif self.command == COMMAND.wifi_down:
-            ret, info = self.__radio_down()
+            if self.radio_index == "*":
+                ret, info = self.__radio_down_all(cc)
+            else:
+                ret, info = self.__radio_down_single()
         elif self.command == COMMAND.wifi_up:
-            ret, info = self.__radio_up()
+            if self.radio_index == "*":
+                ret, info = self.__radio_up_all(cc)
+            else:
+                ret, info = self.__radio_up_single()
         elif self.command == COMMAND.reboot:
             ret, info = "FAIL", "Command not implemented"
         elif self.command == COMMAND.get_logs:
@@ -310,7 +316,7 @@ class Command:  # pylint: disable=too-many-instance-attributes
         self.logger.debug("No mission config to apply!")
         return "FAIL", "No setting to apply"
 
-    def __radio_down(self) -> Tuple[str, str]:
+    def __radio_down_single(self) -> Tuple[str, str]:
 
         for process in ["/opt/S9011sNatsMesh", "/opt/S90APoint"]:
             ret = subprocess.run(
@@ -328,7 +334,16 @@ class Command:  # pylint: disable=too-many-instance-attributes
         self.logger.debug("Radio deactivated")
         return "OK", "Radio deactivated"
 
-    def __radio_up(self) -> Tuple[str, str]:
+    def __radio_down_all(self, cc) -> Tuple[str, str]:
+        for index in cc.settings.radio_index:
+            if self.comms_status[index].is_mesh_radio_on:
+                ret, info = self.__radio_down_single()
+                if ret == "FAIL":
+                    return ret, info
+        self.logger.debug("All radios deactivated")
+        return "OK", "All radios deactivated"
+
+    def __radio_up_single(self) -> Tuple[str, str]:
 
         for process in ["/opt/S9011sNatsMesh", "/opt/S90APoint"]:
             ret = subprocess.run(
@@ -345,6 +360,15 @@ class Command:  # pylint: disable=too-many-instance-attributes
 
         self.logger.debug("Radio activated")
         return "OK", "Radio activated"
+
+    def __radio_up_all(self, cc) -> Tuple[str, str]:
+        for index in cc.settings.radio_index:
+            self.radio_index = str(index)
+            ret, info = self.__radio_up_single()
+            if ret == "FAIL":
+                return ret, info
+        self.logger.debug("All radios activated")
+        return "OK", "All radios activated"
 
     def __enable_visualisation(self, cc) -> Tuple[str, str]:
         try:
