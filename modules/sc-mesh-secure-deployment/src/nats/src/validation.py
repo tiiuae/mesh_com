@@ -203,7 +203,7 @@ def validate_routing(routing: str) -> bool:
     Validates a given routing.
     Returns True if the routing is valid, False otherwise.
     """
-    if routing in ("olsr", "batman-adv"):
+    if routing in ("olsr", "batman-adv", ""):
         return True
     return False
 
@@ -292,6 +292,8 @@ def validate_batman_iface(batman_iface: str) -> bool:
     """
     try:
         if "bat" in batman_iface and int(batman_iface.replace("bat", "")) >= 0:
+            return True
+        if batman_iface == "":
             return True
         return False
     except (ValueError, TypeError, AttributeError):

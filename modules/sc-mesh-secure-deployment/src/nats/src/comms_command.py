@@ -55,7 +55,7 @@ class Command:  # pylint: disable=too-many-instance-attributes
     Command class
     """
 
-    def __init__(self, comms_status: List[CommsStatus], logger):
+    def __init__(self, comms_status: List[CommsStatus], logger, nats_mode=False):
         self.logger = logger
         self.api_version = 1
         self.command = ""
@@ -63,13 +63,15 @@ class Command:  # pylint: disable=too-many-instance-attributes
         self.radio_index = ""
         self.interval = 1
         self.comms_status = comms_status
+        self.nats_mode = nats_mode
+        self.ctrl_mptcp = False
 
     def handle_command(self, msg: str, cc) -> Tuple[str, str, str]:
         """
         handler for commands
 
         Args:
-            msg: JSON formatted data from NATS message.
+            msg: JSON formatted data command message.
             cc: CommsController class
 
         Returns:
@@ -163,16 +165,23 @@ class Command:  # pylint: disable=too-many-instance-attributes
         processes = [
             "/opt/S9011sNatsMesh",
             "/opt/S90APoint",
-            "/opt/S90nats_discovery",
         ]
-        # Stop S90mptcp before restarting S9011sNatsMesh
-        ret = subprocess.run(
-                ["/opt/S90mptcp", "stop"], shell=False, check=True, capture_output=True, )
-        if ret.returncode != 0:
-                return "FAIL", f"Clearing MPTCP configs failed" + str(
-                    ret.returncode
-                ) + str(ret.stdout) + str(ret.stderr)
-        self.logger.debug("Stopped MPTCP service")
+        if self.nats_mode:
+            processes.append("/opt/S90nats_discovery")
+
+        if self.ctrl_mptcp:
+            # Stop S90mptcp before restarting S9011sNatsMesh
+            ret = subprocess.run(
+                ["/opt/S90mptcp", "stop"],
+                shell=False,
+                check=True,
+                capture_output=True,
+            )
+            if ret.returncode != 0:
+                return "FAIL", f"Clearing MPTCP configs failed" + str(ret.returncode) + str(
+                    ret.stdout
+                ) + str(ret.stderr)
+            self.logger.debug("Stopped MPTCP service")
 
         for process in processes:
             # Restart mesh with default settings
@@ -199,8 +208,7 @@ class Command:  # pylint: disable=too-many-instance-attributes
             if status == "FAIL":
                 return (
                     "FAIL",
-                    "Revoke failed partially."
-                    + " Visualisation is still active",
+                    "Revoke failed partially." + " Visualisation is still active",
                 )
 
         return "OK", "Mesh settings revoked"
@@ -252,16 +260,23 @@ class Command:  # pylint: disable=too-many-instance-attributes
             processes = [
                 "/opt/S9011sNatsMesh",
                 "/opt/S90APoint",
-                "/opt/S90nats_discovery",
             ]
-            # Stop S90mptcp before restarting S9011sNatsMesh
-            ret = subprocess.run(
-                ["/opt/S90mptcp", "stop"], shell=False, check=True, capture_output=True, )
-            if ret.returncode != 0:
-                return "FAIL", f"Clearing MPTCP configs failed" + str(
-                    ret.returncode
-                ) + str(ret.stdout) + str(ret.stderr)
-            self.logger.debug("Stopped MPTCP service")
+            if self.nats_mode:
+                processes.append("/opt/S90nats_discovery")
+
+            if self.ctrl_mptcp:
+                # Stop S90mptcp before restarting S9011sNatsMesh
+                ret = subprocess.run(
+                    ["/opt/S90mptcp", "stop"],
+                    shell=False,
+                    check=True,
+                    capture_output=True,
+                )
+                if ret.returncode != 0:
+                    return "FAIL", f"Clearing MPTCP configs failed" + str(
+                        ret.returncode
+                    ) + str(ret.stdout) + str(ret.stderr)
+                self.logger.debug("Stopped MPTCP service")
 
             for process in processes:
                 # delay before restarting mesh using delay
@@ -277,15 +292,20 @@ class Command:  # pylint: disable=too-many-instance-attributes
                     ) + str(ret.stdout) + str(ret.stderr)
             self.logger.debug("Mission configurations applied")
 
-            time.sleep(5)
-            # Start S90mptcp after restarting S9011sNatsMesh
-            ret = subprocess.run(
-                ["/opt/S90mptcp", "start"], shell=False, check=True, capture_output=True, )
-            if ret.returncode != 0:
-                return "FAIL", f"Setting MPTCP configs failed" + str(
-                    ret.returncode
-                ) + str(ret.stdout) + str(ret.stderr)
-            self.logger.debug("Started MPTCP service")
+            if self.ctrl_mptcp:
+                time.sleep(5)
+                # Start S90mptcp after restarting S9011sNatsMesh
+                ret = subprocess.run(
+                    ["/opt/S90mptcp", "start"],
+                    shell=False,
+                    check=True,
+                    capture_output=True,
+                )
+                if ret.returncode != 0:
+                    return "FAIL", f"Setting MPTCP configs failed" + str(
+                        ret.returncode
+                    ) + str(ret.stdout) + str(ret.stderr)
+                self.logger.debug("Started MPTCP service")
             return "OK", "Mission configurations applied"
         self.logger.debug("No mission config to apply!")
         return "FAIL", "No setting to apply"
@@ -346,9 +366,7 @@ class Command:  # pylint: disable=too-many-instance-attributes
             return "FAIL", "Failed to disable visualisation"
 
         self.logger.debug("Visualisation disabled")
-        self.comms_status[
-            int(self.radio_index)
-        ].is_visualisation_active = False
+        self.comms_status[int(self.radio_index)].is_visualisation_active = False
         return "OK", "Visualisation disabled"
 
     @staticmethod
@@ -379,7 +397,11 @@ class Command:  # pylint: disable=too-many-instance-attributes
                     return "FAIL", "'{p}' DEBUG COMMAND failed", ""
                 file_b64 = base64.b64encode(ret.stdout)
             else:
-                return "FAIL", f"DEBUG COMMAND disabled: cc.debug_mode_enabled: {cc.debug_mode_enabled}", ""
+                return (
+                    "FAIL",
+                    f"DEBUG COMMAND disabled: cc.debug_mode_enabled: {cc.debug_mode_enabled}",
+                    "",
+                )
         except Exception as e:
             self.logger.error("DEBUG COMMAND failed, %s", e)
             return "FAIL", f"'{p}' DEBUG COMMAND failed", ""
@@ -462,7 +484,7 @@ class Command:  # pylint: disable=too-many-instance-attributes
             files = ConfigFiles()
             for status in self.comms_status:
                 status.refresh_status()
-  
+
             with open(files.IDENTITY, "rb") as file:
                 identity = file.read()
             identity_dict["identity"] = identity.decode().strip()

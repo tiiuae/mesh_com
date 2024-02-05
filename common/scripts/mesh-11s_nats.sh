@@ -313,7 +313,9 @@ EOF
       /usr/local/bin/cli_app set support_ch_width 1
 
       # Batman parameters
-      batctl "$wifidev" hop_penalty 30
+      if [ "$routing_algo" == "batman-adv" ]; then
+        batctl "$wifidev" hop_penalty 30
+      fi
 
       echo "Longer range tweak.."
       #if [ "$priority" == "long_range" ]; then
@@ -474,7 +476,7 @@ EOF
             iptables -A FORWARD --in-interface "$wifidev" -j ACCEPT
             mesh_kill "[o]lsrd -i $bridge_name -d 0"
             (olsrd -i "$bridge_name" -d 0)&
-      else
+      elif [ "$routing_algo" = "batman-adv" ]; then
             ##batman-adv###
             ifconfig "$bridge_name" down
             add_network_intf_to_bridge "$bridge_name" "$ifname_ap"
@@ -687,7 +689,11 @@ main () {
   echo "Used: $wifidev $phyname"
 
   if [[ -z "$algo" ]]; then
-      routing_algo="batman-adv"
+      if [[ -z "$batman_iface" ]]; then
+        routing_algo=""
+      else
+        routing_algo="batman-adv"  
+      fi
   else
       routing_algo=$algo
   fi
