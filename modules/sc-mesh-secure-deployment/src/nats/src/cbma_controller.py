@@ -17,7 +17,7 @@ from src.constants import Constants
 from mdm_agent import Interface
 
 from cbma import setup_cbma  # type: ignore[import-not-found]
-from cbma.tools.utils import batman  # type: ignore[import-not-found]
+#from cbma.tools.utils import batman  # type: ignore[import-not-found]
 
 
 class CBMAControl:
@@ -54,6 +54,14 @@ class CBMAControl:
         self.__lower_cbma_interfaces: List[Interface] = []
         self.__upper_cbma_interfaces: List[Interface] = []
 
+        self.__white_interfaces = ["bat0", "halow1", "wlp3s0"]
+        self.__red_interfaces = ["bat1", "eth0", "eth1", "usb0"]
+        self.__na_cbma_interfaces = ["bat0", "bat1", "br-lan"]
+
+        self.br_name = "br-lan"
+        self.lower_batman = "bat0"
+        self.upper_batman = "bat1"
+
     def __get_interfaces(self):
         interfaces = []
         ipr = IPRoute()
@@ -80,25 +88,6 @@ class CBMAControl:
                 mac_address=interface_data["mac_address"],
             )
             self.__interfaces.append(interface)
-
-    @staticmethod
-    def __cleanup_batman_interfaces():
-        # Create an IPRoute object
-        ip = IPRoute()
-        interfaces_to_cleanup = ["bat0", "bat1"]
-
-        for interface in interfaces_to_cleanup:
-            if interface in [link.get_attr("IFLA_IFNAME") for link in ip.get_links()]:
-                # If the interface exists, set it down, and then delete it
-                ip.link(
-                    "set",
-                    index=ip.link_lookup(ifname=interface)[0],
-                    state="down",
-                )
-                ip.link("delete", index=ip.link_lookup(ifname=interface)[0])
-
-        # Close the IPRoute object
-        ip.close()
 
     def __remove_all_interfaces_from_bridge(self, bridge_name):
         # Create an IPRoute object
@@ -143,6 +132,48 @@ class CBMAControl:
             # Close the IPRoute object
             ip.close()
 
+    def __create_bridge(self, bridge_name):
+        ip = IPRoute()
+        try:
+            bridge_indices = ip.link_lookup(ifname=bridge_name)
+            if not bridge_indices:
+                ip.link("add", ifname=bridge_name, kind="bridge")
+
+        except Exception as e:
+            self.logger.debug(
+                "Error creating bridge %s! Error: %s",
+                bridge_name,
+                e,
+            )
+
+        finally:
+            ip.close()
+
+    def __set_bridge_ip(self, bridge_name, mesh_vif_name):
+        ip = IPRoute()
+        try:
+            # Get the MAC address of the mesh interface
+            mesh_if_mac = self.__get_mac_addr(mesh_vif_name)
+
+            # Extract the last two bytes of the MAC address
+            ip_random = mesh_if_mac[15:17]
+            # Calculate the bridge IP address
+            bridge_ip = f"192.168.1.{int(ip_random, 16)}"
+
+            # Add the IP address to the bridge
+            ip.addr(
+                "add",
+                index=ip.link_lookup(ifname=bridge_name)[0],
+                address=bridge_ip,
+                mask=24,
+            )
+        except Exception as e:
+            self.logger.debug(
+                "Error setting bridge IP for %s! Error: %s", bridge_name, e
+            )
+        finally:
+            ip.close()
+
     def __add_interface_to_bridge(self, bridge_name, interface_to_add):
         # Create an IPRoute object
         ip = IPRoute()
@@ -180,9 +211,24 @@ class CBMAControl:
                 bridge_name,
                 e,
             )
-
         finally:
             # Close the IPRoute object
+            ip.close()
+
+    def __set_bridge_up(self, bridge_name):
+        ip = IPRoute()
+        try:
+            # Bring the bridge up
+            bridge_indices = ip.link_lookup(ifname=bridge_name)
+            if bridge_indices:
+                ip.link("set", index=bridge_indices[0], state="up")
+        except Exception as e:
+            self.logger.debug(
+                "Error bringing up bridge %s! Error: %s",
+                bridge_name,
+                e,
+            )
+        finally:
             ip.close()
 
     @staticmethod
@@ -208,8 +254,7 @@ class CBMAControl:
                 "--jump",
                 "ACCEPT",
             ],
-            check=False
-
+            check=False,
         )
         subprocess.run(
             [
@@ -221,7 +266,7 @@ class CBMAControl:
                 "--jump",
                 "ACCEPT",
             ],
-            check=False
+            check=False,
         )
 
     @staticmethod
@@ -264,6 +309,30 @@ class CBMAControl:
         finally:
             ip.close()
 
+    def __get_mac_addr(self, interface_name):
+        for interface in self.__interfaces:
+            if interface.interface_name == interface_name:
+                return interface.mac_address
+        return None  # Interface not found in the list
+
+    def __create_batman_interface(self, batman_if, if_name):
+        ip = IPRoute()
+        try:
+            mac = self.__get_mac_addr(if_name)
+            # Check if the interface already exists
+            interface_indices = ip.link_lookup(ifname=batman_if)
+            if not interface_indices:
+                # If the interface doesn't exist, create it as a Batman interface
+                ip.link("add", ifname=batman_if, kind="batadv", address=mac)
+        except Exception as e:
+            self.logger.debug(
+                "Error creating Batman interface %s: %s",
+                batman_if,
+                e,
+            )
+        finally:
+            ip.close()
+
     def __destroy_batman_interface(self, mesh_interface):
         # pylint: disable=invalid-name
         ip = IPRoute()
@@ -271,9 +340,7 @@ class CBMAControl:
         try:
             ip.link("delete", ifname=mesh_interface)
         except Exception as e:
-            self.logger.debug(
-                f"Error: Unable to destroy interface {mesh_interface}."
-            )
+            self.logger.debug(f"Error: Unable to destroy interface {mesh_interface}.")
             self.logger.debug(f"Exception: {str(e)}")
         finally:
             ip.close()
@@ -292,13 +359,15 @@ class CBMAControl:
             ip.close()
 
     def __cleanup_cbma(self):
-        self.__shutdown_interface("bat0")
-        self.__shutdown_interface("bat1")
+        self.__shutdown_interface(self.lower_batman)
+        self.__shutdown_interface(self.upper_batman)
         self.__delete_ebtables_rules()
         self.__delete_macsec_links()
-        self.__destroy_batman_interface("bat0")
-        self.__destroy_batman_interface("bat1")
+        self.__destroy_batman_interface(self.lower_batman)
+        self.__destroy_batman_interface(self.upper_batman)
+        # HACK: How can we know that "br-upper" even exists and who owns it?
         self.__shutdown_and_delete_bridge("br-upper")
+        self.__shutdown_and_delete_bridge(self.br_name)
 
     def stop_cbma(self):
         """
@@ -320,9 +389,7 @@ class CBMAControl:
                     if process.is_alive():
                         process.terminate()
                 except Exception as e:
-                    self.logger.error(
-                        f"Terminating lower CBMA process error: {e}"
-                    )
+                    self.logger.error(f"Terminating lower CBMA process error: {e}")
 
             for process in self.__lower_cbma_processes.values():
                 try:
@@ -330,9 +397,7 @@ class CBMAControl:
                         process.join(timeout=1.0)
                         process.kill()
                 except Exception as e:
-                    self.logger.error(
-                        f"Killing lower CBMA process error: {e}"
-                    )
+                    self.logger.error(f"Killing lower CBMA process error: {e}")
 
             for if_name, process in self.__upper_cbma_processes.items():
                 try:
@@ -344,9 +409,7 @@ class CBMAControl:
                     if process.is_alive():
                         process.terminate()
                 except Exception as e:
-                    self.logger.error(
-                        f"Terminating upper CBMA process error: {e}"
-                    )
+                    self.logger.error(f"Terminating upper CBMA process error: {e}")
 
             for process in self.__upper_cbma_processes.values():
                 try:
@@ -354,12 +417,8 @@ class CBMAControl:
                         process.join(timeout=1.0)
                         process.kill()
                 except Exception as e:
-                    self.logger.error(
-                        f"Killing upper CBMA process error: {e}"
-                    )
-            self.logger.debug(
-                "CBMA processes terminated, continue cleanup..."
-            )
+                    self.logger.error(f"Killing upper CBMA process error: {e}")
+            self.logger.debug("CBMA processes terminated, continue cleanup...")
             self.__cleanup_cbma()
             self.logger.debug("CBMA cleanup finished")
 
@@ -373,9 +432,7 @@ class CBMAControl:
         certificate_path = f"{cert_path}/MAC/{mac}.crt"
 
         if not path.exists(certificate_path):
-            self.logger.debug(
-                "Certificate not found: %s", certificate_path
-            )
+            self.logger.debug("Certificate not found: %s", certificate_path)
             return False
 
         self.logger.debug("Certificate found: %s", certificate_path)
@@ -396,7 +453,7 @@ class CBMAControl:
             ):
                 interfaces_without_certificate.append(interface)
 
-        # Remove interfaces without certificates lower CBMA interface list
+        # Remove interfaces without certificates from lower CBMA interface list
         for interface in interfaces_without_certificate:
             self.logger.debug(
                 "Interface %s doesn't have certificate!", interface.interface_name
@@ -405,15 +462,10 @@ class CBMAControl:
                 self.__lower_cbma_interfaces.remove(interface)
 
         not_allowed_lower_cbma_interfaces = []
-        # FIXME: Hard coded red interfaces for testing purposes
-        # Eventually MDM server will define interface colors somehow
-        red_interface_prefixes = ["eth", "usb", "wlan", "br-lan", "bat", "lan"]
+        filtering_list = self.__red_interfaces.copy() + self.__na_cbma_interfaces.copy()
         for interface in self.__lower_cbma_interfaces:
             interface_name = interface.interface_name.lower()
-            if any(
-                prefix in interface_name
-                for prefix in red_interface_prefixes
-            ):
+            if any(prefix in interface_name for prefix in filtering_list):
                 not_allowed_lower_cbma_interfaces.append(interface)
 
         # Remove not allowed interfaces from lower CBMA interface list
@@ -421,15 +473,10 @@ class CBMAControl:
             if interface in self.__lower_cbma_interfaces:
                 self.__lower_cbma_interfaces.remove(interface)
 
-        # FIXME: Hard coded white (upper CBMA) interfaces for testing purposes
-        # Eventually MDM server will define interface colors somehow
-        white_interfaces = ["bat0", "halow1", "wlp3s0"]
+        # Add white aka upper CBMA interfaces
         for interface in self.__interfaces:
             interface_name = interface.interface_name.lower()
-            if any(prefix in interface_name for prefix in white_interfaces):
-                # TODO: Reminder to make sure not to add bat1 ever to upper CBMA
-                if interface.interface_name == "bat1":
-                    continue
+            if any(prefix in interface_name for prefix in self.__white_interfaces):
                 self.__upper_cbma_interfaces.append(interface)
 
         # Lower and upper CBMA interfaces are mutually exclusive so remove
@@ -438,15 +485,16 @@ class CBMAControl:
             if interface in self.__lower_cbma_interfaces:
                 self.__lower_cbma_interfaces.remove(interface)
 
-    def __wait_for_batman_interfaces(self, timeout=3):
+    def __wait_for_batman_interfaces(self, timeout=4):
         start_time = time.time()
+        self.__get_interfaces()
         while True:
             with self.__lock:
                 found = any(
-                    interface.interface_name == "bat0"
+                    interface.interface_name == self.lower_batman
                     for interface in self.__interfaces
                 ) and any(
-                    interface.interface_name == "bat1"
+                    interface.interface_name == self.upper_batman
                     for interface in self.__interfaces
                 )
                 if found:
@@ -459,47 +507,30 @@ class CBMAControl:
             time.sleep(1)  # Sleep for 1 second before checking again
             self.__get_interfaces()
 
+    def __init_batman_and_bridge(self):
+        if_name = self.__comms_ctrl.settings.mesh_vif[0]
+        self.__get_interfaces()
+        self.__create_batman_interface(self.lower_batman, if_name)
+        self.__create_batman_interface(self.upper_batman, if_name)
+        self.__create_bridge(self.br_name)
+        self.__set_bridge_ip(self.br_name, if_name)
+        self.__wait_for_batman_interfaces()
+
     def setup_cbma(self):
         """
         Sets up both upper and lower CBMA.
         """
-        # Cleanup CBMA before starting it
         self.__cleanup_cbma()
-        # FIXME: bridge name/control in general
-        self.__remove_all_interfaces_from_bridge("br-lan")
+        self.__init_batman_and_bridge()
 
-        # TODO - Shall this be done differently?
-        # Create batman interfaces
-        batman("bat0")
-        batman("bat1")
-
-        self.__get_interfaces()
-        self.__wait_for_batman_interfaces()
         self.__update_cbma_interface_lists()
         self.__setup_lower_cbma()
         self.__setup_upper_cbma()
 
         # Add interfaces to the bridge
-        bridge_setting = self.__comms_ctrl.settings.bridge[0]
-        bridge_setting = bridge_setting.strip('"')
-        components = bridge_setting.split()
-        bridge_name = components[0]
-        interface_names = components[1:]
-
-        not_allowed_interfaces_in_bridge = ["bat0"]
-        for not_allowed_interface in not_allowed_interfaces_in_bridge:
-            if not_allowed_interface in interface_names:
-                interface_names.remove(not_allowed_interface)
-
-        # FIXME: Hard coded red interfaces for testing purposes
-        # Eventually MDM server will define interface colors
-        mandatory_interfaces = ["bat1", "eth0", "eth1", "usb0"]
-        for mandatory_interface in mandatory_interfaces:
-            if mandatory_interface not in interface_names:
-                interface_names.append(mandatory_interface)
-
-        for interface in interface_names:
-            self.__add_interface_to_bridge(bridge_name, interface)
+        for interface in self.__red_interfaces:
+            self.__add_interface_to_bridge(self.br_name, interface)
+        self.__set_bridge_up(self.br_name)
         self.__cbma_set_up = True
         return True
 
@@ -523,7 +554,7 @@ class CBMAControl:
                 "lower",
                 interface_name,
                 Constants.CBMA_PORT_LOWER.value,
-                "bat0",
+                self.lower_batman,
                 self.__cbma_certs_path,
                 self.__cbma_ca_cert_path,
                 "off",
@@ -577,7 +608,7 @@ class CBMAControl:
                 "upper",
                 interface_name,
                 Constants.CBMA_PORT_UPPER.value,
-                "bat1",
+                self.upper_batman,
                 cbma_certs_path,
                 cbma_ca_cert_path,
                 "off",
