@@ -56,7 +56,7 @@ class CBMAControl:
         self.__upper_cbma_interfaces: List[Interface] = []
 
         self.__white_interfaces = ["bat0", "halow1", "wlp3s0"]
-        self.__red_interfaces = ["bat1", "eth0", "eth1", "usb0"]
+        self.__red_interfaces = ["bat1", "eth0", "eth1", "usb0", "lan1"]
         self.__na_cbma_interfaces = ["bat0", "bat1", "br-lan"]
 
         self.br_name = "br-lan"
@@ -89,49 +89,6 @@ class CBMAControl:
                 mac_address=interface_data["mac_address"],
             )
             self.__interfaces.append(interface)
-
-    def __remove_all_interfaces_from_bridge(self, bridge_name):
-        # Create an IPRoute object
-        ip = IPRoute()
-
-        try:
-            # Get the index of the bridge
-            bridge_indices = ip.link_lookup(ifname=bridge_name)
-            if bridge_indices:
-                bridge_index = bridge_indices[0]
-            else:
-                self.logger.debug(
-                    "Cannot remove interfaces from %s as it was not found!",
-                    bridge_name,
-                )
-                return
-            # Get the indices of all interfaces currently in the bridge
-            interfaces_indices = [
-                link["index"] for link in ip.get_links(master=bridge_index)
-            ]
-
-            if not interfaces_indices:
-                self.logger.debug(
-                    "No interfaces to remove from the bridge %s!",
-                    bridge_name,
-                )
-                return
-
-            # Remove each interface from the bridge
-            for interface_index in interfaces_indices:
-                ip.link(
-                    "set", index=interface_index, master=0
-                )  # Set the master to 0 (no bridge)
-
-        except Exception as e:
-            self.logger.debug(
-                "Error removing interfaces from bridge %s!",
-                e,
-            )
-
-        finally:
-            # Close the IPRoute object
-            ip.close()
 
     def __create_bridge(self, bridge_name):
         ip = IPRoute()
@@ -218,17 +175,17 @@ class CBMAControl:
             # Close the IPRoute object
             ip.close()
 
-    def __set_bridge_up(self, bridge_name):
+    def __set_interface_up(self, interface_name):
         ip = IPRoute()
         try:
-            # Bring the bridge up
-            bridge_indices = ip.link_lookup(ifname=bridge_name)
-            if bridge_indices:
-                ip.link("set", index=bridge_indices[0], state="up")
+            # Bring the interface ip
+            interface_indices = ip.link_lookup(ifname=interface_name)
+            if interface_indices:
+                ip.link("set", index=interface_indices[0], state="up")
         except Exception as e:
             self.logger.debug(
-                "Error bringing up bridge %s! Error: %s",
-                bridge_name,
+                "Error bringing up interface %s! Error: %s",
+                interface_name,
                 e,
             )
         finally:
@@ -515,6 +472,8 @@ class CBMAControl:
         self.__get_interfaces()
         self.__create_batman_interface(self.lower_batman, if_name)
         self.__create_batman_interface(self.upper_batman, if_name)
+        self.__set_interface_up(self.lower_batman)
+        self.__set_interface_up(self.upper_batman)
         self.__create_bridge(self.br_name)
         self.__set_bridge_ip(self.br_name, if_name)
         self.__wait_for_batman_interfaces()
@@ -550,7 +509,7 @@ class CBMAControl:
         # Add interfaces to the bridge
         for interface in self.__red_interfaces:
             self.__add_interface_to_bridge(self.br_name, interface)
-        self.__set_bridge_up(self.br_name)
+        self.__set_interface_up(self.br_name)
         self.__cbma_set_up = True
         return True
 
