@@ -23,16 +23,6 @@ else
       generate_identity_id
   fi
 
-  #######################################
-  # Initialise default radios and IF    #
-  #######################################
-
-  # Do not continue in case halow init has not finished
-  # Halow is slow to start, so we wait for it to finish
-  while ps aux | grep [i]nit_halow > /dev/null; do
-      sleep 1
-  done
-
   sleep 3
 
   #######################################
