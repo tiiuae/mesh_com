@@ -493,7 +493,7 @@ class CBMAControl:
 
         # FIXME: Hard coded red interfaces for testing purposes
         # Eventually MDM server will define interface colors
-        mandatory_interfaces = ["bat1", "eth0", "eth1", "usb0"]
+        mandatory_interfaces = ["bat1", "eth1", "usb0"]
         for mandatory_interface in mandatory_interfaces:
             if mandatory_interface not in interface_names:
                 interface_names.append(mandatory_interface)
