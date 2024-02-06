@@ -41,14 +41,6 @@ else
     fi
   done
 
-  echo "Starting AP service"
-  # Loop for AP service
-  for i in {0..2}; do
-    if [ "$i" -eq 0 ] || [ -f "/opt/${i}_mesh.conf" ]; then
-      /opt/S90APoint start id"$i"
-    fi
-  done
-
   sleep 3
 
   #######################################
