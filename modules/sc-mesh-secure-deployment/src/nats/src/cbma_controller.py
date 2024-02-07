@@ -56,7 +56,7 @@ class CBMAControl:
         self.__upper_cbma_interfaces: List[Interface] = []
 
         self.__white_interfaces = ["bat0", "halow1"]
-        self.__red_interfaces = ["eth0", "eth1", "usb0", "lan1", "bat1", "wlan1"]
+        self.__red_interfaces = ["bat1", "wlan1"]
         self.__na_cbma_interfaces = ["bat0", "bat1", "br-lan"]
 
         self.br_name = "br-lan"
