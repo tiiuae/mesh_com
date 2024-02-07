@@ -57,7 +57,15 @@ class CBMAControl:
 
         self.__white_interfaces = ["bat0", "halow1"]
         self.__red_interfaces = ["bat1", "wlan1"]
-        self.__na_cbma_interfaces = ["bat0", "bat1", "br-lan"]
+        self.__na_cbma_interfaces = [
+            "bat0",
+            "bat1",
+            "br-lan",
+            "eth0",
+            "eth1",
+            "usb0",
+            "lan1",
+        ]
 
         self.br_name = "br-lan"
         self.lower_batman = "bat0"
@@ -89,9 +97,9 @@ class CBMAControl:
             self.__interfaces.append(interface)
 
         self.logger.debug(
-                "__get_interfaces: %s",
-                interfaces,
-            )
+            "__get_interfaces: %s",
+            interfaces,
+        )
 
     def __create_bridge(self, bridge_name):
         ip = IPRoute()
