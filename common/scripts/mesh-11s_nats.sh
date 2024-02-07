@@ -481,16 +481,16 @@ EOF
             ifconfig "$bridge_name" down
             add_network_intf_to_bridge "$bridge_name" "$ifname_ap"
             iptables -A FORWARD --in-interface "$batman_iface" -j ACCEPT
+            ifconfig "$bridge_name" "$bridge_ip" netmask "$nmask"
+            ifconfig "$bridge_name" up
+            echo
+            ifconfig "$bridge_name"
+            # Add forwading rules from AP to "$batman_iface" interface
+            iptables -P FORWARD ACCEPT
+            route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
+            route add -net "$network" gw "$bridge_ip" netmask "$nmask" dev "$bridge_name"
+            iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
       fi
-      ifconfig "$bridge_name" "$bridge_ip" netmask "$nmask"
-      ifconfig "$bridge_name" up
-      echo
-      ifconfig "$bridge_name"
-      # Add forwading rules from AP to "$batman_iface" interface
-      iptables -P FORWARD ACCEPT
-      route del -net "$network" gw 0.0.0.0 netmask "$nmask" dev "$bridge_name"
-      route add -net "$network" gw "$bridge_ip" netmask "$nmask" dev "$bridge_name"
-      iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
 
       #SLAAC immediately after basic setup
       slaac "$slaac"
@@ -554,14 +554,14 @@ ieee80211n=1
 #ieee80211ac=1
 #vht_capab=[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]
 EOF
-      ifconfig "$bridge_name" down
-      add_network_intf_to_bridge "$bridge_name" "$ifname_ap"
-      ifconfig "$bridge_name" "$ipaddr" netmask "$nmask"
-      ifconfig "$bridge_name" up
-      echo
-      ifconfig "$bridge_name"
-      iptables -P FORWARD ACCEPT
-      ip addr flush dev "$batman_iface"
+      #ifconfig "$bridge_name" down
+      #add_network_intf_to_bridge "$bridge_name" "$ifname_ap"
+      #ifconfig "$bridge_name" "$ipaddr" netmask "$nmask"
+      #ifconfig "$bridge_name" up
+      #echo
+      #ifconfig "$bridge_name"
+      #iptables -P FORWARD ACCEPT
+      #ip addr flush dev "$batman_iface"
 
       #SLAAC immediately after basic setup
       slaac "$slaac"
