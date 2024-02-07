@@ -11,6 +11,7 @@ from typing import List, Dict
 from copy import deepcopy
 import json
 import fnmatch
+import re
 from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
 
 from src import cbma_paths
@@ -466,36 +467,33 @@ class CBMAControl:
             if interface in self.__lower_cbma_interfaces:
                 self.__lower_cbma_interfaces.remove(interface)
 
-    def __wait_for_halow_interface(self, timeout=10):
-        self.logger.debug("Wait for halow interface to exist")
+    def __wait_for_ap(self, timeout=4):
         start_time = time.time()
-        self.__get_interfaces()
         while True:
-            with self.__lock:
-                found = any(
-                    interface.interface_name.startswith("halow")
-                    for interface in self.__interfaces
-                )
-                if found:
+            try:
+                result = subprocess.check_output(["iw", "dev", "wlan1", "info"])
+                result_str = result.decode("utf-8")
+                # Use regular expressions to extract the interface type
+                match = re.search(r"type\s+([\w-]+)", result_str)
+                if match.group(1) == "AP":
                     return True
-            elapsed_time = time.time() - start_time
 
-            if elapsed_time >= timeout:
-                return False  # Timeout reached
+                elapsed_time = time.time() - start_time
 
-            time.sleep(2)  # Sleep for 2 seconds before checking again
-            self.__get_interfaces()
+                if elapsed_time >= timeout:
+                    return False  # Timeout reached
+                time.sleep(1)
+            except subprocess.CalledProcessError:
+                return False
 
-    def __wait_for_batman_interfaces(self, timeout=4):
+    def __wait_for_interface(self, if_name, timeout=3):
+        self.logger.debug("__wait_for_interface %s", if_name)
         start_time = time.time()
         self.__get_interfaces()
         while True:
             with self.__lock:
                 found = any(
-                    interface.interface_name == self.lower_batman
-                    for interface in self.__interfaces
-                ) and any(
-                    interface.interface_name == self.upper_batman
+                    interface.interface_name == if_name and interface.operstat == "UP"
                     for interface in self.__interfaces
                 )
                 if found:
@@ -524,7 +522,8 @@ class CBMAControl:
         self.__set_interface_up(self.upper_batman)
         self.__create_bridge(self.br_name)
         self.__set_bridge_ip(self.br_name, if_name)
-        self.__wait_for_batman_interfaces()
+        self.__wait_for_interface(self.lower_batman)
+        self.__wait_for_interface(self.upper_batman)
 
     def __setup_radios(self):
         # Create command to start all radios
@@ -542,12 +541,19 @@ class CBMAControl:
             self.logger.debug("Error: Unable to bring up the radio interfaces!")
             return False
 
-        # Halow startup may take long time. Ensure interface is up before exit.
+        # Radio startup may take long time. Try to ensure
+        # interface exists and is ready to be added to bridge.
         for interface_name in self.__comms_ctrl.settings.mesh_vif:
             self.logger.debug("mesh_vif: %s", interface_name)
+            timeout = 3
             if interface_name.startswith("halow"):
-                if not self.__wait_for_halow_interface():
-                    return False
+                timeout = 10
+            self.__wait_for_interface(interface_name, timeout)
+
+        for mode in self.__comms_ctrl.settings.mode:
+            if mode == "ap+mesh_mcc":
+                self.__wait_for_ap()
+
         return True
 
     def setup_cbma(self):
@@ -561,12 +567,13 @@ class CBMAControl:
         self.__setup_lower_cbma()
         self.__setup_upper_cbma()
 
+        # Set radios on
+        self.__setup_radios()
+
         # Add interfaces to the bridge
         for interface in self.__red_interfaces:
             self.__add_interface_to_bridge(self.br_name, interface)
         self.__set_interface_up(self.br_name)
-        # Set radios on
-        self.__setup_radios()
         self.__cbma_set_up = True
         return True
 
