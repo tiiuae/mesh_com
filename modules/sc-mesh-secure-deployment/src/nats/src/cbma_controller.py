@@ -9,8 +9,9 @@ import time
 from multiprocessing import Process
 from typing import List, Dict
 from copy import deepcopy
-from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
 import json
+import fnmatch
+from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
 
 from src import cbma_paths
 from src.comms_controller import CommsController
@@ -18,7 +19,6 @@ from src.constants import Constants
 from mdm_agent import Interface
 
 from cbma import setup_cbma  # type: ignore[import-not-found]
-#from cbma.tools.utils import batman  # type: ignore[import-not-found]
 
 
 class CBMAControl:
@@ -55,8 +55,8 @@ class CBMAControl:
         self.__lower_cbma_interfaces: List[Interface] = []
         self.__upper_cbma_interfaces: List[Interface] = []
 
-        self.__white_interfaces = ["bat0", "halow1", "wlp3s0"]
-        self.__red_interfaces = ["bat1", "eth0", "eth1", "usb0", "lan1"]
+        self.__white_interfaces = ["bat0", "halow1"]
+        self.__red_interfaces = ["eth0", "eth1", "usb0", "lan1", "bat1", "wlan1"]
         self.__na_cbma_interfaces = ["bat0", "bat1", "br-lan"]
 
         self.br_name = "br-lan"
@@ -76,9 +76,7 @@ class CBMAControl:
                 "operstate": ifstate,
                 "mac_address": mac_address,
             }
-
-            if interface_info:
-                interfaces.append(interface_info)
+            interfaces.append(interface_info)
 
         self.__interfaces.clear()
 
@@ -89,6 +87,11 @@ class CBMAControl:
                 mac_address=interface_data["mac_address"],
             )
             self.__interfaces.append(interface)
+
+        self.logger.debug(
+                "__get_interfaces: %s",
+                interfaces,
+            )
 
     def __create_bridge(self, bridge_name):
         ip = IPRoute()
@@ -282,6 +285,12 @@ class CBMAControl:
             # Check if the interface already exists
             interface_indices = ip.link_lookup(ifname=batman_if)
             if not interface_indices:
+                self.logger.debug(
+                    "Create interface %s using %s interface's MAC: %s.",
+                    batman_if,
+                    if_name,
+                    mac,
+                )
                 # If the interface doesn't exist, create it as a Batman interface
                 ip.link("add", ifname=batman_if, kind="batadv", address=mac)
         except Exception as e:
@@ -422,7 +431,11 @@ class CBMAControl:
                 self.__lower_cbma_interfaces.remove(interface)
 
         not_allowed_lower_cbma_interfaces = []
-        filtering_list = self.__red_interfaces.copy() + self.__na_cbma_interfaces.copy()
+        filtering_list = (
+            self.__red_interfaces.copy()
+            + self.__na_cbma_interfaces.copy()
+            + self.__white_interfaces.copy()
+        )
         for interface in self.__lower_cbma_interfaces:
             interface_name = interface.interface_name.lower()
             if any(prefix in interface_name for prefix in filtering_list):
@@ -444,6 +457,26 @@ class CBMAControl:
         for interface in self.__upper_cbma_interfaces:
             if interface in self.__lower_cbma_interfaces:
                 self.__lower_cbma_interfaces.remove(interface)
+
+    def __wait_for_halow_interface(self, timeout=10):
+        self.logger.debug("Wait for halow interface to exist")
+        start_time = time.time()
+        self.__get_interfaces()
+        while True:
+            with self.__lock:
+                found = any(
+                    interface.interface_name.startswith("halow")
+                    for interface in self.__interfaces
+                )
+                if found:
+                    return True
+            elapsed_time = time.time() - start_time
+
+            if elapsed_time >= timeout:
+                return False  # Timeout reached
+
+            time.sleep(2)  # Sleep for 2 seconds before checking again
+            self.__get_interfaces()
 
     def __wait_for_batman_interfaces(self, timeout=4):
         start_time = time.time()
@@ -469,6 +502,13 @@ class CBMAControl:
 
     def __init_batman_and_bridge(self):
         if_name = self.__comms_ctrl.settings.mesh_vif[0]
+        if if_name.startswith("halow"):
+            if_pattern = "wlp*s0"
+            for interface_name in self.__comms_ctrl.settings.mesh_vif:
+                if fnmatch.fnmatch(interface_name, if_pattern):
+                    if_name = interface_name
+                    break
+
         self.__get_interfaces()
         self.__create_batman_interface(self.lower_batman, if_name)
         self.__create_batman_interface(self.upper_batman, if_name)
@@ -478,10 +518,7 @@ class CBMAControl:
         self.__set_bridge_ip(self.br_name, if_name)
         self.__wait_for_batman_interfaces()
 
-    def setup_cbma(self):
-        """
-        Sets up both upper and lower CBMA.
-        """
+    def __setup_radios(self):
         # Create command to start all radios
         cmd = json.dumps(
             {
@@ -491,14 +528,24 @@ class CBMAControl:
             }
         )
 
-        ret, _, _ = self.__comms_ctrl.command.handle_command(
-            cmd, self.__comms_ctrl
-        )
+        ret, _, _ = self.__comms_ctrl.command.handle_command(cmd, self.__comms_ctrl)
 
         if ret != "OK":
             self.logger.debug("Error: Unable to bring up the radio interfaces!")
             return False
 
+        # Halow startup may take long time. Ensure interface is up before exit.
+        for interface_name in self.__comms_ctrl.settings.mesh_vif:
+            self.logger.debug("mesh_vif: %s", interface_name)
+            if interface_name.startswith("halow"):
+                if not self.__wait_for_halow_interface():
+                    return False
+        return True
+
+    def setup_cbma(self):
+        """
+        Sets up both upper and lower CBMA.
+        """
         self.__cleanup_cbma()
         self.__init_batman_and_bridge()
 
@@ -510,6 +557,8 @@ class CBMAControl:
         for interface in self.__red_interfaces:
             self.__add_interface_to_bridge(self.br_name, interface)
         self.__set_interface_up(self.br_name)
+        # Set radios on
+        self.__setup_radios()
         self.__cbma_set_up = True
         return True
 
