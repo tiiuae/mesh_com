@@ -225,13 +225,13 @@ class MdmAgent:
         :return: -
         """
         self.running = True
-
+        previous_status = ""
         while self.running:
-            self.logger.debug(
-                "status: %s, mdm_available: %s",
-                self.__status,
-                self.mdm_service_available,
-            )
+            status = f"status: {self.__status}, mdm_available: {self.mdm_service_available}"
+            # to avoid flooding log file
+            if previous_status != status:
+                self.logger.debug(status)
+                previous_status = status
 
             if (
                 self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "FAIL"
