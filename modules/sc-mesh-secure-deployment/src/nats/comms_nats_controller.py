@@ -512,7 +512,7 @@ class MdmAgent:
         :return: status
         """
 
-        # we do not need for UTM branch
+        # we do not need it for UTM branch
         # so just skip this step and return OK status
         return "OK"
 
