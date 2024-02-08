@@ -1421,7 +1421,7 @@ class MdmAgent:
                 self.__interval = Constants.OK_POLLING_TIME_SECONDS.value
                 self.__mesh_conf_request_processed = True
                 self.logger.debug(
-                    "************ all statuses are OK !!!"
+                    "All statuses are OK."
                 )
             else:
                 self.__interval = Constants.FAIL_POLLING_TIME_SECONDS.value
