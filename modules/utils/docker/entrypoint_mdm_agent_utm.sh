@@ -15,5 +15,5 @@ fi
 #######################################
 # Enable MDM stuff                    #
 #######################################
-echo "starting mdm agent for testing purposes"
+echo "starting mdm agent"
 /opt/S90mdm_agent start
