@@ -45,11 +45,11 @@ class CBMAControl:
         self.__cbma_certs_path = "/opt/crypto/ecdsa/birth/filebased"
         self.__cbma_ca_cert_path = "/opt/mspki/ecdsa/certificate_chain.crt"
         self.__upper_cbma_certs_path = (
-            Constants.DOWNLOADED_CBMA_UPPER_PATH.value + "/crypto/ecdsa/birth/filebased"
+            Constants.DOWNLOADED_CBMA_UPPER_PATH.value + "/crypto/rsa/birth/filebased"
         )
         self.__upper_cbma_ca_cert_path = (
             Constants.DOWNLOADED_CBMA_UPPER_PATH.value
-            + "/mspki/ecdsa/certificate_chain.crt"
+            + "/mspki/rsa/certificate_chain.crt"
         )
         self.__lower_cbma_processes: Dict[str, Process] = {}
         self.__upper_cbma_processes: Dict[str, Process] = {}
