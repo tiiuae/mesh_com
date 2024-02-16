@@ -13,6 +13,7 @@ import json
 import fnmatch
 import re
 from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
+import ipaddress
 
 from src import cbma_paths
 from src.comms_controller import CommsController
@@ -68,9 +69,12 @@ class CBMAControl:
             "lan1",
         ]
 
-        self.br_name = "br-lan"
-        self.lower_batman = "bat0"
-        self.upper_batman = "bat1"
+        self.BR_NAME: str = "br-lan"
+        self.BR_WHITE_NAME: str = "br-white"
+        self.LOWER_BATMAN: str = "bat0"
+        self.UPPER_BATMAN: str = "bat1"
+        self.__IPV6_WHITE_PREFIX: str = "fdbb:1ef7:9d6f:e05d"
+        self.__IPV6_RED_PREFIX: str = "fdd8:84dc:fe30:7bf2"
 
     def __get_interfaces(self):
         interfaces = []
@@ -337,15 +341,15 @@ class CBMAControl:
             ip.close()
 
     def __cleanup_cbma(self):
-        self.__shutdown_interface(self.lower_batman)
-        self.__shutdown_interface(self.upper_batman)
+        self.__shutdown_interface(self.LOWER_BATMAN)
+        self.__shutdown_interface(self.UPPER_BATMAN)
         self.__delete_ebtables_rules()
         self.__delete_macsec_links()
-        self.__destroy_batman_interface(self.lower_batman)
-        self.__destroy_batman_interface(self.upper_batman)
+        self.__destroy_batman_interface(self.LOWER_BATMAN)
+        self.__destroy_batman_interface(self.UPPER_BATMAN)
         # HACK: How can we know that "br-upper" even exists and who owns it?
         self.__shutdown_and_delete_bridge("br-upper")
-        self.__shutdown_and_delete_bridge(self.br_name)
+        self.__shutdown_and_delete_bridge(self.BR_NAME)
 
     def stop_cbma(self):
         """
@@ -516,14 +520,14 @@ class CBMAControl:
                     break
 
         self.__get_interfaces()
-        self.__create_batman_interface(self.lower_batman, if_name)
-        self.__create_batman_interface(self.upper_batman, if_name)
-        self.__set_interface_up(self.lower_batman)
-        self.__set_interface_up(self.upper_batman)
-        self.__create_bridge(self.br_name)
-        self.__set_bridge_ip(self.br_name, if_name)
-        self.__wait_for_interface(self.lower_batman)
-        self.__wait_for_interface(self.upper_batman)
+        self.__create_batman_interface(self.LOWER_BATMAN, if_name)
+        self.__create_batman_interface(self.UPPER_BATMAN, if_name)
+        self.__set_interface_up(self.LOWER_BATMAN)
+        self.__set_interface_up(self.UPPER_BATMAN)
+        self.__create_bridge(self.BR_NAME)
+        self.__set_bridge_ip(self.BR_NAME, if_name)
+        self.__wait_for_interface(self.LOWER_BATMAN)
+        self.__wait_for_interface(self.UPPER_BATMAN)
 
     def __setup_radios(self):
         # Create command to start all radios
@@ -572,10 +576,79 @@ class CBMAControl:
 
         # Add interfaces to the bridge
         for interface in self.__red_interfaces:
-            self.__add_interface_to_bridge(self.br_name, interface)
-        self.__set_interface_up(self.br_name)
+            self.__add_interface_to_bridge(self.BR_NAME, interface)
+        self.__set_interface_up(self.BR_NAME)
+
+        # Wait bridge to be up and add global IPv6 address to the bridge
+        self.__wait_for_interface(self.BR_NAME)
+        self.__add_global_ipv6_address(self.BR_NAME, self.__IPV6_RED_PREFIX)
+
+        # Add global IPv6 address to the white batman :)
+        self.__add_global_ipv6_address(self.LOWER_BATMAN, self.__IPV6_WHITE_PREFIX)
+
         self.__cbma_set_up = True
         return True
+
+    def __is_valid_ipv6_local(self, address: (str, int))-> bool:
+        """
+        Check if the address is a valid IPv6 link-local address
+
+        :param address: The address to check
+        :type address: (str, int)
+        :return: True if the address is a valid IPv6 link-local address, False otherwise
+        """
+        try:
+
+            ip = ipaddress.ip_address(address[0])
+            return (ip.version == 6 and
+                    ip.compressed.startswith("fe80:") and
+                    address[1] == 64 and
+                    ip.is_link_local)
+        except Exception as e:
+            self.logger.error(e)
+            return False
+
+    def __add_global_ipv6_address(self, interface_name: str, new_prefix: str)-> None:
+        """
+        Modify the IPv6 address of the specified interface
+
+        :param interface_name: The name of the interface
+        :type interface_name: str
+        :param new_prefix: The new prefix to use
+        :type new_prefix: str
+        """
+        try:
+            with IPRoute() as ip:
+                # Find the current IPv6 link-local address
+                link_local_address = None
+                index = ip.link_lookup(ifname=interface_name)[0]
+                addresses = ip.get_addr(index=index)
+
+                for addr in addresses:
+                    ip_address = addr.get_attrs('IFA_ADDRESS')[0]
+                    prefix_length = int(addr['prefixlen'])
+                    if self.__is_valid_ipv6_local((ip_address, prefix_length)):
+                        link_local_address = ip_address
+                        break
+
+                if not link_local_address:
+                    self.logger.debug(
+                        f"Link-local IPv6 address not found for interface {interface_name}")
+                    return
+
+                # Modify the prefix
+                new_address = new_prefix + link_local_address[link_local_address.find("::") + 1:]
+                self.logger.debug(
+                    f"Current {interface_name} Local IPv6 address: {link_local_address}")
+                self.logger.debug(
+                    f"New {interface_name} Global IPv6 address: {new_address}")
+
+                # Add the modified IPv6 address to the interface
+                ip.addr('add', index=index, address=new_address, prefixlen=64)
+                ip.close()
+
+        except Exception as e:
+            self.logger.error(f"Error: {e}")
 
     def __setup_lower_cbma(self):
         for interface in self.__lower_cbma_interfaces:
@@ -597,7 +670,7 @@ class CBMAControl:
                 "lower",
                 interface_name,
                 Constants.CBMA_PORT_LOWER.value,
-                self.lower_batman,
+                self.LOWER_BATMAN,
                 self.__cbma_certs_path,
                 self.__cbma_ca_cert_path,
                 "off",
@@ -651,7 +724,7 @@ class CBMAControl:
                 "upper",
                 interface_name,
                 Constants.CBMA_PORT_UPPER.value,
-                self.upper_batman,
+                self.UPPER_BATMAN,
                 cbma_certs_path,
                 cbma_ca_cert_path,
                 "off",
