@@ -4,7 +4,7 @@ source ../common/common.sh   # common tools
 source ./osf_common.sh       # common osf tools
 
 test_case="OSF"
-description="Test osf configuration 1"
+description="Test osf configuration BLE_1M 1"
 
 # define globals
 PASS=0
