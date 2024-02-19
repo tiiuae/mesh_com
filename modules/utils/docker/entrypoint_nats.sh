@@ -33,10 +33,31 @@ else
       sleep 1
   done
 
+  CBMA=$(extract_features_value "CBMA" $YAML_FILE)
+  if [ "$CBMA" == "false" ]; then
+    echo "Starting 11s mesh service"
+    # Loop for mesh service
+    for i in {0..2}; do
+      if [ "$i" -eq 0 ] || [ -f "/opt/${i}_mesh.conf" ]; then
+        /opt/S9011sNatsMesh start id"$i"
+      fi
+    done
+
+    echo "Starting AP service"
+    # Loop for AP service
+    for i in {0..2}; do
+      if [ "$i" -eq 0 ] || [ -f "/opt/${i}_mesh.conf" ]; then
+        /opt/S90APoint start id"$i"
+      fi
+    done
+
+    sleep 3
+  fi
+
   #######################################
   # Enable MDM stuff                    #
   #######################################
-  echo "starting mdm agent for testing purposes"
+  echo "starting mdm agent"
   /opt/S90mdm_agent start
 
   # Start jamming service
