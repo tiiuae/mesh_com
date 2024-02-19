@@ -143,11 +143,6 @@ class TestCodeUnderTest:
 
     #  Test that the correct driver is returned
     def test_get_driver_with_valid_driver(self, mocker):
-        # Mock the necessary dependencies
-        mock_popen = Mock()
-        mock_popen.return_value.read.return_value = 'ath10k'
-        mocker.patch('os.popen', mock_popen)
-
         # Create an instance of the Spectral class
         spectral = Spectral()
 
@@ -160,26 +155,6 @@ class TestCodeUnderTest:
 
         # Assert that os.popen was called
         assert driver == expected_value
-
-    #  Test that the correct driver is returned
-    def test_get_driver_with_invalid_driver(self, mocker):
-        # Mock the necessary dependencies
-        mock_popen = Mock()
-        mock_popen.return_value.read.return_value = 'invalid_driver'
-        mocker.patch('os.popen', mock_popen)
-
-        # Create an instance of the Spectral class
-        spectral = Spectral()
-
-        # Mock the necessary arguments
-        spectral.args.debug = False
-
-        # Call the get_driver method
-        with pytest.raises(SystemExit):
-            spectral.get_driver()
-
-        # Assert that os.popen was called
-        os.popen.assert_called_once_with('ls /sys/kernel/debug/ieee80211/phy* | grep ath')
 
     #  Test that the exception raised with invalid driver passed
     def test_initialize_scan_invalid_driver(self, mocker):

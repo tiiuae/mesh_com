@@ -14,7 +14,7 @@ class Options:
         self.starting_channel: int = 36
         self.channels5: List[int] = [36, 40, 44, 48, 149, 153, 157, 161]
         self.osf_interface: str = 'osf0'
-        self.scan_interface: str = 'wlp1s0'
+        self.scan_interface: str = 'wlp3s0'
         self.phy_interface: str = self.get_phy_interface()
         self.module_ip: str = self.get_ip_address("eth0")
         self.debug: bool = False
