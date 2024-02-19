@@ -34,7 +34,7 @@ _init() {
 # Arguments:
 #######################################
 get_mcs() {
-  mcs_str=$(cli_app show config | grep "MCS")
+  mcs_str=$(/usr/local/bin/cli_app show config | grep "MCS")
 
   if [ -z "$mcs_str" ]; then
     echo "Failed to retrieve mcs information"
@@ -52,7 +52,7 @@ get_mcs() {
 # Arguments:
 #######################################
 get_freq() {
-  freq_str=$(cli_app show config | grep "Frequency")
+  freq_str=$(/usr/local/bin/cli_app show config | grep "Frequency")
 
   if [ -z "$freq_str" ]; then
     echo "Failed to retrieve frequency information"
@@ -77,7 +77,7 @@ get_freq() {
 # Arguments:
 #######################################
 get_country() {
-  country_str=$(cli_app show config | grep "Country")
+  country_str=$(/usr/local/bin/cli_app show config | grep "Country")
 
   if [ -z "$country_str" ]; then
     echo "Failed to retrieve country information"
@@ -96,7 +96,6 @@ _test() {
   echo "$0, test called" | print_log
 
   echo -e "\nchecking for halow spi interface..."
-  sleep 1
   for i in $(ls /sys/class/spi_master/); do
       if [[ "$(basename $(readlink /sys/class/spi_master/$i/device))" =~ ^spi-ft232h\.[0-9]+$ ]]; then
           BUSNO=($(echo $i | sed 's/[^0-9]*//g'))
@@ -111,7 +110,6 @@ _test() {
   fi 
 
   echo "spi interface found [spi$BUSNO], checking nrc module installed..."
-  sleep 1
 
   if lsmod | grep -wq "$MODULE"; then
     echo "$MODULE module is installed!"
@@ -123,7 +121,6 @@ _test() {
 
 
   echo -e "\nchecking for halow interface..."
-  sleep 1
 
   if ifconfig "$interface" | grep -q "UP"; then
     echo "$interface interface is up and running"
@@ -133,9 +130,8 @@ _test() {
   fi
 
   echo -e "\nchecking for nrc driver version..."
-  sleep 1
 
-  nrc_version_str=$(cli_app show version | grep "Newracom Firmware Version")
+  nrc_version_str=$(/usr/local/bin/cli_app show version | grep "Newracom Firmware Version")
 
   if [ -z "$nrc_version_str" ]; then
     echo "Failed to retrieve Newracom firmware version"
@@ -158,7 +154,6 @@ _test() {
   fi
 
   echo -e "\nchecking wpa_supplicant is running with halow interface..."
-  sleep 1
 
   if ps -A | grep -w 'wpa_supplicant' | grep -q "$interface"; then
     echo "wpa_supplicant is running with halow interface"
@@ -169,7 +164,6 @@ _test() {
   fi
 
   echo -e "\nchecking halow interface working in mesh point mode..."
-  sleep 1
 
   if iw dev "$interface" info | grep -wq 'type mesh point'; then
     echo "halow interface working in mesh point mode"
@@ -180,10 +174,9 @@ _test() {
   fi  
   
   echo -e "\nchecking manual mcs value setting is working..."
-  sleep 1
 
   #set rate control (rc) off
-  if cli_app set rc off; then
+  if /usr/local/bin/cli_app set rc off; then
     echo "rate control set to off"
   else
     echo "Failed to set rate control off"
@@ -193,7 +186,7 @@ _test() {
 
   for i in {0..7} 10; do
     echo "Setting mcs $i..."
-    cli_app test mcs $i
+    /usr/local/bin/cli_app test mcs $i
     sleep 1
     get_mcs
     if [ "$mcs_int" -eq "$i" ]; then
@@ -205,12 +198,10 @@ _test() {
     fi
   done
 
-  sleep 1
   echo "setting rate control back to default (on)"
-  cli_app set rc on
+  /usr/local/bin/cli_app set rc on
 
   echo -e "\nchecking halow operating frequency..."
-  sleep 1
 
   get_country
   get_freq
@@ -240,7 +231,6 @@ _test() {
   fi
 
   echo -e "\nchecking halow interface is added with batman routing..."
-  sleep 1
 
   if batctl if | grep "$interface: active"; then
     echo "halow interface is active and attached with batman"
@@ -249,6 +239,17 @@ _test() {
     result=$FAIL
   fi
  
+  echo -e "\nchecking for tx packets on the interface $interface..."
+
+  tx_packets=$(ifconfig $interface | grep -E "TX packets" | awk '{print $3}')
+  echo "$tx_packets packets transmitted on $interface interface"
+  
+  if [ $tx_packets == "0" ]; then
+    echo "Tx packets should be more than 0!"
+    result=$FAIL
+    return
+  fi
+
   result=$PASS
 }
 
