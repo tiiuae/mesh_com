@@ -269,9 +269,10 @@ class MdmAgent:
                             self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
                             == "OK"
                         ):
-                            # Restart CBMA with new certificates
-                            self.__cbma_set_up = self.cbma_ctrl.stop_cbma()
-                            self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
+                            if self.__is_cbma_feature_enabled():
+                                # Restart CBMA with new certificates
+                                self.__cbma_set_up = self.cbma_ctrl.stop_cbma()
+                                self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
                         if (
                             self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
                             == "FAIL"
