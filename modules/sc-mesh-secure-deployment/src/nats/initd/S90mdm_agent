@@ -14,9 +14,9 @@ exec="/opt/nats/mdm_agent.py"
 daemon="/usr/bin/daemon"
 
 # TODO testing purposes
-BC_KEY_FILE="/opt/certs/CBMA/BirthCerts/csl1.local.key"
-BC_CERT_FILE="/opt/certs/CBMA/BirthCerts/csl1.local.crt"
-BC_CA_FILE="/opt/certs/CBMA/BirthCerts/ca.crt"
+BC_KEY_FILE="/opt/crypto/ecdsa/birth/filebased/private.key"
+BC_CERT_FILE=$(find /opt/crypto/ecdsa/birth/filebased/DNS/ -type f -name '*.local.crt' -print -quit)
+BC_CA_FILE="/opt/mspki/ecdsa/certificate_chain.crt"
 
 # TODO naming
 CBMA_KEY_FILE="/opt/certs/CBMA/LowerCBMA/csl1.local.key"

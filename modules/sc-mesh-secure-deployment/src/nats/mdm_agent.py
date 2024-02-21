@@ -225,13 +225,13 @@ class MdmAgent:
         :return: -
         """
         self.running = True
-
+        previous_status = ""
         while self.running:
-            self.logger.debug(
-                "status: %s, mdm_available: %s",
-                self.__status,
-                self.mdm_service_available,
-            )
+            status = f"status: {self.__status}, mdm_available: {self.mdm_service_available}"
+            # to avoid flooding log file
+            if previous_status != status:
+                self.logger.debug(status)
+                previous_status = status
 
             if (
                 self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "FAIL"
@@ -269,9 +269,10 @@ class MdmAgent:
                             self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
                             == "OK"
                         ):
-                            # Restart CBMA with new certificates
-                            self.__cbma_set_up = self.cbma_ctrl.stop_cbma()
-                            self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
+                            if self.__is_cbma_feature_enabled():
+                                # Restart CBMA with new certificates
+                                self.__cbma_set_up = self.cbma_ctrl.stop_cbma()
+                                self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
                         if (
                             self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
                             == "FAIL"
@@ -786,28 +787,6 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
     if keyfile is None or certfile is None or ca_file is None:
         cc.logger.debug("MDM: Closing as no certificates provided")
         return
-
-    # if system clock is reset, set it to the certificate creation time
-    if datetime.now() < datetime(2023, 9, 1):
-        # Read the certificate file
-        with open(certfile, "rb") as file:
-            cert_data = file.read()
-
-        # Load the certificate
-        cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert_data)
-
-        # Get the 'notBefore' time
-        creation_time = cert.get_notBefore()
-
-        # The time is in bytes, so decode it to a string
-        creation_time = creation_time.decode("utf-8")
-
-        new_time_str = datetime.strptime(creation_time, "%Y%m%d%H%M%SZ")
-        # Format the datetime object for the 'date' command
-        # Format: MMDDhhmmYYYY.ss
-        time_formatted = new_time_str.strftime("%Y-%m-%d %H:%M:%S")
-        subprocess.run(["date", "-s", time_formatted], check=True)
-        subprocess.run(["hwclock", "--systohc"], check=True)
 
     async def stop():
         await asyncio.sleep(1)

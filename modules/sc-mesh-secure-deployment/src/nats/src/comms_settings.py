@@ -373,11 +373,13 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         matches = re.findall(pattern, mesh_conf_lines, re.MULTILINE)
         for match in matches:
             if "id" in match[0]:
-                index = int(match[0].split("_")[0].replace("id", ""))
                 name_parts = match[0].split("_")[1:]
                 name = "_".join(name_parts)
                 if name == "MODE":
                     self.mode.append(match[1])
+                    index = int(match[0].split("_")[0].replace("id", ""))
+                    if index not in self.radio_index:
+                        self.radio_index.append(index)
                 elif name == "IP":
                     self.ip_address.append(match[1])
                 elif name == "MASK":
