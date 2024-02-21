@@ -4,7 +4,7 @@ source ../common/common.sh   # common tools
 source ./osf_common.sh       # common osf tools
 
 test_case="OSF"
-description="Test osf configuration 2"
+description="Test osf configuration BLE_1M 1"
 
 # define globals
 PASS=0
@@ -22,22 +22,17 @@ PHY_BLE_500K=6
 PHY_BLE_125K=5
 PHY_IEEE=15
 # Channels hopping list. 5 channels always.
-#OSF_CHH="5,10,25,40,80"
-OSF_CHH="15,20,35,55,75"
+OSF_CHH="5,10,25,40,80"
 # Number of TA pairs 1..12
-#OSF_NTA="6"
-OSF_NTA="7"
+OSF_NTA="6"
 # Set number of transmissions per flood 2..12
 OSF_NTX="3"
 # KEY1
-#KEY1="2B,7E,15,16,28,AE,D2,A6,AB,F7,15,88,09,CF,4F,3C"
-KEY1="2B,7E,15,16,28,AE,D2,A6,AB,F7,15,88,09,CF,4F,AA"
+KEY1="2B,7E,15,16,28,AE,D2,A6,AB,F7,15,88,09,CF,4F,3C"
 # KEY2
-#KEY2="2C,7F,16,17,29,AF,D3,A7,AC,F8,16,89,0A,DF,5F,4C"
-KEY2="2C,7F,16,17,29,AF,D3,A7,AC,F8,16,89,0A,DF,5F,BB"
+KEY2="2C,7F,16,17,29,AF,D3,A7,AC,F8,16,89,0A,DF,5F,4C"
 # Firmware version
-#FWVER="301"
-FWVER="302"
+FWVER="301"
 
 #######################################
 # Init
