@@ -217,10 +217,13 @@ def is_valid_interface(interface_name: str) -> bool:
     Validates a given interface.
     Returns True if the interface is valid, False otherwise.
     """
-    interfaces = os.listdir('/sys/class/net')
-    if interface_name in interfaces or validate_batman_iface(interface_name):
-        return True
-    return False
+    try:
+        interfaces = os.listdir('/sys/class/net')
+        if interface_name in interfaces:
+            return True
+        return False
+    except (ValueError, TypeError, AttributeError, NameError):
+        return False
 
 def validate_mesh_vif(mesh_vif: str) -> bool:
     """

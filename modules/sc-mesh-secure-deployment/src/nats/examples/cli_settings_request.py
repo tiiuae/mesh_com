@@ -23,7 +23,7 @@ async def main():
                 "tx_power": "15",
                 "mode": "mesh",  # ap+mesh_scc, mesh, halow
                 "mesh_vif": "wlp2s0",
-                "slaac": "usb0 wlp2s0", # SLAAC support for usb0 + mesh_vif
+                "slaac": "", # SLAAC support for usb0 + mesh_vif
             },
             {
                 "radio_index": "1",
@@ -37,7 +37,7 @@ async def main():
                 "tx_power": "15",
                 "mode": "mesh",  # ap+mesh_scc, mesh, halow
                 "mesh_vif": "wlp3s0",  # this needs to be correct
-                "slaac": "usb0 wlp3s0", # SLAAC support for usb0 + mesh_vif
+                "slaac": "", # SLAAC support for usb0 + mesh_vif
             },
             {
                 "radio_index": "2",
@@ -51,7 +51,7 @@ async def main():
                 "tx_power": "30",
                 "mode": "halow",  # ap+mesh_scc, mesh, halow
                 "mesh_vif": "halow1",
-                "slaac": "usb0 halow1", # SLAAC support for usb0 + mesh_vif
+                "slaac": "", # SLAAC support for usb0 + mesh_vif
             },
         ],
     }
