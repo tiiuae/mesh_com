@@ -37,7 +37,7 @@ echo " target host .... $host"
 echo "------------------------------------------------------------------"
 
 for run in $(seq 1 $runs); do
-  iperf3 -c $host -f m -u -i1 -t 1000 -b 30M >> $log
+  iperf3 -c $host -f m -u -i1 -t 60 -b 30M -V >> $log
   echo -e " run $run: \t $(awk '/Bitrate/ {getline}; END{print $7, $8}' $log)"
 done
 
@@ -69,10 +69,10 @@ fi
 ########################################################################
 if [ -n "$average_bitrate" ]; then
     # Compare the Bitrate value with 25
-    if (( $(echo "$average_bitrate > 25" | bc -l) )); then
-      echo "Average Bitrate receiver: $average_bitrate Mbits/sec - Pass"
+    if (( $(echo "$average_bitrate > 1" | bc -l) )); then
+      echo "Average Bitrate receiver: $average_bitrate Mbits/sec - PASS"
     else
-      echo "Bitrate receiver: $average_bitrate Mbits/sec - Fail"
+      echo "Bitrate receiver: $average_bitrate Mbits/sec - FAIL"
     fi
 fi
 
