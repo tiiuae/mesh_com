@@ -7,7 +7,6 @@ import asyncio
 import json
 import logging
 import signal
-import subprocess
 import threading
 import os
 import glob
@@ -16,11 +15,9 @@ import tarfile
 import shutil
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 from typing import Optional
 from typing import List
 
-import OpenSSL.crypto
 import requests
 import yaml
 
@@ -291,7 +288,7 @@ class MdmAgent:
                     await self.__loop_run_executor(
                         self.executor, ConfigType.DEBUG_CONFIG
                     )
-            if self.__is_cbma_feature_enabled() and not self.__cbma_set_up:
+            if not self.__cbma_set_up:
                 self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
             await asyncio.sleep(
                 float(min(self.__interval, self.__debug_config_interval))

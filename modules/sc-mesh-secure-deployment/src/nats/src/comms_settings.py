@@ -28,22 +28,15 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.radio_index: [int, ...] = []
         self.ssid: [str, ...] = []
         self.key: [str, ...] = []
-        self.ap_mac: [str, ...] = []
         self.country: [str, ...] = []
         self.frequency: [str, ...] = []
         self.frequency_mcc: [str, ...] = []
-        self.ip_address: [str, ...] = []
-        self.subnet: [str, ...] = []
         self.tx_power: [str, ...] = []
         self.mode: [str, ...] = []
-        self.routing: [str, ...] = []
         self.priority: [str, ...] = []
         self.role: str = ""
         self.mesh_vif = []
         self.mptcp = []
-        # self.phy = []
-        self.batman_iface = []
-        self.bridge = []
         self.slaac = []
         self.msversion: str = ""
         self.delay: str = ""  # delay for channel change
@@ -68,10 +61,6 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             return "FAIL", "Invalid WPA3 PSK"
         self.logger.debug("validate mesh settings wpa3 ok")
 
-        if validation.validate_ip_address(self.ip_address[index]) is False:
-            return "FAIL", "Invalid IP address"
-        self.logger.debug("validate mesh settings ip ok")
-
         if validation.validate_mode(self.mode[index]) is False:
             return "FAIL", "Invalid mode"
         self.logger.debug("validate mesh settings mode ok")
@@ -88,17 +77,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             return "FAIL", "Invalid country code"
         self.logger.debug("validate mesh settings country ok")
 
-        if validation.validate_netmask(self.subnet[index]) is False:
-            return "FAIL", "Invalid subnet"
-        self.logger.debug("validate mesh settings subnet ok")
-
         if validation.validate_tx_power(int(self.tx_power[index])) is False:
             return "FAIL", "Invalid tx power"
         self.logger.debug("validate mesh settings tx power ok")
-
-        if validation.validate_routing(self.routing[index]) is False:
-            return "FAIL", "Invalid routing algo"
-        self.logger.debug("validate mesh settings routing ok")
 
         if validation.validate_priority(self.priority[index]) is False:
             return "FAIL", "Invalid priority"
@@ -108,21 +89,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             return "FAIL", "Invalid role"
         self.logger.debug("validate mesh settings role ok")
 
-        if validation.validate_mesh_vif(self.mesh_vif[index]) is False:
-            return "FAIL", "Invalid mesh vif"
-        self.logger.debug("validate mesh settings mesh vif ok")
-
         if validation.validate_mptcp(self.mptcp[index]) is False:
             return "FAIL", "Invalid mptcp value"
         self.logger.debug("validate mesh settings mptcp ok")
-
-        # if validation.validate_phy(self.phy[index]) is False:
-        #     return "FAIL", "Invalid phy"
-        # self.logger.debug("validate mesh settings phy ok")
-
-        if validation.validate_batman_iface(self.batman_iface[index]) is False:
-            return "FAIL", "Invalid batman iface"
-        self.logger.debug("validate mesh settings batman iface ok")
 
         if validation.validate_slaac(self.slaac[index]) is False:
             return "FAIL", "Invalid slaac ifaces"
@@ -137,21 +106,14 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.radio_index: [int, ...] = []
         self.ssid: [str, ...] = []
         self.key: [str, ...] = []
-        self.ap_mac: [str, ...] = []
         self.country: [str, ...] = []
         self.frequency: [str, ...] = []
         self.frequency_mcc: [str, ...] = []
-        self.ip_address: [str, ...] = []
-        self.subnet: [str, ...] = []
         self.tx_power: [str, ...] = []
         self.mode: [str, ...] = []
-        self.routing: [str, ...] = []
         self.priority: [str, ...] = []
         self.mesh_vif: [str, ...] = []
         self.mptcp: [str, ...] = []
-        # self.phy = []
-        self.batman_iface: [str, ...] = []
-        self.bridge: [str, ...] = []
         self.slaac: [str, ...] = []
 
     def handle_mesh_settings_channel_change(
@@ -238,21 +200,14 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 self.radio_index.append(int(parameters["radio_index"]))
                 self.ssid.append(quote(str(parameters["ssid"])))
                 self.key.append(quote(str(parameters["key"])))
-                self.ap_mac.append(quote(str(parameters["ap_mac"])))
                 self.country.append(quote(str(parameters["country"]).lower()))
                 self.frequency.append(quote(str(parameters["frequency"])))
                 self.frequency_mcc.append(quote(str(parameters["frequency_mcc"])))
-                self.ip_address.append(quote(str(parameters["ip"])))
-                self.subnet.append(quote(str(parameters["subnet"])))
                 self.tx_power.append(quote(str(parameters["tx_power"])))
                 self.mode.append(quote(str(parameters["mode"])))
-                self.routing.append(quote(str(parameters["routing"])))
                 self.priority.append(quote(str(parameters["priority"])))
                 self.mesh_vif.append(quote(str(parameters["mesh_vif"])))
                 self.mptcp.append(quote(str(parameters["mptcp"])))
-                # self.phy.append(quote(str(parameters["phy"])))
-                self.batman_iface.append(quote(str(parameters["batman_iface"])))
-                self.bridge.append(str(parameters["bridge"]))
                 self.slaac.append(str(parameters["slaac"]))
 
             for index in self.radio_index:
@@ -320,9 +275,6 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                 mesh_conf.write(f"ROLE={quote(self.role)}\n")
                 mesh_conf.write(f"MSVERSION={quote(self.msversion)}\n")
                 mesh_conf.write(f"id{str(index)}_MODE={quote(self.mode[index])}\n")
-                mesh_conf.write(f"id{str(index)}_IP={quote(self.ip_address[index])}\n")
-                mesh_conf.write(f"id{str(index)}_MASK={quote(self.subnet[index])}\n")
-                mesh_conf.write(f"id{str(index)}_MAC={quote(self.ap_mac[index])}\n")
                 mesh_conf.write(f"id{str(index)}_KEY={quote(self.key[index])}\n")
                 mesh_conf.write(f"id{str(index)}_ESSID={quote(self.ssid[index])}\n")
                 mesh_conf.write(f"id{str(index)}_FREQ={quote(self.frequency[index])}\n")
@@ -336,26 +288,16 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                     f"id{str(index)}_COUNTRY={quote(self.country[index]).upper()}\n"
                 )
                 mesh_conf.write(
-                    f"id{str(index)}_ROUTING={quote(self.routing[index])}\n"
-                )
-                mesh_conf.write(
                     f"id{str(index)}_PRIORITY={quote(self.priority[index])}\n"
                 )
                 mesh_conf.write(
                     f"id{str(index)}_MESH_VIF={quote(self.mesh_vif[index])}\n"
                 )
                 mesh_conf.write(f"id{str(index)}_MPTCP={quote(self.mptcp[index])}\n")
-                # mesh_conf.write(f"id{str(index)}_PHY={quote(self.phy[index])}\n")
-                mesh_conf.write(
-                    f"id{str(index)}_BATMAN_IFACE={quote(self.batman_iface[index])}\n"
-                )
 
-                self.bridge[index] = self.bridge[index].replace('"', "")
-                self.bridge[index] = self.bridge[index].replace("'", "")
                 self.slaac[index] = self.slaac[index].replace('"', "")
                 self.slaac[index] = self.slaac[index].replace("'", "")
 
-                mesh_conf.write(f'id{str(index)}_BRIDGE="{self.bridge[index]}"\n')
                 mesh_conf.write(f'id{str(index)}_SLAAC="{self.slaac[index]}"\n')
 
         except:
@@ -380,12 +322,6 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                     index = int(match[0].split("_")[0].replace("id", ""))
                     if index not in self.radio_index:
                         self.radio_index.append(index)
-                elif name == "IP":
-                    self.ip_address.append(match[1])
-                elif name == "MASK":
-                    self.subnet.append(match[1])
-                elif name == "MAC":
-                    self.ap_mac.append(match[1])
                 elif name == "KEY":
                     self.key.append(match[1])
                 elif name == "ESSID":
@@ -398,20 +334,12 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
                     self.tx_power.append(match[1])
                 elif name == "COUNTRY":
                     self.country.append(match[1])
-                elif name == "ROUTING":
-                    self.routing.append(match[1])
                 elif name == "PRIORITY":
                     self.priority.append(match[1])
                 elif name == "MESH_VIF":
                     self.mesh_vif.append(match[1])
                 elif name == "MPTCP":
                     self.mptcp.append(match[1])
-                # elif name == "PHY":
-                #     self.phy.append(match[1])
-                elif name == "BATMAN_IFACE":
-                    self.batman_iface.append(match[1])
-                elif name == "BRIDGE":
-                    self.bridge.append(str(match[1]))
                 elif name == "SLAAC":
                     self.slaac.append(str(match[1]))
                 else:

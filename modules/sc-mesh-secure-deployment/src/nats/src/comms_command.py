@@ -514,7 +514,8 @@ class Command:  # pylint: disable=too-many-instance-attributes
             identity_dict["identity"] = identity.decode().strip()
             # todo hardcoded interface name
             # pylint: disable=c-extension-no-member
-            nats_ip = ni.ifaddresses("br-lan")[ni.AF_INET][0]["addr"]
+            # get IPv6 address for the interface
+            nats_ip = ni.ifaddresses("br-lan")[ni.AF_INET6][0]["addr"]
             # pylint: enable=c-extension-no-member
             identity_dict["nats_url"] = f"nats://{nats_ip}:4222"
             identity_dict[

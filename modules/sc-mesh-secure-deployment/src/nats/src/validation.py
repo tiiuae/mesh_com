@@ -104,39 +104,6 @@ def validate_wpa3_psk(psk: str) -> bool:
     except (ValueError, TypeError, AttributeError):
         return False
 
-
-def validate_ip_address(ip: str) -> bool:
-    """
-    Validates a given IP address format.
-    Returns True if the IP address is valid, False otherwise.
-    """
-    try:
-        socket.inet_pton(socket.AF_INET, ip)
-        return True
-    except (socket.error, TypeError, AttributeError):
-        return False
-
-
-def validate_netmask(netmask: str) -> bool:
-    """
-    Validates a given netmask format.
-    Returns True if the netmask is valid, False otherwise.
-    """
-    try:
-        parts = [int(part) for part in netmask.split('.')]
-        if len(parts) != 4:
-            return False
-        for part in parts:
-            if part < 0 or part > 255:
-                return False
-        bin_str = ''.join([bin(part)[2:].zfill(8) for part in parts])
-        if '01' in bin_str[1:]:
-            return False
-        return True
-    except (ValueError, TypeError, AttributeError):
-        return False
-
-
 def validate_tx_power(power_in_dbm: int) -> bool:
     """
     Validates a given TX power in dBm.
@@ -198,15 +165,6 @@ def validate_frequency(frequency: int) -> bool:
         return True
     return False
 
-def validate_routing(routing: str) -> bool:
-    """
-    Validates a given routing.
-    Returns True if the routing is valid, False otherwise.
-    """
-    if routing in ("olsr", "batman-adv", ""):
-        return True
-    return False
-
 def validate_priority(priority: str) -> bool:
     """
     Validates a given priority.
@@ -254,15 +212,6 @@ def validate_radio_index(radio_index: str) -> bool:
     except (ValueError, TypeError, AttributeError):
         return False
 
-# def validate_phy(phy: str) -> bool:
-#     """
-#     Validates a given phy.
-#     Returns True if the phy is valid, False otherwise.
-#     """
-#     if "phy" in phy and int(phy.replace("phy", "")) >= 0:
-#         return True
-#     return False
-
 def is_valid_interface(interface_name: str) -> bool:
     """
     Validates a given interface.
@@ -280,20 +229,6 @@ def validate_mesh_vif(mesh_vif: str) -> bool:
     """
     try:
         if is_valid_interface(mesh_vif):
-            return True
-        return False
-    except (ValueError, TypeError, AttributeError):
-        return False
-
-def validate_batman_iface(batman_iface: str) -> bool:
-    """
-    Validates a given batman iface.
-    Returns True if the batman iface is valid, False otherwise.
-    """
-    try:
-        if "bat" in batman_iface and int(batman_iface.replace("bat", "")) >= 0:
-            return True
-        if batman_iface == "":
             return True
         return False
     except (ValueError, TypeError, AttributeError):
