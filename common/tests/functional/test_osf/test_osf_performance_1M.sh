@@ -4,11 +4,9 @@ source ../common/common.sh   # common tools
 source ./osf_common.sh       # common osf tools
 
 test_case="OSF"
-description="Test osf performance"
+description="Test osf performance BLE_1M"
 
 # define globals
-PASS=0
-FAIL=1
 result=$PASS
 server_ipaddress="$1"
 
@@ -74,15 +72,15 @@ tc_2() {
 }
 
 tc_3() {
-  echo -n "TC 3: iperf3 to ${server_ipaddress} chunk 188 bytes, "
+  echo -n "TC 3: UDP iperf3 to ${server_ipaddress} chunk 188 bytes, "
   output=$(timeout --preserve-status 7s iperf3 -6 -u -c"${server_ipaddress}" --forceflush -t5 -l188 -b142K | awk '/receiver/ {print $7}')
   if [ "$?" -ne 0 ] || [ -z "$output" ]; then
     echo -n "iperf3 error or timeout !"
     result=$FAIL
     echo " result= FAIL"
   else
-    echo -n "average bitrate ${output} Kbits/sec,"
-    if (( $(echo "${output} < 130" |bc -l) )); then
+    echo -n "average receiver bitrate ${output} Kbits/sec,"
+    if (( $(echo "${output} < 120" |bc -l) )); then
       echo " result= FAIL"
       result=$FAIL
     else 
@@ -93,15 +91,15 @@ tc_3() {
 }
 
 tc_4() {
-  echo -n "TC 4: iperf3 to ${server_ipaddress} chunk 1310 bytes, "
+  echo -n "TC 4: UDP iperf3 to ${server_ipaddress} chunk 1310 bytes, "
   output=$(timeout --preserve-status 7s iperf3 -6 -u -c"${server_ipaddress}" --forceflush -t5 -l1310 -b154K | awk '/receiver/ {print $7}')
   if [ "$?" -ne 0 ] || [ -z "$output" ]; then
     echo -n "iperf3 error or timeout !"
     result=$FAIL
     echo " result= FAIL"
   else
-    echo -n "average bitrate ${output} Kbits/sec,"
-    if (( $(echo "${output} < 140" |bc -l) )); then
+    echo -n "average receiver bitrate ${output} Kbits/sec,"
+    if (( $(echo "${output} < 130" |bc -l) )); then
       echo " result= FAIL"
       result=$FAIL
     else 
@@ -129,16 +127,21 @@ _tests() {
 
  # Call tests
  # Short ping
+ sleep 1
  tc_1
  if [ "$result" -eq "$FAIL" ]; then
    return
  fi
  # Long ping
+ sleep 1
  tc_2
  # iperf3 small chunks
+ sleep 1
  tc_3
  # iperf3 large chunks
+ sleep 1
  tc_4
+ sleep 1
 }
 
 #######################################

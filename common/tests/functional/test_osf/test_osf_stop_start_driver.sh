@@ -7,8 +7,6 @@ test_case="OSF"
 description="Test osf stop/start of driver"
 
 # define globals
-PASS=0
-FAIL=1
 result=$PASS
 
 #######################################
@@ -34,6 +32,16 @@ _init() {
 # result
 # Arguments:
 #######################################
+
+# dummy test for wakeup serial interface
+tc_0() {
+  slip_output=$(timeout --preserve-status 2s slipcmd -H -b"$BAUDRATE" -sn -R'?S' "$SERIALPORT")
+  if [ "$?" -ne 0 ] || [ -z "$slip_output" ] || [ "${slip_output:0:2}" != "!S" ]; then
+    echo -"slipcmd error or timeout [ "${slip_output:0:50}" ] !"
+  fi
+  return
+}
+
 tc_1() {
   echo -n "TC 1: Get osf driver state "
   slip_output=$(timeout --preserve-status 2s slipcmd -H -b"$BAUDRATE" -sn -R'?S' "$SERIALPORT")
@@ -125,6 +133,8 @@ _tests() {
  # call tests
  # Is osf interface unmounted ?
  tc_5
+ # wakeup serial
+ tc_0
  # Request osf driver state
  tc_1
  # Request firmware version
@@ -200,7 +210,18 @@ main() {
   # uses the same serial ports as tunslip6, and doesn't release them until after the script ends, so jams tunslip6.
   SECONDS=0
   /etc/init.d/S98osf52setup stop
-  sleep 2
+  # wait interface unmount, 5s max
+  for (( c=1; c<10; c++ ))
+  do 
+   #echo "c=""$c"
+   sleep 0.5 
+   INTERFACE=$(ip link show | grep "$OSF_INTERFACE")
+   if [ ! "$INTERFACE" ] ; then
+    sleep 0.1
+    break
+   fi
+  done
+  # execute tests
   _tests
   if [ "$result" -eq "$FAIL" ]; then
     echo "FAILED  _test: $test_case" | print_log result
@@ -208,7 +229,17 @@ main() {
   fi
   # mount osf interface
   /etc/init.d/S98osf52setup start
-  sleep 2
+  # wait interface mount, 5s max
+  for (( c=1; c<10; c++ ))
+  do 
+   #echo "c=""$c"
+   sleep 0.5 
+   INTERFACE=$(ip link show | grep "$OSF_INTERFACE")
+   if [ "$INTERFACE" ] ; then
+    sleep 0.1
+    break
+   fi
+  done
   # check if osf interface is mounted
   tc_6
   # Measure restart time

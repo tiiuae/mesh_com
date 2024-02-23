@@ -7,8 +7,6 @@ test_case="OSF"
 description="Test UDP commands"
 
 # define globals
-PASS=0
-FAIL=1
 result=$PASS
 NODEIPV6ADDR=0
 NODEPORT=7777
