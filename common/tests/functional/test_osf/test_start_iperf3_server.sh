@@ -7,8 +7,6 @@ test_case="OSF"
 description="Start iperf3 server"
 
 # define globals
-PASS=0
-FAIL=1
 result=$PASS
 
 #######################################

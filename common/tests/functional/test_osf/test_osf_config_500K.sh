@@ -4,7 +4,7 @@ source ../common/common.sh   # common tools
 source ./osf_common.sh       # common osf tools
 
 test_case="OSF"
-description="Test osf configuration BLE_1M 1"
+description="Test osf configuration BLE_500K"
 
 # define globals
 result=$PASS
@@ -20,17 +20,28 @@ PHY_BLE_500K=6
 PHY_BLE_125K=5
 PHY_IEEE=15
 # Channels hopping list. 5 channels always.
-OSF_CHH="5,10,25,40,80"
+#OSF_CHH="5,10,25,40,80"
+#OSF_CHH="15,20,35,55,75"
+#OSF_CHH="30,35,50,60,70"
+OSF_CHH="7,12,27,42,78"
 # Number of TA pairs 1..12
-OSF_NTA="6"
+#OSF_NTA="6"
+OSF_NTA="7"
 # Set number of transmissions per flood 2..12
 OSF_NTX="3"
 # KEY1
-KEY1="2B,7E,15,16,28,AE,D2,A6,AB,F7,15,88,09,CF,4F,3C"
+#KEY1="2B,7E,15,16,28,AE,D2,A6,AB,F7,15,88,09,CF,4F,3C"
+#KEY1="2B,7E,15,16,28,AE,D2,A6,AB,F7,15,88,09,CF,4F,AA"
+#KEY1="2B,7E,15,16,28,AE,D2,A6,AB,F7,15,88,09,CF,4F,AB"
+KEY1="2B,7E,15,16,28,AE,D2,A6,AB,F7,15,88,09,CF,4F,AC"
 # KEY2
-KEY2="2C,7F,16,17,29,AF,D3,A7,AC,F8,16,89,0A,DF,5F,4C"
+#KEY2="2C,7F,16,17,29,AF,D3,A7,AC,F8,16,89,0A,DF,5F,4C"
+#KEY2="2C,7F,16,17,29,AF,D3,A7,AC,F8,16,89,0A,DF,5F,BB"
+#KEY2="2C,7F,16,17,29,AF,D3,A7,AC,F8,16,89,0A,DF,5F,BA"
+KEY2="2C,7F,16,17,29,AF,D3,A7,AC,F8,16,89,0A,DF,5F,CA"
 # Firmware version
-FWVER="301"
+#FWVER="301"
+FWVER="304"
 
 #######################################
 # Init
@@ -153,8 +164,8 @@ tc_6() {
 }
 
 tc_7() {
-  echo -n "TC 7: Set radio physical layer BLE_1M "
-  slip_output=$(timeout --preserve-status 2s slipcmd -H -b"$BAUDRATE" -sn -R'!SFPHY '"$PHY_BLE_1M" "$SERIALPORT")
+  echo -n "TC 7: Set radio physical layer BLE_500K "
+  slip_output=$(timeout --preserve-status 2s slipcmd -H -b"$BAUDRATE" -sn -R'!SFPHY '"$PHY_BLE_500K" "$SERIALPORT")
   if [ "$?" -ne 0 ] || [ -z "$slip_output" ] || [ "${slip_output:0:6}" != "?SFPHY" ]; then
     echo -n "slipcmd error or timeout [ "${slip_output:0:50}" ] !"
     result=$FAIL
@@ -423,16 +434,16 @@ main() {
 
   # Extract the raw output from slipcmd to get the IPv6 address of the node. We need to stop and start OSF as slipcmd 
   # uses the same serial ports as tunslip6, and doesn't release them until after the script ends, so jams tunslip6.
-  /etc/init.d/S98osf52setup stop
-  sleep 3
+  #/etc/init.d/S98osf52setup stop
+  #sleep 3
   _tests
   if [ "$result" -eq "$FAIL" ]; then
     echo "FAILED  _test: $test_case" | print_log result
     #exit 0
   fi
   # recover osf interface
-  /etc/init.d/S98osf52setup start
-  sleep 4
+  #/etc/init.d/S98osf52setup start
+  #sleep 4
 
   _result
   if [ "$result" -eq "$FAIL" ]; then

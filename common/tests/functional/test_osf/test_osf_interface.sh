@@ -7,8 +7,6 @@ test_case="OSF"
 description="Test OSF interface"
 
 # define globals
-PASS=0
-FAIL=1
 result=$PASS
 
 #######################################

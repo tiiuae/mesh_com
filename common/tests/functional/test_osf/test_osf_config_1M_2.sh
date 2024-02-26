@@ -7,8 +7,6 @@ test_case="OSF"
 description="Test osf configuration BLE_1M 2"
 
 # define globals
-PASS=0
-FAIL=1
 result=$PASS
 rfparams=0,0,0,0,0
 
@@ -62,6 +60,18 @@ _init() {
 # result
 # Arguments:
 #######################################
+
+# dummy test for flush serial interface
+tc_0() {
+  slip_output=$(timeout --preserve-status 2s slipcmd -H -b"$BAUDRATE" -sn -R'?S' "$SERIALPORT")
+  if [ "$?" -ne 0 ] || [ -z "$slip_output" ] || [ "${slip_output:0:2}" != "!S" ]; then
+    #echo -"slipcmd error or timeout [ "${slip_output:0:50}" ] !"
+    slip_output=$(timeout --preserve-status 2s slipcmd -H -b"$BAUDRATE" -sn -R'?S' "$SERIALPORT")
+    slip_output=$(timeout --preserve-status 2s slipcmd -H -b"$BAUDRATE" -sn -R'?S' "$SERIALPORT")
+  fi
+  return
+}
+
 tc_1() {
   echo -n "TC 1: Get osf driver state "
   slip_output=$(timeout --preserve-status 2s slipcmd -H -b"$BAUDRATE" -sn -R'?S' "$SERIALPORT")
@@ -315,6 +325,7 @@ _tests() {
   echo "$0, test called" | print_log
 
  # call tests
+ tc_0
  # Request osf driver state
  tc_1
  # Request firmware version
