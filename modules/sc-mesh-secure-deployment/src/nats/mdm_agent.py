@@ -13,10 +13,16 @@ import glob
 import base64
 import tarfile
 import shutil
+import socket
+import ssl
 
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from typing import List
+
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519
 
 import requests
 import yaml
@@ -159,6 +165,61 @@ class MdmAgent:
         self.__url = address
         self.mdm_service_available = status
 
+        if self.mdm_service_available:
+            self.__get_server_cert_type()
+
+    def __get_server_cert_type(self):
+        parts = self.__url.split(":")
+        if len(parts) == 2:
+            hostname = parts[0]
+            port = int(parts[1])
+
+            try:
+                # Create a socket connection to the server
+                sock = socket.create_connection((hostname, port))
+
+                # Create an SSL context and load the certificate, key, and CA files
+                context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                context.load_verify_locations(cafile=self.__ca)
+
+                with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+                    peer_cert = ssock.getpeercert(binary_form=True)
+                    cert = x509.load_der_x509_certificate(peer_cert, default_backend())
+                    # Extract key type and signature algorithm
+                    public_key = cert.public_key()
+
+                    # Determine key type
+                    if isinstance(public_key, rsa.RSAPublicKey):
+                        key_type = "rsa"
+                    elif isinstance(public_key, ec.EllipticCurvePublicKey):
+                        key_type = "ecdsa"
+                    elif isinstance(public_key, ed25519.Ed25519PublicKey):
+                        key_type = "eddsa"
+                    else:
+                        key_type = "unknown"
+
+                    self.logger.debug("Server's public key type: %s", key_type)
+
+                    if not key_type == "unknown":
+                        certificate_files = glob.glob(
+                            f"/opt/crypto/{key_type}/birth/filebased/DNS/*.local.crt"
+                        )
+                        if certificate_files:
+                            self.__certificate_file = certificate_files[0]
+                        else:
+                            self.logger.error(
+                                "No certificate file found for %s", key_type
+                            )
+                            return
+                        self.__keyfile = (
+                            f"/opt/crypto/{key_type}/birth/filebased/private.key"
+                        )
+                        self.__ca = f"/opt/mspki/{key_type}/certificate_chain.crt"
+            except Exception as e:
+                self.logger.error(
+                    "Error occurred during certificate type detection: %s", e
+                )
+
     def interface_monitor_cb(self, interfaces) -> None:
         """
         Callback for network interfaces. Service
@@ -288,7 +349,7 @@ class MdmAgent:
                     await self.__loop_run_executor(
                         self.executor, ConfigType.DEBUG_CONFIG
                     )
-            if not self.__cbma_set_up:
+            if self.__is_cbma_feature_enabled() and not self.__cbma_set_up:
                 self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
             await asyncio.sleep(
                 float(min(self.__interval, self.__debug_config_interval))
@@ -364,9 +425,13 @@ class MdmAgent:
                                 "r:bz2",
                             ) as tar:
                                 for member in tar.getmembers():
+                                    # Skip empty folders
+                                    if member.isdir() and not ".." in member.name:
+                                        continue
+
                                     # Only extract regular files that don't contain relative paths
                                     if not member.isfile() or ".." in member.name:
-                                        raise tarfile.TarError("Invalid/Malicious file in archive")
+                                        raise tarfile.TarError(f"Invalid/Malicious file in archive: {member.name}")
 
                                     # Construct the full path where the file would be extracted
                                     file_path = os.path.join(cert_path, member.name)

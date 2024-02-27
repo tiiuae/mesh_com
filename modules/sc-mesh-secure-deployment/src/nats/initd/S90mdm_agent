@@ -13,21 +13,12 @@ exec="/opt/nats/mdm_agent.py"
 # The path of the daemon executable
 daemon="/usr/bin/daemon"
 
-# TODO testing purposes
-BC_KEY_FILE="/opt/crypto/ecdsa/birth/filebased/private.key"
-BC_CERT_FILE=$(find /opt/crypto/ecdsa/birth/filebased/DNS/ -type f -name '*.local.crt' -print -quit)
-BC_CA_FILE="/opt/mspki/ecdsa/certificate_chain.crt"
-
-# TODO naming
-CBMA_KEY_FILE="/opt/certs/CBMA/LowerCBMA/csl1.local.key"
-CBMA_CERT_FILE="/opt/certs/CBMA/LowerCBMA/csl1.local.crt"
-CBMA_CA_FILE="/opt/certs/CBMA/LowerCBMA/ca.crt"
-
+BC_KEY_FILE="/opt/crypto/rsa/birth/filebased/private.key"
+BC_CERT_FILE=$(find /opt/crypto/rsa/birth/filebased/DNS/ -type f -name '*.local.crt' -print -quit)
+BC_CA_FILE="/opt/mspki/rsa/certificate_chain.crt"
 
 if [ -e "$BC_CA_FILE" ] && [ -e "$BC_KEY_FILE" ] && [ -e "$BC_CERT_FILE" ]; then
   command_args="-k $BC_KEY_FILE -c $BC_CERT_FILE -r $BC_CA_FILE"
-elif [ -e "$CBMA_KEY_FILE" ] && [ -e "$CBMA_CERT_FILE" ] && [ -e "$CBMA_CA_FILE" ]; then
-  command_args="-k $CBMA_KEY_FILE -c $CBMA_CERT_FILE -r $CBMA_CA_FILE"
 else
   command_args=""
 fi
