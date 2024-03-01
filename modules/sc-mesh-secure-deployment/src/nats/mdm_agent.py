@@ -34,7 +34,6 @@ from src.constants import Constants, ConfigType, StatusType
 from src import comms_config_store
 from src import cbma_controller
 
-
 # pylint: disable=too-few-public-methods
 class Interface:
     """
@@ -45,6 +44,9 @@ class Interface:
         self.interface_name = interface_name
         self.operstat = operstat
         self.mac_address = mac_address
+
+
+
 
 
 # pylint: enable=too-few-public-methods
@@ -86,7 +88,7 @@ class MdmAgent:
         self.__interfaces: List[Interface] = []
         self.executor = ThreadPoolExecutor(1)
         self.__lock = threading.Lock()
-        self.cbma_ctrl = cbma_controller.CBMAControl(
+        self.cbma_ctrl = cbma_controller.CBMAAdaptation(
             self.__comms_ctrl,
             self.logger,
             self.__lock

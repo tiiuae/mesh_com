@@ -6,7 +6,6 @@ import logging
 import subprocess
 import threading
 import time
-from multiprocessing import Process
 from typing import List, Dict
 from copy import deepcopy
 import json
@@ -20,10 +19,10 @@ from src.comms_controller import CommsController
 from src.constants import Constants
 from mdm_agent import Interface
 
-from cbma import setup_cbma  # type: ignore[import-not-found]
+#from cbma import setup_cbma  # type: ignore[import-not-found]
+from run_cbma import CBMAControl # type: ignore[import-not-found]
 
-
-class CBMAControl:
+class CBMAAdaptation(object):
     """
     CBMA Control
     """
@@ -52,8 +51,8 @@ class CBMAControl:
             Constants.DOWNLOADED_CBMA_UPPER_PATH.value
             + "/mspki/rsa/certificate_chain.crt"
         )
-        self.__lower_cbma_processes: Dict[str, Process] = {}
-        self.__upper_cbma_processes: Dict[str, Process] = {}
+        self.__lower_cbma_processes = None
+        self.__upper_cbma_processes = None
         self.__lower_cbma_interfaces: List[Interface] = []
         self.__upper_cbma_interfaces: List[Interface] = []
 
@@ -207,68 +206,68 @@ class CBMAControl:
         finally:
             ip.close()
 
-    @staticmethod
-    def __delete_ebtables_rules():
-        command_ebtables = ["ebtables", "-t", "nat", "-L", "OUTPUT"]
-        command_sed = ["sed", "-n", "/OUTPUT/,/^$/{/^--/p}"]
-        command_xargs = ["xargs", "ebtables", "-t", "nat", "-D", "OUTPUT"]
-
-        proc_ebtables = subprocess.Popen(command_ebtables, stdout=subprocess.PIPE)
-        proc_sed = subprocess.Popen(
-            command_sed, stdin=proc_ebtables.stdout, stdout=subprocess.PIPE
-        )
-        proc_xargs = subprocess.Popen(command_xargs, stdin=proc_sed.stdout)
-        proc_xargs.wait()
-
-        subprocess.run(
-            [
-                "ebtables",
-                "--delete",
-                "FORWARD",
-                "--logical-in",
-                "br-upper",
-                "--jump",
-                "ACCEPT",
-            ],
-            check=False,
-        )
-        subprocess.run(
-            [
-                "ebtables",
-                "--delete",
-                "FORWARD",
-                "--logical-out",
-                "br-upper",
-                "--jump",
-                "ACCEPT",
-            ],
-            check=False,
-        )
-
-    @staticmethod
-    def __delete_macsec_links():
-        # Define the command as a list of arguments
-        command_macsec = ["ip", "macsec", "show"]
-        command_grep = ["grep", ": protect on validate"]
-        command_awk1 = ["awk", "-F:", "{print $2}"]
-        command_awk2 = ["awk", "{print $1}"]
-        command_xargs = ["xargs", "-I", "{}", "ip", "link", "delete", "{}"]
-
-        # Run the commands using subprocess and connect their pipes
-        proc_macsec = subprocess.Popen(command_macsec, stdout=subprocess.PIPE)
-        proc_grep = subprocess.Popen(
-            command_grep, stdin=proc_macsec.stdout, stdout=subprocess.PIPE
-        )
-        proc_awk1 = subprocess.Popen(
-            command_awk1, stdin=proc_grep.stdout, stdout=subprocess.PIPE
-        )
-        proc_awk2 = subprocess.Popen(
-            command_awk2, stdin=proc_awk1.stdout, stdout=subprocess.PIPE
-        )
-        proc_xargs = subprocess.Popen(command_xargs, stdin=proc_awk2.stdout)
-
-        # Wait for the xargs process to finish
-        proc_xargs.wait()
+    #@staticmethod
+    # def __delete_ebtables_rules():
+    #     command_ebtables = ["ebtables", "-t", "nat", "-L", "OUTPUT"]
+    #     command_sed = ["sed", "-n", "/OUTPUT/,/^$/{/^--/p}"]
+    #     command_xargs = ["xargs", "ebtables", "-t", "nat", "-D", "OUTPUT"]
+    #
+    #     proc_ebtables = subprocess.Popen(command_ebtables, stdout=subprocess.PIPE)
+    #     proc_sed = subprocess.Popen(
+    #         command_sed, stdin=proc_ebtables.stdout, stdout=subprocess.PIPE
+    #     )
+    #     proc_xargs = subprocess.Popen(command_xargs, stdin=proc_sed.stdout)
+    #     proc_xargs.wait()
+    #
+    #     subprocess.run(
+    #         [
+    #             "ebtables",
+    #             "--delete",
+    #             "FORWARD",
+    #             "--logical-in",
+    #             "br-upper",
+    #             "--jump",
+    #             "ACCEPT",
+    #         ],
+    #         check=False,
+    #     )
+    #     subprocess.run(
+    #         [
+    #             "ebtables",
+    #             "--delete",
+    #             "FORWARD",
+    #             "--logical-out",
+    #             "br-upper",
+    #             "--jump",
+    #             "ACCEPT",
+    #         ],
+    #         check=False,
+    #     )
+    #
+    # @staticmethod
+    # def __delete_macsec_links():
+    #     # Define the command as a list of arguments
+    #     command_macsec = ["ip", "macsec", "show"]
+    #     command_grep = ["grep", ": protect on validate"]
+    #     command_awk1 = ["awk", "-F:", "{print $2}"]
+    #     command_awk2 = ["awk", "{print $1}"]
+    #     command_xargs = ["xargs", "-I", "{}", "ip", "link", "delete", "{}"]
+    #
+    #     # Run the commands using subprocess and connect their pipes
+    #     proc_macsec = subprocess.Popen(command_macsec, stdout=subprocess.PIPE)
+    #     proc_grep = subprocess.Popen(
+    #         command_grep, stdin=proc_macsec.stdout, stdout=subprocess.PIPE
+    #     )
+    #     proc_awk1 = subprocess.Popen(
+    #         command_awk1, stdin=proc_grep.stdout, stdout=subprocess.PIPE
+    #     )
+    #     proc_awk2 = subprocess.Popen(
+    #         command_awk2, stdin=proc_awk1.stdout, stdout=subprocess.PIPE
+    #     )
+    #     proc_xargs = subprocess.Popen(command_xargs, stdin=proc_awk2.stdout)
+    #
+    #     # Wait for the xargs process to finish
+    #     proc_xargs.wait()
 
     def __shutdown_interface(self, interface_name):
         # pylint: disable=invalid-name
@@ -339,76 +338,6 @@ class CBMAControl:
             )
         finally:
             ip.close()
-
-    def __cleanup_cbma(self):
-        self.__shutdown_interface(self.LOWER_BATMAN)
-        self.__shutdown_interface(self.UPPER_BATMAN)
-        self.__delete_ebtables_rules()
-        self.__delete_macsec_links()
-        self.__destroy_batman_interface(self.LOWER_BATMAN)
-        self.__destroy_batman_interface(self.UPPER_BATMAN)
-        # HACK: How can we know that "br-upper" even exists and who owns it?
-        self.__shutdown_and_delete_bridge("br-upper")
-        self.__shutdown_and_delete_bridge(self.BR_NAME)
-
-    def stop_cbma(self):
-        """
-        Stops CBMA by terminating CBMA processes. Also
-        destroys batman and bridge interfaces.
-        """
-        if not self.__cbma_set_up:
-            return
-        try:
-            self.logger.debug("Stopping CBMA...")
-
-            for if_name, process in self.__lower_cbma_processes.items():
-                try:
-                    self.logger.debug(
-                        "Stopping lower CBMA process %s for interface %s",
-                        process,
-                        if_name,
-                    )
-                    if process.is_alive():
-                        process.terminate()
-                except Exception as e:
-                    self.logger.error(f"Terminating lower CBMA process error: {e}")
-
-            for process in self.__lower_cbma_processes.values():
-                try:
-                    if process.is_alive():
-                        process.join(timeout=1.0)
-                        process.kill()
-                except Exception as e:
-                    self.logger.error(f"Killing lower CBMA process error: {e}")
-
-            for if_name, process in self.__upper_cbma_processes.items():
-                try:
-                    self.logger.debug(
-                        "Stopping upper CBMA process %s for interface %s",
-                        process,
-                        if_name,
-                    )
-                    if process.is_alive():
-                        process.terminate()
-                except Exception as e:
-                    self.logger.error(f"Terminating upper CBMA process error: {e}")
-
-            for process in self.__upper_cbma_processes.values():
-                try:
-                    if process.is_alive():
-                        process.join(timeout=1.0)
-                        process.kill()
-                except Exception as e:
-                    self.logger.error(f"Killing upper CBMA process error: {e}")
-            self.logger.debug("CBMA processes terminated, continue cleanup...")
-            self.__cleanup_cbma()
-            self.logger.debug("CBMA cleanup finished")
-
-        except Exception as e:
-            self.logger.error(f"Stop CBMA error: {e}")
-        finally:
-            self.__cbma_set_up = False
-        return False
 
     def __has_certificate(self, cert_path, mac) -> bool:
         certificate_path = f"{cert_path}/MAC/{mac}.crt"
@@ -568,11 +497,13 @@ class CBMAControl:
         self.__init_batman_and_bridge()
 
         self.__update_cbma_interface_lists()
-        self.__setup_lower_cbma()
-        self.__setup_upper_cbma()
 
         # Set radios on
         self.__setup_radios()
+
+        # setup cbma
+        self.__setup_lower_cbma()
+        self.__setup_upper_cbma()
 
         # Add interfaces to the bridge
         for interface in self.__red_interfaces:
@@ -651,83 +582,98 @@ class CBMAControl:
             self.logger.error(f"Error: {e}")
 
     def __setup_lower_cbma(self):
-        for interface in self.__lower_cbma_interfaces:
-            interface_name = interface.interface_name.lower()
-            try:
-                index = self.__comms_ctrl.settings.mesh_vif.index(interface_name)
-                wpa_supplicant_ctrl_path = (
-                    f"/var/run/wpa_supplicant_id{index}/{interface_name}"
-                )
-            except ValueError:
-                wpa_supplicant_ctrl_path = None
 
-            self.logger.debug(
-                "Setup lower CBMA for interface: %s, wpa_supplicant_ctrl_path: %s",
-                interface_name,
-                wpa_supplicant_ctrl_path,
-            )
-            process = setup_cbma.cbma(
-                "lower",
-                interface_name,
-                Constants.CBMA_PORT_LOWER.value,
-                self.LOWER_BATMAN,
-                self.__cbma_certs_path,
-                self.__cbma_ca_cert_path,
-                "off",
-                wpa_supplicant_ctrl_path,
-            )
-            self.__lower_cbma_processes[interface_name] = process
+        lower_cbma_interfaces = []
+        for interface in self.__lower_cbma_interfaces:
+            if interface.interface_name not in lower_cbma_interfaces:
+                lower_cbma_interfaces.append(interface.interface_name)
+
+        self.logger.debug("Lower CBMA interfaces: %s", lower_cbma_interfaces)
+
+        # todo folder path, cert path, ca cert path
+        self.__lower_cbma_processes = CBMAControl(lower_cbma_interfaces,
+                                                  self.LOWER_BATMAN,
+                                                  "/opt/crypto/ecdsa")
+        self.__lower_cbma_processes.start()
+        self.__lower_cbma_processes.join()
 
     def __setup_upper_cbma(self):
+        upper_cbma_interfaces = []
+        has_upper_certificate = 1
         for interface in self.__upper_cbma_interfaces:
-            interface_name = interface.interface_name.lower()
-            try:
-                index = self.__comms_ctrl.settings.mesh_vif.index(interface_name)
-                wpa_supplicant_ctrl_path = (
-                    f"/var/run/wpa_supplicant_id{index}/{interface_name}"
-                )
-            except ValueError:
-                wpa_supplicant_ctrl_path = None
+            if interface.interface_name not in upper_cbma_interfaces:
+                upper_cbma_interfaces.append(interface.interface_name)
 
             if self.__has_certificate(
                 self.__upper_cbma_certs_path, interface.mac_address
             ):
-                self.logger.debug(
-                    "Using upper cbma certificate for interface %s", interface_name
-                )
-                cbma_certs_path = self.__upper_cbma_certs_path
-                cbma_ca_cert_path = self.__upper_cbma_ca_cert_path
+                has_upper_certificate = has_upper_certificate and 1
             else:
                 # TODO: Temporary backup solution to use lower CBMA certificates
                 if self.__has_certificate(
                     self.__cbma_certs_path, interface.mac_address
                 ):
-                    self.logger.debug(
-                        "Using lower cbma certificate as a backup for interface %s",
-                        interface_name,
-                    )
-                    cbma_certs_path = self.__cbma_certs_path
-                    cbma_ca_cert_path = self.__cbma_ca_cert_path
+                    has_upper_certificate = has_upper_certificate and 0
                 else:
-                    self.logger.debug(
-                        "No cbma certificate for interface %s", interface_name
+                    self.logger.warning(
+                        "No cbma certificate for interface %s", interface.name
                     )
                     continue
 
-            self.logger.debug(
-                "Setup upper CBMA for interface: %s, wpa_supplicant_ctrl_path: %s",
-                interface_name,
-                wpa_supplicant_ctrl_path,
-            )
+        # todo
+        # if has_upper_certificate:
+        #     self.logger.debug(
+        #         "Using upper cbma certificates for interfaces")
+        #     cbma_certs_path = self.__upper_cbma_certs_path
+        #     cbma_ca_cert_path = self.__upper_cbma_ca_cert_path
+        # else:
+        #     self.logger.debug(
+        #         "Using lower cbma certificate as a backup for interface %s")
+        #     cbma_certs_path = self.__cbma_certs_path
+        #     cbma_ca_cert_path = self.__cbma_ca_cert_path
 
-            process = setup_cbma.cbma(
-                "upper",
-                interface_name,
-                Constants.CBMA_PORT_UPPER.value,
-                self.UPPER_BATMAN,
-                cbma_certs_path,
-                cbma_ca_cert_path,
-                "off",
-                wpa_supplicant_ctrl_path,
-            )
-            self.__upper_cbma_processes[interface_name] = process
+        self.logger.debug("Upper CBMA interfaces: %s", upper_cbma_interfaces)
+
+        # TODO which upper certs should be used
+        self.__upper_cbma_processes = CBMAControl(upper_cbma_interfaces,
+                                                  self.UPPER_BATMAN,
+                                                  "/opt/crypto/ecdsa")
+        self.__upper_cbma_processes.start()
+        self.__upper_cbma_processes.join()
+
+    def __cleanup_cbma(self):
+        self.__shutdown_interface(self.LOWER_BATMAN)
+        self.__shutdown_interface(self.UPPER_BATMAN)
+
+        # HACK: remove
+        # self.__delete_ebtables_rules()
+        # self.__delete_macsec_links()
+
+        self.__destroy_batman_interface(self.LOWER_BATMAN)
+        self.__destroy_batman_interface(self.UPPER_BATMAN)
+        # HACK: How can we know that "br-upper" even exists and who owns it?
+        self.__shutdown_and_delete_bridge("br-upper")
+        self.__shutdown_and_delete_bridge(self.BR_NAME)
+
+    def stop_cbma(self):
+        """
+        Stops CBMA by terminating CBMA processes. Also
+        destroys batman and bridge interfaces.
+        """
+        if not self.__cbma_set_up:
+            return
+        try:
+            self.logger.debug("Stopping CBMA...")
+
+            self.__lower_cbma_processes.stop()
+            self.__upper_cbma_processes.stop()
+
+            self.logger.debug("CBMA processes terminated, continue cleanup...")
+            self.__cleanup_cbma()
+            self.logger.debug("CBMA cleanup finished")
+
+        except Exception as e:
+            self.logger.error(f"Stop CBMA error: {e}")
+        finally:
+            self.__cbma_set_up = False
+        return False
