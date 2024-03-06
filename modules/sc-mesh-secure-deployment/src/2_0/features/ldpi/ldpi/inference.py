@@ -58,9 +58,6 @@ class TrainedModel:
         self.near_max_threshold: Optional[float] = None
         self.max_threshold: Optional[float] = None
         self.hundred_one_threshold: Optional[float] = None
-
-        # Load trained model
-        self.store_models_path: str = f'features/ldpi/ldpi/training/output/{self.args.model_name}/'
         self._init_model()
 
         self.chosen_threshold: float = self._initialize_threshold()
@@ -75,16 +72,16 @@ class TrainedModel:
         try:
             print('Loading best model and center from saved state')
             # Load model from disk
-            model_save_path = os.path.join(self.store_models_path, 'best_model_with_center.pth')
+            model_save_path = os.path.join(self.args.store_models_path, 'best_model_with_center.pth')
             if self.quantized:
                 print('Loading quantized model')
                 if self.backend == 'qnnpack':
                     torch.backends.quantized.engine = 'qnnpack'
-                quantized_model_path = os.path.join(self.store_models_path, 'scripted_quantized_model.pth')
+                quantized_model_path = os.path.join(self.args.store_models_path, 'scripted_quantized_model.pth')
                 self.model = torch.jit.load(quantized_model_path, map_location=torch.device('cpu'))
             else:
                 print('Loading traced model')
-                traced_model_path = os.path.join(self.store_models_path, 'traced_model.pth')
+                traced_model_path = os.path.join(self.args.store_models_path, 'traced_model.pth')
                 self.model = torch.jit.load(traced_model_path, map_location=torch.device('cpu'))
 
             # Set model to eval mode

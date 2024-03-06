@@ -85,6 +85,9 @@ class LDPIOptions:
         # Inference related arguments
         self.threshold_type: str = 'max'
 
+        # Model Path
+        self.store_models_path: str = f'features/ldpi/ldpi/training/output/ResCNN/'
+
     def parse_options(self) -> NoReturn:
         """
         Parse command-line arguments and update instance attributes.
