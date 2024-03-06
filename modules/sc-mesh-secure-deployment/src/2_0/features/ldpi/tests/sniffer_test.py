@@ -1,10 +1,11 @@
 from unittest.mock import Mock, patch
-
+import sys
 import dpkt
 import pytest
 
+sys.path.insert(0, '/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/ldpi')
 from options import SnifferOptions
-from sniffer import Sniffer
+from sniffer.sniffer import Sniffer
 
 
 class TestSniffer:
@@ -37,8 +38,14 @@ class TestSniffer:
         normal_mock_buf = b'\x00' * 60
 
         mock_buf = batman_mock_buf if is_batman else normal_mock_buf
-        mock_eth = Mock()
+
+        # Create a real Ethernet frame instance
+        mock_eth = dpkt.ethernet.Ethernet()
         mock_eth.type = eth_type
+
+        # Set source and destination MAC addresses
+        mock_eth.src = b'\x00\x11\x22\x33\x44\x55'
+        mock_eth.dst = b'\x66\x77\x88\x99\xaa\xbb'
 
         if is_batman:
             mock_eth.dst = b'\xff\xff\xff\xff\xff\xff' if is_broadcast else b'\x00' * 6
@@ -53,9 +60,9 @@ class TestSniffer:
                 with patch.object(sniffer, 'unpack_ip') as mock_unpack_ip:
                     sniffer.process_packet(123456789, mock_buf)
                     if nested_eth_type is not None and not is_broadcast:
-                        mock_unpack_ip.assert_called_with(mock_eth.data, 123456789)
+                        mock_unpack_ip.assert_called_with(mock_eth.data, 123456789, '00:11:22:33:44:55', '66:77:88:99:aa:bb')
                     else:
-                        mock_unpack_ip.assert_called_with(mock_eth, 123456789)
+                        mock_unpack_ip.assert_called_with(mock_eth, 123456789, '00:11:22:33:44:55', '66:77:88:99:aa:bb')
             else:
                 sniffer.process_packet(123456789, mock_buf)
 

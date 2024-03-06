@@ -1,18 +1,21 @@
 import os
+import sys
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 import torch
 
-from ldpi import TrainedModel
+sys.path.insert(0, '/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/ldpi')
 from options import LDPIOptions
+from ldpi.inference import TrainedModel
 
 
 class TestTrainedModel:
     @pytest.fixture
     def mock_options(self):
         options = LDPIOptions()
+        options.store_models_path = '/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/ldpi/ldpi/training/output/ResCNN/'
         options.threshold_type = 'max'
         options.n = 4
         options.l = 60
@@ -22,7 +25,7 @@ class TestTrainedModel:
     class TestTrainedModelFileExistence:
         def test_model_files_existence(self, mock_options):
             model = TrainedModel(mock_options)
-            model_path = model.store_models_path
+            model_path = mock_options.store_models_path
 
             # Define the expected file paths
             expected_files = [
@@ -40,11 +43,12 @@ class TestTrainedModel:
                 # Attempt to load the model file with PyTorch
                 try:
                     if 'scripted_quantized_model.pth' in full_path or 'traced_model.pth' in full_path:
+                        torch.backends.quantized.engine = 'qnnpack'
                         # For model files, use torch.jit.load
-                        torch.jit.load(full_path)
+                        torch.jit.load(full_path, map_location=torch.device('cpu'))
                     else:
                         # For other .pth files, use torch.load
-                        torch.load(full_path)
+                        torch.load(full_path, map_location=torch.device('cpu'))
                 except Exception as e:
                     assert False, f"Failed to load file {file_path} with PyTorch: {e}"
 
@@ -57,6 +61,7 @@ class TestTrainedModel:
     def test_initialize_threshold(self, mock_options, threshold_type, expected_threshold):
         mock_options.threshold_type = threshold_type
         model = TrainedModel(mock_options)
+        model_path = mock_options.store_models_path
 
         # Mocking the thresholds as they are not set in the __init__ method
         model.ninety_nine_threshold = 0.99
@@ -72,8 +77,8 @@ class TestTrainedModel:
         len_packets = mock_options.l
 
         # Create mock flow data
-        flow_key_1 = (b'\xC0\xA8\x00\x01', 12345, b'\xC0\xA8\x00\x02', 80, 6)
-        flow_key_2 = (b'\xC0\xA8\x00\x03', 12345, b'\xC0\xA8\x00\x04', 80, 17)
+        flow_key_1 = (b'\xC0\xA8\x00\x01', 12345, b'\xC0\xA8\x00\x02', 80, 6, '00:11:22:33:44:55', '00:11:22:33:44:66')
+        flow_key_2 = (b'\xC0\xA8\x00\x03', 12345, b'\xC0\xA8\x00\x04', 80, 17, '00:11:22:33:44:66', '00:11:22:33:44:55')
 
         # Example numpy arrays representing packet data
         flow_data_1 = [np.random.rand(len_packets).astype(np.float32) for _ in range(num_packets)]
@@ -88,6 +93,7 @@ class TestTrainedModel:
 
     def test_prepare_tensors(self, mock_options, flow_data, black_list):
         mock_model = TrainedModel(mock_options)
+        mock_model.store_models_path = 'ldpi/training/output/traced_model.pth/'
         flow_data_copy = flow_data.copy()
         keys, tensor = mock_model.prepare_tensors(flow_data, black_list)
 
@@ -115,6 +121,7 @@ class TestTrainedModel:
     def test_infer_anomalies(self, mock_options):
         # Create a mock TrainedModel instance
         model = TrainedModel(mock_options)
+        model_path = mock_options.store_models_path
 
         # Mock the model's encode method
         model.model = MagicMock()
