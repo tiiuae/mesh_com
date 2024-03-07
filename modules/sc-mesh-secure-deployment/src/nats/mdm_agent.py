@@ -32,7 +32,7 @@ from src import comms_controller
 from src import comms_service_discovery
 from src.constants import Constants, ConfigType, StatusType
 from src import comms_config_store
-from src import cbma_controller
+from src import cbma_adaptation
 
 # pylint: disable=too-few-public-methods
 class Interface:
@@ -44,9 +44,6 @@ class Interface:
         self.interface_name = interface_name
         self.operstat = operstat
         self.mac_address = mac_address
-
-
-
 
 
 # pylint: enable=too-few-public-methods
@@ -88,7 +85,7 @@ class MdmAgent:
         self.__interfaces: List[Interface] = []
         self.executor = ThreadPoolExecutor(1)
         self.__lock = threading.Lock()
-        self.cbma_ctrl = cbma_controller.CBMAAdaptation(
+        self.cbma_ctrl = cbma_adaptation.CBMAAdaptation(
             self.__comms_ctrl,
             self.logger,
             self.__lock
@@ -157,7 +154,7 @@ class MdmAgent:
         except FileNotFoundError:
             self.__device_id = "default"
 
-    def mdm_server_address_cb(self, address: str, status: bool, **kwargs) -> None:
+    def mdm_server_address_cb(self, address: str, status: bool, **_) -> None:
         """
         Callback for MDM server address
         :param address: MDM server address
@@ -279,7 +276,7 @@ class MdmAgent:
         """
         self.thread_if_mon.start()
 
-    async def execute(self) -> None:
+    async def execute(self) -> None: # pylint: disable=too-many-branches
         """
         Execute MDM agent
         :return: -
@@ -329,10 +326,9 @@ class MdmAgent:
                             self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
                             == "OK"
                         ):
-                            if self.__is_cbma_feature_enabled():
-                                # Restart CBMA with new certificates
-                                self.__cbma_set_up = self.cbma_ctrl.stop_cbma()
-                                self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
+                            # Restart CBMA with new certificates
+                            self.__cbma_set_up = self.cbma_ctrl.stop_cbma()
+                            self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
                         if (
                             self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
                             == "FAIL"
@@ -351,7 +347,7 @@ class MdmAgent:
                     await self.__loop_run_executor(
                         self.executor, ConfigType.DEBUG_CONFIG
                     )
-            if self.__is_cbma_feature_enabled() and not self.__cbma_set_up:
+            if not self.__cbma_set_up:
                 self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
             await asyncio.sleep(
                 float(min(self.__interval, self.__debug_config_interval))
@@ -383,7 +379,7 @@ class MdmAgent:
 
     def __action_certificates(
         self, response: requests.Response, certificate_type: str
-    ) -> str:
+    ) -> str: # pylint: disable=too-many-branches, too-many-statements
         """
         Action certificates
         :param response: HTTP response
@@ -586,7 +582,7 @@ class MdmAgent:
 
     def __handle_received_config(
         self, response: requests.Response, config: ConfigType
-    ) -> (str, str):
+    ) -> str:
         """
         Handle received config
         :param response: HTTP response
@@ -597,6 +593,8 @@ class MdmAgent:
             f"HTTP Request Response: {response.text.strip()} {str(response.status_code).strip()}"
         )
 
+        ret = "FAIL"
+
         if (
             self.__mesh_conf_request_processed
             and config.value == ConfigType.DEBUG_CONFIG.value
@@ -604,17 +602,17 @@ class MdmAgent:
             self.__previous_debug_config = response.text.strip()
             self.__config_store.store(ConfigType.DEBUG_CONFIG.value, self.__previous_debug_config)
             self.__debug_config_interval = Constants.OK_POLLING_TIME_SECONDS.value
-            return "OK"
+            ret = "OK"
         else:
             # radio configuration actions
             if config.value == ConfigType.MESH_CONFIG.value:
                 ret = self.__action_radio_configuration(response)
-                return ret
 
             # feature.yaml actions
-            if config.value == ConfigType.FEATURES.value:
+            elif config.value == ConfigType.FEATURES.value:
                 ret = self.__action_feature_yaml(response)
-                return ret
+
+        return ret
 
     def download_certificate_bundle(
         self, certificate_type: str = ""
@@ -706,20 +704,20 @@ class MdmAgent:
             )
         return requests.Response()
 
-    def __is_cbma_feature_enabled(self) -> bool:
-        """
-        Check if CBMA feature is enabled
-        :return: True if enabled, False otherwise
-        """
-        with open(Constants.YAML_FILE.value, "r", encoding="utf-8") as stream:
-            try:
-                features = yaml.safe_load(stream)
-                return bool(features["CBMA"])
-            except (yaml.YAMLError, KeyError, FileNotFoundError) as exc:
-                self.logger.error(
-                    f"CBMA disabled as feature configuration not found: {exc}"
-                )
-            return False
+    # def __is_cbma_feature_enabled(self) -> bool:
+    #     """
+    #     Check if CBMA feature is enabled
+    #     :return: True if enabled, False otherwise
+    #     """
+    #     with open(Constants.YAML_FILE.value, "r", encoding="utf-8") as stream:
+    #         try:
+    #             features = yaml.safe_load(stream)
+    #             return bool(features["CBMA"])
+    #         except (yaml.YAMLError, KeyError, FileNotFoundError) as exc:
+    #             self.logger.error(
+    #                 f"CBMA disabled as feature configuration not found: {exc}"
+    #             )
+    #         return False
 
     def __validate_response(
         self, response: requests.Response, config: ConfigType
@@ -767,7 +765,7 @@ class MdmAgent:
 
         return status
 
-    async def __loop_run_executor(self, executor, config: ConfigType) -> None:
+    async def __loop_run_executor(self, executor, config: ConfigType) -> None: # pylint: disable=too-many-branches
         """
         Loop run executor
         :param executor: executor
@@ -793,7 +791,7 @@ class MdmAgent:
                 self.logger.debug(
                     "Validation status: %s", self.__status[status_type]
                 )
-            return "FAIL"
+            return
 
         if self.__mesh_conf_request_processed:
             if (

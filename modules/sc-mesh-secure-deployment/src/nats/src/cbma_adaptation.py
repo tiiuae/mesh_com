@@ -6,21 +6,21 @@ import logging
 import subprocess
 import threading
 import time
-from typing import List, Dict
+from typing import List
 from copy import deepcopy
 import json
 import fnmatch
 import re
-from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
 import ipaddress
+from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
 
 from src import cbma_paths
 from src.comms_controller import CommsController
 from src.constants import Constants
 from mdm_agent import Interface
 
-#from cbma import setup_cbma  # type: ignore[import-not-found]
-from run_cbma import CBMAControl # type: ignore[import-not-found]
+from controller import CBMAController
+from models.certificates import CBMACertificates
 
 class CBMAAdaptation(object):
     """
@@ -48,8 +48,7 @@ class CBMAAdaptation(object):
             Constants.DOWNLOADED_CBMA_UPPER_PATH.value + "/crypto/rsa/birth/filebased"
         )
         self.__upper_cbma_ca_cert_path = (
-            Constants.DOWNLOADED_CBMA_UPPER_PATH.value
-            + "/mspki/rsa/certificate_chain.crt"
+                Constants.DOWNLOADED_CBMA_UPPER_PATH.value + "/upper_certificates/rootCA.crt"
         )
         self.__lower_cbma_processes = None
         self.__upper_cbma_processes = None
@@ -112,8 +111,8 @@ class CBMAAdaptation(object):
             if not bridge_indices:
                 ip.link("add", ifname=bridge_name, kind="bridge")
 
-        except Exception as e:
-            self.logger.debug(
+        except:
+            self.logger.exception(
                 "Error creating bridge %s! Error: %s",
                 bridge_name,
                 e,
@@ -400,7 +399,8 @@ class CBMAAdaptation(object):
             if interface in self.__lower_cbma_interfaces:
                 self.__lower_cbma_interfaces.remove(interface)
 
-    def __wait_for_ap(self, timeout=4):
+    @staticmethod
+    def __wait_for_ap(timeout=4):
         start_time = time.time()
         while True:
             try:
@@ -581,25 +581,39 @@ class CBMAAdaptation(object):
         except Exception as e:
             self.logger.error(f"Error: {e}")
 
-    def __setup_lower_cbma(self):
+    def __setup_lower_cbma(self) -> None:
+        """
+        Sets up lower CBMA.
+        :return: None
+        """
+        self.logger.debug("Setting up lower CBMA...")
+        cert_dir = f"{self.__cbma_certs_path}/MAC/"
+        key = f"{self.__cbma_certs_path}/private.key"
+        chain = ["/opt/mspki/ecdsa/security_officers/filebased.crt",
+                 "/opt/mspki/ecdsa/intermediate.crt",
+                 "/opt/mspki/ecdsa/root.crt"]
 
-        lower_cbma_interfaces = []
-        for interface in self.__lower_cbma_interfaces:
-            if interface.interface_name not in lower_cbma_interfaces:
-                lower_cbma_interfaces.append(interface.interface_name)
+        certificates = CBMACertificates(cert_dir, key, chain)
 
-        self.logger.debug("Lower CBMA interfaces: %s", lower_cbma_interfaces)
-
-        # todo folder path, cert path, ca cert path
-        self.__lower_cbma_processes = CBMAControl(lower_cbma_interfaces,
+        self.__lower_cbma_processes = CBMAController(Constants.CBMA_PORT_LOWER.value,
                                                   self.LOWER_BATMAN,
-                                                  "/opt/crypto/ecdsa")
-        self.__lower_cbma_processes.start()
-        self.__lower_cbma_processes.join()
+                                                  certificates, False)
+        for interface in self.__lower_cbma_interfaces:
+            ret = self.__lower_cbma_processes.add_interface(interface.interface_name)
+            self.logger.debug(f"Lower CBMA interfaces added: {interface.interface_name} "
+                              f"status: {ret}")
 
-    def __setup_upper_cbma(self):
+    def __setup_upper_cbma(self) -> None
+        """
+        Sets up upper CBMA.
+        :return: None
+        """
+
         upper_cbma_interfaces = []
         has_upper_certificate = 1
+
+        self.logger.debug("Setting up upper CBMA...")
+
         for interface in self.__upper_cbma_interfaces:
             if interface.interface_name not in upper_cbma_interfaces:
                 upper_cbma_interfaces.append(interface.interface_name)
@@ -620,26 +634,34 @@ class CBMAAdaptation(object):
                     )
                     continue
 
-        # todo
-        # if has_upper_certificate:
-        #     self.logger.debug(
-        #         "Using upper cbma certificates for interfaces")
-        #     cbma_certs_path = self.__upper_cbma_certs_path
-        #     cbma_ca_cert_path = self.__upper_cbma_ca_cert_path
-        # else:
-        #     self.logger.debug(
-        #         "Using lower cbma certificate as a backup for interface %s")
-        #     cbma_certs_path = self.__cbma_certs_path
-        #     cbma_ca_cert_path = self.__cbma_ca_cert_path
+        if has_upper_certificate:
+            self.logger.debug(
+                "Using upper cbma certificates for interfaces")
+            cert_dir: str = f"{self.__upper_cbma_certs_path}/MAC/"
+            key: str = f"{self.__upper_cbma_certs_path}/private.key"
+            chain: list[str] = []
+            ca: str = self.__upper_cbma_ca_cert_path
 
-        self.logger.debug("Upper CBMA interfaces: %s", upper_cbma_interfaces)
+        else:  # use birth certs
+            self.logger.debug(
+                "Using lower cbma certificate as a backup for interface")
 
-        # TODO which upper certs should be used
-        self.__upper_cbma_processes = CBMAControl(upper_cbma_interfaces,
-                                                  self.UPPER_BATMAN,
-                                                  "/opt/crypto/ecdsa")
-        self.__upper_cbma_processes.start()
-        self.__upper_cbma_processes.join()
+            cert_dir: str = f"{self.__cbma_certs_path}/MAC/"
+            key: str = f"{self.__cbma_certs_path}/private.key"
+            chain: list[str] = ["/opt/mspki/ecdsa/security_officers/filebased.crt",
+                     "/opt/mspki/ecdsa/intermediate.crt",
+                     "/opt/mspki/ecdsa/root.crt"]
+            ca: str = ""
+
+        certificates = CBMACertificates(cert_dir, key, chain, ca)
+        self.__upper_cbma_processes = CBMAController(Constants.CBMA_PORT_UPPER.value,
+                                                     self.UPPER_BATMAN,
+                                                     certificates, True)
+
+        for _interface in self.__upper_cbma_interfaces:
+            ret = self.__upper_cbma_processes.add_interface(_interface.interface_name)
+            self.logger.debug(f"Lower CBMA interfaces added: {_interface.interface_name} "
+                              f"status: {ret}")
 
     def __cleanup_cbma(self):
         self.__shutdown_interface(self.LOWER_BATMAN)
