@@ -35,7 +35,7 @@ RUN chown -R builder:builder /$PACKAGE_NAME
 
 USER builder
 
-RUN rosdep update
+RUN rosdep update --include-eol-distros
 
 VOLUME /$PACKAGE_NAME/sources
 WORKDIR /$PACKAGE_NAME/sources

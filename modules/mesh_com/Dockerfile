@@ -1,25 +1,18 @@
 # Given dynamically from CI job.
 FROM --platform=${BUILDPLATFORM:-linux/amd64} ghcr.io/tiiuae/fog-ros-sdk:v3.1.0-${TARGETARCH:-amd64} AS builder
 
-# Install build dependencies
-RUN apt update -y && apt install -y --no-install-recommends \
-    curl \
-    python3-bloom \
-    fakeroot \
-    dh-make \
-    dh-python \
-    python3-pytest \
-    ros-${ROS_DISTRO}-ament-flake8 \
-    ros-${ROS_DISTRO}-ament-pep257 \
-    && rm -rf /var/lib/apt/lists/*
+# Must be defined another time after "FROM" keyword.
+ARG TARGETARCH
 
-# Build mesh_com
-COPY . /main_ws/src/
+# SRC_DIR environment variable is defined in the fog-ros-sdk image.
+# The same workspace path is used by all ROS2 components.
+# See: https://github.com/tiiuae/fog-ros-baseimage/blob/main/Dockerfile.sdk_builder
+COPY . $SRC_DIR/mesh_com
 
-# this:
-# 1) builds the application
-# 2) packages the application as .deb in /main_ws/
-RUN /packaging/build.sh
+# Tar directories so they are easier to handle when doing installation.
+RUN /packaging/build_colcon_sdk.sh ${TARGETARCH:-amd64}
+# Even though it is possible to tar the install directory for retrieving it later in runtime image,
+# the tar extraction in arm64 emulated on arm64 is still slow. So, we copy the install directory instead
 
 #  ▲               runtime ──┐
 #  └── build                 ▼
@@ -32,7 +25,6 @@ RUN apt update \
     && apt install -y --no-install-recommends \
         alfred \
         batctl \
-        keepalived \
         iproute2 \
         iw \
         net-tools \
@@ -45,9 +37,10 @@ RUN apt update \
 
 COPY modules/mesh_com/entrypoint.sh /entrypoint.sh
 
-COPY --from=builder /main_ws/src/modules/ros-*-mesh-com_*_amd64.deb /mesh-com.deb
+# Replicate the ROS2 directory structure to so scripts do not need to be refactored.
+RUN mkdir -p /opt/ros/humble/share/bin/
 
-COPY common/scripts/mesh-11s.sh /opt/ros/humble/share/bin/mesh-11s.sh
+COPY common/scripts/ /opt/ros/humble/share/bin/
 
 # WORKSPACE_DIR environment variable is defined in the fog-ros-baseimage.
 # The same installation directory is used by all ROS2 components.

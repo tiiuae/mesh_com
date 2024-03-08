@@ -1,9 +1,5 @@
 name: tii-mesh-com
 
-permissions:
-  contents: read
-  packages: write
-
 on:
   push:
     branches: [ feat-default-mesh-sergei ]
@@ -16,7 +12,14 @@ on:
 jobs:
   tii-mesh-com:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
 
       - uses: actions/checkout@v4
 
@@ -49,6 +52,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: linux/amd64,linux/arm64,linux/riscv64
           file: ./modules/mesh_com/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
