@@ -603,7 +603,7 @@ class CBMAAdaptation(object):
             self.logger.debug(f"Lower CBMA interfaces added: {interface.interface_name} "
                               f"status: {ret}")
 
-    def __setup_upper_cbma(self) -> None
+    def __setup_upper_cbma(self) -> None:
         """
         Sets up upper CBMA.
         :return: None
@@ -634,7 +634,7 @@ class CBMAAdaptation(object):
                     )
                     continue
 
-        if has_upper_certificate:
+        if False: #has_upper_certificate:
             self.logger.debug(
                 "Using upper cbma certificates for interfaces")
             cert_dir: str = f"{self.__upper_cbma_certs_path}/MAC/"
@@ -660,7 +660,7 @@ class CBMAAdaptation(object):
 
         for _interface in self.__upper_cbma_interfaces:
             ret = self.__upper_cbma_processes.add_interface(_interface.interface_name)
-            self.logger.debug(f"Lower CBMA interfaces added: {_interface.interface_name} "
+            self.logger.debug(f"Upper CBMA interfaces added: {_interface.interface_name} "
                               f"status: {ret}")
 
     def __cleanup_cbma(self):
