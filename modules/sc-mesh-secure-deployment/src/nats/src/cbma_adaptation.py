@@ -1,7 +1,7 @@
 """
 CBMA Controller
 """
-from os import path
+import os
 import logging
 import subprocess
 import threading
@@ -9,6 +9,7 @@ import time
 from typing import List
 from copy import deepcopy
 import json
+import random
 import fnmatch
 import re
 import ipaddress
@@ -120,6 +121,16 @@ class CBMAAdaptation(object):
 
         finally:
             ip.close()
+
+    def __set_interface_mac(self, interface, new_mac):
+        try:
+            # Change the MAC address of the bridge interface
+            subprocess.check_call(['ip', 'link', 'set', 'dev', interface, 'address', new_mac])
+
+        except subprocess.CalledProcessError as e:
+            self.logger.debug(
+                "Error setting MAC address for %s! Error: %s", interface, e
+            )
 
     def __set_bridge_ip(self, bridge_name, mesh_vif_name):
         ip = IPRoute()
@@ -289,21 +300,22 @@ class CBMAAdaptation(object):
                 return interface.mac_address
         return None  # Interface not found in the list
 
-    def __create_batman_interface(self, batman_if, if_name):
+    def __create_batman_interface(self, batman_if, mac_addr=None):
         ip = IPRoute()
         try:
-            mac = self.__get_mac_addr(if_name)
             # Check if the interface already exists
             interface_indices = ip.link_lookup(ifname=batman_if)
             if not interface_indices:
                 self.logger.debug(
-                    "Create interface %s using %s interface's MAC: %s.",
+                    "Create interface %s, mac_addr: %s",
                     batman_if,
-                    if_name,
-                    mac,
+                    mac_addr if mac_addr is not None else "random",
                 )
                 # If the interface doesn't exist, create it as a Batman interface
-                ip.link("add", ifname=batman_if, kind="batadv", address=mac)
+                if mac_addr is not None:
+                    ip.link("add", ifname=batman_if, kind="batadv", address=mac_addr)
+                else:
+                    ip.link("add", ifname=batman_if, kind="batadv")
         except Exception as e:
             self.logger.debug(
                 "Error creating Batman interface %s: %s",
@@ -341,7 +353,7 @@ class CBMAAdaptation(object):
     def __has_certificate(self, cert_path, mac) -> bool:
         certificate_path = f"{cert_path}/MAC/{mac}.crt"
 
-        if not path.exists(certificate_path):
+        if not os.path.exists(certificate_path):
             self.logger.debug("Certificate not found: %s", certificate_path)
             return False
 
@@ -439,6 +451,24 @@ class CBMAAdaptation(object):
             time.sleep(1)  # Sleep for 1 second before checking again
             self.__get_interfaces()
 
+    def __create_mac(self, randomized: bool = False, interface_mac: str="") -> str:
+        """
+        Create a random MAC address or flip the locally administered bit of the given MAC address
+        :return: The random MAC address
+        """
+        if randomized:
+            mac = [random.randint(0x00, 0xff) for _ in range(6)]  # Generate 6 random bytes
+            mac[0] &= 0xfc  # Clear multicast and locally administered bits
+            mac[0] |= 0x02  # Set the locally administered bit
+            return ':'.join(['%02x' % byte for byte in mac])
+        else:
+            # Split MAC address into octets and flip the locally administered bit
+            octets = interface_mac.split(':')
+            first_octet = int(octets[0], 16)
+            flipped_first_octet = first_octet ^ 2
+
+            return f"{flipped_first_octet}:{':'.join(octets[1:])}"
+
     def __init_batman_and_bridge(self):
         if_name = self.__comms_ctrl.settings.mesh_vif[0]
         if if_name.startswith("halow"):
@@ -449,12 +479,16 @@ class CBMAAdaptation(object):
                     break
 
         self.__get_interfaces()
-        self.__create_batman_interface(self.LOWER_BATMAN, if_name)
-        self.__create_batman_interface(self.UPPER_BATMAN, if_name)
+        # if_name MAC and flip the locally administered bit
+        self.__create_batman_interface(self.LOWER_BATMAN, self.__create_mac(False,
+                                                               self.__get_mac_addr(if_name)))
+        self.__create_batman_interface(self.UPPER_BATMAN)
         self.__set_interface_up(self.LOWER_BATMAN)
         self.__set_interface_up(self.UPPER_BATMAN)
         self.__create_bridge(self.BR_NAME)
-        self.__set_bridge_ip(self.BR_NAME, if_name)
+
+        # Set random MAC address for the bridge
+        self.__set_interface_mac(self.BR_NAME, self.__create_mac(True))
         self.__wait_for_interface(self.LOWER_BATMAN)
         self.__wait_for_interface(self.UPPER_BATMAN)
 
@@ -599,9 +633,10 @@ class CBMAAdaptation(object):
                                                   self.LOWER_BATMAN,
                                                   certificates, False)
         for interface in self.__lower_cbma_interfaces:
-            ret = self.__lower_cbma_processes.add_interface(interface.interface_name)
-            self.logger.debug(f"Lower CBMA interfaces added: {interface.interface_name} "
-                              f"status: {ret}")
+            if interface.interface_name != "dummy0":
+                ret = self.__lower_cbma_processes.add_interface(interface.interface_name)
+                self.logger.debug(f"Lower CBMA interfaces added: {interface.interface_name} "
+                                  f"status: {ret}")
 
     def __setup_upper_cbma(self) -> None:
         """
