@@ -702,7 +702,7 @@ class CBMAAdaptation(object):
 
         certificates = CBMACertificates(cert_dir, key, chain, ca)
         self.__upper_cbma_controller = CBMAController(
-            Constants.CBMA_PORT_UPPER.value, self.UPPER_BATMAN, certificates, True
+            Constants.CBMA_PORT_UPPER.value, self.UPPER_BATMAN, certificates, True, True
         )
 
         for _interface in self.__upper_cbma_interfaces:
