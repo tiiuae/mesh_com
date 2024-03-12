@@ -56,7 +56,7 @@ elif [[ "$DRONE_TYPE" == "fog" || "$DRONE_TYPE" == "cm-fog" ]]; then
         MESH_IP=$EDGE_IP
     else
         # mesh class is gs; single cm-fog or fog: 192.168.248.10; multiple cm-fog: 192.168.248.2-9
-        MESH_IP=$FOG_GS_IP
+        MESH_IP=$FOG_IP_IN_GS_MESH
     fi
     start_mesh-11s
     if [ "$MESH_CLASS" == "gs" ]; then
@@ -68,7 +68,7 @@ elif [[ "$DRONE_TYPE" == "fog" || "$DRONE_TYPE" == "cm-fog" ]]; then
     start_mesh_executor
 elif [[ "$DRONE_TYPE" == "singlemesh" ]]; then
     # singlemesh: 192.168.248.11-254
-    MESH_IP="$RECON_GS_IP"
+    MESH_IP="$RECON_IP_IN_GS_MESH"
     start_mesh-11s
     # mesh class is gs
     gateway_ip="$GS_GW_VIP" # VRRP GS virtual IP for the Default mesh
