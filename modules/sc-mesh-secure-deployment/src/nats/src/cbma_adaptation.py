@@ -54,6 +54,7 @@ class CBMAAdaptation(object):
             Constants.DOWNLOADED_CBMA_UPPER_PATH.value
             + "/upper_certificates/rootCA.crt"
         )
+        self.__upper_cbma_key_path = Constants.GENERATED_CERTS_PATH.value + "/rsa/birth/filebased"
         self.__lower_cbma_controller = None
         self.__upper_cbma_controller = None
         self.__lower_cbma_interfaces: List[Interface] = []
@@ -681,13 +682,12 @@ class CBMAAdaptation(object):
                     )
                     continue
 
-        if False:  # has_upper_certificate:
+        if has_upper_certificate:
             self.logger.debug("Using upper cbma certificates for interfaces")
             cert_dir: str = f"{self.__upper_cbma_certs_path}/MAC/"
-            key: str = f"{self.__upper_cbma_certs_path}/private.key"
-            chain: list[str] = []
-            ca: str = self.__upper_cbma_ca_cert_path
-
+            key: str = f"{self.__upper_cbma_key_path}/private.key"
+            chain: list[str] = [self.__upper_cbma_ca_cert_path]
+            ca: str = ""
         else:  # use birth certs
             self.logger.debug("Using lower cbma certificate as a backup for interface")
 
