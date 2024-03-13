@@ -41,7 +41,7 @@ class CBMAAdaptation(object):
         Constructor
         """
         self.__comms_ctrl: CommsController = comms_ctrl
-        self.logger: logging.Logger = logger.getChild("CBMAControl")
+        self.logger: logging.Logger = logger.getChild("CBMAAdaptation")
         self.__interfaces: List[Interface] = []
         self.__lock = lock
         self.__cbma_set_up = False  # Indicates whether CBMA has been configured
@@ -635,6 +635,7 @@ class CBMAAdaptation(object):
         self.__lower_cbma_controller = CBMAController(
             Constants.CBMA_PORT_LOWER.value, self.LOWER_BATMAN, certificates, False
         )
+
         for interface in self.__lower_cbma_interfaces:
             try:
                 ret = self.__lower_cbma_controller.add_interface(
