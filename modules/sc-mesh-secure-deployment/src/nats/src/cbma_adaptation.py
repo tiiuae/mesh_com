@@ -42,6 +42,7 @@ class CBMAAdaptation(object):
         """
         self.__comms_ctrl: CommsController = comms_ctrl
         self.logger: logging.Logger = logger.getChild("CBMAAdaptation")
+        self.logger.setLevel(logging.INFO)
         self.__interfaces: List[Interface] = []
         self.__lock = lock
         self.__cbma_set_up = False  # Indicates whether CBMA has been configured
@@ -132,7 +133,7 @@ class CBMAAdaptation(object):
             subprocess.check_call(['ip', 'link', 'set', 'dev', interface, 'address', new_mac])
 
         except subprocess.CalledProcessError as e:
-            self.logger.debug(
+            self.logger.error(
                 "Error setting MAC address for %s! Error: %s", interface, e
             )
 
@@ -214,7 +215,7 @@ class CBMAAdaptation(object):
             if interface_indices:
                 ip.link("set", index=interface_indices[0], state="up")
         except Exception as e:
-            self.logger.debug(
+            self.logger.error(
                 "Error bringing up interface %s! Error: %s",
                 interface_name,
                 e,
@@ -260,7 +261,7 @@ class CBMAAdaptation(object):
                 else:
                     ip.link("add", ifname=batman_if, kind="batadv")
         except Exception as e:
-            self.logger.debug(
+            self.logger.error(
                 "Error creating Batman interface %s: %s",
                 batman_if,
                 e,
@@ -268,17 +269,16 @@ class CBMAAdaptation(object):
         finally:
             ip.close()
 
+    def __set_batman_routing_algo(self, algo: str) -> None:
+        try:
+            subprocess.run(["batctl", "routing_algo", algo], check=True)
+        except subprocess.CalledProcessError as e:
+            self.logger.error("Error setting batman routing algo to %s: %s", algo, e)
+
     def __configure_batman_interface(self, batman_if: str) -> None:
         is_upper = False
         if batman_if == self.UPPER_BATMAN:
             is_upper = True
-        try:
-            subprocess.run(
-                ["batctl", "routing_algo", "BATMAN_V"], check=True
-            )
-        except subprocess.CalledProcessError as e:
-            logging.error("Error setting routing algo!: %s", e)
-
         try:
             subprocess.run(
                 ["batctl", "meshif", batman_if, "aggregation", "0"], check=True
@@ -313,7 +313,7 @@ class CBMAAdaptation(object):
                 ["ip", "link", "set", "dev", batman_if, "mtu", mtu_size], check=True
             )
         except subprocess.CalledProcessError as e:
-            logging.error("Error configuring BATMAN interface: %s", e)
+            self.logger.error("Error configuring BATMAN interface: %s", e)
 
     def __destroy_batman_interface(self, mesh_interface: str) -> None:
         # pylint: disable=invalid-name
@@ -344,7 +344,7 @@ class CBMAAdaptation(object):
         certificate_path = f"{cert_path}/MAC/{mac}.crt"
 
         if not os.path.exists(certificate_path):
-            self.logger.debug("Certificate not found: %s", certificate_path)
+            self.logger.warning("Certificate not found: %s", certificate_path)
             return False
 
         self.logger.debug("Certificate found: %s", certificate_path)
@@ -469,6 +469,7 @@ class CBMAAdaptation(object):
                     break
 
         self.__get_interfaces()
+        self.__set_batman_routing_algo("BATMAN_V")
         # if_name MAC and flip the locally administered bit
         self.__create_batman_interface(
             self.LOWER_BATMAN,
@@ -499,7 +500,7 @@ class CBMAAdaptation(object):
         ret, _, _ = self.__comms_ctrl.command.handle_command(cmd, self.__comms_ctrl)
 
         if ret != "OK":
-            self.logger.debug("Error: Unable to bring up the radio interfaces!")
+            self.logger.error("Error: Unable to bring up the radio interfaces!")
             return False
 
         # Radio startup may take long time. Try to ensure
@@ -641,7 +642,7 @@ class CBMAAdaptation(object):
                 ret = self.__lower_cbma_controller.add_interface(
                     interface.interface_name
                 )
-                self.logger.debug(
+                self.logger.info(
                     f"Lower CBMA interfaces added: {interface.interface_name} "
                     f"status: {ret}"
                 )
@@ -661,7 +662,7 @@ class CBMAAdaptation(object):
         upper_cbma_interfaces = []
         has_upper_certificate = 1
 
-        self.logger.debug("Setting up upper CBMA...")
+        self.logger.info("Setting up upper CBMA...")
 
         for interface in self.__upper_cbma_interfaces:
             if interface.interface_name not in upper_cbma_interfaces:
@@ -684,13 +685,13 @@ class CBMAAdaptation(object):
                     continue
 
         if has_upper_certificate:
-            self.logger.debug("Using upper cbma certificates for interfaces")
+            self.logger.info("Using upper cbma certificates for interfaces")
             cert_dir: str = f"{self.__upper_cbma_certs_path}/MAC/"
             key: str = f"{self.__upper_cbma_key_path}/private.key"
             chain: list[str] = [self.__upper_cbma_ca_cert_path]
             ca: str = ""
         else:  # use birth certs
-            self.logger.debug("Using lower cbma certificate as a backup for interface")
+            self.logger.warning("Using lower cbma certificate as a backup for interface")
 
             cert_dir: str = f"{self.__cbma_certs_path}/MAC/"
             key: str = f"{self.__cbma_certs_path}/private.key"
