@@ -227,7 +227,7 @@ class MdmAgent:
         :return: -
         """
         with self.__lock:
-            self.logger.debug("Interface monitor cb: %s", interfaces)
+            #self.logger.debug("Interface monitor cb: %s", interfaces)
             self.__interfaces.clear()
 
             for interface_data in interfaces:
