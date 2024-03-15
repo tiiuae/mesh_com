@@ -1,5 +1,5 @@
 # Given dynamically from CI job.
-FROM --platform=${BUILDPLATFORM:-linux/amd64} ghcr.io/tiiuae/fog-ros-sdk:v3.1.0-${TARGETARCH:-amd64} AS builder
+FROM --platform=${BUILDPLATFORM:-linux/amd64} ghcr.io/tiiuae/fog-ros-sdk:v3.2.0-${TARGETARCH:-amd64} AS builder
 
 # Must be defined another time after "FROM" keyword.
 ARG TARGETARCH
@@ -17,7 +17,7 @@ RUN /packaging/build_colcon_sdk.sh ${TARGETARCH:-amd64}
 #  ▲               runtime ──┐
 #  └── build                 ▼
 
-FROM ghcr.io/tiiuae/fog-ros-baseimage:v3.1.0
+FROM ghcr.io/tiiuae/fog-ros-baseimage:v3.2.0
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 
