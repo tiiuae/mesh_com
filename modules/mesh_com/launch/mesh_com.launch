@@ -5,6 +5,4 @@
   </node>
   <node name="__mesh_exec" pkg="mesh_com" exec="mesh_executor" namespace='$(env DRONE_DEVICE_ID)'>
   </node>
-  <node name="__mesh_exec" pkg="mesh_com" exec="default_mesh_router_select" namespace='$(env DRONE_DEVICE_ID)'>
-  </node>
 </launch>
