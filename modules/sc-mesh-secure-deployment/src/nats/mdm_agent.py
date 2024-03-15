@@ -7,20 +7,23 @@ import asyncio
 import json
 import logging
 import signal
-import subprocess
 import threading
 import os
 import glob
 import base64
 import tarfile
 import shutil
+import socket
+import ssl
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 from typing import Optional
 from typing import List
 
-import OpenSSL.crypto
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519
+
 import requests
 import yaml
 
@@ -29,8 +32,7 @@ from src import comms_controller
 from src import comms_service_discovery
 from src.constants import Constants, ConfigType, StatusType
 from src import comms_config_store
-from src import cbma_controller
-
+from src import cbma_adaptation
 
 # pylint: disable=too-few-public-methods
 class Interface:
@@ -83,7 +85,7 @@ class MdmAgent:
         self.__interfaces: List[Interface] = []
         self.executor = ThreadPoolExecutor(1)
         self.__lock = threading.Lock()
-        self.cbma_ctrl = cbma_controller.CBMAControl(
+        self.cbma_ctrl = cbma_adaptation.CBMAAdaptation(
             self.__comms_ctrl,
             self.logger,
             self.__lock
@@ -152,7 +154,7 @@ class MdmAgent:
         except FileNotFoundError:
             self.__device_id = "default"
 
-    def mdm_server_address_cb(self, address: str, status: bool, **kwargs) -> None:
+    def mdm_server_address_cb(self, address: str, status: bool, **_) -> None:
         """
         Callback for MDM server address
         :param address: MDM server address
@@ -162,6 +164,61 @@ class MdmAgent:
         self.__url = address
         self.mdm_service_available = status
 
+        if self.mdm_service_available:
+            self.__get_server_cert_type()
+
+    def __get_server_cert_type(self):
+        parts = self.__url.split(":")
+        if len(parts) == 2:
+            hostname = parts[0]
+            port = int(parts[1])
+
+            try:
+                # Create a socket connection to the server
+                sock = socket.create_connection((hostname, port))
+
+                # Create an SSL context and load the certificate, key, and CA files
+                context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                context.load_verify_locations(cafile=self.__ca)
+
+                with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+                    peer_cert = ssock.getpeercert(binary_form=True)
+                    cert = x509.load_der_x509_certificate(peer_cert, default_backend())
+                    # Extract key type and signature algorithm
+                    public_key = cert.public_key()
+
+                    # Determine key type
+                    if isinstance(public_key, rsa.RSAPublicKey):
+                        key_type = "rsa"
+                    elif isinstance(public_key, ec.EllipticCurvePublicKey):
+                        key_type = "ecdsa"
+                    elif isinstance(public_key, ed25519.Ed25519PublicKey):
+                        key_type = "eddsa"
+                    else:
+                        key_type = "unknown"
+
+                    self.logger.debug("Server's public key type: %s", key_type)
+
+                    if not key_type == "unknown":
+                        certificate_files = glob.glob(
+                            f"/opt/crypto/{key_type}/birth/filebased/DNS/*.local.crt"
+                        )
+                        if certificate_files:
+                            self.__certificate_file = certificate_files[0]
+                        else:
+                            self.logger.error(
+                                "No certificate file found for %s", key_type
+                            )
+                            return
+                        self.__keyfile = (
+                            f"/opt/crypto/{key_type}/birth/filebased/private.key"
+                        )
+                        self.__ca = f"/opt/mspki/{key_type}/certificate_chain.crt"
+            except Exception as e:
+                self.logger.error(
+                    "Error occurred during certificate type detection: %s", e
+                )
+
     def interface_monitor_cb(self, interfaces) -> None:
         """
         Callback for network interfaces. Service
@@ -170,7 +227,7 @@ class MdmAgent:
         :return: -
         """
         with self.__lock:
-            self.logger.debug("Interface monitor cb: %s", interfaces)
+            #self.logger.debug("Interface monitor cb: %s", interfaces)
             self.__interfaces.clear()
 
             for interface_data in interfaces:
@@ -219,7 +276,7 @@ class MdmAgent:
         """
         self.thread_if_mon.start()
 
-    async def execute(self) -> None:
+    async def execute(self) -> None: # pylint: disable=too-many-branches
         """
         Execute MDM agent
         :return: -
@@ -269,10 +326,9 @@ class MdmAgent:
                             self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
                             == "OK"
                         ):
-                            if self.__is_cbma_feature_enabled():
-                                # Restart CBMA with new certificates
-                                self.__cbma_set_up = self.cbma_ctrl.stop_cbma()
-                                self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
+                            # Restart CBMA with new certificates
+                            self.__cbma_set_up = self.cbma_ctrl.stop_cbma()
+                            self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
                         if (
                             self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
                             == "FAIL"
@@ -291,7 +347,7 @@ class MdmAgent:
                     await self.__loop_run_executor(
                         self.executor, ConfigType.DEBUG_CONFIG
                     )
-            if self.__is_cbma_feature_enabled() and not self.__cbma_set_up:
+            if not self.__cbma_set_up:
                 self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
             await asyncio.sleep(
                 float(min(self.__interval, self.__debug_config_interval))
@@ -323,7 +379,7 @@ class MdmAgent:
 
     def __action_certificates(
         self, response: requests.Response, certificate_type: str
-    ) -> str:
+    ) -> str: # pylint: disable=too-many-branches, too-many-statements
         """
         Action certificates
         :param response: HTTP response
@@ -367,9 +423,13 @@ class MdmAgent:
                                 "r:bz2",
                             ) as tar:
                                 for member in tar.getmembers():
+                                    # Skip empty folders
+                                    if member.isdir() and not ".." in member.name:
+                                        continue
+
                                     # Only extract regular files that don't contain relative paths
                                     if not member.isfile() or ".." in member.name:
-                                        raise tarfile.TarError("Invalid/Malicious file in archive")
+                                        raise tarfile.TarError(f"Invalid/Malicious file in archive: {member.name}")
 
                                     # Construct the full path where the file would be extracted
                                     file_path = os.path.join(cert_path, member.name)
@@ -522,7 +582,7 @@ class MdmAgent:
 
     def __handle_received_config(
         self, response: requests.Response, config: ConfigType
-    ) -> (str, str):
+    ) -> str:
         """
         Handle received config
         :param response: HTTP response
@@ -533,6 +593,8 @@ class MdmAgent:
             f"HTTP Request Response: {response.text.strip()} {str(response.status_code).strip()}"
         )
 
+        ret = "FAIL"
+
         if (
             self.__mesh_conf_request_processed
             and config.value == ConfigType.DEBUG_CONFIG.value
@@ -540,17 +602,17 @@ class MdmAgent:
             self.__previous_debug_config = response.text.strip()
             self.__config_store.store(ConfigType.DEBUG_CONFIG.value, self.__previous_debug_config)
             self.__debug_config_interval = Constants.OK_POLLING_TIME_SECONDS.value
-            return "OK"
+            ret = "OK"
         else:
             # radio configuration actions
             if config.value == ConfigType.MESH_CONFIG.value:
                 ret = self.__action_radio_configuration(response)
-                return ret
 
             # feature.yaml actions
-            if config.value == ConfigType.FEATURES.value:
+            elif config.value == ConfigType.FEATURES.value:
                 ret = self.__action_feature_yaml(response)
-                return ret
+
+        return ret
 
     def download_certificate_bundle(
         self, certificate_type: str = ""
@@ -642,20 +704,20 @@ class MdmAgent:
             )
         return requests.Response()
 
-    def __is_cbma_feature_enabled(self) -> bool:
-        """
-        Check if CBMA feature is enabled
-        :return: True if enabled, False otherwise
-        """
-        with open(Constants.YAML_FILE.value, "r", encoding="utf-8") as stream:
-            try:
-                features = yaml.safe_load(stream)
-                return bool(features["CBMA"])
-            except (yaml.YAMLError, KeyError, FileNotFoundError) as exc:
-                self.logger.error(
-                    f"CBMA disabled as feature configuration not found: {exc}"
-                )
-            return False
+    # def __is_cbma_feature_enabled(self) -> bool:
+    #     """
+    #     Check if CBMA feature is enabled
+    #     :return: True if enabled, False otherwise
+    #     """
+    #     with open(Constants.YAML_FILE.value, "r", encoding="utf-8") as stream:
+    #         try:
+    #             features = yaml.safe_load(stream)
+    #             return bool(features["CBMA"])
+    #         except (yaml.YAMLError, KeyError, FileNotFoundError) as exc:
+    #             self.logger.error(
+    #                 f"CBMA disabled as feature configuration not found: {exc}"
+    #             )
+    #         return False
 
     def __validate_response(
         self, response: requests.Response, config: ConfigType
@@ -703,7 +765,7 @@ class MdmAgent:
 
         return status
 
-    async def __loop_run_executor(self, executor, config: ConfigType) -> None:
+    async def __loop_run_executor(self, executor, config: ConfigType) -> None: # pylint: disable=too-many-branches
         """
         Loop run executor
         :param executor: executor
@@ -729,7 +791,7 @@ class MdmAgent:
                 self.logger.debug(
                     "Validation status: %s", self.__status[status_type]
                 )
-            return "FAIL"
+            return
 
         if self.__mesh_conf_request_processed:
             if (

@@ -163,8 +163,10 @@ class CommsServiceMonitor:
                 if server:
                     server = server.rstrip(".")
 
-                kwargs = {"address": f'{server}:{info.port}',"service_name": name,"ipv4_addresses": info.addresses,
-                          "ipv6_addresses": info.addresses,"port": info.port,"status": service_available}
+                kwargs = {"address": f'{server}:{info.port}',"service_name": name,
+                          "ipv4_addresses": info._ipv4_addresses,
+                          "ipv6_addresses": info._ipv6_addresses,
+                          "port": info.port,"status": service_available}
 
                 self.service_callback(**kwargs)
 

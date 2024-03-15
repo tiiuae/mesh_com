@@ -1,29 +1,31 @@
 """
-CBMA Controller
+CBMA Adaptation
 """
-from os import path
+import os
 import logging
 import subprocess
 import threading
 import time
-from multiprocessing import Process
-from typing import List, Dict
+from typing import List, Union
 from copy import deepcopy
 import json
+import random
 import fnmatch
 import re
-from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
 import ipaddress
+from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
 
 from src import cbma_paths
 from src.comms_controller import CommsController
 from src.constants import Constants
 from mdm_agent import Interface
 
-from cbma import setup_cbma  # type: ignore[import-not-found]
+from controller import CBMAController
+from models.certificates import CBMACertificates
 
 
-class CBMAControl:
+# pylint: disable=broad-exception-caught
+class CBMAAdaptation(object):
     """
     CBMA Control
     """
@@ -39,7 +41,8 @@ class CBMAControl:
         Constructor
         """
         self.__comms_ctrl: CommsController = comms_ctrl
-        self.logger: logging.Logger = logger.getChild("CBMAControl")
+        self.logger: logging.Logger = logger.getChild("CBMAAdaptation")
+        self.logger.setLevel(logging.INFO)
         self.__interfaces: List[Interface] = []
         self.__lock = lock
         self.__cbma_set_up = False  # Indicates whether CBMA has been configured
@@ -50,10 +53,11 @@ class CBMAControl:
         )
         self.__upper_cbma_ca_cert_path = (
             Constants.DOWNLOADED_CBMA_UPPER_PATH.value
-            + "/mspki/rsa/certificate_chain.crt"
+            + "/upper_certificates/rootCA.crt"
         )
-        self.__lower_cbma_processes: Dict[str, Process] = {}
-        self.__upper_cbma_processes: Dict[str, Process] = {}
+        self.__upper_cbma_key_path = Constants.GENERATED_CERTS_PATH.value + "/rsa/birth/filebased"
+        self.__lower_cbma_controller = None
+        self.__upper_cbma_controller = None
         self.__lower_cbma_interfaces: List[Interface] = []
         self.__upper_cbma_interfaces: List[Interface] = []
 
@@ -76,7 +80,7 @@ class CBMAControl:
         self.__IPV6_WHITE_PREFIX: str = "fdbb:1ef7:9d6f:e05d"
         self.__IPV6_RED_PREFIX: str = "fdd8:84dc:fe30:7bf2"
 
-    def __get_interfaces(self):
+    def __get_interfaces(self) -> None:
         interfaces = []
         ipr = IPRoute()
         for link in ipr.get_links():
@@ -106,7 +110,7 @@ class CBMAControl:
             interfaces,
         )
 
-    def __create_bridge(self, bridge_name):
+    def __create_bridge(self, bridge_name) -> None:
         ip = IPRoute()
         try:
             bridge_indices = ip.link_lookup(ifname=bridge_name)
@@ -114,7 +118,7 @@ class CBMAControl:
                 ip.link("add", ifname=bridge_name, kind="bridge")
 
         except Exception as e:
-            self.logger.debug(
+            self.logger.exception(
                 "Error creating bridge %s! Error: %s",
                 bridge_name,
                 e,
@@ -123,7 +127,17 @@ class CBMAControl:
         finally:
             ip.close()
 
-    def __set_bridge_ip(self, bridge_name, mesh_vif_name):
+    def __set_interface_mac(self, interface, new_mac):
+        try:
+            # Change the MAC address of the bridge interface
+            subprocess.check_call(['ip', 'link', 'set', 'dev', interface, 'address', new_mac])
+
+        except subprocess.CalledProcessError as e:
+            self.logger.error(
+                "Error setting MAC address for %s! Error: %s", interface, e
+            )
+
+    def __set_bridge_ip(self, bridge_name: str, mesh_vif_name: str) -> None:
         ip = IPRoute()
         try:
             # Get the MAC address of the mesh interface
@@ -150,7 +164,9 @@ class CBMAControl:
         finally:
             ip.close()
 
-    def __add_interface_to_bridge(self, bridge_name, interface_to_add):
+    def __add_interface_to_bridge(
+        self, bridge_name: str, interface_to_add: str
+    ) -> None:
         # Create an IPRoute object
         ip = IPRoute()
 
@@ -191,7 +207,7 @@ class CBMAControl:
             # Close the IPRoute object
             ip.close()
 
-    def __set_interface_up(self, interface_name):
+    def __set_interface_up(self, interface_name: str) -> None:
         ip = IPRoute()
         try:
             # Bring the interface ip
@@ -199,7 +215,7 @@ class CBMAControl:
             if interface_indices:
                 ip.link("set", index=interface_indices[0], state="up")
         except Exception as e:
-            self.logger.debug(
+            self.logger.error(
                 "Error bringing up interface %s! Error: %s",
                 interface_name,
                 e,
@@ -207,70 +223,7 @@ class CBMAControl:
         finally:
             ip.close()
 
-    @staticmethod
-    def __delete_ebtables_rules():
-        command_ebtables = ["ebtables", "-t", "nat", "-L", "OUTPUT"]
-        command_sed = ["sed", "-n", "/OUTPUT/,/^$/{/^--/p}"]
-        command_xargs = ["xargs", "ebtables", "-t", "nat", "-D", "OUTPUT"]
-
-        proc_ebtables = subprocess.Popen(command_ebtables, stdout=subprocess.PIPE)
-        proc_sed = subprocess.Popen(
-            command_sed, stdin=proc_ebtables.stdout, stdout=subprocess.PIPE
-        )
-        proc_xargs = subprocess.Popen(command_xargs, stdin=proc_sed.stdout)
-        proc_xargs.wait()
-
-        subprocess.run(
-            [
-                "ebtables",
-                "--delete",
-                "FORWARD",
-                "--logical-in",
-                "br-upper",
-                "--jump",
-                "ACCEPT",
-            ],
-            check=False,
-        )
-        subprocess.run(
-            [
-                "ebtables",
-                "--delete",
-                "FORWARD",
-                "--logical-out",
-                "br-upper",
-                "--jump",
-                "ACCEPT",
-            ],
-            check=False,
-        )
-
-    @staticmethod
-    def __delete_macsec_links():
-        # Define the command as a list of arguments
-        command_macsec = ["ip", "macsec", "show"]
-        command_grep = ["grep", ": protect on validate"]
-        command_awk1 = ["awk", "-F:", "{print $2}"]
-        command_awk2 = ["awk", "{print $1}"]
-        command_xargs = ["xargs", "-I", "{}", "ip", "link", "delete", "{}"]
-
-        # Run the commands using subprocess and connect their pipes
-        proc_macsec = subprocess.Popen(command_macsec, stdout=subprocess.PIPE)
-        proc_grep = subprocess.Popen(
-            command_grep, stdin=proc_macsec.stdout, stdout=subprocess.PIPE
-        )
-        proc_awk1 = subprocess.Popen(
-            command_awk1, stdin=proc_grep.stdout, stdout=subprocess.PIPE
-        )
-        proc_awk2 = subprocess.Popen(
-            command_awk2, stdin=proc_awk1.stdout, stdout=subprocess.PIPE
-        )
-        proc_xargs = subprocess.Popen(command_xargs, stdin=proc_awk2.stdout)
-
-        # Wait for the xargs process to finish
-        proc_xargs.wait()
-
-    def __shutdown_interface(self, interface_name):
+    def __shutdown_interface(self, interface_name: str) -> None:
         # pylint: disable=invalid-name
         ip = IPRoute()
         # pylint: enable=invalid-name
@@ -285,29 +238,30 @@ class CBMAControl:
         finally:
             ip.close()
 
-    def __get_mac_addr(self, interface_name):
+    def __get_mac_addr(self, interface_name: str) -> Union[None, str]:
         for interface in self.__interfaces:
             if interface.interface_name == interface_name:
                 return interface.mac_address
         return None  # Interface not found in the list
 
-    def __create_batman_interface(self, batman_if, if_name):
+    def __create_batman_interface(self, batman_if, mac_addr=None) -> None:
         ip = IPRoute()
         try:
-            mac = self.__get_mac_addr(if_name)
             # Check if the interface already exists
             interface_indices = ip.link_lookup(ifname=batman_if)
             if not interface_indices:
                 self.logger.debug(
-                    "Create interface %s using %s interface's MAC: %s.",
+                    "Create interface %s, mac_addr: %s",
                     batman_if,
-                    if_name,
-                    mac,
+                    mac_addr if mac_addr is not None else "random",
                 )
                 # If the interface doesn't exist, create it as a Batman interface
-                ip.link("add", ifname=batman_if, kind="batadv", address=mac)
+                if mac_addr is not None:
+                    ip.link("add", ifname=batman_if, kind="batadv", address=mac_addr)
+                else:
+                    ip.link("add", ifname=batman_if, kind="batadv")
         except Exception as e:
-            self.logger.debug(
+            self.logger.error(
                 "Error creating Batman interface %s: %s",
                 batman_if,
                 e,
@@ -315,7 +269,53 @@ class CBMAControl:
         finally:
             ip.close()
 
-    def __destroy_batman_interface(self, mesh_interface):
+    def __set_batman_routing_algo(self, algo: str) -> None:
+        try:
+            subprocess.run(["batctl", "routing_algo", algo], check=True)
+        except subprocess.CalledProcessError as e:
+            self.logger.error("Error setting batman routing algo to %s: %s", algo, e)
+
+    def __configure_batman_interface(self, batman_if: str) -> None:
+        is_upper = False
+        if batman_if == self.UPPER_BATMAN:
+            is_upper = True
+        try:
+            subprocess.run(
+                ["batctl", "meshif", batman_if, "aggregation", "0"], check=True
+            )
+            subprocess.run(
+                ["batctl", "meshif", batman_if, "bridge_loop_avoidance", "1"],
+                check=True,
+            )
+
+            arp_table_setting = "1" if is_upper else "0"
+            subprocess.run(
+                [
+                    "batctl",
+                    "meshif",
+                    batman_if,
+                    "distributed_arp_table",
+                    arp_table_setting,
+                ],
+                check=True,
+            )
+
+            subprocess.run(
+                ["batctl", "meshif", batman_if, "fragmentation", "1"], check=True
+            )
+
+            subprocess.run(
+                ["batctl", "meshif", batman_if, "orig_interval", "5000"], check=True
+            )
+
+            mtu_size = "1500" if is_upper else "1546"
+            subprocess.run(
+                ["ip", "link", "set", "dev", batman_if, "mtu", mtu_size], check=True
+            )
+        except subprocess.CalledProcessError as e:
+            self.logger.error("Error configuring BATMAN interface: %s", e)
+
+    def __destroy_batman_interface(self, mesh_interface: str) -> None:
         # pylint: disable=invalid-name
         ip = IPRoute()
         # pylint: enable=invalid-name
@@ -327,7 +327,7 @@ class CBMAControl:
         finally:
             ip.close()
 
-    def __shutdown_and_delete_bridge(self, bridge_name):
+    def __shutdown_and_delete_bridge(self, bridge_name: str) -> None:
         ip = IPRoute()
         try:
             index = ip.link_lookup(ifname=bridge_name)[0]
@@ -340,87 +340,17 @@ class CBMAControl:
         finally:
             ip.close()
 
-    def __cleanup_cbma(self):
-        self.__shutdown_interface(self.LOWER_BATMAN)
-        self.__shutdown_interface(self.UPPER_BATMAN)
-        self.__delete_ebtables_rules()
-        self.__delete_macsec_links()
-        self.__destroy_batman_interface(self.LOWER_BATMAN)
-        self.__destroy_batman_interface(self.UPPER_BATMAN)
-        # HACK: How can we know that "br-upper" even exists and who owns it?
-        self.__shutdown_and_delete_bridge("br-upper")
-        self.__shutdown_and_delete_bridge(self.BR_NAME)
-
-    def stop_cbma(self):
-        """
-        Stops CBMA by terminating CBMA processes. Also
-        destroys batman and bridge interfaces.
-        """
-        if not self.__cbma_set_up:
-            return
-        try:
-            self.logger.debug("Stopping CBMA...")
-
-            for if_name, process in self.__lower_cbma_processes.items():
-                try:
-                    self.logger.debug(
-                        "Stopping lower CBMA process %s for interface %s",
-                        process,
-                        if_name,
-                    )
-                    if process.is_alive():
-                        process.terminate()
-                except Exception as e:
-                    self.logger.error(f"Terminating lower CBMA process error: {e}")
-
-            for process in self.__lower_cbma_processes.values():
-                try:
-                    if process.is_alive():
-                        process.join(timeout=1.0)
-                        process.kill()
-                except Exception as e:
-                    self.logger.error(f"Killing lower CBMA process error: {e}")
-
-            for if_name, process in self.__upper_cbma_processes.items():
-                try:
-                    self.logger.debug(
-                        "Stopping upper CBMA process %s for interface %s",
-                        process,
-                        if_name,
-                    )
-                    if process.is_alive():
-                        process.terminate()
-                except Exception as e:
-                    self.logger.error(f"Terminating upper CBMA process error: {e}")
-
-            for process in self.__upper_cbma_processes.values():
-                try:
-                    if process.is_alive():
-                        process.join(timeout=1.0)
-                        process.kill()
-                except Exception as e:
-                    self.logger.error(f"Killing upper CBMA process error: {e}")
-            self.logger.debug("CBMA processes terminated, continue cleanup...")
-            self.__cleanup_cbma()
-            self.logger.debug("CBMA cleanup finished")
-
-        except Exception as e:
-            self.logger.error(f"Stop CBMA error: {e}")
-        finally:
-            self.__cbma_set_up = False
-        return False
-
-    def __has_certificate(self, cert_path, mac) -> bool:
+    def __has_certificate(self, cert_path: str, mac: str) -> bool:
         certificate_path = f"{cert_path}/MAC/{mac}.crt"
 
-        if not path.exists(certificate_path):
-            self.logger.debug("Certificate not found: %s", certificate_path)
+        if not os.path.exists(certificate_path):
+            self.logger.warning("Certificate not found: %s", certificate_path)
             return False
 
         self.logger.debug("Certificate found: %s", certificate_path)
         return True
 
-    def __update_cbma_interface_lists(self):
+    def __update_cbma_interface_lists(self) -> None:
         # Initially all the interfaces with certificates should use lower CBMA
         self.__lower_cbma_interfaces.clear()
         with self.__lock:
@@ -471,7 +401,8 @@ class CBMAControl:
             if interface in self.__lower_cbma_interfaces:
                 self.__lower_cbma_interfaces.remove(interface)
 
-    def __wait_for_ap(self, timeout=4):
+    @staticmethod
+    def __wait_for_ap(timeout: int = 4) -> bool:
         start_time = time.time()
         while True:
             try:
@@ -490,7 +421,7 @@ class CBMAControl:
             except subprocess.CalledProcessError:
                 return False
 
-    def __wait_for_interface(self, if_name, timeout=3):
+    def __wait_for_interface(self, if_name, timeout: int = 3) -> bool:
         self.logger.debug("__wait_for_interface %s", if_name)
         start_time = time.time()
         self.__get_interfaces()
@@ -510,7 +441,25 @@ class CBMAControl:
             time.sleep(1)  # Sleep for 1 second before checking again
             self.__get_interfaces()
 
-    def __init_batman_and_bridge(self):
+    def __create_mac(self, randomized: bool = False, interface_mac: str = "") -> str:
+        """
+        Create a random MAC address or flip the locally administered bit of the given MAC address
+        :return: The random MAC address
+        """
+        if randomized:
+            mac = [random.randint(0x00, 0xff) for _ in range(6)]  # Generate 6 random bytes
+            mac[0] &= 0xfc  # Clear multicast and locally administered bits
+            mac[0] |= 0x02  # Set the locally administered bit
+            return ':'.join(['%02x' % byte for byte in mac])
+        else:
+            # Split MAC address into octets and flip the locally administered bit
+            octets = interface_mac.split(':')
+            first_octet = int(octets[0], 16)
+            flipped_first_octet = first_octet ^ 2
+
+            return f"{flipped_first_octet}:{':'.join(octets[1:])}"
+
+    def __init_batman_and_bridge(self) -> None:
         if_name = self.__comms_ctrl.settings.mesh_vif[0]
         if if_name.startswith("halow"):
             if_pattern = "wlp*s0"
@@ -520,16 +469,25 @@ class CBMAControl:
                     break
 
         self.__get_interfaces()
-        self.__create_batman_interface(self.LOWER_BATMAN, if_name)
-        self.__create_batman_interface(self.UPPER_BATMAN, if_name)
+        self.__set_batman_routing_algo("BATMAN_V")
+        # if_name MAC and flip the locally administered bit
+        self.__create_batman_interface(
+            self.LOWER_BATMAN,
+            self.__create_mac(False, self.__get_mac_addr(if_name))
+        )
+        self.__configure_batman_interface(self.LOWER_BATMAN)
+        self.__create_batman_interface(self.UPPER_BATMAN)
+        self.__configure_batman_interface(self.UPPER_BATMAN)
         self.__set_interface_up(self.LOWER_BATMAN)
         self.__set_interface_up(self.UPPER_BATMAN)
         self.__create_bridge(self.BR_NAME)
-        self.__set_bridge_ip(self.BR_NAME, if_name)
+
+        # Set random MAC address for the bridge
+        self.__set_interface_mac(self.BR_NAME, self.__create_mac(True))
         self.__wait_for_interface(self.LOWER_BATMAN)
         self.__wait_for_interface(self.UPPER_BATMAN)
 
-    def __setup_radios(self):
+    def __setup_radios(self) -> bool:
         # Create command to start all radios
         cmd = json.dumps(
             {
@@ -542,7 +500,7 @@ class CBMAControl:
         ret, _, _ = self.__comms_ctrl.command.handle_command(cmd, self.__comms_ctrl)
 
         if ret != "OK":
-            self.logger.debug("Error: Unable to bring up the radio interfaces!")
+            self.logger.error("Error: Unable to bring up the radio interfaces!")
             return False
 
         # Radio startup may take long time. Try to ensure
@@ -560,7 +518,7 @@ class CBMAControl:
 
         return True
 
-    def setup_cbma(self):
+    def setup_cbma(self) -> None:
         """
         Sets up both upper and lower CBMA.
         """
@@ -568,11 +526,13 @@ class CBMAControl:
         self.__init_batman_and_bridge()
 
         self.__update_cbma_interface_lists()
-        self.__setup_lower_cbma()
-        self.__setup_upper_cbma()
 
         # Set radios on
         self.__setup_radios()
+
+        # setup cbma
+        self.__setup_lower_cbma()
+        self.__setup_upper_cbma()
 
         # Add interfaces to the bridge
         for interface in self.__red_interfaces:
@@ -589,7 +549,7 @@ class CBMAControl:
         self.__cbma_set_up = True
         return True
 
-    def __is_valid_ipv6_local(self, address: (str, int))-> bool:
+    def __is_valid_ipv6_local(self, address: tuple[str, int]) -> bool:
         """
         Check if the address is a valid IPv6 link-local address
 
@@ -600,15 +560,17 @@ class CBMAControl:
         try:
 
             ip = ipaddress.ip_address(address[0])
-            return (ip.version == 6 and
-                    ip.compressed.startswith("fe80:") and
-                    address[1] == 64 and
-                    ip.is_link_local)
+            return (
+                ip.version == 6
+                and ip.compressed.startswith("fe80:")
+                and address[1] == 64
+                and ip.is_link_local
+            )
         except Exception as e:
             self.logger.error(e)
             return False
 
-    def __add_global_ipv6_address(self, interface_name: str, new_prefix: str)-> None:
+    def __add_global_ipv6_address(self, interface_name: str, new_prefix: str) -> None:
         """
         Modify the IPv6 address of the specified interface
 
@@ -625,109 +587,175 @@ class CBMAControl:
                 addresses = ip.get_addr(index=index)
 
                 for addr in addresses:
-                    ip_address = addr.get_attrs('IFA_ADDRESS')[0]
-                    prefix_length = int(addr['prefixlen'])
+                    ip_address = addr.get_attrs("IFA_ADDRESS")[0]
+                    prefix_length = int(addr["prefixlen"])
                     if self.__is_valid_ipv6_local((ip_address, prefix_length)):
                         link_local_address = ip_address
                         break
 
                 if not link_local_address:
                     self.logger.debug(
-                        f"Link-local IPv6 address not found for interface {interface_name}")
+                        f"Link-local IPv6 address not found for interface {interface_name}"
+                    )
                     return
 
                 # Modify the prefix
-                new_address = new_prefix + link_local_address[link_local_address.find("::") + 1:]
+                new_address = (
+                    new_prefix + link_local_address[link_local_address.find("::") + 1 :]
+                )
                 self.logger.debug(
-                    f"Current {interface_name} Local IPv6 address: {link_local_address}")
+                    f"Current {interface_name} Local IPv6 address: {link_local_address}"
+                )
                 self.logger.debug(
-                    f"New {interface_name} Global IPv6 address: {new_address}")
+                    f"New {interface_name} Global IPv6 address: {new_address}"
+                )
 
                 # Add the modified IPv6 address to the interface
-                ip.addr('add', index=index, address=new_address, prefixlen=64)
+                ip.addr("add", index=index, address=new_address, prefixlen=64)
                 ip.close()
 
         except Exception as e:
             self.logger.error(f"Error: {e}")
 
-    def __setup_lower_cbma(self):
+    def __setup_lower_cbma(self) -> None:
+        """
+        Sets up lower CBMA.
+        :return: None
+        """
+        self.logger.debug("Setting up lower CBMA...")
+        cert_dir = f"{self.__cbma_certs_path}/MAC/"
+        key = f"{self.__cbma_certs_path}/private.key"
+        chain = [
+            "/opt/mspki/ecdsa/security_officers/filebased.crt",
+            "/opt/mspki/ecdsa/intermediate.crt",
+            "/opt/mspki/ecdsa/root.crt",
+        ]
+
+        certificates = CBMACertificates(cert_dir, key, chain)
+
+        self.__lower_cbma_controller = CBMAController(
+            Constants.CBMA_PORT_LOWER.value, self.LOWER_BATMAN, certificates, False
+        )
+
         for interface in self.__lower_cbma_interfaces:
-            interface_name = interface.interface_name.lower()
             try:
-                index = self.__comms_ctrl.settings.mesh_vif.index(interface_name)
-                wpa_supplicant_ctrl_path = (
-                    f"/var/run/wpa_supplicant_id{index}/{interface_name}"
+                ret = self.__lower_cbma_controller.add_interface(
+                    interface.interface_name
                 )
-            except ValueError:
-                wpa_supplicant_ctrl_path = None
+                self.logger.info(
+                    f"Lower CBMA interfaces added: {interface.interface_name} "
+                    f"status: {ret}"
+                )
+            except Exception as e:
+                self.logger.exception(
+                    "Error adding CBMA interface %s! Error: %s",
+                    interface.interface_name,
+                    e,
+                )
 
-            self.logger.debug(
-                "Setup lower CBMA for interface: %s, wpa_supplicant_ctrl_path: %s",
-                interface_name,
-                wpa_supplicant_ctrl_path,
-            )
-            process = setup_cbma.cbma(
-                "lower",
-                interface_name,
-                Constants.CBMA_PORT_LOWER.value,
-                self.LOWER_BATMAN,
-                self.__cbma_certs_path,
-                self.__cbma_ca_cert_path,
-                "off",
-                wpa_supplicant_ctrl_path,
-            )
-            self.__lower_cbma_processes[interface_name] = process
+    def __setup_upper_cbma(self) -> None:
+        """
+        Sets up upper CBMA.
+        :return: None
+        """
 
-    def __setup_upper_cbma(self):
+        upper_cbma_interfaces = []
+        has_upper_certificate = 1
+
+        self.logger.info("Setting up upper CBMA...")
+
         for interface in self.__upper_cbma_interfaces:
-            interface_name = interface.interface_name.lower()
-            try:
-                index = self.__comms_ctrl.settings.mesh_vif.index(interface_name)
-                wpa_supplicant_ctrl_path = (
-                    f"/var/run/wpa_supplicant_id{index}/{interface_name}"
-                )
-            except ValueError:
-                wpa_supplicant_ctrl_path = None
+            if interface.interface_name not in upper_cbma_interfaces:
+                upper_cbma_interfaces.append(interface.interface_name)
 
             if self.__has_certificate(
                 self.__upper_cbma_certs_path, interface.mac_address
             ):
-                self.logger.debug(
-                    "Using upper cbma certificate for interface %s", interface_name
-                )
-                cbma_certs_path = self.__upper_cbma_certs_path
-                cbma_ca_cert_path = self.__upper_cbma_ca_cert_path
+                has_upper_certificate = has_upper_certificate and 1
             else:
                 # TODO: Temporary backup solution to use lower CBMA certificates
                 if self.__has_certificate(
                     self.__cbma_certs_path, interface.mac_address
                 ):
-                    self.logger.debug(
-                        "Using lower cbma certificate as a backup for interface %s",
-                        interface_name,
-                    )
-                    cbma_certs_path = self.__cbma_certs_path
-                    cbma_ca_cert_path = self.__cbma_ca_cert_path
+                    has_upper_certificate = has_upper_certificate and 0
                 else:
-                    self.logger.debug(
-                        "No cbma certificate for interface %s", interface_name
+                    self.logger.warning(
+                        "No cbma certificate for interface %s", interface.name
                     )
                     continue
 
-            self.logger.debug(
-                "Setup upper CBMA for interface: %s, wpa_supplicant_ctrl_path: %s",
-                interface_name,
-                wpa_supplicant_ctrl_path,
-            )
+        if has_upper_certificate:
+            self.logger.info("Using upper cbma certificates for interfaces")
+            cert_dir: str = f"{self.__upper_cbma_certs_path}/MAC/"
+            key: str = f"{self.__upper_cbma_key_path}/private.key"
+            chain: list[str] = [self.__upper_cbma_ca_cert_path]
+            ca: str = ""
+        else:  # use birth certs
+            self.logger.warning("Using lower cbma certificate as a backup for interface")
 
-            process = setup_cbma.cbma(
-                "upper",
-                interface_name,
-                Constants.CBMA_PORT_UPPER.value,
-                self.UPPER_BATMAN,
-                cbma_certs_path,
-                cbma_ca_cert_path,
-                "off",
-                wpa_supplicant_ctrl_path,
-            )
-            self.__upper_cbma_processes[interface_name] = process
+            cert_dir: str = f"{self.__cbma_certs_path}/MAC/"
+            key: str = f"{self.__cbma_certs_path}/private.key"
+            chain: list[str] = [
+                "/opt/mspki/ecdsa/security_officers/filebased.crt",
+                "/opt/mspki/ecdsa/intermediate.crt",
+                "/opt/mspki/ecdsa/root.crt",
+            ]
+            ca: str = ""
+
+        certificates = CBMACertificates(cert_dir, key, chain, ca)
+        self.__upper_cbma_controller = CBMAController(
+            Constants.CBMA_PORT_UPPER.value, self.UPPER_BATMAN, certificates, True, True
+        )
+
+        for _interface in self.__upper_cbma_interfaces:
+            try:
+                ret = self.__upper_cbma_controller.add_interface(
+                    _interface.interface_name
+                )
+                self.logger.debug(
+                    f"Upper CBMA interfaces added: {_interface.interface_name} "
+                    f"status: {ret}"
+                )
+            except Exception as e:
+                self.logger.exception(
+                    "Error adding upper CBMA interface %s! Error: %s",
+                    _interface.interface_name,
+                    e,
+                )
+
+    def __cleanup_cbma(self) -> None:
+        self.__shutdown_interface(self.LOWER_BATMAN)
+        self.__shutdown_interface(self.UPPER_BATMAN)
+
+        # HACK: remove
+        # self.__delete_ebtables_rules()
+        # self.__delete_macsec_links()
+
+        self.__destroy_batman_interface(self.LOWER_BATMAN)
+        self.__destroy_batman_interface(self.UPPER_BATMAN)
+        # HACK: How can we know that "br-upper" even exists and who owns it?
+        self.__shutdown_and_delete_bridge("br-upper")
+        self.__shutdown_and_delete_bridge(self.BR_NAME)
+
+    def stop_cbma(self) -> bool:
+        """
+        Stops CBMA by terminating CBMA processes. Also
+        destroys batman and bridge interfaces.
+        """
+        if not self.__cbma_set_up:
+            return
+        try:
+            self.logger.debug("Stopping CBMA...")
+
+            self.__lower_cbma_controller.stop()
+            self.__upper_cbma_controller.stop()
+
+            self.logger.debug("CBMA processes terminated, continue cleanup...")
+            self.__cleanup_cbma()
+            self.logger.debug("CBMA cleanup finished")
+
+        except Exception as e:
+            self.logger.error(f"Stop CBMA error: {e}")
+        finally:
+            self.__cbma_set_up = False
+        return False

@@ -74,4 +74,4 @@ class SecMessageHandler:
                 pass
             except Exception as e:
                 self.logger.error("Error receiving message.", exc_info=True)
-                break
+                pass

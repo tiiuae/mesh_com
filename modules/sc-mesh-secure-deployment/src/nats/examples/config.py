@@ -8,7 +8,7 @@ except ImportError:
     print("No identity found!!!!!!!!!!!!!!!!!!!!!!!!")
     print("Please run _cli_command_get_identity.py to get the identity (creates identity.py)")
 
-MODULE_IP = "10.10.20.2"  # or 192.168.1.x - brlan ip address
+MODULE_IP = "127.0.0.1"  # or 192.168.1.x - brlan ip address
 MODULE_PORT = "4222"
 
 # IPv6 connection example

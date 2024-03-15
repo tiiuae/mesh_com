@@ -23,7 +23,10 @@ class AuthServer:
         self.port = port
         self.CERT_PATH = cert_path
         # FIXME: temporary hard coding for key path
-        self.KEY_PATH = "/opt/crypto/ecdsa/birth/filebased"
+        if "/crypto/ecdsa" in self.CERT_PATH:
+            self.KEY_PATH = "/opt/crypto/ecdsa/birth/filebased"
+        elif "/crypto/rsa" in self.CERT_PATH:
+            self.KEY_PATH = "/opt/crypto/rsa/birth/filebased"
         self.ca = ca_path
         self.interface = interface
         self.mymac = get_mac_addr(self.interface)

@@ -504,6 +504,7 @@ class Command:  # pylint: disable=too-many-instance-attributes
         """
 
         identity_dict = {}
+        nats_ip = "NA"
         try:
             files = ConfigFiles()
             for status in self.comms_status:
@@ -512,11 +513,15 @@ class Command:  # pylint: disable=too-many-instance-attributes
             with open(files.IDENTITY, "rb") as file:
                 identity = file.read()
             identity_dict["identity"] = identity.decode().strip()
-            # todo hardcoded interface name
+
             # pylint: disable=c-extension-no-member
-            nats_ip = ni.ifaddresses("br-lan")[ni.AF_INET][0]["addr"]
-            # pylint: enable=c-extension-no-member
-            identity_dict["nats_url"] = f"nats://{nats_ip}:4222"
+            ips = ni.ifaddresses("br-lan")
+            for item in ips[ni.AF_INET6]:
+                if item["addr"].startswith("fd"):
+                    nats_ip = item["addr"]
+                    break
+
+            identity_dict["nats_url"] = f"nats://[{nats_ip}]:4222"
             identity_dict[
                 "interfaces"
             ] = CommsInterfaces().get_wireless_device_info()  # type: ignore
