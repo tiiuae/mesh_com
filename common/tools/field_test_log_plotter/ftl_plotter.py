@@ -400,17 +400,6 @@ class FieldTestLogPlotter:
             self.df['RX throughput [Bits/s]'] = self.df['RX throughput [Bits/s]'] / tp_divider
             self.df['TX throughput [Bits/s]'] = self.df['TX throughput [Bits/s]'] / tp_divider
 
-        tp_divider = 1
-        # Convert throughput values
-        if self.throughput_units == 'Kb':
-            tp_divider = 1000
-        elif self.throughput_units == 'Mb':
-            tp_divider = 1000000
-        if tp_divider > 1:
-            # Converting only actual values but not changing column name.
-            self.df['RX throughput [Bits/s]'] = self.df['RX throughput [Bits/s]'] / tp_divider
-            self.df['TX throughput [Bits/s]'] = self.df['TX throughput [Bits/s]'] / tp_divider
-
     def plot_temp_voltage_and_current(self):
         """
         Plots temperatures, voltages and current as a function of time.
