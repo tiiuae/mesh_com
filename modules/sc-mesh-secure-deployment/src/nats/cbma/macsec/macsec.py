@@ -107,8 +107,8 @@ class MACsec(object):
             if not run_script_bug_workaround_retcode(create_str.split()):
                 logger.info(f"Monitoring MACsec connection with {self.peer_mac} peer")
                 while run_script_bug_workaround_retcode(monitor_str.split(),
-                                                        quiet_on_error=True) == self.KEY_REFRESH_CODE \
-                      and self.refresh_keys():
+                                                        quiet_on_error=True) == self.KEY_REFRESH_CODE:
+                      #and self.refresh_keys():
                         pass
             logger.warning(f"MACsec connection with {self.peer_mac} peer ended")
 
