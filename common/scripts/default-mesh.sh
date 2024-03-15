@@ -5,7 +5,7 @@ if [[ "$MESH_CLASS" != "gs" && "$MESH_CLASS" != "edge" ]]; then
   echo "Wrong mesh class, check container env parameters"
   exit 1
 else
-  echo "Mesh class: " $MESH_CLASS
+  echo "Mesh class: " "$MESH_CLASS"
 fi
 
 # Function to check if drone is provisioned
@@ -25,12 +25,12 @@ check_drone_provisioned() {
 start_mesh_executor() {
     sleep 120
     echo "INFO: Starting ROS topic"
-    ros-with-env /opt/ros/${ROS_DISTRO}/lib/mesh_com/mesh_executor
+    ros-with-env /opt/ros/"${ROS_DISTRO}"/lib/mesh_com/mesh_executor
 }
 
 #Function to start mesh-11s.sh
 start_mesh-11s() {
-    /opt/ros/${ROS_DISTRO}/share/bin/mesh-11s.sh $MESH_MODE $MESH_IP $MESH_MASK $MESH_MAC $MESH_KEY $MESH_ESSID $MESH_FREQ $MESH_TX $MESH_COUNTRY
+    /opt/ros/"${ROS_DISTRO}"/share/bin/mesh-11s.sh "$MESH_MODE" "$MESH_IP" "$MESH_MASK" "$MESH_MAC" "$MESH_KEY" "$MESH_ESSID" "$MESH_FREQ" "$MESH_TX" "$MESH_COUNTRY"
     echo "mesh setup done"
 }
 
@@ -41,7 +41,7 @@ if [[ "$DRONE_TYPE" == "recon" ]]; then
     MESH_IP="$EDGE_IP"
     start_mesh-11s
     gateway_ip="$FOG_GW_VIP" # VRRP FOG virtual IP for the Default mesh
-    route add default gw $gateway_ip bat0
+    route add default gw "$gateway_ip" bat0
     check_drone_provisioned
     # Start executor. Required to publish ROS2 topic.
     start_mesh_executor
@@ -61,7 +61,7 @@ elif [[ "$DRONE_TYPE" == "fog" || "$DRONE_TYPE" == "cm-fog" ]]; then
     start_mesh-11s
     if [ "$MESH_CLASS" == "gs" ]; then
         gateway_ip="$GS_GW_VIP" # VRRP GS virtual IP for the Default mesh
-        route add default gw $gateway_ip bat0
+        route add default gw "$gateway_ip" bat0
     fi
     check_drone_provisioned
     # Start executor. Required to publish ROS2 topic.
@@ -72,7 +72,7 @@ elif [[ "$DRONE_TYPE" == "singlemesh" ]]; then
     start_mesh-11s
     # mesh class is gs
     gateway_ip="$GS_GW_VIP" # VRRP GS virtual IP for the Default mesh
-    route add default gw $gateway_ip bat0
+    route add default gw "$gateway_ip" bat0
     check_drone_provisioned
     # Start executor. Required to publish ROS2 topic.
     start_mesh_executor
