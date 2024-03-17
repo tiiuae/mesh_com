@@ -16,6 +16,6 @@ class CertificateVerificationError(Exception):
 class TLSVerificationCallbackInterface(ABC):
     @abstractmethod
     def verify(self, conn: SSL.Connection, cert: crypto.X509, errnum: int, depth: int, ok: int) -> bool:
-        raise NotImplementedError("Verify not implemented")
+        raise NotImplementedError('verify not implemented')
 
 

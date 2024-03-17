@@ -234,7 +234,7 @@ create_bridge_if_needed()
 		ip link set dev "$MACBR_NAME" arp off || true
 		ip link set dev "$MACBR_NAME" multicast off || true
 		ip link set dev "$MACBR_NAME" alias "$LEVEL MACVLAN/MACsec bridge above $BASE_INTERFACE_NAME" || true
-		ip link set dev "$MACBR_NAME" addrgenmode none || true
+		ip link set dev "$MACBR_NAME" addrgenmode eui64 || true
 		ip link set dev "$MACBR_NAME" type bridge no_linklocal_learn 1 || true
 		ebtables -t nat -N "$MACBR_NAME" || true
 		ebtables -t nat -A OUTPUT -j "$MACBR_NAME" --logical-out "$MACBR_NAME" || true

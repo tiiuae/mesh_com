@@ -55,16 +55,15 @@ class TLSVerification(TLSVerificationCallbackInterface):
 
 
     def verify_peer(self, peer_ipv6: str, peer_cert: crypto.X509) -> bool:
-        if not (peer_conn_mac := get_mac_from_ipv6(peer_ipv6)):
-            logger.error(f"Unable to find {peer_ipv6} MAC address in IPv6 ND cache")
-            return False
-
-        if not (peer_cert_mac := get_mac_from_san(peer_cert)):
-            logger.error(f"Unable to find {peer_ipv6} MAC address in the certificate's SAN")
+        try:
+            peer_conn_mac = get_mac_from_ipv6(peer_ipv6)
+            peer_cert_mac = get_mac_from_san(peer_cert)
+        except Exception as e:
+            logger.error(e)
             return False
 
         if peer_conn_mac.lower() != peer_cert_mac.lower():
-            logger.error(f"Peer MAC address doesn't match the certificate one: {peer_conn_mac} vs {peer_cert_mac}")
+            logger.error(f"Peer MAC address doesn't match the certificate's one: {peer_conn_mac} vs {peer_cert_mac}")
             return False
         return self.verify_certificate(peer_cert)
 
@@ -73,7 +72,7 @@ class TLSVerification(TLSVerificationCallbackInterface):
         try:
             return self._validation(cert)
         except Exception as e:
-            logger.error(f"An unexpected error occurred during certificate verification> {e}.", exc_info=True)
+            logger.error(f"An unexpected error occurred during certificate verification: {e}", exc_info=True)
             return False
 
 
@@ -93,12 +92,12 @@ class TLSVerification(TLSVerificationCallbackInterface):
         current_date = datetime.now()
 
         if expiration_date < current_date:
-            logger.error(f"Certificate has expired")
+            logger.error('Certificate has expired')
             return False
 
         # TODO - Uncomment when device date doesn't revert to Jan 1 1970
         # if activation_date > current_date:
-        #     logger.error(f"Client certificate not yet active")
+        #     logger.error('Client certificate not yet active')
         #     return False
 
         return self._verify_certificate_chain(cert_x509)
@@ -108,7 +107,7 @@ class TLSVerification(TLSVerificationCallbackInterface):
         try:
             store_ctx = crypto.X509StoreContext(self.x509_store, cert_x509)
             store_ctx.verify_certificate()
-            logger.debug(f"Certificate verification successful")
+            logger.debug('Certificate verification successful')
             return True
         except Exception as e:
             logger.error(f"Certificate chain verification failed: {e}", exc_info=True)
@@ -132,10 +131,10 @@ class TLSVerification(TLSVerificationCallbackInterface):
             # err.args is like: ([('SSL routines', '', 'tlsv1 alert unknown ca')],)
             # so we have to access tuple, then array and then tuple
             error_msg = err.args[0][0][2]
-            if error_msg.lower() == "certificate verify failed":
-                raise CertificateVerificationError("Certificate verification failed")
-            elif error_msg.lower() == "tlsv1 alert unknown ca":
-                raise CertificateVerificationError("Certificate verification failed")
+            if error_msg.lower() == 'certificate verify failed':
+                raise CertificateVerificationError('Certificate verification failed')
+            elif error_msg.lower() == 'tlsv1 alert unknown ca':
+                raise CertificateVerificationError('Certificate verification failed')
         except CertificateVerificationError as e:
             return e
         except Exception as e:

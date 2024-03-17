@@ -11,6 +11,6 @@ class FileBasedSecureSocket(FileBasedSecureContext, TLSVerification):
 
 
     def _close(self) -> None:
-        if (sock_conn_obj := self.__dict__.get("sock_conn_obj")) and \
+        if (sock_conn_obj := self.__dict__.get('sock_conn_obj')) and \
            isinstance(sock_conn_obj, FileBasedSecureConnection):
             sock_conn_obj.close()

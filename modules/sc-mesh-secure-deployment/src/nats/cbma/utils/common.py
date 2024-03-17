@@ -36,7 +36,7 @@ def run_script_bug_workaround(cmd_list: list[str], quiet_on_error: bool = False)
 
     if ret_code == 0:
         last_line = proc_stderr.splitlines()[-1]
-        if "exit" in last_line:
+        if 'exit' in last_line:
             ret_code = int(last_line.split()[-1])
             if ret_code > 0 and not quiet_on_error:
                 logger.error(f"'{cmd_str}' failed with error code {ret_code}")
