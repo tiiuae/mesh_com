@@ -14,12 +14,12 @@ class CBMACertificates(object):
 class ICertificate(ABC):
     @abstractmethod
     def get_subject_key_identifier(self) -> bool:
-        raise NotImplementedError("get_subject_key_identifier not implemented")
+        raise NotImplementedError('get_subject_key_identifier not implemented')
 
     @abstractmethod
     def get_authority_key_identifier(self) -> bytes:
-        raise NotImplementedError("get_authority_key_identifier not implemented")
+        raise NotImplementedError('get_authority_key_identifier not implemented')
 
     @abstractmethod
     def get_end_date(self) -> datetime:
-        raise NotImplementedError("get_end_date not implemented")
+        raise NotImplementedError('get_end_date not implemented')

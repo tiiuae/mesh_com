@@ -3,7 +3,7 @@
 
 NUM_NODES=2
 
-KEYPAIR_TYPE="eddsa"    # Can be ecdsa, eddsa, or rsa
+KEYPAIR_TYPE="rsa"    # Can be ecdsa, eddsa, or rsa
 
 DEFAULT_LOG_LEVEL="INFO"
 
@@ -45,7 +45,7 @@ check_dependencies() {
 
 
 check_max_nest_dev() {
-    I="max_next_dev"
+    I="max_nest_dev"
 
     echo -n "[+] Getting maximum number of interfaces that can be chained together... "
 

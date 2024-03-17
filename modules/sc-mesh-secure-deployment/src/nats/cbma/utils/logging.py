@@ -13,8 +13,8 @@ LOG_IFACE_ALIGNMENT: int = 6  # Longest iface one would be 6 chars for wlp1s0
 LOG_NAME_ALIGNMENT: int = 31  # From secure_socket.secure_connection
 LOG_FUNC_ALIGNMENT: int = 33  # From __create_socket_connection_object
 
-LOG_DIR = os.environ.get("LOG_DIR", LOG_DIR)
-LOG_LEVEL = logging.getLevelName(os.environ["LOG_LEVEL"]) if os.getenv("LOG_LEVEL") else LOG_LEVEL
+LOG_DIR = os.environ.get('LOG_DIR', LOG_DIR)
+LOG_LEVEL = logging.getLevelName(os.environ['LOG_LEVEL']) if os.getenv('LOG_LEVEL') else LOG_LEVEL
 
 _logger_names: list[str] = []
 
@@ -22,7 +22,7 @@ _logger_names: list[str] = []
 def __get_immediate_caller_filename() -> str:
     # Skipping first 2 frames as they contain get_logger and this function name
     for frame in stack()[2:]:
-        if frame.filename.startswith("/"):
+        if frame.filename.startswith('/'):
             filename: str = frame.filename
             break
     else:
@@ -60,7 +60,7 @@ def __add_console_handler(logger: logging.Logger, name: str, name_prefix: str) -
         name = os.path.extsep.join([name_prefix, name])
     else:
         name_format = ("{:<%i} [{:<%i}]" % (LOG_IFACE_ALIGNMENT + 2, LOG_NAME_ALIGNMENT)
-                       ).format(" ", name)
+                       ).format(' ', name)
 
     # Prevent duplicated log entries if creating multiple loggers with the same name
     # Note: FileHandler inherits from StreamHandler -> we check that handler isn't FileHandler
@@ -84,13 +84,13 @@ def __add_console_handler(logger: logging.Logger, name: str, name_prefix: str) -
 
 
 def __add_file_handler(logger: logging.Logger, log_path: str) -> bool:
-    name = os.path.basename(log_path).removesuffix(os.path.extsep + "log")
+    name = os.path.basename(log_path).removesuffix(os.path.extsep + 'log')
     log_dir = os.path.dirname(log_path)
 
     log_dir_real = os.path.realpath(os.path.expanduser(log_dir))
     LOG_DIR_real = os.path.realpath(os.path.expanduser(LOG_DIR))
     if log_dir_real == LOG_DIR_real:
-        name_format = ("{:<%i} [{:}]" % (LOG_IFACE_ALIGNMENT + 2)).format(" ", name)
+        name_format = ("{:<%i} [{:}]" % (LOG_IFACE_ALIGNMENT + 2)).format(' ', name)
     else:
         subdirs_list = log_dir_real.removeprefix(LOG_DIR_real + os.path.sep).split(os.path.sep)
         subdirs_list.append(name)
@@ -151,7 +151,7 @@ def get_logger(name: str = '', log_dir: str = '') -> logging.Logger:
     __add_console_handler(logger, name, name_prefix)
 
     if log_dir:
-        log_path = os.path.normpath(os.path.join(LOG_DIR, log_dir, f'{name}{os.path.extsep}log'))
+        log_path = os.path.normpath(os.path.join(LOG_DIR, log_dir, f"{name}{os.path.extsep}log"))
         try:
             __add_file_handler(logger, log_path)
         except Exception as e:
@@ -167,7 +167,7 @@ def setup_global_file_logging(log_dir: str = '') -> bool:
     NOTE: Only supposed to be used at the beginning of every process after spawning.
     '''
     if not _logger_names:
-        raise Exception("No loggers found")
+        raise Exception('No loggers found')
 
     LOG_DIR_parent = os.path.dirname(LOG_DIR.rstrip(os.path.sep))
     log_dir = os.path.normpath(os.path.join(LOG_DIR, log_dir))
@@ -177,7 +177,7 @@ def setup_global_file_logging(log_dir: str = '') -> bool:
     for name in _logger_names.copy():
         logger = logging.getLogger(name)
 
-        log_path = os.path.join(log_dir, f'{name}{os.path.extsep}log')
+        log_path = os.path.join(log_dir, f"{name}{os.path.extsep}log")
         try:
             if not __add_file_handler(logger, log_path):
                 continue
@@ -192,7 +192,7 @@ def setup_global_file_logging(log_dir: str = '') -> bool:
             logger.error(f"Exception when creating '{log_path}': {e}")
 
             if isinstance(e, OSError) and e.errno == errno.EACCES and e.filename == LOG_DIR_parent:
-                logger.warning(f"Continuing without logging to file")
+                logger.warning('Continuing without logging to file')
                 break
             logger.warning(f"Continuing without logging to '{log_path}'")
 

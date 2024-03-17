@@ -70,7 +70,7 @@ class CBMAController(ICBMAController):
                 return False
 
         certificates = deepcopy(self.certificates)
-        certificates.cert.rstrip("/")
+        certificates.cert.rstrip('/')
         certificates.cert += f"/{get_interface_mac_address(interface)}.crt"
 
         cbma = CBMA(interface=interface,
@@ -104,7 +104,7 @@ class CBMAController(ICBMAController):
 
 
     def start(self) -> bool:
-        logger.debug(f"Starting all processes")
+        logger.debug('Starting all processes')
         success = True
         for process in self.processes.values():
             process.start()
@@ -115,7 +115,7 @@ class CBMAController(ICBMAController):
 
 
     def stop(self) -> bool:
-        logger.debug(f"Stopping all processes")
+        logger.debug('Stopping all processes')
         success = True
         for interface_process in self.processes.items():
             if not self.__stop_interface_process(interface_process):
@@ -124,7 +124,7 @@ class CBMAController(ICBMAController):
 
 
     def join(self, timeout: Optional[float] = None) -> bool:
-        logger.debug(f"Joining all processes")
+        logger.debug('Joining all processes')
         success = True
         for process in self.processes.values():
             if not process.join(timeout):

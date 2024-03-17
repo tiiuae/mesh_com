@@ -85,39 +85,53 @@ class MACsec(object):
         if not self.secure_connection_callback(self.update_config):
             return False
 
-        l_or_u = "u" if self.is_upper else "l"
+        l_or_u = 'u' if self.is_upper else 'l'
         update_str = f"bash -x {CBMA_ROOT}/scripts/mess/update_mess.sh {l_or_u} {self.peer_mac} {self.tx_key} {self.rx_key}"
 
         return not run_script_bug_workaround_retcode(update_str.split())
 
 
+    def monitor(self) -> bool:
+        l_or_u = 'u' if self.is_upper else 'l'
+        monitor_str = f"bash -x {CBMA_ROOT}/scripts/mess/monitor_mess.sh {l_or_u} {self.interface} {self.peer_mac}"
+
+        logger.info(f"Monitoring MACsec connection with {self.peer_mac} peer")
+        success = True
+        while run_script_bug_workaround_retcode(monitor_str.split(),
+                                                quiet_on_error=True) == self.KEY_REFRESH_CODE:
+                # if not self.refresh_keys():
+                #     success = False
+                #     break
+            pass
+        logger.warning(f"MACsec connection with {self.peer_mac} peer ended")
+        return success
+
+
     def connect(self) -> bool:
-        l_or_u = "u" if self.is_upper else "l"
+        l_or_u = 'u' if self.is_upper else 'l'
         encryption = 'on' if self.enable_encryption else 'off'
 
         create_str = f"bash -x {CBMA_ROOT}/scripts/mess/create_mess.sh {l_or_u} {self.interface} {self.peer_mac} {self.tx_key} {self.rx_key} {encryption}"
-        monitor_str = f"bash -x {CBMA_ROOT}/scripts/mess/monitor_mess.sh {l_or_u} {self.peer_mac}"
 
         retries = 0
         while retries < self.MAX_RETRIES:
             retries += 1
             self.__cleanup()
 
-            logger.info(f"Creating MACsec connection with {self.peer_mac} peer")
-            if not run_script_bug_workaround_retcode(create_str.split()):
-                logger.info(f"Monitoring MACsec connection with {self.peer_mac} peer")
-                while run_script_bug_workaround_retcode(monitor_str.split(),
-                                                        quiet_on_error=True) == self.KEY_REFRESH_CODE:
-                      #and self.refresh_keys():
-                        pass
-            logger.warning(f"MACsec connection with {self.peer_mac} peer ended")
+            logger.info(f"Attempt {retries}/{self.MAX_RETRIES} - Creating MACsec connection with {self.peer_mac} peer")
+            if run_script_bug_workaround_retcode(create_str.split()):
+                logger.error(f"Attempt {retries}/{self.MAX_RETRIES} - Unable to create MACsec connection with {self.peer_mac} peer")
+            elif self.monitor():
+                retries = 0
+            else:
+                break
 
         self.cleanup()
         return False
 
 
     def __cleanup(self) -> bool:
-        l_or_u = "u" if self.is_upper else "l"
+        l_or_u = 'u' if self.is_upper else 'l'
         cleanup_str = f"bash -x {CBMA_ROOT}/scripts/mess/cleanup_mess.sh {l_or_u} {self.interface} {self.peer_mac}"
 
         return not run_script_bug_workaround_retcode(cleanup_str.split())
@@ -127,7 +141,7 @@ class MACsec(object):
         logger.info(f"Cleaning up MACsec {self.peer_mac} peer setup")
 
         if not self.__cleanup():
-            logger.warning(f"Unable to clean {self.peer_mac} MACsec setup")
+            logger.error(f"Unable to clean {self.peer_mac} MACsec setup")
             return False
 
         return True

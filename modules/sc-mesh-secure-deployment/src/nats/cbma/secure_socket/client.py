@@ -18,13 +18,13 @@ logger = get_logger()
 class FileBasedSecureSocketClient(FileBasedSecureSocket):
     TIMEOUT_SECONDS = 15
     DEFAULT_CONNECT_PARAMS = {
-        "MAX_RETRIES": 5,
-        "MIN_WAIT_TIME_SECONDS": 1,
-        "MAX_WAIT_TIME_SECONDS": 3
+        'MAX_RETRIES': 5,
+        'MIN_WAIT_TIME_SECONDS': 1,
+        'MAX_WAIT_TIME_SECONDS': 3
     }
     HANDSHAKE_PARAMS = {
-        "MAX_RETRIES": 5,
-        "WAIT_TIME_SECONDS": 0.5,
+        'MAX_RETRIES': 5,
+        'WAIT_TIME_SECONDS': 0.5,
     }
 
     def __init__(self,
@@ -65,7 +65,7 @@ class FileBasedSecureSocketClient(FileBasedSecureSocket):
         while retries_handshake < max_retries_handshake:
             retries_handshake += 1
             try:
-                logger.debug(f"Attempting handshake {retries_handshake}/{max_retries_handshake} with {self.server_ipv6}")
+                logger.debug(f"Attempt {retries_handshake}/{max_retries_handshake} - Performing handshake with {self.server_ipv6}")
                 self.sock_conn_obj.do_handshake()
                 logger.debug(f"Handshake with {self.server_ipv6} successful after {retries_handshake} attempts")
                 return True
@@ -98,13 +98,13 @@ class FileBasedSecureSocketClient(FileBasedSecureSocket):
             self._close()
             try:
                 self.sock_conn_obj = self.__create_socket_connection_object()
-                logger.debug(f"Attempting connection {retries}/{max_retries} with {self.server_ipv6}")
+                logger.debug(f"Attempt {retries}/{max_retries} - Connecting with {self.server_ipv6}")
                 self.sock_conn_obj.connect(conn_params)
                 if not self.__do_handshake():
                     break
                 return self.macsec_callback(self.sock_conn_obj)
             except socket.timeout:
-                logger.error("Socket timed out")
+                logger.error('Socket timed out')
                 break
             except (socket.error, CertificateVerificationError) as e:
                 if isinstance(e, CertificateVerificationError):
@@ -112,7 +112,7 @@ class FileBasedSecureSocketClient(FileBasedSecureSocket):
                 else:
                     logger.error(f"Socket error: {e}")
                 wait_time = random.uniform(min_wait_time, max_wait_time)
-                logger.warning(f"Retrying in {wait_time:.2f} seconds...")
+                logger.warning(f"Attempt {retries}/{max_retries} - Retrying connection with {self.server_ipv6} in {wait_time:.2f} seconds")
                 time.sleep(wait_time)
             except Exception as e:
                 logger.error(f"Unexpected exception: {e}", exc_info=True)

@@ -10,5 +10,5 @@ OpenSSLCallback = Callable[[SSL.Connection, crypto.X509, int, int, int], bool]
 class SecureContextInterface(ABC):
     @abstractmethod
     def create_ssl_context(self) -> SSL.Context:
-        raise NotImplementedError("create_ssl_context not implemented")
+        raise NotImplementedError('create_ssl_context not implemented')
 

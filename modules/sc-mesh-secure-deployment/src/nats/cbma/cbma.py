@@ -5,7 +5,7 @@ from multiprocessing import Process
 from typing import Tuple
 
 from utils.logging import get_logger, setup_global_file_logging
-from utils.networking import get_interface_link_local_ipv6_address
+from utils.networking import get_interface_link_local_ipv6_address, get_mac_from_ipv6
 from utils.multicast import bytes_2_multicast_postfix
 from models.certificates import CBMACertificates
 from models.cbma import ICBMA
@@ -85,7 +85,7 @@ class CBMA(ICBMA):
             if multicast_group_postfix := bytes_2_multicast_postfix(akid):
                 break
         else:
-            multicast_group_postfix = ":1"
+            multicast_group_postfix = ':1'
             self.logger.warning(f"Unable to find multicast group in {self.certificates.chain} - Using ::1")
 
         def multicast_secure_connection_callback(ipv6: str) -> bool:
@@ -125,15 +125,18 @@ class CBMA(ICBMA):
 
 
     def __macsec_callback(self, conn: SecureConnection) -> bool:
-        ipv6 = conn.get_peer_name()[0]
+        peer_ipv6 = conn.get_peer_name()[0]
+        peer_mac = get_mac_from_ipv6(peer_ipv6)
 
-        def macsec_secure_connection_callback(callback: MACsecCallbackType) -> bool:
-            return self.__secure_connection_callback(ipv6, callback)
+        def macsec_secure_connection_callback(macsec_callback: MACsecCallbackType) -> bool:
+            return self.__secure_connection_callback(peer_ipv6, macsec_callback)
 
         macsec = MACsec(is_upper=self.is_upper,
                         interface=self.interface,
                         enable_encryption=self.enable_macsec_encryption,
                         secure_connection_callback=macsec_secure_connection_callback)
+
+        self.logger.info(f"Starting MACsec connection with {peer_ipv6} ({peer_mac})")
 
         # NOTE - Daemon processes cannot spawn other multiprocessing.Processes
         process = Process(target=macsec.start, args=(conn,))
@@ -141,23 +144,23 @@ class CBMA(ICBMA):
 
         process.join(timeout=self.PROCESS_START_TIMEOUT)
         if not process.is_alive() or not process.pid:
+            self.logger.error(f"Unable to start MACsec connection with {peer_ipv6} ({peer_mac})")
             return False
 
-        self._macsec_processes[process.pid] = (ipv6, process)
-
+        self._macsec_processes[process.pid] = (peer_ipv6, process)
         return True
 
 
     def start(self) -> bool:
         self.__setup_instance()
 
-        self.logger.info(f"Starting CBMA")
+        self.logger.info('Starting CBMA')
 
         return self.multicast_service.start()
 
 
     def stop(self) -> bool:
-        self.logger.info(f"Stopping CBMA")
+        self.logger.info('Stopping CBMA')
 
         success = self.multicast_service.stop()
 
@@ -169,16 +172,16 @@ class CBMA(ICBMA):
                 process.terminate()
                 process.join(timeout=self.PROCESS_STOP_TIMEOUT)
             except Exception as e:
-                self.logger.error(f"Exception when terminating {pid}: {e}")
+                self.logger.error(f"Exception when terminating MACsec process {pid}: {e}")
             try:
                 if not process.is_alive():
                     continue
                 process.kill()
                 process.join(timeout=self.PROCESS_STOP_TIMEOUT)
             except Exception as e:
-                self.logger.error(f"Exception when killing {pid}: {e}")
+                self.logger.error(f"Exception when killing MACsec process {pid}: {e}")
             if process.is_alive():
-                self.logger.error(f"Unable to stop {pid}")
+                self.logger.error(f"Unable to stop MACsec process {pid}")
                 success = False
 
         self.logger.info(f"CBMA cleanup was {'' if success else 'not '}successful")

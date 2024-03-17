@@ -1,6 +1,8 @@
 import socket
 import errno
 
+from typing import Any
+
 from OpenSSL import SSL
 
 from models.certificates import CBMACertificates
@@ -44,22 +46,23 @@ class FileBasedSecureSocketServer(FileBasedSecureSocket):
 
         index = socket.if_nametoindex(self.interface)
 
-        sock_conn_obj.bind(("::", self.port, 0, index))
+        sock_conn_obj.bind(('::', self.port, 0, index))
         sock_conn_obj.set_accept_state()
 
         return sock_conn_obj
 
 
-    def handle_client(self, client_connection: FileBasedSecureConnection, client_address: str) -> bool:
+    def handle_client(self, client_connection: FileBasedSecureConnection, client_address: Any) -> bool:
+        client_ipv6 = client_address[0]
         try:
-            logger.debug(f"Starting handshake with {client_address}")
+            logger.debug(f"Starting handshake with {client_ipv6}")
             client_connection.do_handshake()
         except SSL.Error as err:
             err = self.catch_certificate_verification_failure(err)
-            logger.error(f"Handshake with {client_address} failed: {err}")
+            logger.error(f"Handshake with {client_ipv6} failed: {err}")
             return False
 
-        logger.debug(f"Handshake with {client_address} successful")
+        logger.debug(f"Handshake with {client_ipv6} successful")
         return True
 
 
@@ -68,18 +71,18 @@ class FileBasedSecureSocketServer(FileBasedSecureSocket):
         try:
             self.sock_conn_obj = self.__create_socket_connection_object()
             self.sock_conn_obj.listen(self.MAX_CONNECTIONS_TO_LISTEN)
-            logger.debug("Server listening")
+            logger.debug('Server listening')
 
             client_connection, client_address = self.sock_conn_obj.accept()
             if client_handled := self.handle_client(client_connection, client_address):
                 return self.macsec_callback(client_connection)
         except socket.timeout:
-            logger.error("Socket timed out")
+            logger.error('Socket timed out')
         except CertificateVerificationError as e:
             logger.error(e)
         except socket.error as e:
             if e.errno == errno.EBADF:
-                logger.debug("Client closed the connection")
+                logger.debug('Client closed the connection')
             else:
                 logger.error(f"Socket error: {e}")
         except Exception as e:
@@ -87,5 +90,5 @@ class FileBasedSecureSocketServer(FileBasedSecureSocket):
         finally:
             self._close()
 
-        logger.info("Exiting")
+        logger.info('Exiting')
         return client_handled

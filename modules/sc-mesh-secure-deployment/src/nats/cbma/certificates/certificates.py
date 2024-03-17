@@ -7,7 +7,7 @@ from models.certificates import ICertificate
 
 class OpenSSLCertificate(ICertificate):
     def __init__(self, cert_path: str) -> None:
-        with open(cert_path, "rb") as file:
+        with open(cert_path, 'rb') as file:
             self.x509_cert: crypto.X509 = crypto.load_certificate(crypto.FILETYPE_PEM, file.read())
 
         self.extensions: list[crypto.X509Extension] = []
@@ -25,7 +25,7 @@ class OpenSSLCertificate(ICertificate):
         for extension in self.extensions:
             if encoded_name in extension.get_short_name():
                 return extension
-        raise ValueError(f'Failed to get the extension {name.capitalize()}')
+        raise ValueError(f"Failed to get the extension {name.capitalize()}")
 
 
     def get_subject_key_identifier(self) -> bytes:

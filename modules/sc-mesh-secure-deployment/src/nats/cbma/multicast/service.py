@@ -3,6 +3,7 @@ import threading
 import time
 
 from typing import Callable, Tuple
+from struct import pack
 
 from utils.networking import LLA_PREFIX, get_interface_link_local_ipv6_address
 from utils.logging import get_logger
@@ -57,25 +58,25 @@ class MulticastService(object):
             sock.connect((self.multicast_group, self.destination_port))
             sock.setblocking(False)
 
-            logger.debug(f'Running the multicast sender loop')
+            logger.debug('Running the multicast-sender loop')
             retries = 0
             while not self.event.is_set():
                 try:
                     bytes_sent: int = sock.send(b'')
                     if bytes_sent == -1:
-                        logger.error("Failed to send packet")
+                        logger.error('Failed to send packet')
                     else:
                         retries = 0
                 except Exception as e:
                     retries += 1
                     logger.error(f"Attempt {retries}/{self.MAX_RETRIES} - Exception when sending multicast packet: {e}")
                     if retries == self.MAX_RETRIES:
-                        logger.error("Maximum attempts for sending multicast packets reached")
+                        logger.error('Maximum attempts for sending multicast packets reached')
                         self.event.set()
                         break
                 time.sleep(self.MULTICAST_SEND_DELAY)
 
-            logger.debug(f'Multicast-send loop is completed')
+            logger.debug('Exiting multicast-sender loop')
 
 
     def receive_multicast_loop(self) -> bool:
@@ -86,7 +87,7 @@ class MulticastService(object):
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, str(self.interface + '\0').encode('utf-8'))
 
             index: int = socket.if_nametoindex(self.interface)
-            index_bytes: bytes = index.to_bytes(4, byteorder='little')
+            index_bytes: bytes = pack('=I', index)
             # Set the multicast interface
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, index_bytes)
 
@@ -104,7 +105,7 @@ class MulticastService(object):
             # TODO - mcasts aren't received if not binding to the wildcard
             # sock.bind((self.ipv6, self.destination_port, 0, index))
 
-            logger.debug(f'Running the multicast receive loop')
+            logger.debug('Running the multicast-receiver loop')
             retries = 0
             while not self.event.is_set():
                 try:
@@ -117,10 +118,10 @@ class MulticastService(object):
                     retries += 1
                     logger.error(f"Attempt {retries}/{self.MAX_RETRIES} - Exception when receiving multicast packets: {e}")
                     if retries == self.MAX_RETRIES:
-                        logger.error("Maximum attempts for receiving multicast packets reached")
+                        logger.error('Maximum attempts for receiving multicast packets reached')
                         self.event.set()
 
-            logger.debug('Exiting multicast-receive loop')
+            logger.debug('Exiting multicast-receiver loop')
             success = True
         return success
 
@@ -129,11 +130,10 @@ class MulticastService(object):
         try:
             peer_ipv6: str = address[0]
             if peer_ipv6.startswith(LLA_PREFIX) and self.ipv6 != peer_ipv6:
-                logger.debug(f'Received announcement from {peer_ipv6}')
                 self.authenticate_peer(peer_ipv6)
 
-        except Exception as exc:
-            logger.error(f"Failed to process received message: {exc}")
+        except Exception as e:
+            logger.error(f"Failed to process received message: {e}")
             return False
 
         return True
@@ -155,7 +155,7 @@ class MulticastService(object):
             self.authenticated_peers.remove(peer_ipv6)
             return True
         except ValueError:
-            logger.error(f"Peer {peer_ipv6} not authenticated")
+            logger.error(f"{peer_ipv6} not authenticated")
             return False
 
 
@@ -167,13 +167,13 @@ class MulticastService(object):
         if not self.sender_thread.is_alive():
             return False
 
-        logger.info(f"Starting multicast service")
+        logger.info('Starting multicast service')
 
         return self.receive_multicast_loop()
 
 
     def stop(self) -> bool:
-        logger.info("Stopping service ...")
+        logger.info('Stopping service ...')
         self.event.set()
         self.sender_thread.join(self.THREAD_JOIN_TIMEOUT)
 
