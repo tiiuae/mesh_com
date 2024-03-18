@@ -96,13 +96,14 @@ class MACsec(object):
         monitor_str = f"bash -x {CBMA_ROOT}/scripts/mess/monitor_mess.sh {l_or_u} {self.interface} {self.peer_mac}"
 
         logger.info(f"Monitoring MACsec connection with {self.peer_mac} peer")
-        success = True
+        success = False
         while run_script_bug_workaround_retcode(monitor_str.split(),
                                                 quiet_on_error=True) == self.KEY_REFRESH_CODE:
-                # if not self.refresh_keys():
-                #     success = False
-                #     break
-            pass
+            # if not self.refresh_keys():
+            #     success = False
+            #     break
+            success = True
+
         logger.warning(f"MACsec connection with {self.peer_mac} peer ended")
         return success
 
@@ -123,8 +124,6 @@ class MACsec(object):
                 logger.error(f"Attempt {retries}/{self.MAX_RETRIES} - Unable to create MACsec connection with {self.peer_mac} peer")
             elif self.monitor():
                 retries = 0
-            else:
-                break
 
         self.cleanup()
         return False
