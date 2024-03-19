@@ -34,7 +34,7 @@ check_dependencies() {
         exit 1
     fi
 
-    for t in brctl ebtables batctl; do
+    for t in brctl ebtables batctl faketime; do
         if ! type $t >/dev/null 2>&1; then
             printf "\n[!] FATAL: '$t' is missing!\n"
             exit 1
