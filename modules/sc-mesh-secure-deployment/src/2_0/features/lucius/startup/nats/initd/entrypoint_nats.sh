@@ -80,6 +80,8 @@ else
     /opt/S90mptcp start
   fi
 
+  # /opt/wait_for_bat_if.sh
+
   /opt/S90Alfred start
   /opt/S90AlfredUpper start
   /opt/S91Socat start
