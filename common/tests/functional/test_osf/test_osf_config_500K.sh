@@ -72,8 +72,11 @@ tc_0() {
   slip_output=$(timeout --preserve-status 2s slipcmd -H -b"$BAUDRATE" -sn -R'?S' "$SERIALPORT")
   if [ "$?" -ne 0 ] || [ -z "$slip_output" ] || [ "${slip_output:0:2}" != "!S" ]; then
     #echo -"slipcmd error or timeout [ "${slip_output:0:50}" ] !"
+    sleep 0.1
     slip_output=$(timeout --preserve-status 2s slipcmd -H -b"$BAUDRATE" -sn -R'?S' "$SERIALPORT")
+    sleep 0.1
     slip_output=$(timeout --preserve-status 2s slipcmd -H -b"$BAUDRATE" -sn -R'?S' "$SERIALPORT")
+    sleep 0.1
   fi
   return
 }
