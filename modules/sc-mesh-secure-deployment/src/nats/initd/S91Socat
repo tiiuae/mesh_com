@@ -1,12 +1,14 @@
 #!/bin/sh
 
 # The daemon's name (to ensure uniqueness and for stop, restart and status)
-name="alfred"
+name="socat-for-alfred"
 
 # The path of the Python executable
-exec="/usr/bin/alfred"
-network_interface=${2:-wlp1s0}
-command_args="-i $network_interface -m"
+exec="/usr/bin/socat"
+
+alfred_lower_sock=/var/run/alfred.sock
+alfred_upper_sock=/var/run/alfred_upper.sock
+command_args="UNIX-LISTEN:$alfred_upper_sock,fork,unlink-early UNIX-CONNECT:$alfred_lower_sock"
 
 [ -x "$exec" ] || exit 0
 

@@ -1,12 +1,13 @@
 #!/bin/sh
 
 # The daemon's name (to ensure uniqueness and for stop, restart and status)
-name="alfred"
+name="alfred-upper"
 
 # The path of the Python executable
-exec="/usr/bin/alfred"
-network_interface=${2:-wlp1s0}
-command_args="-i $network_interface -m"
+# exec="/usr/bin/alfred"
+# command_args="-b bat1 -i bat0 -m -u /var/run/alfred_upper.sock"
+exec="/bin/sh"
+command_args="/opt/start_alfred_upper.sh"
 
 [ -x "$exec" ] || exit 0
 
@@ -30,6 +31,7 @@ case "$1" in
             echo "$name is already running."
         else
             echo "Starting $name..."
+
             "$daemon" $daemon_start_args \
                 --name "$name" --pidfiles "$pidfiles" \
                 ${user:+--user $user} ${chroot:+--chroot $chroot} \

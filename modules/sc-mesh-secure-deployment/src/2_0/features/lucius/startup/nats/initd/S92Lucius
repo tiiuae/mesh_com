@@ -1,26 +1,29 @@
 #!/bin/sh
 
 # The daemon's name (to ensure uniqueness and for stop, restart and status)
-name="alfred"
+name="lucius"
 
 # The path of the Python executable
-exec="/usr/bin/alfred"
-network_interface=${2:-wlp1s0}
-command_args="-i $network_interface -m"
+python_exec="/usr/bin/python"
+exec="application"
 
-[ -x "$exec" ] || exit 0
+[ -x "$python_exec" ] || exit 0
 
 # The path of the daemon executable
 daemon="/usr/bin/daemon"
 
+command_args="-s"
+
+
+LOG_FILE=/opt/lucius.log
 # Other configuration parameters for the service
 pidfiles="/var/run"
 user=""
 chroot=""
-chdir=""
+chdir="/opt/nats/lucius"
 umask=""
-stdout="daemon.info"
-stderr="daemon.err"
+stdout="$LOG_FILE"
+stderr="$LOG_FILE"
 daemon_start_args="--delay=11 --attempts=1 --respawn"
 
 case "$1" in
@@ -35,7 +38,7 @@ case "$1" in
                 ${user:+--user $user} ${chroot:+--chroot $chroot} \
                 ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
                 ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
-                -- "$exec" $command_args
+                --  "$python_exec" -m "$exec" $command_args
             echo done.
         fi
         ;;
