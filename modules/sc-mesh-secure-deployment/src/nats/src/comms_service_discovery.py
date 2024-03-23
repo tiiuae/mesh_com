@@ -10,7 +10,7 @@ import logging
 import inspect
 
 import netifaces
-from zeroconf import ServiceStateChange, Zeroconf
+from zeroconf import ServiceStateChange, Zeroconf, IPVersion
 from zeroconf import ServiceBrowser, ServiceInfo
 
 
@@ -94,9 +94,9 @@ class CommsServiceMonitor:
         self.running = True
         if self.interface:
             addresses = self.__get_ip_addresses(self.interface)
-            self.zeroconf = Zeroconf(interfaces=addresses)
+            self.zeroconf = Zeroconf(interfaces=addresses, ip_version=IPVersion.All)
         else:
-            self.zeroconf = Zeroconf()
+            self.zeroconf = Zeroconf(ip_version=IPVersion.All)
 
         self.service_browser = ServiceBrowser(
             self.zeroconf,
