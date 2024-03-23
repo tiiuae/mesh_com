@@ -175,7 +175,7 @@ class MdmAgent:
 
             try:
                 # Create a socket connection to the server
-                sock = socket.create_connection((hostname, port))
+                sock = socket.create_connection((hostname, port), timeout=20)
 
                 # Create an SSL context and load the certificate, key, and CA files
                 context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
@@ -369,7 +369,7 @@ class MdmAgent:
                 params={"device_id": self.__device_id},
                 cert=(self.__certificate_file, self.__keyfile),
                 verify=self.__ca,
-                timeout=2,
+                timeout=20,
             )
         except requests.exceptions.ConnectionError as err:
             self.logger.error(
@@ -642,7 +642,7 @@ class MdmAgent:
                 params=data,
                 cert=(self.__certificate_file, self.__keyfile),
                 verify=self.__ca,
-                timeout=2,
+                timeout=20,
             )
         except FileNotFoundError as e:
             self.logger.error("Certificate file not found: %s", e)
@@ -694,7 +694,7 @@ class MdmAgent:
                 json=data,
                 cert=(self.__certificate_file, self.__keyfile),
                 verify=self.__ca,
-                timeout=2,
+                timeout=20,
             )
         except FileNotFoundError as e:
             self.logger.error("Certificate file not found: %s", e)
