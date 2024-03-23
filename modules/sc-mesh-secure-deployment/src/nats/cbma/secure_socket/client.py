@@ -2,7 +2,9 @@ import time
 import random
 import socket
 
+from typing import Union
 from operator import itemgetter
+
 from OpenSSL import SSL
 
 from models.certificates import CBMACertificates
@@ -16,13 +18,13 @@ logger = get_logger()
 
 
 class FileBasedSecureSocketClient(FileBasedSecureSocket):
-    TIMEOUT_SECONDS = 15
-    DEFAULT_CONNECT_PARAMS = {
+    TIMEOUT_SECONDS: int = 4
+    DEFAULT_CONNECT_PARAMS: dict[str, Union[int, float]] = {
         'MAX_RETRIES': 5,
-        'MIN_WAIT_TIME_SECONDS': 1,
-        'MAX_WAIT_TIME_SECONDS': 3
+        'MIN_WAIT_TIME_SECONDS': 0.2,
+        'MAX_WAIT_TIME_SECONDS': 1.0
     }
-    HANDSHAKE_PARAMS = {
+    HANDSHAKE_PARAMS: dict[str, Union[int, float]] = {
         'MAX_RETRIES': 5,
         'WAIT_TIME_SECONDS': 0.5,
     }
@@ -48,6 +50,7 @@ class FileBasedSecureSocketClient(FileBasedSecureSocket):
         sock_conn_obj = FileBasedSecureConnection(ctx,
                                                   socket.socket(socket.AF_INET6, socket.SOCK_STREAM))
         sock_conn_obj._socket.settimeout(self.TIMEOUT_SECONDS)
+        sock_conn_obj.set_connect_state()
 
         return sock_conn_obj
 
@@ -85,7 +88,7 @@ class FileBasedSecureSocketClient(FileBasedSecureSocket):
         return False
 
 
-    def connect(self, retry_params: dict[str, int] = DEFAULT_CONNECT_PARAMS) -> bool:
+    def connect(self, retry_params: dict[str, Union[int, float]] = DEFAULT_CONNECT_PARAMS) -> bool:
         """
         Returns True if connection was established, otherwise False.
         """

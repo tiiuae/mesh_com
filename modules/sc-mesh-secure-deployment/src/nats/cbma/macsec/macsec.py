@@ -16,10 +16,10 @@ logger = get_logger()
 
 
 class MACsec(object):
-    MAX_RETRIES = 5
-    UPPER_KEY_LENGTH = 64
-    LOWER_KEY_LENGTH = 32
-    KEY_REFRESH_CODE = 255
+    MAX_RETRIES: int = 5
+    UPPER_KEY_LENGTH: int = 64
+    LOWER_KEY_LENGTH: int = 32
+    KEY_REFRESH_CODE: int = 255
 
     def __init__(self,
                  is_upper: bool,
