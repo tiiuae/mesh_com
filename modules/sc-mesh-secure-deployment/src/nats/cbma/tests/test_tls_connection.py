@@ -38,7 +38,7 @@ def test_tls_connection_fails_bogus_cert() -> None:
     interface = "wlp0s20f3"
     address = get_interface_link_local_ipv6_address(interface)
 
-    server = FileBasedSecureSocketServer(interface, 4433, certificates, custom_cb_mock)
+    server = FileBasedSecureSocketServer(interface, address, 4433, certificates, custom_cb_mock)
     server_thread = thread_start(server.listen)
 
     client = FileBasedSecureSocketClient(interface, address, 4433, certificates, custom_cb_mock)
@@ -63,7 +63,7 @@ def test_tls_connection_fails_bogus_chain() -> None:
     interface = "wlp0s20f3"
     address = get_interface_link_local_ipv6_address(interface)
 
-    server = FileBasedSecureSocketServer(interface, 4433, certificates, custom_cb_mock)
+    server = FileBasedSecureSocketServer(interface, address, 4433, certificates, custom_cb_mock)
     server_thread = thread_start(server.listen)
 
     client = FileBasedSecureSocketClient(interface, address, 4433, certificates, custom_cb_mock)
@@ -93,7 +93,7 @@ def test_tls_connection_fails_verification() -> None:
     interface = "wlp0s20f3"
     address = get_interface_link_local_ipv6_address(interface)
 
-    server = FileBasedSecureSocketServer(interface, 4433, certificates, custom_cb_mock)
+    server = FileBasedSecureSocketServer(interface, address, 4433, certificates, custom_cb_mock)
     server_thread = thread_start(server.listen)
 
     client = FileBasedSecureSocketClient(interface, address, 4433, certificates, custom_cb_mock)
@@ -124,7 +124,7 @@ def test_tls_connection_succeeds_verification() -> None:
     interface = "wlp0s20f3"
     address = get_interface_link_local_ipv6_address(interface)
 
-    server = FileBasedSecureSocketServer(interface, 4433, certificates, custom_cb_mock)
+    server = FileBasedSecureSocketServer(interface, address, 4433, certificates, custom_cb_mock)
     server_thread = thread_start(server.listen)
 
     client = FileBasedSecureSocketClient(interface, address, 4433, certificates, custom_cb_mock)
@@ -152,7 +152,7 @@ def test_tls_connection_fails_custom_callback() -> None:
     interface = "wlp0s20f3"
     address = get_interface_link_local_ipv6_address(interface)
 
-    server = FileBasedSecureSocketServer(interface, 4433, certificates, custom_cb_mock)
+    server = FileBasedSecureSocketServer(interface, address, 4433, certificates, custom_cb_mock)
     server_thread = thread_start(server.listen)
 
     client = FileBasedSecureSocketClient(interface, address, 4433, certificates, custom_cb_mock)
@@ -178,7 +178,7 @@ def test_tls_connection_succeeds_custom_verify_callback() -> None:
     interface = "wlp0s20f3"
     address = get_interface_link_local_ipv6_address(interface)
 
-    server = FileBasedSecureSocketServer(interface, 4433, certificates, custom_cb_mock)
+    server = FileBasedSecureSocketServer(interface, address, 4433, certificates, custom_cb_mock)
     server_thread = thread_start(server.listen)
 
     client = FileBasedSecureSocketClient(interface, address, 4433, certificates, custom_cb_mock)

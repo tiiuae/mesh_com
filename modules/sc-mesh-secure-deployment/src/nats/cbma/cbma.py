@@ -24,7 +24,7 @@ SIGNALS = [signal.SIGINT, signal.SIGTERM]
 class CBMA(ICBMA):
     SETUP_GLOBAL_FILE_LOGGING: bool = True
     PROCESS_START_TIMEOUT: float = 0.2
-    PROCESS_STOP_TIMEOUT: float = 1.0
+    PROCESS_STOP_TIMEOUT: float = 5.0
 
     # TODO - Give more visibility to 'enable_macsec_encryption' and 'is_upper'
     def __init__(self,
@@ -57,6 +57,7 @@ class CBMA(ICBMA):
             try:
                 if self.ipv6 > peer_ipv6:
                     secure_socket_server = self.secure_socket_server(self.interface,
+                                                                     peer_ipv6,
                                                                      self.port,
                                                                      self.certificates,
                                                                      macsec_callback)
@@ -152,11 +153,16 @@ class CBMA(ICBMA):
 
 
     def start(self) -> bool:
-        self.__setup_instance()
+        try:
+            self.__setup_instance()
+        except Exception as e:
+            self.logger.error(e)
+            return False
 
         self.logger.info('Starting CBMA')
 
-        return self.multicast_service.start()
+        self.multicast_service.start()
+        return self.stop()
 
 
     def stop(self) -> bool:

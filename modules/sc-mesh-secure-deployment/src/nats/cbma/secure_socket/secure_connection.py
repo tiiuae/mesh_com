@@ -23,8 +23,10 @@ SecureConnectionCallbackType = Callable[[MACsecCallbackType], bool]
 
 
 class FileBasedSecureConnection(SSL.Connection, SecureConnection):
-    def __init__(self, context: SSL.Context, socket: socket.socket) -> None:
-        SSL.Connection.__init__(self, context, socket)
+    def __init__(self, context: SSL.Context, sock: socket.socket) -> None:
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_QUICKACK, 1)
+        SSL.Connection.__init__(self, context, sock)
         SecureConnection.__init__(self)
 
 
@@ -37,9 +39,10 @@ class FileBasedSecureConnection(SSL.Connection, SecureConnection):
 
 
     def accept(self) -> Tuple[FileBasedSecureConnection, Any]:
-        client_connection, client_address = SSL.Connection.accept(self)
-        conn = FileBasedSecureConnection(client_connection._context, client_connection._socket)
+        client_connection, client_address = self._socket.accept()
+        conn = FileBasedSecureConnection(self._context, client_connection)
         conn.set_accept_state()
+
         return (conn, client_address)
 
 

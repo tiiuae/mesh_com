@@ -46,7 +46,7 @@ def __get_immediate_caller_filename() -> str:
 
 def __get_formatter(log_level: int, name: str) -> logging.Formatter:
     if log_level == logging.DEBUG:
-        log_format = LOG_FORMAT.format("{} [%%(funcName)-%is]" % LOG_FUNC_ALIGNMENT)
+        log_format = LOG_FORMAT.format('{} [%%(funcName)-%is]' % LOG_FUNC_ALIGNMENT)
     else:
         log_format = LOG_FORMAT
 
@@ -55,11 +55,11 @@ def __get_formatter(log_level: int, name: str) -> logging.Formatter:
 
 def __add_console_handler(logger: logging.Logger, name: str, name_prefix: str) -> bool:
     if name_prefix:
-        name_format = ("[{:<%i}] [{:<%i}]" % (LOG_IFACE_ALIGNMENT, LOG_NAME_ALIGNMENT)
+        name_format = ('[{:<%i}] [{:<%i}]' % (LOG_IFACE_ALIGNMENT, LOG_NAME_ALIGNMENT)
                        ).format(name_prefix, name)
         name = os.path.extsep.join([name_prefix, name])
     else:
-        name_format = ("{:<%i} [{:<%i}]" % (LOG_IFACE_ALIGNMENT + 2, LOG_NAME_ALIGNMENT)
+        name_format = ('{:<%i} [{:<%i}]' % (LOG_IFACE_ALIGNMENT + 2, LOG_NAME_ALIGNMENT)
                        ).format(' ', name)
 
     # Prevent duplicated log entries if creating multiple loggers with the same name
@@ -90,13 +90,13 @@ def __add_file_handler(logger: logging.Logger, log_path: str) -> bool:
     log_dir_real = os.path.realpath(os.path.expanduser(log_dir))
     LOG_DIR_real = os.path.realpath(os.path.expanduser(LOG_DIR))
     if log_dir_real == LOG_DIR_real:
-        name_format = ("{:<%i} [{:}]" % (LOG_IFACE_ALIGNMENT + 2)).format(' ', name)
+        name_format = ('{:<%i} [{:<%i}]' % (LOG_IFACE_ALIGNMENT + 2, LOG_NAME_ALIGNMENT)).format(' ', name)
     else:
         subdirs_list = log_dir_real.removeprefix(LOG_DIR_real + os.path.sep).split(os.path.sep)
         subdirs_list.append(name)
         name = os.path.extsep.join(subdirs_list)
         name_prefix = subdirs_list.pop(0)
-        name_format = ("[{:<%i}] [{:}]" % LOG_IFACE_ALIGNMENT).format(name_prefix, os.path.extsep.join(subdirs_list))
+        name_format = ('[{:<%i}] [{:<%i}]' % (LOG_IFACE_ALIGNMENT, LOG_NAME_ALIGNMENT)).format(name_prefix, os.path.extsep.join(subdirs_list))
 
     # Prevent duplicated log entries if creating multiple loggers with the same name
     if handlers := [h for h in logger.handlers if isinstance(h, logging.FileHandler)]:

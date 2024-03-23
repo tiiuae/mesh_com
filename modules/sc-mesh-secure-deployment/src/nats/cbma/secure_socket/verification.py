@@ -15,7 +15,7 @@ logger = get_logger()
 
 
 class TLSVerification(TLSVerificationCallbackInterface):
-    _PEM_RE = re.compile(
+    _PEM_RE: re.Pattern = re.compile(
         b'-----BEGIN CERTIFICATE-----\r?.+?\r?-----END CERTIFICATE-----\r?\n?', re.DOTALL
     )
 
