@@ -1,5 +1,5 @@
 #!/bin/bash
-source ./qos_olsrd_conf.sh
+source /opt/mesh_com/common/scripts/qos_olsrd_conf.sh
 is_interface() {
   # arguments:
   # $1 = interface name
