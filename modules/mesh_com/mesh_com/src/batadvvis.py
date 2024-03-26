@@ -75,7 +75,7 @@ class BatAdvVis:
         """
         while self.thread_running:
             self.latest_topology = self.get()
-            time.sleep(1.0)
+            time.sleep(0.4)
 
 
 # Real user is mesh_executor

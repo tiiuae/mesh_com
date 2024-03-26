@@ -313,7 +313,7 @@ class Batman:
         while self.thread_running:
             self.update_stat_data()
             self.latest_stat = self.get_stat()
-            sleep(1.0)
+            sleep(0.4)
 
 
 # Real user is mesh_executor

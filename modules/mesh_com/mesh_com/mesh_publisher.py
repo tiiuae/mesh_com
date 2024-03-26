@@ -4,6 +4,8 @@ from rclpy.qos import QoSPresetProfiles
 
 from std_msgs.msg import String
 import socket
+import signal
+
 from .src.socket_helper import recv_msg, send_msg
 
 
@@ -12,7 +14,7 @@ class MeshPublisher(Node):
         super().__init__('mesh_publisher')
         self.publisher_ = self.create_publisher(String, 'mesh_visual',
                                                 QoSPresetProfiles.SYSTEM_DEFAULT.value)
-        timer_period = 10  # seconds
+        timer_period = 1  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
         self.PORT = 33221  # Port to listen on (non-privileged ports are > 1023)
@@ -40,19 +42,32 @@ class MeshPublisher(Node):
         self.mesh_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.mesh_socket.settimeout(1)
 
+# Python does not register SIGINT if it is not called from an interactive shell.
+# So we need our own signal handler.
+def sigint_handler(_signo, _stack_frame):
+    raise KeyboardInterrupt
 
 def main(args=None):
+    signal.signal(signal.SIGINT, sigint_handler)
+
     rclpy.init(args=args)
 
     mesh_publisher = MeshPublisher()
 
-    rclpy.spin(mesh_publisher)
-
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    mesh_publisher.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(mesh_publisher)
+    except KeyboardInterrupt:
+        # Hide the KeyboardInterrupt exception not handled.
+        pass
+    finally:
+        # Destroy the node explicitly
+        # (optional - otherwise it will be done automatically
+        # when the garbage collector destroys the node object)
+        print('INFO: mesh_publisher.destroy_node')
+        mesh_publisher.destroy_node()
+        print('INFO: rclpy.shutdown')
+        rclpy.shutdown()
+        print('INFO: Publisher node shutdown gracefully.')
 
 
 if __name__ == '__main__':
