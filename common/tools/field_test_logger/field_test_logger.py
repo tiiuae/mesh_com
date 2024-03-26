@@ -44,7 +44,7 @@ class FieldTestLogger:
         self.__logger_output = []
         self.__filename = ""
 
-    def create_csv(self, suffix : str):
+    def create_csv(self, suffix: str):
         now_str = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         self.__filename = f"{now_str}_{suffix}.csv"
         self.__construct_csv_header()
@@ -63,7 +63,7 @@ class FieldTestLogger:
             wr = csv.writer(csvfile, delimiter=',')
             wr.writerow(self.__logger_output)
 
-    def register_logger_function(self, name : str, function):
+    def register_logger_function(self, name: str, function):
         """
         params:
             [name] name of the header row element
