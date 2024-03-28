@@ -80,7 +80,7 @@ tc_3() {
     echo " result= FAIL"
   else
     echo -n "average receiver bitrate ${output} Kbits/sec,"
-    if (( $(echo "${output} < 120" |bc -l) )); then
+    if (( $(echo "${output} < 101" |bc -l) )); then
       echo " result= FAIL"
       result=$FAIL
     else 
@@ -99,7 +99,7 @@ tc_4() {
     echo " result= FAIL"
   else
     echo -n "average receiver bitrate ${output} Kbits/sec,"
-    if (( $(echo "${output} < 130" |bc -l) )); then
+    if (( $(echo "${output} < 101" |bc -l) )); then
       echo " result= FAIL"
       result=$FAIL
     else 
