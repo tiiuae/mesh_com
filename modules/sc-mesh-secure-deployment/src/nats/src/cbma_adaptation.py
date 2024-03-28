@@ -680,7 +680,7 @@ class CBMAAdaptation(object):
                     has_upper_certificate = has_upper_certificate and 0
                 else:
                     self.logger.warning(
-                        "No cbma certificate for interface %s", interface.name
+                        "No cbma certificate for interface %s", interface.interface_name
                     )
                     continue
 
