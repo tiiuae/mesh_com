@@ -6,6 +6,7 @@ import logging
 import subprocess
 import threading
 import time
+import socket
 from typing import List, Union
 from copy import deepcopy
 import json
@@ -432,7 +433,7 @@ class CBMAAdaptation(object):
                     for interface in self.__interfaces
                 )
                 if found:
-                    return True
+                    break
             elapsed_time = time.time() - start_time
 
             if elapsed_time >= timeout:
@@ -440,6 +441,27 @@ class CBMAAdaptation(object):
 
             time.sleep(1)  # Sleep for 1 second before checking again
             self.__get_interfaces()
+
+        link_local_address = self.__get_link_local_ipv6_address(if_name)
+        if not link_local_address:
+            self.logger.debug(
+                f"Link-local IPv6 address not found for interface {if_name}"
+            )
+            return
+        index = socket.if_nametoindex(if_name)
+
+        # Now we wait until the interface is ready
+        start_time = time.time()
+        while True:
+            try:
+                socket.create_server((link_local_address, 0, 0, index),
+                                     family=socket.AF_INET6)
+                return True
+            except Exception:
+                elapsed_time = time.time() - start_time
+                if elapsed_time >= timeout:
+                    return False
+                time.sleep(1)
 
     def __create_mac(self, randomized: bool = False, interface_mac: str = "") -> str:
         """
@@ -570,6 +592,20 @@ class CBMAAdaptation(object):
             self.logger.error(e)
             return False
 
+    def __get_link_local_ipv6_address(self, interface_name: str) -> str:
+            with IPRoute() as ip:
+                index = ip.link_lookup(ifname=interface_name)[0]
+                addresses = ip.get_addr(index=index)
+
+                for addr in addresses:
+                    ip_address = addr.get_attrs("IFA_ADDRESS")[0]
+                    prefix_length = int(addr["prefixlen"])
+                    if self.__is_valid_ipv6_local((ip_address, prefix_length)):
+                        ip.close()
+                        return ip_address
+                ip.close()
+            return ''
+
     def __add_global_ipv6_address(self, interface_name: str, new_prefix: str) -> None:
         """
         Modify the IPv6 address of the specified interface
@@ -581,17 +617,7 @@ class CBMAAdaptation(object):
         """
         try:
             with IPRoute() as ip:
-                # Find the current IPv6 link-local address
-                link_local_address = None
-                index = ip.link_lookup(ifname=interface_name)[0]
-                addresses = ip.get_addr(index=index)
-
-                for addr in addresses:
-                    ip_address = addr.get_attrs("IFA_ADDRESS")[0]
-                    prefix_length = int(addr["prefixlen"])
-                    if self.__is_valid_ipv6_local((ip_address, prefix_length)):
-                        link_local_address = ip_address
-                        break
+                link_local_address = self.__get_link_local_ipv6_address(interface_name)
 
                 if not link_local_address:
                     self.logger.debug(
