@@ -69,7 +69,6 @@ case "$1" in
             ifname_ap="$(ifconfig -a | grep -m 1 "wlan*" | awk -F':' '{ print $1 }')"
             ifconfig "$ifname_ap" down 2>/dev/null
             iw dev "$ifname_ap" del 2>/dev/null
-            return 0
         else
             echo "$name is not running."
         fi
@@ -91,7 +90,6 @@ case "$1" in
             ifname_ap="$(ifconfig -a | grep -m 1 "wlan*" | awk -F':' '{ print $1 }')"
             ifconfig "$ifname_ap" down 2>/dev/null
             iw dev "$ifname_ap" del 2>/dev/null
-            return 0
         fi
         if [ "${!_MODE}" == "ap+mesh_mcc" ] || [ "${!_MODE}" == "ap+mesh_scc" ]; then
 	          # start if not running
