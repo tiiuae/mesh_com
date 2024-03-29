@@ -62,13 +62,14 @@ case "$1" in
             echo done.
 
             NEW_PID=$(ps ax | grep -E "[h]ostapd-$RADIO_INDEX" | awk {'print $1'})
-            kill -9 "$NEW_PID"
+            kill -9 "$NEW_PID" 2>/dev/null
             rm -fr /var/run/hostapd/* 2>/dev/null
             ifconfig "${!_WIFI}"-1 down 2>/dev/null
             iw dev "${!_WIFI}"-1 del 2>/dev/null
             ifname_ap="$(ifconfig -a | grep -m 1 "wlan*" | awk -F':' '{ print $1 }')"
             ifconfig "$ifname_ap" down 2>/dev/null
             iw dev "$ifname_ap" del 2>/dev/null
+            ps aux | awk "/radvd.+(${!_WIFI// /|})/&&!/awk/{system(\"kill \" \$1 \" || :\")}" 2>/dev/null
         else
             echo "$name is not running."
         fi
@@ -83,13 +84,14 @@ case "$1" in
             echo done.
 
             NEW_PID=$(ps ax | grep -E "[h]ostapd-$RADIO_INDEX" | awk {'print $1'})
-            kill -9 "$NEW_PID"
+            kill -9 "$NEW_PID" 2>/dev/null
             rm -fr /var/run/hostapd/* 2>/dev/null
             ifconfig "${!_WIFI}"-1 down 2>/dev/null
             iw dev "${!_WIFI}"-1 del 2>/dev/null
             ifname_ap="$(ifconfig -a | grep -m 1 "wlan*" | awk -F':' '{ print $1 }')"
             ifconfig "$ifname_ap" down 2>/dev/null
             iw dev "$ifname_ap" del 2>/dev/null
+            ps aux | awk "/radvd.+(${!_WIFI// /|})/&&!/awk/{system(\"kill \" \$1 \" || :\")}" 2>/dev/null
         fi
         if [ "${!_MODE}" == "ap+mesh_mcc" ] || [ "${!_MODE}" == "ap+mesh_scc" ]; then
 	          # start if not running
