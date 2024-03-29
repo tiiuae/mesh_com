@@ -62,7 +62,11 @@ case "$1" in
             echo done.
 
             NEW_PID=$(ps ax | grep -E "[h]ostapd-$RADIO_INDEX" | awk {'print $1'})
-            kill -9 "$NEW_PID" 2>/dev/null
+            if [ -n "$NEW_PID" ]; then
+                kill "$NEW_PID" 2>/dev/null
+                sleep 1
+                ! kill -0 "$NEW_PID" || kill -9 "$NEW_PID" 2>/dev/null
+            fi
             rm -fr /var/run/hostapd/* 2>/dev/null
             ifconfig "${!_WIFI}"-1 down 2>/dev/null
             iw dev "${!_WIFI}"-1 del 2>/dev/null
@@ -84,7 +88,11 @@ case "$1" in
             echo done.
 
             NEW_PID=$(ps ax | grep -E "[h]ostapd-$RADIO_INDEX" | awk {'print $1'})
-            kill -9 "$NEW_PID" 2>/dev/null
+            if [ -n "$NEW_PID" ]; then
+                kill "$NEW_PID" 2>/dev/null
+                sleep 1
+                ! kill -0 "$NEW_PID" || kill -9 "$NEW_PID" 2>/dev/null
+            fi
             rm -fr /var/run/hostapd/* 2>/dev/null
             ifconfig "${!_WIFI}"-1 down 2>/dev/null
             iw dev "${!_WIFI}"-1 del 2>/dev/null
