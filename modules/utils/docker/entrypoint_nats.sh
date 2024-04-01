@@ -80,6 +80,17 @@ else
     /opt/S90mptcp start
   fi
 
+  echo "wait for bat1 to come up"
+  if [ ! -e /sys/class/net/bat1 ]; then
+    batctl meshif bat1 interface create routing_algo BATMAN_V
+  fi
+
+  /opt/S90mdm_agent start
+
+  while [ $(batctl bat1 n | grep disabled | wc -l) != 0 ]; do
+    sleep 1
+  done
+
   /opt/S90Alfred start
   /opt/S90AlfredUpper start
   /opt/S91Socat start
