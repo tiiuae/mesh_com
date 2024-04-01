@@ -635,6 +635,7 @@ class CBMAAdaptation(object):
                 self.logger.debug(
                     f"New {interface_name} Global IPv6 address: {new_address}"
                 )
+                index = ip.link_lookup(ifname=interface_name)[0]
 
                 # Add the modified IPv6 address to the interface
                 ip.addr("add", index=index, address=new_address, prefixlen=64)
