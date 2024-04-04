@@ -622,6 +622,12 @@ main () {
   # to get eth_port warning free
   eth_port=$eth_port
 
+  #Enabling control layer virtual interface
+  vlan_interface="${eth_port}.100"
+  ip link add link "$eth_port" name "$vlan_interface" type vlan id 100
+  ip link set dev "$vlan_interface" up
+  ip addr add 192.168.254.254/24 dev "$vlan_interface"
+
   # default mesh handling and power off radio
   if [ "$1" == "mesh" ]; then
     mode=$1
