@@ -622,8 +622,8 @@ main () {
   # to get eth_port warning free
   eth_port=$eth_port
 
-  #Checking if usb0 is used as ethernet port
-  if ip link show usb0 &> /dev/null; then      
+  #Checking if usb0 is used as ethernet port and is up
+  if [[ $(cat /sys/class/net/usb0/operstate) == "up" ]]; then      
     # Set eth_port to usb0
     eth_port="usb0"
     echo "Ethernet port is set to usb0"
@@ -632,10 +632,11 @@ main () {
   fi
 
   #Enabling control layer virtual interface
+  control_ip="${control_ip:-192.168.254.254/24}"
   vlan_interface="${eth_port}.100"
   ip link add link "$eth_port" name "$vlan_interface" type vlan id 100
   ip link set dev "$vlan_interface" up
-  ip addr add 192.168.254.254/24 dev "$vlan_interface"
+  ip addr add "$control_ip" dev "$vlan_interface"
   echo "Control layer virtual interface $vlan_interface created and configured."
 
   # default mesh handling and power off radio
