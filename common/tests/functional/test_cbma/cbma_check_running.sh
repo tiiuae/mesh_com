@@ -1,17 +1,48 @@
 #!/bin/sh
 
-mdm_constants='/opt/mesh_com/modules/sc-mesh-secure-deployment/src/nats/src/constants.py'
-lower_or_upper="$(awk "BEGIN{print toupper(\"$1\")}")"
+MULTICAST_PORT=15002
+MULTICAST_PREFIX='ff33'
+TIMEOUT_SECONDS=10
 
-if [ $# -ne 1 ] || case "$lower_or_upper" in LOWER|UPPER) false;; esac; then
-    echo "Usage: $0 <lower|upper>"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <iface> [<port>]"
     exit 1
 fi
 
-port="$(awk "/^[[:space:]]*CBMA_PORT_${lower_or_upper}/{print \$NF}" $mdm_constants)"
+check_dependencies() {
+    for t in tcpdump timeout; do
+        if ! type $t >/dev/null 2>&1; then
+            echo "[!] FATAL: '$t' is missing!" >&2
+            exit 2
+        fi
+    done
+}
 
-if ! ss -lp | grep -q "\\b$port\\b.*python"; then
-    echo "Fail"
-    exit 1
-fi
-echo "Pass"
+check_interface() {
+    iface="$1"
+
+    if [ ! -e "/sys/class/net/${iface}/address" ]; then
+        echo "'$iface' does not exist" >&2
+        exit 3
+    fi
+    case "$iface" in bat*) MULTICAST_PORT=$((MULTICAST_PORT + 1));; esac
+}
+
+cbma_check_running() {
+    iface="$1"
+    port="${2:-$MULTICAST_PORT}"
+
+    packet="$(timeout $TIMEOUT_SECONDS tcpdump -c1 -i "$iface" -qQ out udp and port "$port" 2>/dev/null)"
+    mcast_group="$(expr "$packet" : '.*[[:space:]]\([^.]\+\).[0-9]\+:')"
+
+    if [ "${mcast_group%%:*}" != 'ff33' ]; then
+        echo 'Fail'
+        exit 4
+    fi
+    echo 'Pass'
+}
+
+check_dependencies
+check_interface $1
+cbma_check_running $@
