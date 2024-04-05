@@ -509,6 +509,24 @@ class CBMAAdaptation(object):
         self.__wait_for_interface(self.LOWER_BATMAN)
         self.__wait_for_interface(self.UPPER_BATMAN)
 
+    def stop_radios(self) -> bool:
+        # Create command to stop all radios
+        cmd = json.dumps(
+            {
+                "api_version": 1,
+                "cmd": "DOWN",
+                "radio_index": "*",
+            }
+        )
+
+        ret, _, _ = self.__comms_ctrl.command.handle_command(cmd, self.__comms_ctrl)
+
+        if ret != "OK":
+            self.logger.error("Error: Unable to bring down the radio interfaces!")
+            return False
+
+        return True
+
     def __setup_radios(self) -> bool:
         # Create command to start all radios
         cmd = json.dumps(
@@ -540,7 +558,7 @@ class CBMAAdaptation(object):
 
         return True
 
-    def setup_cbma(self) -> None:
+    def setup_cbma(self) -> bool:
         """
         Sets up both upper and lower CBMA.
         """

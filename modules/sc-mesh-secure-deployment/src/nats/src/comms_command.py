@@ -336,10 +336,10 @@ class Command:  # pylint: disable=too-many-instance-attributes
 
     def __radio_down_all(self, cc) -> Tuple[str, str]:
         for index in cc.settings.radio_index:
-            if self.comms_status[index].is_mesh_radio_on:
-                ret, info = self.__radio_down_single()
-                if ret == "FAIL":
-                    return ret, info
+            self.radio_index = str(index)
+            ret, info = self.__radio_down_single()
+            if ret == "FAIL":
+                return ret, info
         self.logger.debug("All radios deactivated")
         return "OK", "All radios deactivated"
 
