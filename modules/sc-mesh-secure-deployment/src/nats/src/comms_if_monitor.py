@@ -5,9 +5,11 @@ to be used by MDM agent to get network interface statuss.
 
 # pylint: disable=too-few-public-methods, too-many-nested-blocks
 from typing import Callable, List, Dict
+import subprocess
 from copy import deepcopy
 from pyroute2 import IPRoute
 
+DUMMY_INTERFACE_NAME = 'ifdummy0'
 
 class CommsInterfaceMonitor:
     """
@@ -94,6 +96,25 @@ class CommsInterfaceMonitor:
                 break
         self.__ipr.close()
 
+    def __create_dummy_interface(self, interface_name):
+        """
+        Create a dummy interface.
+
+        Arguments:
+            interface_name: str -- Name of the interface to be created.
+        """
+        subprocess.run(['ip', 'link', 'add', 'dev', interface_name, 'type', 'dummy'],
+                           check=True)
+
+    def __delete_dummy_interface(self, interface_name):
+        """
+        Delete a dummy interface.
+
+        Arguments:
+            interface_name: str -- Name of the interface to be deleted.
+        """
+        subprocess.run(['ip', 'link', 'delete', 'dev', interface_name], check=True)
+
     def stop(self):
         """
         Stop monitoring at latest after any waited RTNL message.
@@ -106,3 +127,6 @@ class CommsInterfaceMonitor:
             None
         """
         self.__running = False
+        # workaround to stop the blocking get() call
+        self.__create_dummy_interface(DUMMY_INTERFACE_NAME)
+        self.__delete_dummy_interface(DUMMY_INTERFACE_NAME)

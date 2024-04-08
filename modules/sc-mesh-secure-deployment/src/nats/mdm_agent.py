@@ -704,21 +704,6 @@ class MdmAgent:
             )
         return requests.Response()
 
-    # def __is_cbma_feature_enabled(self) -> bool:
-    #     """
-    #     Check if CBMA feature is enabled
-    #     :return: True if enabled, False otherwise
-    #     """
-    #     with open(Constants.YAML_FILE.value, "r", encoding="utf-8") as stream:
-    #         try:
-    #             features = yaml.safe_load(stream)
-    #             return bool(features["CBMA"])
-    #         except (yaml.YAMLError, KeyError, FileNotFoundError) as exc:
-    #             self.logger.error(
-    #                 f"CBMA disabled as feature configuration not found: {exc}"
-    #             )
-    #         return False
-
     def __validate_response(
         self, response: requests.Response, config: ConfigType
     ) -> str:
@@ -854,24 +839,33 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
         await asyncio.sleep(1)
         asyncio.get_running_loop().stop()
 
-    def signal_handler():
+
+    def signal_handler(signum, frame):
+        sig_name = signal.Signals(signum).name
+        cc.logger.debug(f"signal_handler {sig_name} ({signum}) received.")
+
+        if sig_name in ("SIGUSR1", "SIGINT", "SIGTERM"):
+            if not mdm.running:
+                # stop sequence already started
+                return
+
         cc.logger.debug("Disconnecting MDM agent...")
+
         mdm.mdm_service_available = False
         mdm.running = False
         mdm.executor.shutdown()
         mdm.interface_monitor.stop()
         mdm.cbma_ctrl.stop_cbma()
+        mdm.cbma_ctrl.stop_radios()
         if mdm.service_monitor.running:
             mdm.stop_service_discovery()
         if mdm.thread_if_mon.is_alive():
             mdm.thread_if_mon.join()
             cc.logger.debug("Interface monitor stopped")
-        asyncio.create_task(stop())
 
-    for sig in ("SIGINT", "SIGTERM"):
-        asyncio.get_running_loop().add_signal_handler(
-            getattr(signal, sig), signal_handler
-        )
+    # Register signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     cc.logger.debug("MDM: comms_nats_controller Listening for requests")
 
@@ -886,7 +880,7 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
     except Exception as e:
         cc.logger.exception("Exception:")
     finally:
-        signal_handler()
+        signal_handler(signal.SIGUSR1, signal_handler)
 
 
 if __name__ == "__main__":
