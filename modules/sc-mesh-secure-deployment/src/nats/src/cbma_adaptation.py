@@ -587,6 +587,8 @@ class CBMAAdaptation(object):
         self.__add_global_ipv6_address(self.LOWER_BATMAN, self.__IPV6_WHITE_PREFIX)
 
         self.__cbma_set_up = True
+
+        # todo what about the false return value?
         return True
 
     def __is_valid_ipv6_local(self, address: tuple[str, int]) -> bool:

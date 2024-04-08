@@ -831,8 +831,6 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
     """
     cc = comms_controller.CommsController()
 
-    mdm_agent_stopped = False
-
     if keyfile is None or certfile is None or ca_file is None:
         cc.logger.debug("MDM: Closing as no certificates provided")
         return
@@ -843,16 +841,13 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
 
 
     def signal_handler(signum, frame):
-        global mdm_agent_stopped
-
         sig_name = signal.Signals(signum).name
         cc.logger.debug(f"signal_handler {sig_name} ({signum}) received.")
 
-        if sig_name == "SIGUSR1":
-            if mdm_agent_stopped:
+        if sig_name in ("SIGUSR1", "SIGINT", "SIGTERM"):
+            if not mdm.running:
                 # stop sequence already started
                 return
-        mdm_agent_stopped = True
 
         cc.logger.debug("Disconnecting MDM agent...")
 

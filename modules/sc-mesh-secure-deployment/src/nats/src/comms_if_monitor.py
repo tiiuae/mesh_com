@@ -105,6 +105,7 @@ class CommsInterfaceMonitor:
         """
         subprocess.run(['ip', 'link', 'add', 'dev', interface_name, 'type', 'dummy'],
                            check=True)
+
     def __delete_dummy_interface(self, interface_name):
         """
         Delete a dummy interface.
