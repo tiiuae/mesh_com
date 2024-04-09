@@ -1,6 +1,7 @@
 import subprocess
 import re
 
+
 class WifiInfo:
 
     def __init__(self, interval, interface, batman_interface):
@@ -271,21 +272,36 @@ class WifiInfo:
         #print(f"tx throughput: {self.tx_throughput}")
 
     def __update_batman_neighbors(self):
-        batctl_cmd = ['batctl', 'meshif', self.__batman_interface, 'n', '-n', '-H']
+        batctl_cmd = ['batctl', 'meshif', self.__batman_interface, 'n']
 
         batctl_proc = subprocess.Popen(batctl_cmd,
                                        stdout=subprocess.PIPE)
 
         out = batctl_proc.communicate()[0].decode().rstrip()
 
+        routing_algo = None
+        lines = out.split('\n')
+        for line in lines:
+            if "B.A.T.M.A.N. adv" in line:
+                if "BATMAN_V" in line:
+                    routing_algo = "BATMAN_V"
+                    break
+
+        if routing_algo == "BATMAN_V":
+            node_index = 0
+        else:
+            node_index = 1
+
         lines = out.split("\n")
 
         nodes = ""
 
         for line in lines:
+            if "Neighbor" in line or "B.A.T.M.A.N. adv" in line:
+                continue
             node_stats = line.split()
-            if len(node_stats) == 3:
-                nodes = f"{nodes}{node_stats[1]},{node_stats[2][:-1]};"
+            if len(node_stats) >= node_index + 2:
+                nodes = f"{nodes}{node_stats[node_index]},{node_stats[node_index + 1]};"
 
         # Remove semicolon after last node in list
         self.__neighbors = nodes[:-1]
