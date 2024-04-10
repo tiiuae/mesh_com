@@ -117,8 +117,8 @@ async def main_fmo(server, port, keyfile=None, certfile=None, interval=1000) -> 
                         "debug_mode"
                     ]
                     cc.debug_mode_enabled = True if debug_mode == "enabled" else False
-            except:
-                pass
+            except Exception as e:
+                cc.logger.error("Error reading debug config file: %s", e)
             ret, info, resp = cc.command.handle_command(data, cc)
         elif subject == f"comms.status.{identity}":
             ret, info = "OK", "Returning current status"

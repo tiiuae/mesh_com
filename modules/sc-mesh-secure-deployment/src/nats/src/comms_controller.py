@@ -28,11 +28,11 @@ class CommsController:  # pylint: disable=too-few-public-methods
 
         self.c_status = []
 
-        radio_amount: int = self.__check_radio_amount()
-        if radio_amount < 0:
+        self.radio_amount: int = self.__check_radio_amount()
+        if self.radio_amount < 0:
             self.main_logger.debug("Radio amount Error")
 
-        for i in range(0, radio_amount):
+        for i in range(0, self.radio_amount):
             self.c_status.append(
                 comms_status.CommsStatus(
                     self.main_logger.getChild(f"status {str(i)}"), i
@@ -77,6 +77,7 @@ class CommsController:  # pylint: disable=too-few-public-methods
                 cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
             )
         except Exception as e:
-            self.logger.error("Radio amount Error:", e)
+            # main_logger is used here as self.logger is not yet initialized
+            self.main_logger.exception(e)
             return -1
         return len(cmd_result.stdout.decode().splitlines())

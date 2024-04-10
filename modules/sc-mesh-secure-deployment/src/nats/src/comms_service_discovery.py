@@ -40,6 +40,7 @@ class CommsServiceMonitor:
         service_cb: Optional[Callable] = None,
         interface: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
+        test: Optional[bool] = False,
     ) -> None:
         self.service_name = service_name
         self.service_type = service_type
@@ -48,6 +49,7 @@ class CommsServiceMonitor:
         self.service_callback = service_cb
         self.interface = interface
         self.running = False
+        self.test = test
         if logger is None:
             self.__logger = logging.getLogger("service_monitor")
             self.__logger.setLevel(logging.DEBUG)
@@ -107,6 +109,8 @@ class CommsServiceMonitor:
         try:
             while self.running:
                 time.sleep(1)
+                if self.test:
+                    break
         except KeyboardInterrupt:
             self.close()
 

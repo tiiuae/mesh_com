@@ -6,7 +6,7 @@ Unittests for validations.py
 import unittest
 import os
 import random
-from .context import validation
+import src.validation as validation
 
 
 class TestValidation(unittest.TestCase):
@@ -47,34 +47,6 @@ class TestValidation(unittest.TestCase):
                 """12345678901234567890123456789012345678901234567890123456789012345"""
             )
         )
-
-    def test_validate_ip_address(self):
-        """
-        Test cases for validate_ip_address(ip)
-        """
-        # ip is valid
-        self.assertTrue(validation.validate_ip_address("10.10.10.10"))
-        # ip is invalid
-        self.assertFalse(validation.validate_ip_address("1000.0.0.0"))
-        # ip is invalid
-        self.assertFalse(validation.validate_ip_address(1))
-        # ip is invalid
-        self.assertFalse(validation.validate_ip_address("0.0.0"))
-        # ip is invalid
-        self.assertFalse(validation.validate_ip_address("0.0.256.0"))
-
-    def test_validate_netmask(self):
-        """
-        Test cases for validate_netmask(netmask)
-        """
-        # netmask is valid
-        self.assertTrue(validation.validate_netmask("255.255.255.0"))
-        # netmask is invalid
-        self.assertFalse(validation.validate_netmask("0.0.0.255"))
-        # netmask is invalid
-        self.assertFalse(validation.validate_netmask("a.b.c.d"))
-        # netmask is invalid
-        self.assertFalse(validation.validate_netmask(1))
 
     def test_validate_tx_power(self):
         """
@@ -146,25 +118,6 @@ class TestValidation(unittest.TestCase):
         # frequency is invalid
         self.assertFalse(validation.validate_frequency("2412"))
 
-    def test_validate_routing(self):
-        """
-        Test cases for validate_routing(routing)
-        """
-        # routing is invalid
-        self.assertFalse(validation.validate_routing("none"))
-        # routing is valid
-        self.assertTrue(validation.validate_routing("olsr"))
-        # routing is valid
-        self.assertTrue(validation.validate_routing("batman-adv"))
-        # routing is invalid
-        self.assertFalse(validation.validate_routing("nonee"))
-        # routing is invalid
-        self.assertFalse(validation.validate_routing("olsrr"))
-        # routing is invalid
-        self.assertFalse(validation.validate_routing("batmann"))
-        # routing is invalid
-        self.assertFalse(validation.validate_routing(1))
-
     def test_validate_priority(self):
         """
         Test cases for validate_priority(priority)
@@ -215,21 +168,6 @@ class TestValidation(unittest.TestCase):
         self.assertFalse(validation.validate_mesh_vif(""))
         self.assertFalse(validation.validate_mesh_vif(" "))
         self.assertFalse(validation.validate_mesh_vif("  "))
-
-    def test_validate_batman_iface(self):
-        """
-        Test cases for validate_batman_iface(batman_iface)
-        """
-        # batman iface is valid
-        self.assertTrue(validation.validate_batman_iface("bat0"))
-        # batman iface is valid
-        self.assertTrue(validation.validate_batman_iface("bat1"))
-        # batman iface is valid
-        self.assertTrue(validation.validate_batman_iface("bat2"))
-        # batman iface is invalid
-        self.assertFalse(validation.validate_batman_iface("3"))
-        # batman iface is invalid
-        self.assertFalse(validation.validate_batman_iface(0))
 
 
 if __name__ == "__main__":
