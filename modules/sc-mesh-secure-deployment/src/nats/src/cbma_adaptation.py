@@ -20,18 +20,18 @@ from src import cbma_paths
 from src.comms_controller import CommsController
 from src.constants import Constants
 from mdm_agent import Interface
+from src import comms_config_store
 
 from controller import CBMAController
 from models.certificates import CBMACertificates
 
 
-# pylint: disable=broad-exception-caught
+# pylint: disable=broad-except, invalid-name, too-many-instance-attributes
 class CBMAAdaptation(object):
     """
     CBMA Control
     """
 
-    # pylint: disable=too-many-arguments
     def __init__(
         self,
         comms_ctrl: CommsController,
@@ -56,23 +56,13 @@ class CBMAAdaptation(object):
             Constants.DOWNLOADED_CBMA_UPPER_PATH.value
             + "/upper_certificates/rootCA.crt"
         )
-        self.__upper_cbma_key_path = Constants.GENERATED_CERTS_PATH.value + "/rsa/birth/filebased"
+        self.__upper_cbma_key_path = (
+            Constants.GENERATED_CERTS_PATH.value + "/rsa/birth/filebased"
+        )
         self.__lower_cbma_controller = None
         self.__upper_cbma_controller = None
         self.__lower_cbma_interfaces: List[Interface] = []
         self.__upper_cbma_interfaces: List[Interface] = []
-
-        self.__white_interfaces = ["bat0", "halow1"]
-        self.__red_interfaces = ["bat1", "wlan1"]
-        self.__na_cbma_interfaces = [
-            "bat0",
-            "bat1",
-            "br-lan",
-            "eth0",
-            "eth1",
-            "usb0",
-            "lan1",
-        ]
 
         self.BR_NAME: str = "br-lan"
         self.BR_WHITE_NAME: str = "br-white"
@@ -80,6 +70,124 @@ class CBMAAdaptation(object):
         self.UPPER_BATMAN: str = "bat1"
         self.__IPV6_WHITE_PREFIX: str = "fdbb:1ef7:9d6f:e05d"
         self.__IPV6_RED_PREFIX: str = "fdd8:84dc:fe30:7bf2"
+
+        # Set minimum required configuration
+        self.__white_interfaces = [self.LOWER_BATMAN]
+        self.__red_interfaces = [self.UPPER_BATMAN]
+        self.__na_cbma_interfaces = [
+            self.LOWER_BATMAN,
+            self.UPPER_BATMAN,
+            self.BR_NAME,
+        ]
+
+        # Default routing algo
+        self.__batman_ra = "BATMAN_V"
+
+        # Read configs from file
+        self.__config = comms_config_store.ConfigStore("/opt/ms_config.yaml")
+        self.__cbma_config = self.__config.read("CBMA")
+        self.__batman_config = self.__config.read("BATMAN")
+        self.__vlan_config = self.__config.read("VLAN")
+
+        # Extend/update default configs using yaml file content
+        if self.__cbma_config:
+            white_interfaces = self.__cbma_config.get("white_interfaces")
+            red_interfaces = self.__cbma_config.get("red_interfaces")
+            exclude_interfaces = self.__cbma_config.get("exclude_interfaces")
+            self.logger.info(f"White interfaces config: {white_interfaces}")
+            self.logger.info(f"Red interfaces config: {red_interfaces}")
+            self.logger.info(f"Exclude interfaces config: {exclude_interfaces}")
+
+            if white_interfaces:
+                self.__white_interfaces.extend(white_interfaces)
+            if red_interfaces:
+                self.__red_interfaces.extend(red_interfaces)
+            if exclude_interfaces:
+                self.__na_cbma_interfaces.extend(exclude_interfaces)
+
+        if self.__batman_config:
+            batman_ra = self.__batman_config.get("routing_algo")
+            self.logger.info(f"Batman routing algo config: {batman_ra}")
+            if batman_ra:
+                self.__batman_ra = batman_ra
+
+        # Create VLAN interfaces if configured
+        self.__create_vlan_interfaces()
+
+    def __create_vlan_interfaces(self) -> None:
+        if not self.__vlan_config:
+            self.logger.info("No VLAN configuration found")
+            return
+
+        for vlan_name, vlan_data in self.__vlan_config.items():
+            self.logger.info(f"{vlan_name}, {vlan_data}")
+            parent_interface = vlan_data.get("parent_interface")
+            vlan_id = str(vlan_data.get("vlan_id"))
+            ipv4_address = vlan_data.get("ipv4_address")
+            ipv4_subnet_mask = vlan_data.get("ipv4_subnet_mask")
+
+            if parent_interface and vlan_id:
+                try:
+                    # Delete existing VLAN interface if it exists
+                    subprocess.run(["ip", "link", "delete", vlan_name], check=False)
+
+                    # Create VLAN interface
+                    subprocess.run(
+                        [
+                            "ip",
+                            "link",
+                            "add",
+                            "link",
+                            parent_interface,
+                            "name",
+                            vlan_name,
+                            "type",
+                            "vlan",
+                            "id",
+                            vlan_id,
+                        ],
+                        check=True,
+                    )
+
+                    # Bring VLAN interface up
+                    subprocess.run(
+                        ["ip", "link", "set", vlan_name, "up"], check=True
+                    )
+
+                    if ipv4_address and ipv4_subnet_mask:
+                        # Set IPv4 address and subnet mask
+                        subprocess.run(
+                            [
+                                "ip",
+                                "addr",
+                                "add",
+                                f"{ipv4_address}/{ipv4_subnet_mask}",
+                                "dev",
+                                vlan_name,
+                            ],
+                            check=True,
+                        )
+
+                    self.logger.info(
+                        f"VLAN interface {vlan_name} created and configured."
+                    )
+                except subprocess.CalledProcessError as e:
+                    self.logger.error(f"Error creating VLAN interface {vlan_name}: {e}")
+            else:
+                self.logger.error(
+                    f"Invalid configuration for VLAN {vlan_name}: parent_interface or vlan_id missing."
+                )
+
+    def __delete_vlan_interfaces(self) -> None:
+        if not self.__vlan_config:
+            return
+
+        for vlan_name, _ in self.__vlan_config.items():
+            try:
+                # Delete existing VLAN interface if it exists
+                subprocess.run(["ip", "link", "delete", vlan_name], check=False)
+            except subprocess.CalledProcessError as e:
+                self.logger.error(f"Error deleting VLAN interface {vlan_name}: {e}")
 
     def __get_interfaces(self) -> None:
         interfaces = []
@@ -131,7 +239,9 @@ class CBMAAdaptation(object):
     def __set_interface_mac(self, interface, new_mac):
         try:
             # Change the MAC address of the bridge interface
-            subprocess.check_call(['ip', 'link', 'set', 'dev', interface, 'address', new_mac])
+            subprocess.check_call(
+                ["ip", "link", "set", "dev", interface, "address", new_mac]
+            )
 
         except subprocess.CalledProcessError as e:
             self.logger.error(
@@ -187,7 +297,7 @@ class CBMAAdaptation(object):
 
             if not interface_indices:
                 self.logger.debug(
-                    "Cannot add interfaces %s to bridge %s!",
+                    "Cannot add interface %s to bridge %s!",
                     interface_to_add,
                     bridge_name,
                 )
@@ -225,9 +335,7 @@ class CBMAAdaptation(object):
             ip.close()
 
     def __shutdown_interface(self, interface_name: str) -> None:
-        # pylint: disable=invalid-name
         ip = IPRoute()
-        # pylint: enable=invalid-name
         try:
             index = ip.link_lookup(ifname=interface_name)[0]
             ip.link("set", index=index, state="down")
@@ -317,9 +425,7 @@ class CBMAAdaptation(object):
             self.logger.error("Error configuring BATMAN interface: %s", e)
 
     def __destroy_batman_interface(self, mesh_interface: str) -> None:
-        # pylint: disable=invalid-name
         ip = IPRoute()
-        # pylint: enable=invalid-name
         try:
             ip.link("delete", ifname=mesh_interface)
         except Exception as e:
@@ -447,15 +553,16 @@ class CBMAAdaptation(object):
             self.logger.debug(
                 f"Link-local IPv6 address not found for interface {if_name}"
             )
-            return
+            return False
         index = socket.if_nametoindex(if_name)
 
         # Now we wait until the interface is ready
         start_time = time.time()
         while True:
             try:
-                socket.create_server((link_local_address, 0, 0, index),
-                                     family=socket.AF_INET6)
+                socket.create_server(
+                    (link_local_address, 0, 0, index), family=socket.AF_INET6
+                )
                 return True
             except Exception:
                 elapsed_time = time.time() - start_time
@@ -469,13 +576,15 @@ class CBMAAdaptation(object):
         :return: The random MAC address
         """
         if randomized:
-            mac = [random.randint(0x00, 0xff) for _ in range(6)]  # Generate 6 random bytes
-            mac[0] &= 0xfc  # Clear multicast and locally administered bits
+            mac = [
+                random.randint(0x00, 0xFF) for _ in range(6)
+            ]  # Generate 6 random bytes
+            mac[0] &= 0xFC  # Clear multicast and locally administered bits
             mac[0] |= 0x02  # Set the locally administered bit
-            return ':'.join(['%02x' % byte for byte in mac])
+            return ":".join(["%02x" % byte for byte in mac])
         else:
             # Split MAC address into octets and flip the locally administered bit
-            octets = interface_mac.split(':')
+            octets = interface_mac.split(":")
             first_octet = int(octets[0], 16)
             flipped_first_octet = first_octet ^ 2
 
@@ -491,11 +600,10 @@ class CBMAAdaptation(object):
                     break
 
         self.__get_interfaces()
-        self.__set_batman_routing_algo("BATMAN_V")
+        self.__set_batman_routing_algo(self.__batman_ra)
         # if_name MAC and flip the locally administered bit
         self.__create_batman_interface(
-            self.LOWER_BATMAN,
-            self.__create_mac(False, self.__get_mac_addr(if_name))
+            self.LOWER_BATMAN, self.__create_mac(False, self.__get_mac_addr(if_name))
         )
         self.__configure_batman_interface(self.LOWER_BATMAN)
         self.__create_batman_interface(self.UPPER_BATMAN)
@@ -510,6 +618,9 @@ class CBMAAdaptation(object):
         self.__wait_for_interface(self.UPPER_BATMAN)
 
     def stop_radios(self) -> bool:
+        """
+        Stops radios
+        """
         # Create command to stop all radios
         cmd = json.dumps(
             {
@@ -562,7 +673,6 @@ class CBMAAdaptation(object):
         """
         Sets up both upper and lower CBMA.
         """
-        self.__cleanup_cbma()
         self.__init_batman_and_bridge()
 
         self.__update_cbma_interface_lists()
@@ -613,18 +723,18 @@ class CBMAAdaptation(object):
             return False
 
     def __get_link_local_ipv6_address(self, interface_name: str) -> str:
-            with IPRoute() as ip:
-                index = ip.link_lookup(ifname=interface_name)[0]
-                addresses = ip.get_addr(index=index)
+        with IPRoute() as ip:
+            index = ip.link_lookup(ifname=interface_name)[0]
+            addresses = ip.get_addr(index=index)
 
-                for addr in addresses:
-                    ip_address = addr.get_attrs("IFA_ADDRESS")[0]
-                    prefix_length = int(addr["prefixlen"])
-                    if self.__is_valid_ipv6_local((ip_address, prefix_length)):
-                        ip.close()
-                        return ip_address
-                ip.close()
-            return ''
+            for addr in addresses:
+                ip_address = addr.get_attrs("IFA_ADDRESS")[0]
+                prefix_length = int(addr["prefixlen"])
+                if self.__is_valid_ipv6_local((ip_address, prefix_length)):
+                    ip.close()
+                    return ip_address
+            ip.close()
+        return ""
 
     def __add_global_ipv6_address(self, interface_name: str, new_prefix: str) -> None:
         """
@@ -738,7 +848,9 @@ class CBMAAdaptation(object):
             chain: list[str] = [self.__upper_cbma_ca_cert_path]
             ca: str = ""
         else:  # use birth certs
-            self.logger.warning("Using lower cbma certificate as a backup for interface")
+            self.logger.warning(
+                "Using lower cbma certificate as a backup for interface"
+            )
 
             cert_dir: str = f"{self.__cbma_certs_path}/MAC/"
             key: str = f"{self.__cbma_certs_path}/private.key"
@@ -774,17 +886,13 @@ class CBMAAdaptation(object):
         self.__shutdown_interface(self.LOWER_BATMAN)
         self.__shutdown_interface(self.UPPER_BATMAN)
 
-        # HACK: remove
-        # self.__delete_ebtables_rules()
-        # self.__delete_macsec_links()
-
         self.__destroy_batman_interface(self.LOWER_BATMAN)
         self.__destroy_batman_interface(self.UPPER_BATMAN)
-        # HACK: How can we know that "br-upper" even exists and who owns it?
-        self.__shutdown_and_delete_bridge("br-upper")
+
+        self.__delete_vlan_interfaces()
         self.__shutdown_and_delete_bridge(self.BR_NAME)
 
-    def stop_cbma(self) -> bool:
+    def stop_cbma(self) -> None:
         """
         Stops CBMA by terminating CBMA processes. Also
         destroys batman and bridge interfaces.
@@ -798,11 +906,9 @@ class CBMAAdaptation(object):
             self.__upper_cbma_controller.stop()
 
             self.logger.debug("CBMA processes terminated, continue cleanup...")
-            self.__cleanup_cbma()
-            self.logger.debug("CBMA cleanup finished")
-
         except Exception as e:
             self.logger.error(f"Stop CBMA error: {e}")
         finally:
+            self.__cleanup_cbma()
+            self.logger.debug("CBMA cleanup finished")
             self.__cbma_set_up = False
-        return False
