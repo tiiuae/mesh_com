@@ -1,0 +1,40 @@
+###########################
+# Mesh Shield config file #
+###########################
+
+# All the interfaces are black by default.
+# Excluded interfaces or interfaces without macsec certificates are not added to lower CBMA.
+# White interfaces are added to upper CBMA and are excluded automatically from lower CBMA.
+# Red interfaces will be added to br_lan no matter is CBMA enabled for those interfaces or not.
+
+CBMA:
+  exclude_interfaces: 
+    - eth0
+    - eth1
+    - usb0
+    - lan1
+    - lan2
+    - lan3
+    - vlan_black
+    - vlan_red
+  white_interfaces: 
+    - halow1
+  red_interfaces:
+    - wlan1
+    - vlan_red
+
+BATMAN:
+  routing_algo: BATMAN_V
+
+VLAN:
+  vlan_black:
+    parent_interface: eth0
+    vlan_id: 100
+    ipv4_address: 192.168.1.1
+    ipv4_subnet_mask: 255.255.255.0
+  vlan_red:
+    parent_interface: eth0
+    vlan_id: 90
+    ipv4_address: 192.168.2.1
+    ipv4_subnet_mask: 255.255.255.0
+  

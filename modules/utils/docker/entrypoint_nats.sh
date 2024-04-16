@@ -33,6 +33,12 @@ else
       sleep 1
   done
 
+  # Move default config to root of /opt
+  if [ ! -f "/opt/ms_config.yaml" ]; then
+      echo "Create /opt/ms_config.yaml"
+      cp /opt/nats/conf/default_ms_config.yaml /opt/ms_config.yaml
+  fi
+
   #######################################
   # Enable MDM stuff                    #
   #######################################
