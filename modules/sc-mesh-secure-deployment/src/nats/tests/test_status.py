@@ -21,7 +21,6 @@ class TestCommsStatus(unittest.TestCase):
                 assert comms_status.ap_interface_name == ""
                 assert comms_status.mesh_interface_name == ""
 
-
     def test_wpa_status_reset(self):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", ResourceWarning)
