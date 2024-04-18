@@ -1,36 +1,20 @@
-from typing import List
+"""
+Helper module to register and unregister services in DNS-SD.
+"""
+from typing import Optional
 from zeroconf import Zeroconf, IPVersion, ServiceInfo
-import socket
-import psutil
 
 
 SERVICE_TYPE: str = '_mdm._tcp.local.'
 SERVICE_NAME: str = 'MDM Service'
 HOSTNAME: str = 'defaultmdm.local'
 
-IPV4_ANY_ADDR: str = '127.0.0.1'
-IPV6_ANY_ADDR: str = '::'
+IPV4_ANY_ADDR: bytes = b'\x7f\x00\x00\x01'
+IPV6_ANY_ADDR: bytes = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01'
 
-info: ServiceInfo = None
-zeroconf: Zeroconf = None
+info: Optional[ServiceInfo] = None
+zeroconf: Optional[Zeroconf] = None
 kwargs_dict: dict = {}
-
-
-def get_interface_addresses(interface: str) -> List[bytes]:
-    """
-    Get interface addresses.
-    """
-    attributes: List = psutil.net_if_addrs().get(interface, [])
-    addresses: List[bytes] = []
-    for attr in attributes:
-        if socket.AddressFamily.AF_INET == attr.family:
-            addresses.append(socket.inet_aton(attr.address))
-        if socket.AddressFamily.AF_INET6 == attr.family:
-            address: str = str(attr.address).replace(f'%{interface}', '')
-            addresses.append(socket.inet_pton(socket.AF_INET6, address))
-
-    return addresses
-
 
 def dns_service_register() -> None:
     """
@@ -44,7 +28,7 @@ def dns_service_register() -> None:
     global info, zeroconf
     info = ServiceInfo(type_=SERVICE_TYPE,
                        name=f'{SERVICE_NAME}.{SERVICE_TYPE}',
-                       addresses=get_interface_addresses("lo"),
+                       addresses=[IPV4_ANY_ADDR, IPV6_ANY_ADDR],
                        port=5000,
                        properties={'description': SERVICE_NAME},
                        server=f'{HOSTNAME}.')
@@ -60,7 +44,6 @@ def dns_service_unregister() -> None:
     return:
         None
     """
-    global info, zeroconf
     zeroconf.unregister_service(info)
     zeroconf.close()
 
@@ -85,5 +68,4 @@ def get_kwargs_dict() -> dict:
     return:
         dict
     """
-    global kwargs_dict
     return kwargs_dict

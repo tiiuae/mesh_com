@@ -41,11 +41,3 @@ class ConfigStore:
             return self.state[key]
         except (KeyError, AttributeError):
             return None
-
-if __name__ == '__main__':
-    # Example usage
-
-    state_manager = ConfigStore("/tmp/test.yaml")
-    print(state_manager.read(constants.ConfigType.MESH_CONFIG.value))
-    state_manager.store(constants.ConfigType.DEBUG_CONFIG.value, True)
-    print(state_manager.read(constants.ConfigType.DEBUG_CONFIG.value))

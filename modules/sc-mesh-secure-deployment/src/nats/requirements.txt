@@ -1,0 +1,14 @@
+# common and mdm agent
+zeroconf==0.119.0
+netifaces==0.11.0
+cryptography==3.3.2
+requests==2.26.0
+PyYAML==6.0.1
+pyroute2==0.5.7
+pyOpenSSL==19.1.0
+
+# FMO
+nats-py==2.1.7
+PyKCS11==1.5.10
+pycryptodome==3.14.1
+asn1crypto==1.4.0

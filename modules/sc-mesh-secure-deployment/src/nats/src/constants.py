@@ -33,16 +33,20 @@ class Constants(Enum):
     Constants class
     """
 
+    # Root of the mesh_shield
+
+    ROOT_PATH: str = "/opt"
+
     # Features YAML file
     YAML_FILE: str = (
-        "/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features.yaml"
+        f"{ROOT_PATH}/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features.yaml"
     )
 
     # filebased certs and keys
-    DOWNLOADED_CBMA_UPPER_PATH: str = "/opt/certs/CBMA/UpperCBMA"
-    DOWNLOADED_CBMA_LOWER_PATH: str = "/opt/certs/CBMA/LowerCBMA"
-    DOWNLOADED_CBMA_BIRTHCERTS_PATH: str = "/opt/certs/CBMA/BirthCerts"
-    GENERATED_CERTS_PATH: str = "/opt/crypto"
+    DOWNLOADED_CBMA_UPPER_PATH: str = f"{ROOT_PATH}/certs/CBMA/UpperCBMA"
+    DOWNLOADED_CBMA_LOWER_PATH: str = f"{ROOT_PATH}/certs/CBMA/LowerCBMA"
+    DOWNLOADED_CBMA_BIRTHCERTS_PATH: str = f"{ROOT_PATH}/certs/CBMA/BirthCerts"
+    GENERATED_CERTS_PATH: str = f"{ROOT_PATH}/crypto"
 
     # CBMA
     CBMA_PORT_UPPER: int = 15002
@@ -58,13 +62,3 @@ class Constants(Enum):
 
     OK_POLLING_TIME_SECONDS: int = 600
     FAIL_POLLING_TIME_SECONDS: int = 1
-
-if __name__ == "__main__":
-    # Usage
-    print(Constants.YAML_FILE.value)
-
-    # Trying to modify a constant will result in an AttributeError
-    try:
-        Constants.YAML_FILE.value= "test"
-    except AttributeError:
-        print("AttributeError: Constant cannot be modified == OK")
