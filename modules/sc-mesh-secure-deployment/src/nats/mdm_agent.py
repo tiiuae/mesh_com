@@ -33,17 +33,7 @@ from src import comms_service_discovery
 from src.constants import Constants, ConfigType, StatusType
 from src import comms_config_store
 from src import cbma_adaptation
-
-# pylint: disable=too-few-public-methods
-class Interface:
-    """
-    Class to store interface name, operationstatus and MAC address
-    """
-
-    def __init__(self, interface_name, operstat, mac_address):
-        self.interface_name = interface_name
-        self.operstat = operstat
-        self.mac_address = mac_address
+from src.interface import Interface
 
 
 # pylint: enable=too-few-public-methods

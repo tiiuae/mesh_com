@@ -19,7 +19,7 @@ from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
 from src import cbma_paths
 from src.comms_controller import CommsController
 from src.constants import Constants
-from mdm_agent import Interface
+from src.interface import Interface
 from src import comms_config_store
 
 from controller import CBMAController
