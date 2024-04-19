@@ -83,11 +83,22 @@ class CBMAAdaptation(object):
         # Default routing algo
         self.__batman_ra = "BATMAN_V"
 
+        self.__config = None
+        self.__cbma_config = None
+        self.__batman_config = None
+        self.__vlan_config = None
+        self.__hop_penalty = None
+
         # Read configs from file
-        self.__config = comms_config_store.ConfigStore("/opt/ms_config.yaml")
-        self.__cbma_config = self.__config.read("CBMA")
-        self.__batman_config = self.__config.read("BATMAN")
-        self.__vlan_config = self.__config.read("VLAN")
+        try:
+            self.__config = comms_config_store.ConfigStore("/opt/ms_config.yaml")
+        except Exception as e:
+            self.logger.error(f"Error reading config file: {e}")
+
+        if self.__config is not None:
+            self.__cbma_config = self.__config.read("CBMA")
+            self.__batman_config = self.__config.read("BATMAN")
+            self.__vlan_config = self.__config.read("VLAN")
 
         # Extend/update default configs using yaml file content
         if self.__cbma_config:
@@ -107,8 +118,11 @@ class CBMAAdaptation(object):
 
         if self.__batman_config:
             batman_ra = self.__batman_config.get("routing_algo")
+            self.__hop_penalty = self.__batman_config.get("hop_penalty")
             self.logger.info(f"Batman routing algo config: {batman_ra}")
-            if batman_ra:
+            self.logger.info(f"Batman hop penalty config: {self.__hop_penalty}")
+
+            if batman_ra in ["BATMAN_V", "BATMAN_IV"]:
                 self.__batman_ra = batman_ra
 
         # Create VLAN interfaces if configured
@@ -125,6 +139,8 @@ class CBMAAdaptation(object):
             vlan_id = str(vlan_data.get("vlan_id"))
             ipv4_address = vlan_data.get("ipv4_address")
             ipv4_subnet_mask = vlan_data.get("ipv4_subnet_mask")
+            ipv6_address = vlan_data.get("ipv6_local_address")
+            ipv6_prefix_length = vlan_data.get("ipv6_prefix_length")
 
             if parent_interface and vlan_id:
                 try:
@@ -150,9 +166,7 @@ class CBMAAdaptation(object):
                     )
 
                     # Bring VLAN interface up
-                    subprocess.run(
-                        ["ip", "link", "set", vlan_name, "up"], check=True
-                    )
+                    subprocess.run(["ip", "link", "set", vlan_name, "up"], check=True)
 
                     if ipv4_address and ipv4_subnet_mask:
                         # Set IPv4 address and subnet mask
@@ -162,6 +176,20 @@ class CBMAAdaptation(object):
                                 "addr",
                                 "add",
                                 f"{ipv4_address}/{ipv4_subnet_mask}",
+                                "dev",
+                                vlan_name,
+                            ],
+                            check=True,
+                        )
+
+                    if ipv6_address and ipv6_prefix_length:
+                        # Set IPv6 address and prefix length
+                        subprocess.run(
+                            [
+                                "ip",
+                                "addr",
+                                "add",
+                                f"{ipv6_address}/{ipv6_prefix_length}",
                                 "dev",
                                 vlan_name,
                             ],
@@ -424,6 +452,105 @@ class CBMAAdaptation(object):
         except subprocess.CalledProcessError as e:
             self.logger.error("Error configuring BATMAN interface: %s", e)
 
+    def __set_hop_penalty(self) -> None:
+        if self.__hop_penalty is None:
+            return
+        # Set hop penalty for mesh interfaces
+        meshif_hop_penalty = self.__hop_penalty.get("meshif", {})
+        if meshif_hop_penalty is not None:
+            for interface, penalty in meshif_hop_penalty.items():
+                self.logger.info(f"interface: {interface}, penalty {penalty}")
+                try:
+                    subprocess.run(
+                        ["batctl", "meshif", interface, "hop_penalty", str(penalty)],
+                        check=True,
+                    )
+                except Exception as e:
+                    self.logger.info(
+                        "Failed to set hop penalty %s for: %s. Error: %s",
+                        penalty,
+                        interface,
+                        e,
+                    )
+
+        # Set hop penalty for hard interfaces
+        hardif_hop_penalty = self.__hop_penalty.get("hardif", {})
+        self.logger.info(f"hardif_hop_penalty: {hardif_hop_penalty}")
+        if hardif_hop_penalty is not None:
+            for interface, penalty in hardif_hop_penalty.items():
+                try:
+                    # Try from lower batman first
+                    hardif = self.__find_batman_hardif(interface, self.LOWER_BATMAN)
+                    if hardif is None:
+                        hardif = self.__find_batman_hardif(interface, self.UPPER_BATMAN)
+                    if hardif:
+                        subprocess.run(
+                            ["batctl", "hardif", hardif, "hop_penalty", str(penalty)],
+                            check=True,
+                        )
+                except Exception as e:
+                    self.logger.info(
+                        "Failed to set hop penalty %s for: %s. Error: %s",
+                        penalty,
+                        interface,
+                        e,
+                    )
+
+    def __find_batman_hardif(self, interface: str, batman_if: str) -> str:
+        # Check if the interface exists in the batctl if list
+        try:
+            batctl_output = subprocess.check_output(["batctl", batman_if, "if"]).decode(
+                "utf-8"
+            )
+            if interface in batctl_output:
+                self.logger.info(
+                    "Interface %s found in %s interface list.", interface, batman_if
+                )
+                return interface
+        except subprocess.CalledProcessError as e:
+            self.logger.warning(
+                "Interface %s not found in %s interface list. Error: %s",
+                interface,
+                batman_if,
+                e,
+            )
+
+        # If interface is not found, try to find it using MAC address
+        mac_address = self.__get_mac_addr(interface).replace(":", "")
+        if mac_address:
+            try:
+                self.logger.debug(
+                    f"Find hardif with mac: {mac_address} from {batman_if}"
+                )
+                batctl_output = subprocess.check_output(
+                    ["batctl", batman_if, "if"]
+                ).decode("utf-8")
+                # batctl_output can contain multpile lines with syntax like:
+                # lmb00301a4fc7d5: active
+                for line in batctl_output.splitlines():
+                    # Get characters before colon characters
+                    interface_match = re.search(r"^(.*?):", line)
+                    if interface_match:
+                        interface_name = interface_match.group(1)
+                        # If name contains expected mac?
+                        if mac_address in interface_name:
+                            self.logger.info(
+                                "Interface %s found in %s interface list.",
+                                interface_name,
+                                batman_if,
+                            )
+                            return interface_name
+            except subprocess.CalledProcessError as e:
+                self.logger.error(
+                    "Interface %s not found in %s if list with mac %s. Error: %s",
+                    interface,
+                    batman_if,
+                    mac_address,
+                    e,
+                )
+
+        return None
+
     def __destroy_batman_interface(self, mesh_interface: str) -> None:
         ip = IPRoute()
         try:
@@ -572,7 +699,8 @@ class CBMAAdaptation(object):
 
     def __create_mac(self, randomized: bool = False, interface_mac: str = "") -> str:
         """
-        Create a random MAC address or flip the locally administered bit of the given MAC address
+        Create a random MAC address or flip the locally administered bit of the given
+        MAC address.
         :return: The random MAC address
         """
         if randomized:
@@ -581,7 +709,7 @@ class CBMAAdaptation(object):
             ]  # Generate 6 random bytes
             mac[0] &= 0xFC  # Clear multicast and locally administered bits
             mac[0] |= 0x02  # Set the locally administered bit
-            return ":".join(["%02x" % byte for byte in mac])
+            return bytes(mac).hex(sep=':', bytes_per_sep=1)
         else:
             # Split MAC address into octets and flip the locally administered bit
             octets = interface_mac.split(":")
@@ -683,6 +811,9 @@ class CBMAAdaptation(object):
         # setup cbma
         self.__setup_lower_cbma()
         self.__setup_upper_cbma()
+
+        # Set batman hop penalty
+        self.__set_hop_penalty()
 
         # Add interfaces to the bridge
         for interface in self.__red_interfaces:
