@@ -109,34 +109,34 @@ class CBMAController(ICBMAController):
 
 
     def start_interface(self, interface: str) -> bool:
-        logger.info(f"Starting CBMA in ${interface}")
+        logger.info(f"Starting CBMA in {interface}")
         if not (process := self.processes.get(interface, None)):
-            logger.error(f"No existing CBMA process found for ${interface}")
+            logger.error(f"No existing CBMA process found for {interface}")
             return False
         if self.is_interface_running(interface):
-            logger.debug(f"CBMA is already running in ${interface}")
+            logger.debug(f"CBMA is already running in {interface}")
             return True
 
         process.start()
         process.join(timeout=self.PROCESS_START_TIMEOUT)
         if not process.is_alive():
-            logger.error(f"Unable to start CBMA in ${interface}")
+            logger.error(f"Unable to start CBMA in {interface}")
             return False
-        logger.debug(f"Successfully started CBMA in ${interface}")
+        logger.debug(f"Successfully started CBMA in {interface}")
         return True
 
 
     def stop_interface(self, interface: str) -> bool:
-        logger.info(f"Stopping CBMA in ${interface}")
+        logger.info(f"Stopping CBMA in {interface}")
         if not (process := self.processes.get(interface, None)):
-            logger.error(f"No existing CBMA process found for ${interface}")
+            logger.error(f"No existing CBMA process found for {interface}")
             return False
         if not self.is_interface_running(interface):
-            logger.debug(f"CBMA is already stopped in ${interface}")
+            logger.debug(f"CBMA is already stopped in {interface}")
             return True
         if not self.__stop_interface_process(interface, process):
             return False
-        logger.debug(f"Successfully stopped CBMA in ${interface}")
+        logger.debug(f"Successfully stopped CBMA in {interface}")
         return True
 
 
