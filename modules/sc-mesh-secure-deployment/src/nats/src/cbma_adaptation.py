@@ -20,6 +20,7 @@ from src import cbma_paths
 from src.comms_controller import CommsController
 from src.constants import Constants
 from src.interface import Interface
+from src.radio_adaptation import RadioAdaptation
 from src import comms_config_store
 
 from controller import CBMAController
@@ -44,6 +45,7 @@ class CBMAAdaptation(object):
         self.__comms_ctrl: CommsController = comms_ctrl
         self.logger: logging.Logger = logger.getChild("CBMAAdaptation")
         self.logger.setLevel(logging.INFO)
+        self.__radio_control: RadioAdaptation = RadioAdaptation(comms_ctrl, logger)
         self.__interfaces: List[Interface] = []
         self.__lock = lock
         self.__cbma_set_up = False  # Indicates whether CBMA has been configured
@@ -113,6 +115,30 @@ class CBMAAdaptation(object):
 
         # Create VLAN interfaces if configured
         self.__create_vlan_interfaces()
+
+    def get_cbma_initialized(self) -> bool:
+        """
+        Returns whether CBMA has been initialized
+
+        :return: True if CBMA has been initialized, False otherwise
+        """
+        return self.__cbma_set_up
+
+    def get_upper_cbma_interfaces(self) -> List[Interface]:
+        """
+        Get the upper CBMA interfaces
+
+        :return: The upper CBMA interfaces
+        """
+        return self.__upper_cbma_interfaces
+
+    def get_lower_cbma_interfaces(self) -> List[Interface]:
+        """
+        Get the lower CBMA interfaces
+
+        :return: The lower CBMA interfaces
+        """
+        return self.__lower_cbma_interfaces
 
     def __create_vlan_interfaces(self) -> None:
         if not self.__vlan_config:
@@ -621,36 +647,19 @@ class CBMAAdaptation(object):
         """
         Stops radios
         """
-        # Create command to stop all radios
-        cmd = json.dumps(
-            {
-                "api_version": 1,
-                "cmd": "DOWN",
-                "radio_index": "*",
-            }
-        )
 
-        ret, _, _ = self.__comms_ctrl.command.handle_command(cmd, self.__comms_ctrl)
+        ret = self.__radio_control.stop()
 
-        if ret != "OK":
+        if not ret:
             self.logger.error("Error: Unable to bring down the radio interfaces!")
             return False
-
         return True
 
     def __setup_radios(self) -> bool:
-        # Create command to start all radios
-        cmd = json.dumps(
-            {
-                "api_version": 1,
-                "cmd": "UP",
-                "radio_index": "*",
-            }
-        )
 
-        ret, _, _ = self.__comms_ctrl.command.handle_command(cmd, self.__comms_ctrl)
+        ret = self.__radio_control.start()
 
-        if ret != "OK":
+        if not ret:
             self.logger.error("Error: Unable to bring up the radio interfaces!")
             return False
 
@@ -669,7 +678,52 @@ class CBMAAdaptation(object):
 
         return True
 
-    def setup_cbma(self) -> bool:
+
+    def interface_status_handler(self, change_lower: List[Interface], change_upper: List[Interface]):
+        """
+        Handle interface status changes mika
+        """
+
+        self.logger.debug("Interface status change detected")
+        self.logger.debug("Change lower: %s", change_lower)
+        self.logger.debug("Change upper: %s", change_upper)
+
+        if not self.__cbma_set_up:
+            return
+
+        for interface in change_lower:
+
+            interface_config_index = self.__radio_control.get_radio_index(interface.interface_name)
+
+            if (interface.operstat == "DOWN" and
+                    self.__lower_cbma_controller.is_interface_running(interface.interface_name)):
+                if interface_config_index:
+                    self.__radio_control.stop(interface_config_index)
+                self.__lower_cbma_controller.remove_interface(interface.interface_name)
+            elif (interface.operstat == "UP" and
+                  not self.__lower_cbma_controller.is_interface_running(interface.interface_name)):
+                if interface_config_index:
+                    self.__radio_control.start(interface_config_index)
+                    self.__wait_for_interface(interface.interface_name)
+                self.__lower_cbma_controller.add_interface(interface.interface_name)
+
+        for interface in change_upper:
+
+            interface_config_index = self.__radio_control.get_radio_index(interface.interface_name)
+
+            if (interface.operstat == "DOWN" and
+                    self.__upper_cbma_controller.is_interface_running(interface.interface_name)):
+                if interface_config_index:
+                    self.__radio_control.stop(interface_config_index)
+                self.__upper_cbma_controller.remove_interface(interface.interface_name)
+            elif (interface.operstat == "UP" and
+                  not self.__upper_cbma_controller.is_interface_running(interface.interface_name)):
+                if interface_config_index:
+                    self.__radio_control.start(interface_config_index)
+                    self.__wait_for_interface(interface.interface_name)
+                self.__upper_cbma_controller.add_interface(interface.interface_name)
+
+    def setup_cbma(self) -> None:
         """
         Sets up both upper and lower CBMA.
         """
@@ -697,9 +751,6 @@ class CBMAAdaptation(object):
         self.__add_global_ipv6_address(self.LOWER_BATMAN, self.__IPV6_WHITE_PREFIX)
 
         self.__cbma_set_up = True
-
-        # todo what about the false return value?
-        return True
 
     def __is_valid_ipv6_local(self, address: tuple[str, int]) -> bool:
         """

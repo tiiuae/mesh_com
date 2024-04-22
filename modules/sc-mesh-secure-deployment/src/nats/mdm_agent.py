@@ -15,7 +15,6 @@ import tarfile
 import shutil
 import socket
 import ssl
-
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from typing import List
@@ -27,12 +26,10 @@ from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519
 import requests
 import yaml
 
-from src import comms_if_monitor
-from src import comms_controller
-from src import comms_service_discovery
+from src.event import Events, Event
+from src import (comms_if_monitor, comms_controller, comms_service_discovery,
+                 comms_config_store, cbma_adaptation, radio_adaptation)
 from src.constants import Constants, ConfigType, StatusType
-from src import comms_config_store
-from src import cbma_adaptation
 from src.interface import Interface
 
 
@@ -50,20 +47,29 @@ class MdmAgent:
         certificate_file: str = None,
         ca_file: str = None,
         interface: str = None,
+        queue: asyncio.Queue = None,
+        loop: asyncio.AbstractEventLoop = None,
     ):
         """
         Constructor
         """
+        self.queue = queue
+        self.loop = loop
         self.__config_store = comms_config_store.ConfigStore("/opt/dl_configs_store.yaml")
-        self.__previous_config_mesh: Optional[str] = self.__config_store.read(ConfigType.MESH_CONFIG.value)
-        self.__previous_config_features: Optional[str] = self.__config_store.read(ConfigType.FEATURES.value)
-        self.__previous_config_certificates: Optional[str] = self.__config_store.read(ConfigType.BIRTH_CERTIFICATE.value)
-        self.__previous_debug_config: Optional[str] = self.__config_store.read(ConfigType.DEBUG_CONFIG.value)
+        self.__previous_config_mesh: Optional[str] = (
+            self.__config_store.read(ConfigType.MESH_CONFIG.value))
+        self.__previous_config_features: Optional[str] = (
+            self.__config_store.read(ConfigType.FEATURES.value))
+        self.__previous_config_certificates: Optional[str] = (
+            self.__config_store.read(ConfigType.BIRTH_CERTIFICATE.value))
+        self.__previous_debug_config: Optional[str] = (
+            self.__config_store.read(ConfigType.DEBUG_CONFIG.value))
         self.__mesh_conf_request_processed = False
         self.__comms_ctrl: comms_controller.CommsController = comms_ctrl
         self.logger: logging.Logger = self.__comms_ctrl.logger.getChild("mdm_agent")
-        self.__interval: int = Constants.FAIL_POLLING_TIME_SECONDS.value  # TODO: possible to update from MDM server?
-        self.__debug_config_interval: int = Constants.FAIL_POLLING_TIME_SECONDS.value  # TODO: possible to update from MDM server?
+        self.interval: int = Constants.FAIL_POLLING_TIME_SECONDS.value
+        # TODO: possible to update from MDM server?
+        self.debug_config_interval: int = Constants.FAIL_POLLING_TIME_SECONDS.value
 
         self.__url: str = "defaultmdm.local:5000"  # mDNS callback updates this one
         self.__keyfile: str = keyfile
@@ -72,6 +78,7 @@ class MdmAgent:
         self.__config_version: int = 0
         self.mdm_service_available: bool = False
         self.__if_to_monitor: str = interface
+        self.__previous_interfaces: List[Interface] = []
         self.__interfaces: List[Interface] = []
         self.executor = ThreadPoolExecutor(1)
         self.__lock = threading.Lock()
@@ -97,7 +104,6 @@ class MdmAgent:
             target=self.interface_monitor.monitor_interfaces
         )
 
-        self.__cbma_set_up = False  # Indicates whether CBMA has been configured
         try:
             with open("/opt/certs_uploaded", "r", encoding="utf-8") as f:
                 self.__certs_uploaded = True
@@ -107,7 +113,6 @@ class MdmAgent:
             self.logger.debug("Certificate upload needed")
 
         self.__cbma_certs_downloaded = "/opt/mdm/certs"
-        self.running = False
 
         try:
             self.__certs_downloaded = bool(os.listdir(self.__cbma_certs_downloaded))
@@ -144,6 +149,8 @@ class MdmAgent:
         except FileNotFoundError:
             self.__device_id = "default"
 
+        self.__radio_control = radio_adaptation.RadioAdaptation(self.__comms_ctrl, self.logger)
+
     def mdm_server_address_cb(self, address: str, status: bool, **_) -> None:
         """
         Callback for MDM server address
@@ -156,6 +163,8 @@ class MdmAgent:
 
         if self.mdm_service_available:
             self.__get_server_cert_type()
+
+        self.queue.put_nowait(Event(Events.MDM_SERVICE_MONITOR_CB.value, self.mdm_service_available))
 
     def __get_server_cert_type(self):
         parts = self.__url.split(":")
@@ -238,6 +247,9 @@ class MdmAgent:
                         elif interface.operstat == "DOWN":
                             self.stop_service_discovery()
 
+            if Events.MDM_INTERFACE_MONITOR_CB.value not in self.queue._queue:
+                self.queue.put_nowait(Event(Events.MDM_INTERFACE_MONITOR_CB.value, None))
+
     def start_service_discovery(self):
         """
         Starts service monitor thread
@@ -266,82 +278,169 @@ class MdmAgent:
         """
         self.thread_if_mon.start()
 
-    async def execute(self) -> None: # pylint: disable=too-many-branches
+    def get_status(self) -> (dict, bool):
         """
-        Execute MDM agent
+        Print status
+        :return: status, mdm_service_available
+        """
+        return self.__status, self.mdm_service_available
+
+    async def event_handler_upload_certificates(self) -> None:  # pylint: disable=too-many-branches
+        """
+        Upload certificates event handler
+        """
+        if (
+            self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "FAIL"
+            and self.mdm_service_available
+        ):
+
+            resp = self.__upload_certificate_bundle()
+            self.logger.debug(
+                "Certificate upload response: %s", resp
+            )
+            if resp.status_code == 200:
+                self.__status[StatusType.UPLOAD_CERTIFICATES.value] = "OK"
+                with open("/opt/certs_uploaded", "w", encoding="utf-8") as f:
+                    f.write("certs uploaded")
+            else:
+                self.logger.debug("Certificate upload failed")
+
+    async def event_handler_download_certificates(self) -> None: # pylint: disable=too-many-branches
+        """
+        Download certificates event handler
         :return: -
         """
-        self.running = True
-        previous_status = ""
-        while self.running:
-            status = f"status: {self.__status}, mdm_available: {self.mdm_service_available}"
-            # to avoid flooding log file
-            if previous_status != status:
-                self.logger.debug(status)
-                previous_status = status
 
-            if (
-                self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "FAIL"
-                and self.mdm_service_available
-            ):
-                resp = self.upload_certificate_bundle()
+        if (
+            self.__status[StatusType.DOWNLOAD_CERTIFICATES.value] == "FAIL"
+            and self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "OK"
+            and self.mdm_service_available
+        ):
+
+            for certificate_type in [
+                # ConfigType.BIRTH_CERTIFICATE,
+                ConfigType.UPPER_CERTIFICATE,
+                # ConfigType.LOWER_CERTIFICATE,
+            ]:
+                resp = self.__download_certificate_bundle(certificate_type.value)
                 self.logger.debug(
-                    "Certificate upload response: %s", resp
+                    "Certificate download response: %s", resp
                 )
                 if resp.status_code == 200:
-                    self.__status[StatusType.UPLOAD_CERTIFICATES.value] = "OK"
-                    with open("/opt/certs_uploaded", "w", encoding="utf-8") as f:
-                        f.write("certs uploaded")
-                else:
-                    self.logger.debug("Certificate upload failed")
-            elif (
-                self.__status[StatusType.DOWNLOAD_CERTIFICATES.value] == "FAIL"
-                and self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "OK"
-                and self.mdm_service_available
-            ):
-                for certificate_type in [
-                    # ConfigType.BIRTH_CERTIFICATE,
-                    ConfigType.UPPER_CERTIFICATE,
-                    # ConfigType.LOWER_CERTIFICATE,
-                ]:
-                    resp = self.download_certificate_bundle(certificate_type.value)
-                    self.logger.debug(
-                        "Certificate download response: %s", resp
-                    )
-                    if resp.status_code == 200:
-                        self.__status[
-                            StatusType.DOWNLOAD_CERTIFICATES.value
-                        ] = self.__action_certificates(resp, certificate_type.value)
-                        if (
-                            self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
-                            == "OK"
-                        ):
-                            # Restart CBMA with new certificates
-                            self.__cbma_set_up = self.cbma_ctrl.stop_cbma()
-                            self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
-                        if (
-                            self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
-                            == "FAIL"
-                        ):
-                            self.logger.debug(
-                                "Certificates action failed"
-                            )
-                    else:
+                    self.__status[
+                        StatusType.DOWNLOAD_CERTIFICATES.value
+                    ] = self.__action_certificates(resp, certificate_type.value)
+                    if (
+                        self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
+                        == "OK"
+                    ):
+                        # Restart CBMA with new certificates
+                        # sets __cbma_set_up to False or to True
+                        self.cbma_ctrl.stop_cbma()
+                        self.cbma_ctrl.setup_cbma()
+                    if (
+                        self.__status[StatusType.DOWNLOAD_CERTIFICATES.value]
+                        == "FAIL"
+                    ):
                         self.logger.debug(
-                            "Certificate download failed: %s", certificate_type.value
+                            "Certificates action failed"
                         )
-            elif self.mdm_service_available:
-                await self.__loop_run_executor(self.executor, ConfigType.FEATURES)
-                await self.__loop_run_executor(self.executor, ConfigType.MESH_CONFIG)
-                if self.__mesh_conf_request_processed:
-                    await self.__loop_run_executor(
-                        self.executor, ConfigType.DEBUG_CONFIG
+                else:
+                    self.logger.debug(
+                        "Certificate download failed: %s", certificate_type.value
                     )
-            if not self.__cbma_set_up:
-                self.__cbma_set_up = self.cbma_ctrl.setup_cbma()
-            await asyncio.sleep(
-                float(min(self.__interval, self.__debug_config_interval))
-            )
+
+    async def event_handler_features_config(self) -> None:  # pylint: disable=too-many-branches
+        """
+        Mesh config event handler
+        :return: -
+        """
+        if self.mdm_service_available:
+            await self.__loop_run_executor(self.executor, ConfigType.FEATURES)
+
+    async def event_handler_mesh_config(self) -> None:  # pylint: disable=too-many-branches
+        """
+        Mesh config event handler
+        :return: -
+        """
+        if self.mdm_service_available:
+            await self.__loop_run_executor(self.executor, ConfigType.MESH_CONFIG)
+            if self.__mesh_conf_request_processed:
+                await self.__loop_run_executor(
+                    self.executor, ConfigType.DEBUG_CONFIG
+                )
+
+    async def event_service_monitor_cb(self, status: bool) -> None:
+        """
+        Event service monitor callback
+        """
+        if status and self.mdm_service_available:
+            # check status and send events for FAIL status
+            if self.__status[StatusType.DOWNLOAD_MESH_CONFIG.value] == "FAIL":
+                self.queue.put_nowait(Event(Events.MDM_CONFIG_EVENT.value, None))
+            if self.__status[StatusType.DOWNLOAD_FEATURES.value] == "FAIL":
+                self.queue.put_nowait(Event(Events.MDM_FEATURES_EVENT.value, None))
+            if self.__status[StatusType.DOWNLOAD_CERTIFICATES.value] == "FAIL":
+                self.queue.put_nowait(Event(Events.MDM_CERTIFICATES_EVENT.value, None))
+            if self.__status[StatusType.UPLOAD_CERTIFICATES.value] == "FAIL":
+                self.queue.put_nowait(
+                    Event(Events.MDM_CERTIFICATES_UPLOAD_EVENT.value, None))
+
+
+    def __compare_interfaces(self, upper_or_lower: List[Interface]) -> List[Interface]:
+        """
+        Compare interfaces
+        :param upper_or_lower: list of interfaces
+        :return: list of changed interfaces
+        """
+        change: List[Interface] = []
+
+        # Compare interfaces in lower and upper lists
+        for interface_lower in upper_or_lower:
+            # Find the corresponding interface in self.__interfaces
+            found = False
+            for prev_interface in self.__previous_interfaces:
+                if prev_interface.interface_name == interface_lower.interface_name:
+                    for interface in self.__interfaces:
+                        if interface.interface_name == interface_lower.interface_name:
+                            found = True
+                            # Check if operstat has changed
+                            if interface.operstat != interface_lower.operstat:
+                                change.append(interface_lower)
+                            break
+            # If the interface is not found in self.__interfaces, it's a new interface
+            if not found:
+                change.append(interface_lower)
+
+        return change
+
+
+
+    async def event_interface_monitor_cb(self) -> None:
+        """
+        Event interface monitor callback mika
+        """
+
+        self.logger.debug("Runtime CBMA change")
+
+        lower = self.cbma_ctrl.get_lower_cbma_interfaces()
+        upper = self.cbma_ctrl.get_upper_cbma_interfaces()
+
+        with self.__lock:
+            change_lower = self.__compare_interfaces(lower)
+            change_upper = self.__compare_interfaces(upper)
+            self.__previous_interfaces = self.__interfaces.copy()
+
+        self.cbma_ctrl.interface_status_handler(change_lower, change_upper)
+
+
+    async def event_idle_timeout(self) -> None:
+        """
+        Event idle timeout
+        """
+        # todo
+        pass
+
 
     def __http_get_device_config(self, config: ConfigType) -> requests.Response:
         """
@@ -367,9 +466,10 @@ class MdmAgent:
             )
             return requests.Response()
 
+    # pylint: disable=too-many-branches, too-many-statements
     def __action_certificates(
         self, response: requests.Response, certificate_type: str
-    ) -> str: # pylint: disable=too-many-branches, too-many-statements
+    ) -> str:
         """
         Action certificates
         :param response: HTTP response
@@ -419,7 +519,8 @@ class MdmAgent:
 
                                     # Only extract regular files that don't contain relative paths
                                     if not member.isfile() or ".." in member.name:
-                                        raise tarfile.TarError(f"Invalid/Malicious file in archive: {member.name}")
+                                        raise tarfile.TarError(
+                                            f"Invalid/Malicious file in archive: {member.name}")
 
                                     # Construct the full path where the file would be extracted
                                     file_path = os.path.join(cert_path, member.name)
@@ -504,18 +605,8 @@ class MdmAgent:
                 # Extract the radio_index
                 index_number = radio["radio_index"]
 
-                # Create the command
-                cmd = json.dumps(
-                    {
-                        "api_version": 1,
-                        "cmd": "APPLY",
-                        "radio_index": index_number,
-                    }
-                )
+                ret, info = self.__radio_control.apply(index_number)
 
-                ret, info, _ = self.__comms_ctrl.command.handle_command(
-                    cmd, self.__comms_ctrl
-                )
                 self.logger.debug("ret: %s info: %s", ret, info)
 
             if ret == "OK":
@@ -561,7 +652,8 @@ class MdmAgent:
                     file_handle.write(features_yaml)
 
                 self.__config_store.store(ConfigType.FEATURES.value, response.text.strip())
-                self.__previous_config_features = self.__config_store.read(ConfigType.FEATURES.value)
+                self.__previous_config_features = (
+                    self.__config_store.read(ConfigType.FEATURES.value))
                 return "OK"
 
             self.logger.error("No features field in config")
@@ -591,7 +683,7 @@ class MdmAgent:
         ):
             self.__previous_debug_config = response.text.strip()
             self.__config_store.store(ConfigType.DEBUG_CONFIG.value, self.__previous_debug_config)
-            self.__debug_config_interval = Constants.OK_POLLING_TIME_SECONDS.value
+            self.debug_config_interval = Constants.OK_POLLING_TIME_SECONDS.value
             ret = "OK"
         else:
             # radio configuration actions
@@ -604,7 +696,7 @@ class MdmAgent:
 
         return ret
 
-    def download_certificate_bundle(
+    def __download_certificate_bundle(
         self, certificate_type: str = ""
     ) -> requests.Response:
         """
@@ -642,7 +734,7 @@ class MdmAgent:
             )
         return requests.Response()
 
-    def upload_certificate_bundle(self) -> requests.Response:
+    def __upload_certificate_bundle(self) -> requests.Response:
         """
         Upload certificate bundle
         :return: HTTP response
@@ -779,15 +871,15 @@ class MdmAgent:
                 response.status_code == 200
                 and self.__previous_debug_config == response.text.strip()
             ):
-                self.__debug_config_interval = Constants.OK_POLLING_TIME_SECONDS.value
+                self.debug_config_interval = Constants.OK_POLLING_TIME_SECONDS.value
                 self.__mesh_conf_request_processed = False
             elif response.text.strip() == "" or response.status_code != 200:
-                self.__debug_config_interval = Constants.FAIL_POLLING_TIME_SECONDS.value
+                self.debug_config_interval = Constants.FAIL_POLLING_TIME_SECONDS.value
                 if response.status_code == 405:
                     self.logger.debug(
                         "MDM Server has no support for debug mode"
                     )
-                    self.__debug_config_interval = (
+                    self.debug_config_interval = (
                         Constants.OK_POLLING_TIME_SECONDS.value
                     )
                     self.__mesh_conf_request_processed = False
@@ -804,12 +896,67 @@ class MdmAgent:
 
             # if all statuses are OK, then we can start the OK polling
             if all(value == "OK" for value in self.__status.values()):
-                self.__interval = Constants.OK_POLLING_TIME_SECONDS.value
+                self.interval = Constants.OK_POLLING_TIME_SECONDS.value
             else:
-                self.__interval = Constants.FAIL_POLLING_TIME_SECONDS.value
+                self.interval = Constants.FAIL_POLLING_TIME_SECONDS.value
 
             self.logger.debug("status: %s", self.__status)
 
+async def event(mdm: MdmAgent, queue: asyncio.Queue, logger: logging.Logger):
+    """
+    Finite State Machine
+    :param mdm: MdmAgent
+    :param queue: asyncio.Queue
+    :param logger: logging.Logger
+    :return: -
+    """
+
+    status: str = ""
+    mdm_service_available: bool = False
+
+    # setup CBMA
+    mdm.cbma_ctrl.setup_cbma()
+
+    while True:
+
+        try:
+            __event: Event = await asyncio.wait_for(queue.get(),
+                                                timeout=float(min(mdm.interval,
+                                                                  mdm.debug_config_interval)))
+            logger.info("Event: %s", __event.event_name)
+        except asyncio.TimeoutError:
+            logger.info("Timeout.. waiting event..continue")
+            await queue.put(Event(Events.MDM_HANDLER_TIMEOUT_EVENT.value, None))
+            continue
+
+        if __event.event_name not in Events.__members__:
+            continue
+
+        if __event.event_name == Events.MDM_CERTIFICATES_UPLOAD_EVENT.value:
+            await mdm.event_handler_upload_certificates()
+        elif __event.event_name == Events.MDM_SERVICE_MONITOR_CB.value:
+            # mdm server available?  check status and trigger activity
+            if __event.event_data:
+                await mdm.event_service_monitor_cb(__event.event_data)
+        elif __event.event_name == Events.MDM_CERTIFICATES_DOWNLOAD_EVENT.value:
+            await mdm.event_handler_download_certificates()
+        elif __event.event_name == Events.MDM_CONFIG_EVENT.value:
+            await mdm.event_handler_mesh_config()
+        elif __event.event_name == Events.MDM_FEATURES_EVENT.value:
+            await mdm.event_handler_features_config()
+        elif __event.event_name == Events.MDM_INTERFACE_MONITOR_CB.value:
+            await mdm.event_interface_monitor_cb()
+        elif __event.event_name == Events.MDM_HANDLER_TIMEOUT_EVENT.value:
+            await mdm.event_idle_timeout()
+        elif __event.event_name == Events.MDM_STOP_EVENT.value:
+            break
+
+        new_status, new_mdm_service_available = mdm.get_status()
+        if new_status != status or new_mdm_service_available != mdm_service_available:
+            logger.info("Status: %s, MDM Service Available: %s",
+                        new_status, new_mdm_service_available)
+            status = new_status
+            mdm_service_available = new_mdm_service_available
 
 async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) -> None:
     """
@@ -820,6 +967,7 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
     return: -
     """
     cc = comms_controller.CommsController()
+    queue = asyncio.Queue()
 
     if keyfile is None or certfile is None or ca_file is None:
         cc.logger.debug("MDM: Closing as no certificates provided")
@@ -829,20 +977,19 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
         await asyncio.sleep(1)
         asyncio.get_running_loop().stop()
 
-
     def signal_handler(signum, frame):
         sig_name = signal.Signals(signum).name
         cc.logger.debug(f"signal_handler {sig_name} ({signum}) received.")
 
-        if sig_name in ("SIGUSR1", "SIGINT", "SIGTERM"):
-            if not mdm.running:
-                # stop sequence already started
-                return
+        # if sig_name in ("SIGUSR1", "SIGINT", "SIGTERM"):
+        #     if not mdm.running:
+        #         # stop sequence already started
+        #         return
 
         cc.logger.debug("Disconnecting MDM agent...")
 
         mdm.mdm_service_available = False
-        mdm.running = False
+        queue.put(Event(Events.MDM_STOP_EVENT.value, None))
         mdm.executor.shutdown()
         mdm.interface_monitor.stop()
         mdm.cbma_ctrl.stop_cbma()
@@ -860,13 +1007,15 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
     cc.logger.debug("MDM: comms_nats_controller Listening for requests")
 
     # separate instances needed for FMO/MDM
-
-    mdm = MdmAgent(cc, keyfile, certfile, ca_file, interface)
+    mdm = MdmAgent(cc, keyfile, certfile, ca_file, interface, queue, loop)
     mdm.start_interface_monitor()
 
+    event_task_logger = cc.logger.getChild("event_task")
+    event_task = asyncio.create_task(event(mdm, queue, event_task_logger))
+
     try:
-        results = await asyncio.gather(mdm.execute())
-        cc.logger.debug("Results: %s:", results)
+        await asyncio.gather(event_task) # mdm.execute()
+        cc.logger.debug("MDM: stopped")
     except Exception as e:
         cc.logger.exception("Exception:")
     finally:

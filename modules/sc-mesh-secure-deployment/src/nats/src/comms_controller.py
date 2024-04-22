@@ -1,10 +1,9 @@
 import subprocess
 import logging
-from typing import List
-from . import comms_command
-from . import comms_settings
-from . import comms_status
-from . import comms_mesh_telemetry
+from src.comms_command import *
+from src.comms_settings import *
+from src.comms_status import *
+from src.comms_mesh_telemetry import *
 
 
 class CommsController:  # pylint: disable=too-few-public-methods
@@ -34,12 +33,12 @@ class CommsController:  # pylint: disable=too-few-public-methods
 
         for i in range(0, self.radio_amount):
             self.c_status.append(
-                comms_status.CommsStatus(
+                CommsStatus(
                     self.main_logger.getChild(f"status {str(i)}"), i
                 )
             )
 
-        self.settings = comms_settings.CommsSettings(
+        self.settings = CommsSettings(
             self.c_status, self.main_logger.getChild("settings")
         )
 
@@ -47,10 +46,10 @@ class CommsController:  # pylint: disable=too-few-public-methods
             if cstat.index < len(self.settings.mesh_vif):
                 cstat.wifi_interface = self.settings.mesh_vif[cstat.index]
 
-        self.command = comms_command.Command(
+        self.command = Command(
             self.c_status, self.main_logger.getChild("command")
         )
-        self.telemetry = comms_mesh_telemetry.MeshTelemetry(
+        self.telemetry = MeshTelemetry(
             self.interval, self.main_logger.getChild("telemetry")
         )
 
