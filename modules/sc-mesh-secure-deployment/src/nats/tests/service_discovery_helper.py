@@ -8,7 +8,7 @@ SERVICE_TYPE: str = '_mdm._tcp.local.'
 SERVICE_NAME: str = 'MDM Service'
 HOSTNAME: str = 'defaultmdm.local'
 
-IPV4_ANY_ADDR: str = '127.0.0.1'
+IPV4_ANY_ADDR: str = '10.10.10.10'
 IPV6_ANY_ADDR: str = '::'
 
 info: ServiceInfo = None

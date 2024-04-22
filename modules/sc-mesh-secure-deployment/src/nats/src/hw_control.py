@@ -2,7 +2,6 @@
 This module is used to control the provisioning LED on the SC Mesh Secure Deployment board.
 """
 import os
-import sys
 
 # pylint: disable=too-few-public-methods
 class LedControl:
@@ -120,7 +119,7 @@ class LedControl:
         """
         if self.not_supported:
             return None
-        
+
         if self.comms_pcb_version == 1:
             self._led_control_1(state)
         elif self.comms_pcb_version in (0.5, 0):
