@@ -16,7 +16,6 @@ class TestCommsInterfaceMonitor(unittest.TestCase):
         def callback(interfaces):
             global interface_data
             interface_data = interfaces
-            print(interfaces)
 
         monitor = CommsInterfaceMonitor(callback)
 
@@ -24,7 +23,10 @@ class TestCommsInterfaceMonitor(unittest.TestCase):
             target=monitor.monitor_interfaces
         )
         thread_if_mon.start()
-        time.sleep(5)
+        time.sleep(3)
+        monitor._CommsInterfaceMonitor__create_dummy_interface("unittest0")
+        monitor._CommsInterfaceMonitor__delete_dummy_interface("unittest0")
+        time.sleep(2)
         monitor.stop()
         if thread_if_mon.is_alive():
             thread_if_mon.join()

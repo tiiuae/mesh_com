@@ -10,15 +10,20 @@ class TestConstants(unittest.TestCase):
     def test_constants_values_are_immutable(self):
         with self.assertRaises(AttributeError):
             Constants.YAML_FILE.value = "new_value"
+        with self.assertRaises(AttributeError):
             ConfigType.MESH_CONFIG.value = "new_value"
+        with self.assertRaises(AttributeError):
             StatusType.DOWNLOAD_MESH_CONFIG.value = "new_value"
 
     def test_constants_values_are_correct(self):
-        assert Constants.YAML_FILE.value == "/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features.yaml"
-        assert Constants.DOWNLOADED_CBMA_UPPER_PATH.value == "/opt/certs/CBMA/UpperCBMA"
-        assert Constants.DOWNLOADED_CBMA_LOWER_PATH.value == "/opt/certs/CBMA/LowerCBMA"
-        assert Constants.DOWNLOADED_CBMA_BIRTHCERTS_PATH.value == "/opt/certs/CBMA/BirthCerts"
-        assert Constants.GENERATED_CERTS_PATH.value == "/opt/crypto"
+        root_path = Constants.ROOT_PATH.value
+        assert (Constants.YAML_FILE.value ==
+                f"{root_path}/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features.yaml")
+        assert Constants.DOWNLOADED_CBMA_UPPER_PATH.value == f"{root_path}/certs/CBMA/UpperCBMA"
+        assert Constants.DOWNLOADED_CBMA_LOWER_PATH.value == f"{root_path}/certs/CBMA/LowerCBMA"
+        assert (Constants.DOWNLOADED_CBMA_BIRTHCERTS_PATH.value ==
+                f"{root_path}/certs/CBMA/BirthCerts")
+        assert Constants.GENERATED_CERTS_PATH.value == f"{root_path}/crypto"
 
         assert ConfigType.MESH_CONFIG.value == "mesh_conf"
         assert ConfigType.BIRTH_CERTIFICATE.value == "birth_certificate"
