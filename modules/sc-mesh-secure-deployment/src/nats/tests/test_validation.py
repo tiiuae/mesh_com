@@ -4,6 +4,7 @@ Unittests for validations.py
 # pylint: disable=import-error, wrong-import-position, unused-import, \
 # disable=unresolved-reference, undefined-variable, too-long
 import unittest
+from unittest.mock import patch
 import os
 import random
 import src.validation as validation
@@ -25,6 +26,13 @@ class TestValidation(unittest.TestCase):
         self.assertFalse(validation.validate_ssid("meshmeshmessshmeshmessshmeshmesss"))
         # ssid is invalid
         self.assertFalse(validation.validate_ssid(1))
+        self.assertFalse(validation.validate_ssid(f"cltr_{chr(0x1F)}"))
+
+        # ssid is invalid exceptions
+        self.assertFalse(validation.validate_ssid(None))
+        self.assertFalse(validation.validate_ssid(123))
+        self.assertFalse(validation.validate_ssid(object()))
+
         # print ascii chars in the range of ascii code 32 to 126 (decimal)
         ssid = [chr(char) for char in range(32, 126)]
         self.assertTrue(validation.validate_ssid("".join(ssid)[0:32]))
@@ -41,6 +49,15 @@ class TestValidation(unittest.TestCase):
         self.assertTrue(validation.validate_wpa3_psk("12345678"))
         # psk is invalid (short)
         self.assertFalse(validation.validate_wpa3_psk("1234567"))
+
+        # psk is invalid exceptions
+        self.assertFalse(validation.validate_wpa3_psk(None))
+        self.assertFalse(validation.validate_wpa3_psk(123))
+        self.assertFalse(validation.validate_wpa3_psk(object()))
+        # not valid psk
+        self.assertFalse(validation.validate_wpa3_psk("\x01\x02\x03aaaaaaaaaa"))
+
+
         # psk with invalid (long)
         self.assertFalse(
             validation.validate_wpa3_psk(
@@ -62,6 +79,10 @@ class TestValidation(unittest.TestCase):
         self.assertFalse(validation.validate_tx_power(-1))
         # power is Valid
         self.assertTrue(validation.validate_tx_power("10"))
+
+        self.assertFalse(validation.validate_tx_power(None))
+        self.assertFalse(validation.validate_tx_power(object()))
+
 
     def test_validate_country_code(self):
         """
@@ -155,6 +176,10 @@ class TestValidation(unittest.TestCase):
         self.assertFalse(validation.validate_radio_index("-1"))
         self.assertFalse(validation.validate_radio_index(-1))
 
+        self.assertFalse(validation.validate_radio_index(None))
+        self.assertFalse(validation.validate_radio_index(object()))
+        self.assertFalse(validation.validate_radio_index({}))
+
     def test_validate_mesh_vif(self):
         """
         Test cases for validate_mesh_vif(mesh_vif)
@@ -169,6 +194,85 @@ class TestValidation(unittest.TestCase):
         self.assertFalse(validation.validate_mesh_vif(" "))
         self.assertFalse(validation.validate_mesh_vif("  "))
 
+        self.assertFalse(validation.validate_mesh_vif(None))
+        self.assertFalse(validation.validate_mesh_vif(object()))
+        self.assertFalse(validation.validate_mesh_vif({}))
 
-if __name__ == "__main__":
-    unittest.main()
+    @patch('src.validation.os.listdir')
+    def test_validate_interface(self, mock_listdir):
+        """
+        Test cases for is_valid_interface(interface)
+        """
+        mock_listdir.return_value = ['eth0', 'wlan0', 'lo']
+        self.assertTrue(validation.is_valid_interface('eth0'))
+        self.assertTrue(validation.is_valid_interface('wlan0'))
+        self.assertTrue(validation.is_valid_interface('lo'))
+        self.assertFalse(validation.is_valid_interface('eth1'))
+        self.assertFalse(validation.is_valid_interface(''))
+        self.assertFalse(validation.is_valid_interface(object()))
+        self.assertFalse(validation.is_valid_interface(1))
+        self.assertFalse(validation.is_valid_interface(None))
+
+    def test_validate_role(self):
+        """
+        Test cases for validate_role(role)
+        """
+        # role is valid
+        self.assertTrue(validation.validate_role("gcs"))
+        self.assertTrue(validation.validate_role("drone"))
+        self.assertTrue(validation.validate_role("sleeve"))
+        # role is invalid
+        self.assertFalse(validation.validate_role("airplane"))
+        self.assertFalse(validation.validate_role(""))
+        # role is invalid
+        self.assertFalse(validation.validate_role(123))
+        self.assertFalse(validation.validate_role(None))
+        self.assertFalse(validation.validate_role(object()))
+        self.assertFalse(validation.validate_role(["gcs"]))
+
+    def test_validate_delay(self):
+        """
+        Test cases for validate_delay(delay)
+        """
+        self.assertTrue(validation.validate_delay(1))
+        self.assertTrue(validation.validate_delay("1"))
+        self.assertFalse(validation.validate_delay(0))
+        self.assertFalse(validation.validate_delay(-1))
+
+        self.assertFalse(validation.validate_delay(None))
+        self.assertFalse(validation.validate_delay(object()))
+        self.assertFalse(validation.validate_delay("a"))
+        self.assertFalse(validation.validate_delay([]))
+        self.assertFalse(validation.validate_delay({}))
+
+    def test_validate_mptcp(self):
+        """
+        Test cases for validate_mptcp(mptcp)
+        """
+        self.assertTrue(validation.validate_mptcp("enable"))
+        self.assertTrue(validation.validate_mptcp("disable"))
+        self.assertFalse(validation.validate_mptcp("enabled"))
+        self.assertFalse(validation.validate_mptcp("disabled"))
+        self.assertFalse(validation.validate_mptcp("enableed"))
+        self.assertFalse(validation.validate_mptcp("disableed"))
+        self.assertFalse(validation.validate_mptcp(1))
+        self.assertFalse(validation.validate_mptcp(None))
+        self.assertFalse(validation.validate_mptcp(object()))
+
+    @patch('src.validation.is_valid_interface')
+    def test_validate_slaac(self, mock_listdir):
+        """
+        Test cases for validate_slaac(slaac)
+        """
+        mock_listdir.return_value = True
+        self.assertTrue(validation.validate_slaac("usb0 wlp3s0"))
+        self.assertTrue(validation.validate_slaac("usb0"))
+        self.assertTrue(validation.validate_slaac("wlp3s0"))
+        mock_listdir.return_value = False
+        self.assertFalse(validation.validate_slaac("usb0 wlp3s0 wlp2s0"))
+        self.assertFalse(validation.validate_slaac("usb0 wlp3s0 wlp2s0 wlp1s0"))
+        self.assertFalse(validation.validate_slaac("usb0 wlp3s0 wlp2s0 wlp1s0 wlp0s0"))
+        self.assertFalse(validation.validate_slaac("usb0 wlp3s0 wlp2s0 wlp1s0 wlp0s0 wlp4s0"))
+        self.assertFalse(validation.validate_slaac(1))
+        self.assertFalse(validation.validate_slaac(None))
+        self.assertFalse(validation.validate_slaac(object()))

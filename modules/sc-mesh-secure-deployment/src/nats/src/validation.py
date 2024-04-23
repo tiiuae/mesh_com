@@ -179,12 +179,9 @@ def validate_role(role: str) -> bool:
     Validates a given role.
     Returns True if the role is valid, False otherwise.
     """
-    try:
-        if role in ("drone", "sleeve", "gcs"):
-            return True
-        return False
-    except (ValueError, TypeError, AttributeError):
-        return False
+    if role in ("drone", "sleeve", "gcs"):
+        return True
+    return False
 
 def validate_delay(delay: str) -> bool:
     """
@@ -196,7 +193,7 @@ def validate_delay(delay: str) -> bool:
         if delay < 0 or delay == 0:
             return False
         return True
-    except (ValueError, TypeError, AttributeError):
+    except (ValueError, TypeError):
         return False
 
 def validate_radio_index(radio_index: str) -> bool:
@@ -209,7 +206,7 @@ def validate_radio_index(radio_index: str) -> bool:
         if radio_index < 0 or radio_index > 10:
             return False
         return True
-    except (ValueError, TypeError, AttributeError):
+    except (ValueError, TypeError):
         return False
 
 def is_valid_interface(interface_name: str) -> bool:
@@ -221,33 +218,27 @@ def is_valid_interface(interface_name: str) -> bool:
         interfaces = os.listdir('/sys/class/net')
         if interface_name in interfaces:
             return True
+    except OSError:
         return False
-    except (ValueError, TypeError, AttributeError, NameError):
-        return False
+    return False
 
 def validate_mesh_vif(mesh_vif: str) -> bool:
     """
     Validates a given mesh vif.
     Returns True if the mesh vif is valid, False otherwise.
     """
-    try:
-        if is_valid_interface(mesh_vif):
-            return True
-        return False
-    except (ValueError, TypeError, AttributeError):
-        return False
+    if is_valid_interface(mesh_vif):
+        return True
+    return False
 
 def validate_mptcp(mptcp: str) -> bool:
     """
     Validates a given mptcp.
     Returns True if the mptcp is valid, False otherwise.
     """
-    try:
-        if mptcp in ("enable", "disable"):
-            return True
-        return False
-    except (ValueError, TypeError, AttributeError):
-        return False
+    if mptcp in ("enable", "disable"):
+        return True
+    return False
 
 def validate_slaac(slaac: str) -> bool:
     """
