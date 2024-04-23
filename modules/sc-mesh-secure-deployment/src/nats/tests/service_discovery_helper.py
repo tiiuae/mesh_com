@@ -3,14 +3,15 @@ Helper module to register and unregister services in DNS-SD.
 """
 from typing import Optional
 from zeroconf import Zeroconf, IPVersion, ServiceInfo
+from ipaddress import IPv4Address, IPv6Address
 
 
 SERVICE_TYPE: str = '_mdm._tcp.local.'
 SERVICE_NAME: str = 'MDM Service'
 HOSTNAME: str = 'defaultmdm.local'
 
-IPV4_ANY_ADDR: bytes = b'\x7f\x00\x00\x01'
-IPV6_ANY_ADDR: bytes = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01'
+IPV4_ANY_ADDR: bytes = IPv4Address("127.0.0.1").packed
+IPV6_ANY_ADDR: bytes = IPv6Address("::1").packed
 
 info: Optional[ServiceInfo] = None
 zeroconf: Optional[Zeroconf] = None
