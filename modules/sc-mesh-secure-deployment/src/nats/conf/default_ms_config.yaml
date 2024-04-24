@@ -34,8 +34,8 @@ BATMAN:
       halow1: 20
 
 VLAN:
-# IP address definitions for such VLAN interface that is added to
-# CBMA's red_interfaces list (i.e. br-lan bridge) are meaningless.
+# Remember that IP address definitions for such interface that is added to
+# CBMA's red_interfaces list (i.e. br-lan bridge) are not effective.
   vlan_black:
     parent_interface: eth0
     vlan_id: 100
@@ -46,8 +46,4 @@ VLAN:
   vlan_red:
     parent_interface: eth0
     vlan_id: 200
-    #ipv4_address: 192.168.2.1
-    #ipv4_subnet_mask: 255.255.255.0
-    #ipv6_local_address: fe80::192.168.2.1
-    #ipv6_prefix_length: 64
   
