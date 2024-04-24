@@ -584,9 +584,6 @@ class CBMAAdaptation(object):
         self.__setup_lower_cbma()
         self.__setup_upper_cbma()
 
-        # Set batman hop penalty
-        self.__batman.set_hop_penalty()
-
         # Add interfaces to the bridge
         for interface in self.__red_interfaces:
             self.__add_interface_to_bridge(self.BR_NAME, interface)
@@ -598,6 +595,9 @@ class CBMAAdaptation(object):
 
         # Add global IPv6 address to the white batman :)
         self.__add_global_ipv6_address(self.LOWER_BATMAN, self.__IPV6_WHITE_PREFIX)
+
+        # Set batman hop penalty
+        self.__batman.set_hop_penalty()
 
         self.__cbma_set_up = True
 

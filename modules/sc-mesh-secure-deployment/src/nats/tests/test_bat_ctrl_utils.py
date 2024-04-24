@@ -56,11 +56,8 @@ class TestBatCtrlUtils(unittest.TestCase):
             batman_ra="BATMAN_V",
             config_file="test_config_1.yaml",
         )
-    
-    def test_config_reading_success(self):
-        print("hp:", self.bat_utils._BatCtrlUtils__hop_penalty)
-        print("ra:", self.bat_utils._BatCtrlUtils__batman_ra)
 
+    def test_config_reading_success(self):
         # Ensure batman routing algorithm was applied
         self.assertEqual(self.bat_utils._BatCtrlUtils__batman_ra, "BATMAN_IV")
         # Check hardif ho penalties
