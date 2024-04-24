@@ -5,10 +5,35 @@ from glob import glob
 
 from models.certificates import CBMACertificates
 from controller import CBMAController
+from utils.common import run_command_retcode
+from utils.networking import get_interface_mac_address
 from utils.logging import get_logger
 
 
 logger = get_logger(log_dir='.')
+
+
+BATMAN_ROUTING_ALG = 'BATMAN_V'
+
+def get_interface_locally_administed_mac(interface: str) -> str:
+    mac = get_interface_mac_address(interface)
+    mac_bytes = bytearray.fromhex(mac.replace(':', ''))
+    mac_bytes[0] ^= 0x2  # Locally administered bit
+    return mac_bytes.hex(sep=':', bytes_per_sep=1)
+
+def create_batman(batman: str, mac: str) -> None:
+    create_batman_str = f"batctl meshif {batman} interface create routing_algo {BATMAN_ROUTING_ALG}"
+    set_batman_mac_str = f"ip link set {batman} address {mac}"
+    set_batman_up_str = f"ip link set {batman} up"
+    for cmd_str in [create_batman_str, set_batman_mac_str, set_batman_up_str]:
+        if run_command_retcode(cmd_str.split()):
+            sys.exit(255)
+
+def destroy_batman(batman: str) -> None:
+    if glob(f"/sys/class/net/{batman}/lower_*"):
+        return
+    destroy_batman_str = f"ip link del {batman}"
+    run_command_retcode(destroy_batman_str.split())
 
 
 if __name__ == '__main__':
@@ -59,6 +84,10 @@ if __name__ == '__main__':
     else:
         interfaces = args.interfaces if isinstance(args.interfaces, list) else [args.interfaces]
 
+    if not interfaces:
+        logger.error("No interfaces found")
+        sys.exit(255)
+
     if args.batman in interfaces:
         logger.error(f"{args.batman} found in both -i {' '.join(interfaces)} and -b {args.batman} flags")
         sys.exit(255)
@@ -83,6 +112,9 @@ if __name__ == '__main__':
         logger.error(f"Exception when creating the CBMAController: {e}")
         sys.exit(255)
 
+    if not (existing_batman := f"/sys/class/net/{args.batman}" in glob("/sys/class/net/*")):
+        mac = get_interface_locally_administed_mac(interfaces[0])
+        create_batman(args.batman, mac)
     try:
         logger.info(f"Adding {interfaces} to the CBMAController")
         for iface in interfaces:
@@ -94,5 +126,7 @@ if __name__ == '__main__':
         logger.info('Interrupting...')
     finally:
         controller.stop()
+        if not existing_batman:
+            destroy_batman(args.batman)
 
     logger.info('Exiting')
