@@ -105,7 +105,3 @@ class TestSettings(unittest.TestCase):
                 "test.conf",
             )
             self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
-
-
-if __name__ == "__main__":
-    unittest.main()

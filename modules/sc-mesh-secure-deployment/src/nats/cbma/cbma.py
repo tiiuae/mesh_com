@@ -7,6 +7,7 @@ from typing import Tuple
 from utils.logging import get_logger, setup_global_file_logging
 from utils.networking import get_interface_link_local_ipv6_address, get_mac_from_ipv6
 from utils.multicast import bytes_2_multicast_postfix
+from utils.common import run_command_retcode
 from models.certificates import CBMACertificates
 from models.cbma import ICBMA
 
@@ -17,6 +18,8 @@ from secure_socket.server import FileBasedSecureSocketServer
 from secure_socket.secure_connection import SecureConnection, MACsecCallbackType
 from macsec.macsec import MACsec
 
+
+CBMA_ROOT = os.path.normpath(os.path.dirname(__file__))
 
 SIGNALS = [signal.SIGINT, signal.SIGTERM]
 
@@ -100,6 +103,11 @@ class CBMA(ICBMA):
             signal.signal(s, lambda *_: self.__termination_handler())
 
         signal.signal(signal.SIGCHLD, self.__child_handler)
+
+        l_or_u = 'u' if self.is_upper else 'l'
+        create_br_str = f"bash -x {CBMA_ROOT}/scripts/mess/create_bridge.sh {l_or_u} {self.interface}"
+        if run_command_retcode(create_br_str.split()):
+            raise Exception('Unable to create MACsec bridge')
 
 
     def __child_handler(self, signum: int, frame) -> None:
@@ -189,6 +197,11 @@ class CBMA(ICBMA):
             if process.is_alive():
                 self.logger.error(f"Unable to stop MACsec process {pid}")
                 success = False
+
+        l_or_u = 'u' if self.is_upper else 'l'
+        cleanup_br_str = f"bash -x {CBMA_ROOT}/scripts/mess/cleanup_bridge.sh {l_or_u} {self.interface}"
+        if run_command_retcode(cleanup_br_str.split()):
+            success = False
 
         self.logger.info(f"CBMA cleanup was {'' if success else 'not '}successful")
         return success
