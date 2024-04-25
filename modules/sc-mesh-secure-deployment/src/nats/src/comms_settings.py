@@ -65,21 +65,30 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             return "FAIL", "Invalid mode"
         self.logger.debug("validate mesh settings mode ok")
 
-        if validation.validate_frequency(int(self.frequency[index])) is False:
+        try:
+            if validation.validate_frequency(int(self.frequency[index])) is False:
+                return "FAIL", "Invalid frequency"
+            self.logger.debug("validate mesh settings freq ok")
+        except ValueError:
             return "FAIL", "Invalid frequency"
-        self.logger.debug("validate mesh settings freq ok")
 
-        if validation.validate_frequency(int(self.frequency_mcc[index])) is False:
+        try:
+            if validation.validate_frequency(int(self.frequency_mcc[index])) is False:
+                return "FAIL", "Invalid mcc frequency"
+            self.logger.debug("validate mesh settings mcc freq ok")
+        except ValueError:
             return "FAIL", "Invalid mcc frequency"
-        self.logger.debug("validate mesh settings mcc freq ok")
 
         if validation.validate_country_code(self.country[index]) is False:
             return "FAIL", "Invalid country code"
         self.logger.debug("validate mesh settings country ok")
 
-        if validation.validate_tx_power(int(self.tx_power[index])) is False:
+        try:
+            if validation.validate_tx_power(int(self.tx_power[index])) is False:
+                return "FAIL", "Invalid tx power"
+            self.logger.debug("validate mesh settings tx power ok")
+        except ValueError:
             return "FAIL", "Invalid tx power"
-        self.logger.debug("validate mesh settings tx power ok")
 
         if validation.validate_priority(self.priority[index]) is False:
             return "FAIL", "Invalid priority"

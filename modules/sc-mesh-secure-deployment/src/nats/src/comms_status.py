@@ -495,6 +495,7 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
         hash_file_path = f"/opt/{str(self.index)}_mesh.conf_hash"
         old_mesh_cfg_status = self.__mesh_cfg_status
         old_is_mission_cfg = self.__is_mission_cfg
+
         try:
             with open(config_file_path, "rb") as f:
                 config = f.read()
@@ -539,3 +540,4 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
                 self.__mesh_cfg_status,
                 self.__is_mission_cfg,
             )
+
