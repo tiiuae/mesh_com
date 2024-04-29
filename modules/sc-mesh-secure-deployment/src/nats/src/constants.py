@@ -58,7 +58,7 @@ class Constants(Enum):
     GENERATED_CERTS_PATH: str = f"{ROOT_PATH}/crypto"
     ECDSA_BIRTH_FILEBASED: str = "/opt/crypto/ecdsa/birth/filebased"
     RSA_BIRTH_FILEBASED: str = "/opt/crypto/rsa/birth/filebased"
-    RSA_BIRTH_KEY = GENERATED_CERTS_PATH + "/rsa/birth/filebased"
+    RSA_BIRTH_KEY: str = GENERATED_CERTS_PATH + "/rsa/birth/filebased"
 
     # CBMA
     CBMA_PORT_UPPER: int = 15002

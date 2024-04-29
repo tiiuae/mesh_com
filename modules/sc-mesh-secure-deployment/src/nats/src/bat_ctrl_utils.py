@@ -56,7 +56,7 @@ class BatCtrlUtils(object):
     ) -> None:
         """
         Creates a Batman interface with given name and mac.
-        If mac is not given then one is genereted.
+        If mac is not given then one is generated.
         """
         ip = IPRoute()
         try:
@@ -153,7 +153,13 @@ class BatCtrlUtils(object):
                 if penalty is not None:
                     try:
                         subprocess.run(
-                            ["batctl", "meshif", interface, "hop_penalty", str(penalty)],
+                            [
+                                "batctl",
+                                "meshif",
+                                interface,
+                                "hop_penalty",
+                                str(penalty),
+                            ],
                             check=True,
                         )
                     except Exception as e:
@@ -167,32 +173,34 @@ class BatCtrlUtils(object):
         # Set hop penalty for hard interfaces
         hardif_hop_penalty = self.__hop_penalty.get("hardif", {})
         self.logger.info(f"hardif_hop_penalty: {hardif_hop_penalty}")
-        if hardif_hop_penalty is not None:
-            for interface, penalty in hardif_hop_penalty.items():
-                if penalty is not None:
-                    try:
-                        # Serch hardif from all my batmans
-                        for batman_interface in self.__bat_interfaces:
-                            hardif = self.__find_batman_hardif(interface, batman_interface)
-                            if hardif:
-                                subprocess.run(
-                                    [
-                                        "batctl",
-                                        "hardif",
-                                        hardif,
-                                        "hop_penalty",
-                                        str(penalty),
-                                    ],
-                                    check=True,
-                                )
-                                break
-                    except Exception as e:
-                        self.logger.info(
-                            "Failed to set hop penalty %s for: %s. Error: %s",
-                            penalty,
-                            interface,
-                            e,
-                        )
+        if hardif_hop_penalty is None:
+            return
+
+        for interface, penalty in hardif_hop_penalty.items():
+            if penalty is not None:
+                try:
+                    # Serch hardif from all my batmans
+                    for batman_interface in self.__bat_interfaces:
+                        hardif = self.__find_batman_hardif(interface, batman_interface)
+                        if hardif:
+                            subprocess.run(
+                                [
+                                    "batctl",
+                                    "hardif",
+                                    hardif,
+                                    "hop_penalty",
+                                    str(penalty),
+                                ],
+                                check=True,
+                            )
+                            break
+                except Exception as e:
+                    self.logger.info(
+                        "Failed to set hop penalty %s for: %s. Error: %s",
+                        penalty,
+                        interface,
+                        e,
+                    )
 
     @staticmethod
     def __get_interface_mac(interface: str) -> Union[None, str]:
@@ -226,9 +234,10 @@ class BatCtrlUtils(object):
             )
 
         # If interface is not found, try to find it using MAC address
-        mac_address = self.__get_interface_mac(interface).replace(":", "")
+        mac_address = self.__get_interface_mac(interface)
         if mac_address:
             try:
+                mac_address = mac_address.replace(":", "")
                 self.logger.debug(
                     f"Find hardif with mac: {mac_address} from {batman_if}"
                 )
@@ -238,18 +247,14 @@ class BatCtrlUtils(object):
                 # batctl_output can contain multpile lines with syntax like:
                 # lmb00301a4fc7d5: active
                 for line in batctl_output.splitlines():
-                    # Get characters before colon characters
-                    interface_match = re.search(r"^(.*?):", line)
-                    if interface_match:
-                        interface_name = interface_match.group(1)
-                        # If name contains expected mac?
-                        if mac_address in interface_name:
-                            self.logger.info(
-                                "Interface %s found in %s interface list.",
-                                interface_name,
-                                batman_if,
-                            )
-                            return interface_name
+                    interface_name = line.split(":")[0]
+                    if mac_address in interface_name:
+                        self.logger.info(
+                            "Interface %s found in %s interface list.",
+                            interface_name,
+                            batman_if,
+                        )
+                        return interface_name
             except subprocess.CalledProcessError as e:
                 self.logger.error(
                     "Interface %s not found in %s if list with mac %s. Error: %s",

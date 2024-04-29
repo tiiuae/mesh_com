@@ -38,8 +38,8 @@ class TestBatCtrlUtils(unittest.TestCase):
             yaml.dump(cls.yaml_content_1, file_1)
         with open("test_config_2.yaml", "w", encoding="utf-8") as file_2:
             yaml.dump(cls.yaml_content_2, file_2)
-        with open("test_config_3.yaml", "w", encoding="utf-8") as file_2:
-            yaml.dump(cls.yaml_content_3, file_2)
+        with open("test_config_3.yaml", "w", encoding="utf-8") as file_3:
+            yaml.dump(cls.yaml_content_3, file_3)
 
     @classmethod
     def tearDownClass(cls):
@@ -260,6 +260,10 @@ class TestBatCtrlUtils(unittest.TestCase):
         self.assertEqual("5", bat0_hp)
         self.assertEqual("3", ifdummy0_hp)
         self.assertEqual("4", ifdummy1_hp)
+
+    def test__get_interface_mac_for_non_existing_interface(self):
+        mac = self.bat_utils._BatCtrlUtils__get_interface_mac("foobar")
+        self.assertIsNone(mac)
 
     @patch("src.bat_ctrl_utils.IPRoute")
     def test_destroy_batman_interface(self, mock_iproute):
