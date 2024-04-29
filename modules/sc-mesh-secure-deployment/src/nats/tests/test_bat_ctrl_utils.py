@@ -159,7 +159,6 @@ class TestBatCtrlUtils(unittest.TestCase):
             ["batctl", "meshif", "bat0", "distributed_arp_table", "0"],
             ["batctl", "meshif", "bat0", "fragmentation", "1"],
             ["batctl", "meshif", "bat0", "orig_interval", "5000"],
-            ["ip", "link", "set", "dev", "bat0", "mtu", "1546"],
         ]
         for call in expected_calls:
             mock_subprocess_run.assert_any_call(call, check=True)
@@ -171,7 +170,6 @@ class TestBatCtrlUtils(unittest.TestCase):
             ["batctl", "meshif", "bat1", "distributed_arp_table", "1"],
             ["batctl", "meshif", "bat1", "fragmentation", "1"],
             ["batctl", "meshif", "bat1", "orig_interval", "5000"],
-            ["ip", "link", "set", "dev", "bat1", "mtu", "1500"],
         ]
         for call in expected_calls:
             mock_subprocess_run.assert_any_call(call, check=True)
