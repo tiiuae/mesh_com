@@ -505,10 +505,10 @@ class CBMAAdaptation(object):
         self.__batman.create_batman_interface(
             self.LOWER_BATMAN, self.__create_mac(False, self.__get_mac_addr(if_name))
         )
-        self.__configure_batman_interface(self.LOWER_BATMAN)
+        self.__batman.configure_batman_interface(self.LOWER_BATMAN)
         self.__set_mtu_size(self.LOWER_BATMAN)
-        self.__create_batman_interface(self.UPPER_BATMAN)
-        self.__configure_batman_interface(self.UPPER_BATMAN)
+        self.__batman.create_batman_interface(self.UPPER_BATMAN)
+        self.__batman.configure_batman_interface(self.UPPER_BATMAN)
         self.__set_mtu_size(self.UPPER_BATMAN)
         self.__set_interface_up(self.LOWER_BATMAN)
         self.__set_interface_up(self.UPPER_BATMAN)
