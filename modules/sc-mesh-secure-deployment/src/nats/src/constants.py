@@ -35,6 +35,10 @@ class Constants(Enum):
     Constants class
     """
 
+    RED_INTERFACE: str = "RED"
+    BLACK_INTERFACE: str = "BLACK"
+    WHITE_INTERFACE: str = "WHITE"
+
     # Root of the mesh_shield
 
     ROOT_PATH: str = "/opt"
