@@ -21,6 +21,7 @@ from src.comms_controller import CommsController
 from src.constants import Constants
 from src.interface import Interface
 from src import comms_config_store
+from src.bat_ctrl_utils import BatCtrlUtils
 
 from controller import CBMAController
 from models.certificates import CBMACertificates
@@ -47,27 +48,18 @@ class CBMAAdaptation(object):
         self.__interfaces: List[Interface] = []
         self.__lock = lock
         self.__cbma_set_up = False  # Indicates whether CBMA has been configured
-        self.__cbma_certs_path = "/opt/crypto/ecdsa/birth/filebased"
-        self.__cbma_ca_cert_path = "/opt/mspki/ecdsa/certificate_chain.crt"
-        self.__upper_cbma_certs_path = (
-            Constants.DOWNLOADED_CBMA_UPPER_PATH.value + "/crypto/rsa/birth/filebased"
-        )
-        self.__upper_cbma_ca_cert_path = (
-            Constants.DOWNLOADED_CBMA_UPPER_PATH.value
-            + "/upper_certificates/rootCA.crt"
-        )
-        self.__upper_cbma_key_path = (
-            Constants.GENERATED_CERTS_PATH.value + "/rsa/birth/filebased"
-        )
+        self.__cbma_certs_path = Constants.ECDSA_BIRTH_FILEBASED.value
+        self.__upper_cbma_certs_path = Constants.DOWNLOADED_RSA_CERTS_PATH.value
+        self.__upper_cbma_ca_cert_path = Constants.DOWNLOADED_UPPER_CBMA_CA_CERT.value
+        self.__upper_cbma_key_path = Constants.RSA_BIRTH_KEY
         self.__lower_cbma_controller = None
         self.__upper_cbma_controller = None
         self.__lower_cbma_interfaces: List[Interface] = []
         self.__upper_cbma_interfaces: List[Interface] = []
 
-        self.BR_NAME: str = "br-lan"
-        self.BR_WHITE_NAME: str = "br-white"
-        self.LOWER_BATMAN: str = "bat0"
-        self.UPPER_BATMAN: str = "bat1"
+        self.BR_NAME: str = Constants.BR_NAME.value
+        self.LOWER_BATMAN: str = Constants.LOWER_BATMAN.value
+        self.UPPER_BATMAN: str = Constants.UPPER_BATMAN.value
         self.__IPV6_WHITE_PREFIX: str = "fdbb:1ef7:9d6f:e05d"
         self.__IPV6_RED_PREFIX: str = "fdd8:84dc:fe30:7bf2"
 
@@ -80,14 +72,22 @@ class CBMAAdaptation(object):
             self.BR_NAME,
         ]
 
-        # Default routing algo
-        self.__batman_ra = "BATMAN_V"
+        self.__batman = BatCtrlUtils(logger=self.logger)
+        self.__config = None
+        self.__cbma_config = None
+        self.__vlan_config = None
 
         # Read configs from file
-        self.__config = comms_config_store.ConfigStore("/opt/ms_config.yaml")
-        self.__cbma_config = self.__config.read("CBMA")
-        self.__batman_config = self.__config.read("BATMAN")
-        self.__vlan_config = self.__config.read("VLAN")
+        try:
+            self.__config = comms_config_store.ConfigStore(
+                Constants.MS_CONFIG_FILE.value
+            )
+        except Exception as e:
+            self.logger.error(f"Error reading config file: {e}")
+
+        if self.__config is not None:
+            self.__cbma_config = self.__config.read("CBMA")
+            self.__vlan_config = self.__config.read("VLAN")
 
         # Extend/update default configs using yaml file content
         if self.__cbma_config:
@@ -105,12 +105,6 @@ class CBMAAdaptation(object):
             if exclude_interfaces:
                 self.__na_cbma_interfaces.extend(exclude_interfaces)
 
-        if self.__batman_config:
-            batman_ra = self.__batman_config.get("routing_algo")
-            self.logger.info(f"Batman routing algo config: {batman_ra}")
-            if batman_ra:
-                self.__batman_ra = batman_ra
-
         # Create VLAN interfaces if configured
         self.__create_vlan_interfaces()
 
@@ -125,6 +119,8 @@ class CBMAAdaptation(object):
             vlan_id = str(vlan_data.get("vlan_id"))
             ipv4_address = vlan_data.get("ipv4_address")
             ipv4_subnet_mask = vlan_data.get("ipv4_subnet_mask")
+            ipv6_address = vlan_data.get("ipv6_local_address")
+            ipv6_prefix_length = vlan_data.get("ipv6_prefix_length")
 
             if parent_interface and vlan_id:
                 try:
@@ -150,9 +146,7 @@ class CBMAAdaptation(object):
                     )
 
                     # Bring VLAN interface up
-                    subprocess.run(
-                        ["ip", "link", "set", vlan_name, "up"], check=True
-                    )
+                    subprocess.run(["ip", "link", "set", vlan_name, "up"], check=True)
 
                     if ipv4_address and ipv4_subnet_mask:
                         # Set IPv4 address and subnet mask
@@ -168,6 +162,20 @@ class CBMAAdaptation(object):
                             check=True,
                         )
 
+                    if ipv6_address and ipv6_prefix_length:
+                        # Set IPv6 address and prefix length
+                        subprocess.run(
+                            [
+                                "ip",
+                                "addr",
+                                "add",
+                                f"{ipv6_address}/{ipv6_prefix_length}",
+                                "dev",
+                                vlan_name,
+                            ],
+                            check=True,
+                        )
+
                     self.logger.info(
                         f"VLAN interface {vlan_name} created and configured."
                     )
@@ -175,7 +183,7 @@ class CBMAAdaptation(object):
                     self.logger.error(f"Error creating VLAN interface {vlan_name}: {e}")
             else:
                 self.logger.error(
-                    f"Invalid configuration for VLAN {vlan_name}: parent_interface or vlan_id missing."
+                    f"Invalid configuration for VLAN {vlan_name}."
                 )
 
     def __delete_vlan_interfaces(self) -> None:
@@ -247,33 +255,6 @@ class CBMAAdaptation(object):
             self.logger.error(
                 "Error setting MAC address for %s! Error: %s", interface, e
             )
-
-    def __set_bridge_ip(self, bridge_name: str, mesh_vif_name: str) -> None:
-        ip = IPRoute()
-        try:
-            # Get the MAC address of the mesh interface
-            mesh_if_mac = self.__get_mac_addr(mesh_vif_name)
-
-            # Extract the last two bytes of the MAC address
-            ip_random = mesh_if_mac[15:17]
-            # Calculate the bridge IP address
-            bridge_ip = f"192.168.1.{int(ip_random, 16)}"
-
-            # Add the IP address to the bridge
-            ip.addr(
-                "add",
-                index=ip.link_lookup(ifname=bridge_name)[0],
-                address=bridge_ip,
-                mask=24,
-            )
-
-        except Exception as e:
-            self.logger.debug(
-                "Error setting bridge IP for %s! Error: %s", bridge_name, e
-            )
-
-        finally:
-            ip.close()
 
     def __add_interface_to_bridge(
         self, bridge_name: str, interface_to_add: str
@@ -352,83 +333,6 @@ class CBMAAdaptation(object):
             if interface.interface_name == interface_name:
                 return interface.mac_address
         return None  # Interface not found in the list
-
-    def __create_batman_interface(self, batman_if, mac_addr=None) -> None:
-        ip = IPRoute()
-        try:
-            # Check if the interface already exists
-            interface_indices = ip.link_lookup(ifname=batman_if)
-            if not interface_indices:
-                self.logger.debug(
-                    "Create interface %s, mac_addr: %s",
-                    batman_if,
-                    mac_addr if mac_addr is not None else "random",
-                )
-                # If the interface doesn't exist, create it as a Batman interface
-                if mac_addr is not None:
-                    ip.link("add", ifname=batman_if, kind="batadv", address=mac_addr)
-                else:
-                    ip.link("add", ifname=batman_if, kind="batadv")
-        except Exception as e:
-            self.logger.error(
-                "Error creating Batman interface %s: %s",
-                batman_if,
-                e,
-            )
-        finally:
-            ip.close()
-
-    def __set_batman_routing_algo(self, algo: str) -> None:
-        try:
-            subprocess.run(["batctl", "routing_algo", algo], check=True)
-        except subprocess.CalledProcessError as e:
-            self.logger.error("Error setting batman routing algo to %s: %s", algo, e)
-
-    def __configure_batman_interface(self, batman_if: str) -> None:
-        is_upper = False
-        if batman_if == self.UPPER_BATMAN:
-            is_upper = True
-        try:
-            subprocess.run(
-                ["batctl", "meshif", batman_if, "aggregation", "0"], check=True
-            )
-            subprocess.run(
-                ["batctl", "meshif", batman_if, "bridge_loop_avoidance", "1"],
-                check=True,
-            )
-
-            arp_table_setting = "1" if is_upper else "0"
-            subprocess.run(
-                [
-                    "batctl",
-                    "meshif",
-                    batman_if,
-                    "distributed_arp_table",
-                    arp_table_setting,
-                ],
-                check=True,
-            )
-
-            subprocess.run(
-                ["batctl", "meshif", batman_if, "fragmentation", "1"], check=True
-            )
-
-            subprocess.run(
-                ["batctl", "meshif", batman_if, "orig_interval", "5000"], check=True
-            )
-
-        except subprocess.CalledProcessError as e:
-            self.logger.error("Error configuring BATMAN interface: %s", e)
-
-    def __destroy_batman_interface(self, mesh_interface: str) -> None:
-        ip = IPRoute()
-        try:
-            ip.link("delete", ifname=mesh_interface)
-        except Exception as e:
-            self.logger.debug(f"Error: Unable to destroy interface {mesh_interface}.")
-            self.logger.debug(f"Exception: {str(e)}")
-        finally:
-            ip.close()
 
     def __shutdown_and_delete_bridge(self, bridge_name: str) -> None:
         ip = IPRoute()
@@ -568,7 +472,8 @@ class CBMAAdaptation(object):
 
     def __create_mac(self, randomized: bool = False, interface_mac: str = "") -> str:
         """
-        Create a random MAC address or flip the locally administered bit of the given MAC address
+        Create a random MAC address or flip the locally administered bit of the given
+        MAC address.
         :return: The random MAC address
         """
         if randomized:
@@ -577,7 +482,7 @@ class CBMAAdaptation(object):
             ]  # Generate 6 random bytes
             mac[0] &= 0xFC  # Clear multicast and locally administered bits
             mac[0] |= 0x02  # Set the locally administered bit
-            return ":".join(["%02x" % byte for byte in mac])
+            return bytes(mac).hex(sep=':', bytes_per_sep=1)
         else:
             # Split MAC address into octets and flip the locally administered bit
             octets = interface_mac.split(":")
@@ -596,15 +501,14 @@ class CBMAAdaptation(object):
                     break
 
         self.__get_interfaces()
-        self.__set_batman_routing_algo(self.__batman_ra)
         # if_name MAC and flip the locally administered bit
-        self.__create_batman_interface(
+        self.__batman.create_batman_interface(
             self.LOWER_BATMAN, self.__create_mac(False, self.__get_mac_addr(if_name))
         )
-        self.__configure_batman_interface(self.LOWER_BATMAN)
+        self.__batman.configure_batman_interface(self.LOWER_BATMAN)
         self.__set_mtu_size(self.LOWER_BATMAN)
-        self.__create_batman_interface(self.UPPER_BATMAN)
-        self.__configure_batman_interface(self.UPPER_BATMAN)
+        self.__batman.create_batman_interface(self.UPPER_BATMAN)
+        self.__batman.configure_batman_interface(self.UPPER_BATMAN)
         self.__set_mtu_size(self.UPPER_BATMAN)
         self.__set_interface_up(self.LOWER_BATMAN)
         self.__set_interface_up(self.UPPER_BATMAN)
@@ -745,6 +649,9 @@ class CBMAAdaptation(object):
         # Add global IPv6 address to the white batman :)
         self.__add_global_ipv6_address(self.LOWER_BATMAN, self.__IPV6_WHITE_PREFIX)
 
+        # Set batman hop penalty
+        self.__batman.set_hop_penalty()
+
         self.__cbma_set_up = True
 
         # todo what about the false return value?
@@ -800,7 +707,8 @@ class CBMAAdaptation(object):
 
                 if not link_local_address:
                     self.logger.debug(
-                        f"Link-local IPv6 address not found for interface {interface_name}"
+                        "Link-local IPv6 address not found for interface %s",
+                        interface_name
                     )
                     return
 
@@ -881,7 +789,6 @@ class CBMAAdaptation(object):
             ):
                 has_upper_certificate = has_upper_certificate and 1
             else:
-                # TODO: Temporary backup solution to use lower CBMA certificates
                 if self.__has_certificate(
                     self.__cbma_certs_path, interface.mac_address
                 ):
@@ -940,8 +847,8 @@ class CBMAAdaptation(object):
         self.__shutdown_interface(self.LOWER_BATMAN)
         self.__shutdown_interface(self.UPPER_BATMAN)
 
-        self.__destroy_batman_interface(self.LOWER_BATMAN)
-        self.__destroy_batman_interface(self.UPPER_BATMAN)
+        self.__batman.destroy_batman_interface(self.LOWER_BATMAN)
+        self.__batman.destroy_batman_interface(self.UPPER_BATMAN)
 
         self.__delete_vlan_interfaces()
         self.__shutdown_and_delete_bridge(self.BR_NAME)

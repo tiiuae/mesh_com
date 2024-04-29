@@ -3,6 +3,7 @@ Constants for the NATS module
 """
 from enum import Enum
 
+
 class ConfigType(str, Enum):
     """
     Config type
@@ -27,7 +28,8 @@ class StatusType(str, Enum):
     DOWNLOAD_CERTIFICATES: str = "download_certificates"
     UPLOAD_CERTIFICATES: str = "upload_certificates"
 
-# pylint: disable=too-few-public-methods, too-many-instance-attributes, disable=invalid-name
+
+# pylint: disable=too-few-public-methods, too-many-instance-attributes, invalid-name
 class Constants(Enum):
     """
     Constants class
@@ -45,16 +47,34 @@ class Constants(Enum):
     YAML_FILE: str = (
         f"{ROOT_PATH}/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features.yaml"
     )
+    MS_CONFIG_FILE: str = f"{ROOT_PATH}/ms_config.yaml"
 
     # filebased certs and keys
     DOWNLOADED_CBMA_UPPER_PATH: str = f"{ROOT_PATH}/certs/CBMA/UpperCBMA"
     DOWNLOADED_CBMA_LOWER_PATH: str = f"{ROOT_PATH}/certs/CBMA/LowerCBMA"
     DOWNLOADED_CBMA_BIRTHCERTS_PATH: str = f"{ROOT_PATH}/certs/CBMA/BirthCerts"
+    DOWNLOADED_RSA_CERTS_PATH: str = (
+        DOWNLOADED_CBMA_UPPER_PATH + "/crypto/rsa/birth/filebased"
+    )
+    DOWNLOADED_UPPER_CBMA_CA_CERT = (
+        DOWNLOADED_CBMA_UPPER_PATH + "/upper_certificates/rootCA.crt"
+    )
     GENERATED_CERTS_PATH: str = f"{ROOT_PATH}/crypto"
+    ECDSA_BIRTH_FILEBASED: str = "/opt/crypto/ecdsa/birth/filebased"
+    RSA_BIRTH_FILEBASED: str = "/opt/crypto/rsa/birth/filebased"
+    RSA_BIRTH_KEY: str = GENERATED_CERTS_PATH + "/rsa/birth/filebased"
 
     # CBMA
     CBMA_PORT_UPPER: int = 15002
     CBMA_PORT_LOWER: int = 15001
+
+    # BATMAN interfaces
+    LOWER_BATMAN: str = "bat0"
+    UPPER_BATMAN: str = "bat1"
+
+    # Bridge
+    BR_NAME: str = "br-lan"
+    BR_WHITE_NAME: str = "br-white"
 
     # MDM agent
     GET_CONFIG: str = "public/config"
