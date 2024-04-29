@@ -132,10 +132,6 @@ class BatCtrlUtils(object):
                 ["batctl", "meshif", batman_if, "orig_interval", "5000"], check=True
             )
 
-            mtu_size = "1500" if is_upper else "1546"
-            subprocess.run(
-                ["ip", "link", "set", "dev", batman_if, "mtu", mtu_size], check=True
-            )
         except subprocess.CalledProcessError as e:
             self.logger.error("Error configuring BATMAN interface: %s", e)
 
