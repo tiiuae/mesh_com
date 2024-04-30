@@ -49,7 +49,7 @@ class MdmAgent:
         keyfile: str = None,
         certificate_file: str = None,
         ca_file: str = None,
-        interface: str = None,
+        interface: str = Constants.LOWER_BATMAN.value,
     ):
         """
         Constructor
