@@ -43,7 +43,7 @@ case "$1" in
                 ${user:+--user $user} ${chroot:+--chroot $chroot} \
                 ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
                 ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
-                -- rm -fr /var/run/hostapd/wlan1 ; $DIR$DAEMON ${!_MODE} $RADIO_INDEX
+                -- $DIR$DAEMON ${!_MODE} $RADIO_INDEX
             echo done.
         fi
        else
@@ -53,7 +53,6 @@ case "$1" in
        fi
         ;;
 
-
     stop)
         if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
         then
@@ -61,16 +60,15 @@ case "$1" in
             "$daemon" --stop --name "$name" --pidfiles "$pidfiles"
             echo done.
 
-            NEW_PID=$(ps ax | grep -E "[h]ostapd-$RADIO_INDEX" | awk {'print $1'})
+            NEW_PID=$(ps ax | awk "/ostapd-$RADIO_INDEX/{print \$1; exit}")
             if [ -n "$NEW_PID" ]; then
                 kill "$NEW_PID" 2>/dev/null
                 sleep 1
                 ! kill -0 "$NEW_PID" 2>/dev/null || kill -9 "$NEW_PID" 2>/dev/null
             fi
-            rm -fr /var/run/hostapd/* 2>/dev/null
             ifconfig "${!_WIFI}"-1 down 2>/dev/null
             iw dev "${!_WIFI}"-1 del 2>/dev/null
-            ifname_ap="$(ifconfig -a | grep -m 1 "wlan*" | awk -F':' '{ print $1 }')"
+            ifname_ap=$(ifconfig -a | awk -F':' '/!_WIFI/{print $1; exit}')
             ifconfig "$ifname_ap" down 2>/dev/null
             iw dev "$ifname_ap" del 2>/dev/null
             ps aux | awk "/radvd.+(${!_WIFI// /|})/&&!/awk/{system(\"kill \" \$1 \" || :\")}" 2>/dev/null
@@ -81,40 +79,10 @@ case "$1" in
 
 
     restart|reload)
-        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
-        then
-            echo "Stopping $name..."
-            "$daemon" --stop --name "$name" --pidfiles "$pidfiles"
-            echo done.
-
-            NEW_PID=$(ps ax | grep -E "[h]ostapd-$RADIO_INDEX" | awk {'print $1'})
-            if [ -n "$NEW_PID" ]; then
-                kill "$NEW_PID" 2>/dev/null
-                sleep 1
-                ! kill -0 "$NEW_PID" 2>/dev/null || kill -9 "$NEW_PID" 2>/dev/null
-            fi
-            rm -fr /var/run/hostapd/* 2>/dev/null
-            ifconfig "${!_WIFI}"-1 down 2>/dev/null
-            iw dev "${!_WIFI}"-1 del 2>/dev/null
-            ifname_ap="$(ifconfig -a | grep -m 1 "wlan*" | awk -F':' '{ print $1 }')"
-            ifconfig "$ifname_ap" down 2>/dev/null
-            iw dev "$ifname_ap" del 2>/dev/null
-            ps aux | awk "/radvd.+(${!_WIFI// /|})/&&!/awk/{system(\"kill \" \$1 \" || :\")}" 2>/dev/null
-        fi
-        if [ "${!_MODE}" == "ap+mesh_mcc" ] || [ "${!_MODE}" == "ap+mesh_scc" ]; then
-	          # start if not running
-            echo "Starting $name..."
-            "$daemon" $daemon_start_args \
-                --name "$name" --pidfiles "$pidfiles" \
-                ${user:+--user $user} ${chroot:+--chroot $chroot} \
-                ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
-                ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
-                -- $DIR$DAEMON ${!_MODE} $RADIO_INDEX
-            echo done.
-        fi
-
+        "$0" stop "$2"
+        sleep 2
+        "$0" start "$2"
         ;;
-
 
     status)
         "$daemon" --running --name "$name" --pidfiles "$pidfiles" --verbose
