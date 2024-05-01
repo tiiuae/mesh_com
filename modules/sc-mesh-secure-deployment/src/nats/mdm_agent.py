@@ -65,7 +65,6 @@ class MdmAgent:
         self.__interval: int = Constants.FAIL_POLLING_TIME_SECONDS.value  # TODO: possible to update from MDM server?
         self.__debug_config_interval: int = Constants.FAIL_POLLING_TIME_SECONDS.value  # TODO: possible to update from MDM server?
 
-        self.__url: str = "defaultmdm.local:5000"  # mDNS callback updates this one
         self.__keyfile: str = keyfile
         self.__certificate_file: str = certificate_file
         self.__ca: str = ca_file
@@ -80,6 +79,8 @@ class MdmAgent:
             self.logger,
             self.__lock
         )
+        self.__url: str = "defaultmdm.local:5000"  # mDNS callback updates this one
+        self.__fallback_url: str = f"[{self.cbma_ctrl.__IPV6_WHITE_PREFIX}::1]:5000"
 
         self.service_monitor = comms_service_discovery.CommsServiceMonitor(
             service_name="MDM Service",
@@ -352,7 +353,8 @@ class MdmAgent:
             # "mDNS" discovery callback updates the url and can be None
             __https_url = self.__url
             if "None" in __https_url:
-                return requests.Response()  # empty response
+                self.logger.warning("mDNS resolution failed, using fallback")
+                __https_url = self.__fallback_url
 
             return requests.get(
                 f"https://{__https_url}/{Constants.GET_DEVICE_CONFIG.value}/{config.value}",
