@@ -64,6 +64,10 @@ class Constants(Enum):
     RSA_BIRTH_FILEBASED: str = "/opt/crypto/rsa/birth/filebased"
     RSA_BIRTH_KEY: str = GENERATED_CERTS_PATH + "/rsa/birth/filebased"
 
+    # Global IPv6s
+    IPV6_WHITE_PREFIX: str = "fdbb:1ef7:9d6f:e05d"
+    IPV6_RED_PREFIX: str = "fdd8:84dc:fe30:7bf2"
+
     # CBMA
     CBMA_PORT_UPPER: int = 15002
     CBMA_PORT_LOWER: int = 15001

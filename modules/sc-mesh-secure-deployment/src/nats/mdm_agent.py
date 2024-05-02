@@ -80,7 +80,7 @@ class MdmAgent:
             self.__lock
         )
         self.__url: str = "defaultmdm.local:5000"  # mDNS callback updates this one
-        self.__fallback_url: str = f"[{self.cbma_ctrl.__IPV6_WHITE_PREFIX}::1]:5000"
+        self.__fallback_url: str = f"[{Constants.IPV6_WHITE_PREFIX.value}::1]:5000"
 
         self.service_monitor = comms_service_discovery.CommsServiceMonitor(
             service_name="MDM Service",

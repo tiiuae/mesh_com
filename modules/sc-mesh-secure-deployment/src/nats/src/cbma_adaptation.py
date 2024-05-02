@@ -60,8 +60,6 @@ class CBMAAdaptation(object):
         self.BR_NAME: str = Constants.BR_NAME.value
         self.LOWER_BATMAN: str = Constants.LOWER_BATMAN.value
         self.UPPER_BATMAN: str = Constants.UPPER_BATMAN.value
-        self.__IPV6_WHITE_PREFIX: str = "fdbb:1ef7:9d6f:e05d"
-        self.__IPV6_RED_PREFIX: str = "fdd8:84dc:fe30:7bf2"
 
         # Set minimum required configuration
         self.__white_interfaces = [self.LOWER_BATMAN]
@@ -644,10 +642,10 @@ class CBMAAdaptation(object):
 
         # Wait bridge to be up and add global IPv6 address to the bridge
         self.__wait_for_interface(self.BR_NAME)
-        self.__add_global_ipv6_address(self.BR_NAME, self.__IPV6_RED_PREFIX)
+        self.__add_global_ipv6_address(self.BR_NAME, Constants.IPV6_RED_PREFIX.value)
 
         # Add global IPv6 address to the white batman :)
-        self.__add_global_ipv6_address(self.LOWER_BATMAN, self.__IPV6_WHITE_PREFIX)
+        self.__add_global_ipv6_address(self.LOWER_BATMAN, Constants.IPV6_WHITE_PREFIX.value)
 
         # Set batman hop penalty
         self.__batman.set_hop_penalty()
