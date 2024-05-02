@@ -41,21 +41,6 @@ cleanup_macvlan_interface()
 
 
 
-cleanup_bridge_if_needed()
-{
-	cleanup_macvlan_interface
-	for I in $SCN/$MACBR_NAME/lower_*; do
-		if [ "$I" = "$SCN/$MACBR_NAME/lower_*" ]; then
-			ebtables -t nat -D OUTPUT -j "$MACBR_NAME" --logical-out "$MACBR_NAME"
-			ebtables -t nat -X "$MACBR_NAME"
-			ip link delete "$MACBR_NAME"
-		fi
-		break
-	done
-}
-
-
-
 if [ $# -ne 3 ]; then
 	>&2 echo "Usage: $0 u bat0 00:20:91:f8:e7:d6"
 	>&2 echo "Usage: $0 l wlan0 04:f0:21:a6:b7:c8"
@@ -99,5 +84,5 @@ if ! ebtables -V | grep -iq legacy; then
 	! type ebtables-legacy >/dev/null 2>&1 || alias ebtables="ebtables-legacy"
 fi
 
-cleanup_bridge_if_needed
+cleanup_macvlan_interface
 exit $?
