@@ -1,15 +1,7 @@
 #!/bin/bash
 
 
-# kernel bugs force MACSEC_OVERHEAD=24 in create_macscbub_interface() but should still be ok
-export MACSEC_OVERHEAD=16
-
-# needs more testing, an overhead of 32 might even occur if batman-adv uses 4 address mode
-export BATMAN_OVERHEAD=24
-
-export HOPEFULLY1500=1400
-export SCN='/sys/class/net'
-
+source "${BASH_SOURCE%/*}/constants.rc"
 
 create_bridge_if_needed()
 {

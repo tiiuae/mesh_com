@@ -43,7 +43,7 @@ case "$1" in
                 ${user:+--user $user} ${chroot:+--chroot $chroot} \
                 ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
                 ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
-                -- $DIR$DAEMON ${!_MODE} $RADIO_INDEX
+                -- rm -fr /var/run/hostapd/wlan1 ; $DIR$DAEMON ${!_MODE} $RADIO_INDEX
             echo done.
         fi
        else
