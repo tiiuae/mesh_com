@@ -152,11 +152,12 @@ class MdmAgent:
         :param status: MDM connection status
         :return: -
         """
-        self.__url = address
-        self.mdm_service_available = status
+        with self.__lock:
+            self.__url = address
+            self.mdm_service_available = status
 
-        if self.mdm_service_available:
-            self.__get_server_cert_type()
+            if self.mdm_service_available:
+                self.__get_server_cert_type()
 
     def __get_server_cert_type(self):
         parts = self.__url.split(":")
