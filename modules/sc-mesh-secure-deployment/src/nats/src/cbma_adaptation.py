@@ -38,6 +38,7 @@ class CBMAAdaptation(object):
         comms_ctrl: CommsController,
         logger: logging.Logger,
         lock: threading.Lock,
+        config_file: str = Constants.MS_CONFIG_FILE.value,
     ):
         """
         Constructor
@@ -70,16 +71,14 @@ class CBMAAdaptation(object):
             self.BR_NAME,
         ]
 
-        self.__batman = BatCtrlUtils(logger=self.logger)
+        self.__batman = BatCtrlUtils(logger=self.logger, config_file=config_file)
         self.__config = None
         self.__cbma_config = None
         self.__vlan_config = None
 
         # Read configs from file
         try:
-            self.__config = comms_config_store.ConfigStore(
-                Constants.MS_CONFIG_FILE.value
-            )
+            self.__config = comms_config_store.ConfigStore(config_file)
         except Exception as e:
             self.logger.error(f"Error reading config file: {e}")
 
@@ -180,9 +179,7 @@ class CBMAAdaptation(object):
                 except subprocess.CalledProcessError as e:
                     self.logger.error(f"Error creating VLAN interface {vlan_name}: {e}")
             else:
-                self.logger.error(
-                    f"Invalid configuration for VLAN {vlan_name}."
-                )
+                self.logger.error(f"Invalid configuration for VLAN {vlan_name}.")
 
     def __delete_vlan_interfaces(self) -> None:
         if not self.__vlan_config:
@@ -298,20 +295,16 @@ class CBMAAdaptation(object):
             ip.close()
 
     def __set_interface_up(self, interface_name: str) -> None:
-        ip = IPRoute()
         try:
-            # Bring the interface ip
-            interface_indices = ip.link_lookup(ifname=interface_name)
-            if interface_indices:
-                ip.link("set", index=interface_indices[0], state="up")
+            subprocess.run(
+                ["ip", "link", "set", interface_name, "state", "up"], check=True
+            )
         except Exception as e:
             self.logger.error(
                 "Error bringing up interface %s! Error: %s",
                 interface_name,
                 e,
             )
-        finally:
-            ip.close()
 
     def __shutdown_interface(self, interface_name: str) -> None:
         ip = IPRoute()
@@ -441,6 +434,7 @@ class CBMAAdaptation(object):
             elapsed_time = time.time() - start_time
 
             if elapsed_time >= timeout:
+                self.logger.warning("__wait_for_interface timeout for %s", if_name)
                 return False  # Timeout reached
 
             time.sleep(1)  # Sleep for 1 second before checking again
@@ -474,13 +468,13 @@ class CBMAAdaptation(object):
         MAC address.
         :return: The random MAC address
         """
-        if randomized:
+        if randomized or interface_mac is None:
             mac = [
                 random.randint(0x00, 0xFF) for _ in range(6)
             ]  # Generate 6 random bytes
             mac[0] &= 0xFC  # Clear multicast and locally administered bits
             mac[0] |= 0x02  # Set the locally administered bit
-            return bytes(mac).hex(sep=':', bytes_per_sep=1)
+            return bytes(mac).hex(sep=":", bytes_per_sep=1)
         else:
             # Split MAC address into octets and flip the locally administered bit
             octets = interface_mac.split(":")
@@ -586,15 +580,16 @@ class CBMAAdaptation(object):
         MACSEC_OVERHEAD = 16
         BATMAN_OVERHEAD = 24
 
-
         # if upper or lower batman
         if interface_name == self.UPPER_BATMAN:
             interface_color = Constants.RED_INTERFACE.value
         elif interface_name == self.LOWER_BATMAN:
             interface_color = Constants.WHITE_INTERFACE.value
         elif interface_name.startswith("halow"):
-            self.logger.error("Cannot set MTU size for halow interface %s"
-                              " as driver limitation", interface_name)
+            self.logger.error(
+                "Cannot set MTU size for halow interface %s" " as driver limitation",
+                interface_name,
+            )
             return
 
         # use color to set mtu size
@@ -603,7 +598,7 @@ class CBMAAdaptation(object):
         elif interface_color == Constants.WHITE_INTERFACE.value:
             mtu_size = str(BASE_MTU_SIZE + MACSEC_OVERHEAD + BATMAN_OVERHEAD)
         elif interface_color == Constants.BLACK_INTERFACE.value:
-            mtu_size = str(BASE_MTU_SIZE + (2 * (MACSEC_OVERHEAD+ BATMAN_OVERHEAD)))
+            mtu_size = str(BASE_MTU_SIZE + (2 * (MACSEC_OVERHEAD + BATMAN_OVERHEAD)))
         else:
             self.logger.error("Invalid color %s! MTU size not set.", interface_color)
             return
@@ -612,7 +607,8 @@ class CBMAAdaptation(object):
 
         try:
             subprocess.run(
-                ["ip", "link", "set", "dev", interface_name, "mtu", mtu_size], check=True
+                ["ip", "link", "set", "dev", interface_name, "mtu", mtu_size],
+                check=True,
             )
         except subprocess.CalledProcessError as e:
             self.logger.error(
@@ -706,7 +702,7 @@ class CBMAAdaptation(object):
                 if not link_local_address:
                     self.logger.debug(
                         "Link-local IPv6 address not found for interface %s",
-                        interface_name
+                        interface_name,
                     )
                     return
 
@@ -751,7 +747,9 @@ class CBMAAdaptation(object):
 
         for interface in self.__lower_cbma_interfaces:
             try:
-                self.__set_mtu_size(interface.interface_name, Constants.BLACK_INTERFACE.value)
+                self.__set_mtu_size(
+                    interface.interface_name, Constants.BLACK_INTERFACE.value
+                )
 
                 ret = self.__lower_cbma_controller.add_interface(
                     interface.interface_name
@@ -825,7 +823,9 @@ class CBMAAdaptation(object):
         for _interface in self.__upper_cbma_interfaces:
             try:
                 # change mtu size
-                self.__set_mtu_size(_interface.interface_name, Constants.WHITE_INTERFACE.value)
+                self.__set_mtu_size(
+                    _interface.interface_name, Constants.WHITE_INTERFACE.value
+                )
 
                 ret = self.__upper_cbma_controller.add_interface(
                     _interface.interface_name
@@ -856,8 +856,6 @@ class CBMAAdaptation(object):
         Stops CBMA by terminating CBMA processes. Also
         destroys batman and bridge interfaces.
         """
-        if not self.__cbma_set_up:
-            return
         try:
             self.logger.debug("Stopping CBMA...")
 

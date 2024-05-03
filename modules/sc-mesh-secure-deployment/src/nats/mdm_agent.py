@@ -209,6 +209,8 @@ class MdmAgent:
                 self.logger.error(
                     "Error occurred during certificate type detection: %s", e
                 )
+            finally:
+                sock.close()
 
     def interface_monitor_cb(self, interfaces) -> None:
         """
@@ -221,6 +223,7 @@ class MdmAgent:
             #self.logger.debug("Interface monitor cb: %s", interfaces)
             self.__interfaces.clear()
 
+            any_interface_up = False
             for interface_data in interfaces:
                 interface = Interface(
                     interface_name=interface_data["interface_name"],
@@ -229,15 +232,24 @@ class MdmAgent:
                 )
                 self.__interfaces.append(interface)
 
-            if self.__if_to_monitor is None:
-                self.start_service_discovery()
+                if interface.operstat == "UP":
+                    any_interface_up = True
+
+            if any_interface_up:
+                # At least one interface is up, start service discovery
+                if self.__if_to_monitor is None:
+                    self.start_service_discovery()
+                else:
+                    for interface in self.__interfaces:
+                        if interface.interface_name == self.__if_to_monitor:
+                            if interface.operstat == "UP":
+                                self.start_service_discovery()
+                            else:
+                                self.mdm_service_available = False
+                                self.stop_service_discovery()
             else:
-                for interface in self.__interfaces:
-                    if interface.interface_name == self.__if_to_monitor:
-                        if interface.operstat == "UP":
-                            self.start_service_discovery()
-                        elif interface.operstat == "DOWN":
-                            self.stop_service_discovery()
+                self.mdm_service_available = False
+                self.stop_service_discovery()
 
     def start_service_discovery(self):
         """
@@ -247,8 +259,13 @@ class MdmAgent:
         """
         if not self.service_monitor.running:
             self.logger.debug("Start service monitor thread")
-
-            self.__service_monitor_thread.start()
+            if not self.__service_monitor_thread.is_alive():
+                self.__service_monitor_thread = threading.Thread(
+                    target=self.service_monitor.run
+                )
+                self.__service_monitor_thread.start()
+            else:
+                self.logger.warning("Service monitor thread is already running")
 
     def stop_service_discovery(self):
         """
@@ -880,12 +897,19 @@ if __name__ == "__main__":
     parser.add_argument("-k", "--keyfile", help="TLS keyfile", required=False)
     parser.add_argument("-c", "--certfile", help="TLS certfile", required=False)
     parser.add_argument("-r", "--ca", help="ca certfile", required=False)
-    parser.add_argument("-i", "--interface", help="e.g. br-lan or bat0", required=False)
+    parser.add_argument(
+        "-i",
+        "--interface",
+        help="Interface from where to monitor MDM server. Default is bat0",
+        required=False,
+    )
 
     args = parser.parse_args()
     loop = asyncio.new_event_loop()
 
-    loop.run_until_complete(
-        main_mdm(args.keyfile, args.certfile, args.ca, args.interface)
-    )
+    if args.interface is None:
+        interface = Constants.LOWER_BATMAN.value
+    else:
+        interface = args.interface
+    loop.run_until_complete(main_mdm(args.keyfile, args.certfile, args.ca, interface))
     loop.close()
