@@ -34,20 +34,6 @@ mesh_kill() {
   fi
 }
 
-remove_hostapd_socket() {
-   # cleanup for old socket, WAR for following error:
-   #     ctrl_iface exists and seems to be in use - cannot override it
-   #     Delete '/var/run/hostapd/wlan1' manually if it is not used anymore
-   #     Failed to setup control interface for wlan1
-
-   # $1 = interface name
-   INTERFACE_NAME=$1
-
-   if [ -f /var/run/hostapd/"$INTERFACE_NAME" ]; then
-      rm -fr /var/run/hostapd/"$INTERFACE_NAME"
-   fi
-}
-
 calculate_wifi_channel() {
     # arguments:
     # $1 = wifi frequency
@@ -258,9 +244,6 @@ EOF
         iw phy "$phyname" set distance 0
       fi
 
-      echo "$wifidev create 11s.."
-      ifconfig "$wifidev" mtu 1560
-
       echo "$wifidev up.."
       ip link set "$wifidev" up
 
@@ -286,6 +269,7 @@ EOF
 country_code=$cc
 interface=$ifname_ap
 ssid=$ssid
+bridge=br-lan
 hw_mode=$retval_band
 channel=$retval_channel
 macaddr_acl=0
@@ -297,17 +281,13 @@ wpa_key_mgmt=WPA-PSK
 wpa_pairwise=TKIP
 rsn_pairwise=CCMP
 beacon_int=1000
-ctrl_interface=/var/run/hostapd
 EOF
 
       #SLAAC immediately after basic setup
       slaac "$slaac"
 
-      # cleanup for old socket WAR:
-      remove_hostapd_socket "$ifname_ap"
-
       # Start AP
-      /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX".conf -f /tmp/hostapd_"$INDEX".log
+      /usr/sbin/hostapd /var/run/hostapd-"$INDEX".conf -f /tmp/hostapd_"$INDEX".log
       ;;
   "ap+mesh_scc")
       wait_for_intf "$bridge_name"
@@ -334,7 +314,6 @@ EOF
 
       # AP hostapd config
       cat <<EOF >/var/run/hostapd-"$INDEX".conf
-ctrl_interface=/var/run/hostapd
 interface=$ifname_ap
 hw_mode=$retval_band
 channel=$retval_channel
@@ -343,6 +322,7 @@ ieee80211h=1
 ieee80211d=1
 country_code=$cc
 
+bridge=br-lan
 ssid=$ssid
 auth_algs=1
 wpa=2
@@ -352,7 +332,6 @@ wpa_passphrase=$psk
 
 wmm_enabled=1
 beacon_int=1000
-ctrl_interface=/var/run/hostapd
 
 ### IEEE 802.11n
 ieee80211n=1
@@ -366,11 +345,8 @@ EOF
       #SLAAC immediately after basic setup
       slaac "$slaac"
 
-      # cleanup for old socket WAR:
-      remove_hostapd_socket "$ifname_ap"
-
       # Start AP
-      /usr/sbin/hostapd -B /var/run/hostapd-"$INDEX".conf  -f /tmp/hostapd_"$INDEX".log
+      /usr/sbin/hostapd /var/run/hostapd-"$INDEX".conf  -f /tmp/hostapd_"$INDEX".log
       ;;
   *)
       exit 1
