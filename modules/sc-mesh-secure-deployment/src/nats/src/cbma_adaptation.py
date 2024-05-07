@@ -48,7 +48,6 @@ class CBMAAdaptation(object):
         self.logger.setLevel(logging.INFO)
         self.__interfaces: List[Interface] = []
         self.__lock = lock
-        self.__cbma_set_up = False  # Indicates whether CBMA has been configured
         self.__cbma_certs_path = Constants.ECDSA_BIRTH_FILEBASED.value
         self.__upper_cbma_certs_path = Constants.DOWNLOADED_RSA_CERTS_PATH.value
         self.__upper_cbma_ca_cert_path = Constants.DOWNLOADED_UPPER_CBMA_CA_CERT.value
@@ -297,7 +296,7 @@ class CBMAAdaptation(object):
     def __set_interface_up(self, interface_name: str) -> None:
         try:
             subprocess.run(
-                ["ip", "link", "set", interface_name, "state", "up"], check=True
+                ["ip", "link", "set", interface_name, "up", "state", "up"], check=True
             )
         except Exception as e:
             self.logger.error(
@@ -618,6 +617,8 @@ class CBMAAdaptation(object):
     def setup_cbma(self) -> bool:
         """
         Sets up both upper and lower CBMA.
+        :return: True if both lower and upper CBMA was setup
+                 successfully. Returns False otherwise.
         """
         self.__init_batman_and_bridge()
 
@@ -627,8 +628,8 @@ class CBMAAdaptation(object):
         self.__setup_radios()
 
         # setup cbma
-        self.__setup_lower_cbma()
-        self.__setup_upper_cbma()
+        lower_cbma_set_up = self.__setup_lower_cbma()
+        upper_cbma_set_up = self.__setup_upper_cbma()
 
         # Add interfaces to the bridge
         for interface in self.__red_interfaces:
@@ -646,10 +647,7 @@ class CBMAAdaptation(object):
         # Set batman hop penalty
         self.__batman.set_hop_penalty()
 
-        self.__cbma_set_up = True
-
-        # todo what about the false return value?
-        return True
+        return lower_cbma_set_up and upper_cbma_set_up
 
     def __is_valid_ipv6_local(self, address: tuple[str, int]) -> bool:
         """
@@ -725,10 +723,11 @@ class CBMAAdaptation(object):
         except Exception as e:
             self.logger.error(f"Error: {e}")
 
-    def __setup_lower_cbma(self) -> None:
+    def __setup_lower_cbma(self) -> bool:
         """
         Sets up lower CBMA.
-        :return: None
+        :return: True if at least one interface was successfully
+                 added to the lower CBMA. Returns False otherwise.
         """
         self.logger.debug("Setting up lower CBMA...")
         cert_dir = f"{self.__cbma_certs_path}/MAC/"
@@ -744,7 +743,7 @@ class CBMAAdaptation(object):
         self.__lower_cbma_controller = CBMAController(
             Constants.CBMA_PORT_LOWER.value, self.LOWER_BATMAN, certificates, False
         )
-
+        intf_added = False
         for interface in self.__lower_cbma_interfaces:
             try:
                 self.__set_mtu_size(
@@ -758,17 +757,21 @@ class CBMAAdaptation(object):
                     f"Lower CBMA interfaces added: {interface.interface_name} "
                     f"status: {ret}"
                 )
+                if ret:
+                    intf_added = True
             except Exception as e:
                 self.logger.exception(
                     "Error adding CBMA interface %s! Error: %s",
                     interface.interface_name,
                     e,
                 )
+        return intf_added
 
-    def __setup_upper_cbma(self) -> None:
+    def __setup_upper_cbma(self) -> bool:
         """
         Sets up upper CBMA.
-        :return: None
+        :return: True if at least one interface was successfully
+                 added to the upper CBMA. Returns False otherwise.
         """
 
         upper_cbma_interfaces = []
@@ -819,7 +822,7 @@ class CBMAAdaptation(object):
         self.__upper_cbma_controller = CBMAController(
             Constants.CBMA_PORT_UPPER.value, self.UPPER_BATMAN, certificates, True, True
         )
-
+        intf_added = False
         for _interface in self.__upper_cbma_interfaces:
             try:
                 # change mtu size
@@ -834,12 +837,15 @@ class CBMAAdaptation(object):
                     f"Upper CBMA interfaces added: {_interface.interface_name} "
                     f"status: {ret}"
                 )
+                if ret:
+                    intf_added = True
             except Exception as e:
                 self.logger.exception(
                     "Error adding upper CBMA interface %s! Error: %s",
                     _interface.interface_name,
                     e,
                 )
+        return intf_added
 
     def __cleanup_cbma(self) -> None:
         self.__shutdown_interface(self.LOWER_BATMAN)
@@ -851,16 +857,19 @@ class CBMAAdaptation(object):
         self.__delete_vlan_interfaces()
         self.__shutdown_and_delete_bridge(self.BR_NAME)
 
-    def stop_cbma(self) -> None:
+    def stop_cbma(self) -> bool:
         """
         Stops CBMA by terminating CBMA processes. Also
         destroys batman and bridge interfaces.
+        :return: Boolean to indicate success.
         """
+        lower_stopped = False
+        upper_stopped = False
         try:
             self.logger.debug("Stopping CBMA...")
 
-            self.__lower_cbma_controller.stop()
-            self.__upper_cbma_controller.stop()
+            lower_stopped = self.__lower_cbma_controller.stop()
+            upper_stopped = self.__upper_cbma_controller.stop()
 
             self.logger.debug("CBMA processes terminated, continue cleanup...")
         except Exception as e:
@@ -868,4 +877,4 @@ class CBMAAdaptation(object):
         finally:
             self.__cleanup_cbma()
             self.logger.debug("CBMA cleanup finished")
-            self.__cbma_set_up = False
+        return lower_stopped and upper_stopped

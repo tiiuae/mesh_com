@@ -210,8 +210,12 @@ class MdmAgent:
                 self.logger.error(
                     "Error occurred during certificate type detection: %s", e
                 )
-            finally:
+            try:
                 sock.close()
+            except Exception as e:
+                self.logger.warning(
+                    "Exception whilst trying to close socket: %s", e
+                )
 
     def interface_monitor_cb(self, interfaces) -> None:
         """
@@ -902,15 +906,14 @@ if __name__ == "__main__":
         "-i",
         "--interface",
         help="Interface from where to monitor MDM server. Default is bat0",
+        default=Constants.LOWER_BATMAN.value,
         required=False,
     )
 
     args = parser.parse_args()
     loop = asyncio.new_event_loop()
 
-    if args.interface is None:
-        interface = Constants.LOWER_BATMAN.value
-    else:
-        interface = args.interface
-    loop.run_until_complete(main_mdm(args.keyfile, args.certfile, args.ca, interface))
+    loop.run_until_complete(
+        main_mdm(args.keyfile, args.certfile, args.ca, args.interface)
+    )
     loop.close()
