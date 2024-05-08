@@ -69,7 +69,19 @@ chmod 644 "/run/radvd@$INTERFACE.conf"
 # Write the radvd configuration to the file
 echo "Writing configuration to $RADVD_CONF_FILE..."
 cat > "$RADVD_CONF_FILE" << EOF
-interface $INTERFACE
+# Running different radvd instances on different br-lan ports is the desired
+# design and it was working but for some reason br-lan stopped forwarding
+# router advertisements from said port to bat0 and thus the rest of the mesh:
+# in other words leaking RAs, which is not what we want eventually but which is
+# what we need to make things work while we wait for brouting implementation.
+# I tried to debug this but could not quickly find an obvious reason why the
+# temporarily-desired leakage stopped working so here is a quick & dirty
+# workaround as we'll get brouting soon anyway: force leakage by running radvd
+# directly on the whole switch; I did test that several instances of radvd do
+# not mind running on the same interface, at least it worked for me :-)   Seb
+#
+#interface $INTERFACE
+interface br-lan
 {
         IgnoreIfMissing on;
         AdvSendAdvert on;
