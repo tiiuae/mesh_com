@@ -628,8 +628,10 @@ class CBMAAdaptation(object):
         self.__setup_radios()
 
         # setup cbma
-        lower_cbma_set_up = self.__setup_lower_cbma()
-        upper_cbma_set_up = self.__setup_upper_cbma()
+        if not self.__setup_lower_cbma() or not self.__setup_upper_cbma():
+            # Ensure all created CBMA interfaces are cleaned in case of failure
+            self.stop_cbma()
+            return False
 
         # Add interfaces to the bridge
         for interface in self.__red_interfaces:
@@ -642,12 +644,14 @@ class CBMAAdaptation(object):
         self.__add_global_ipv6_address(self.BR_NAME, Constants.IPV6_RED_PREFIX.value)
 
         # Add global IPv6 address to the white batman :)
-        self.__add_global_ipv6_address(self.LOWER_BATMAN, Constants.IPV6_WHITE_PREFIX.value)
+        self.__add_global_ipv6_address(
+            self.LOWER_BATMAN, Constants.IPV6_WHITE_PREFIX.value
+        )
 
         # Set batman hop penalty
         self.__batman.set_hop_penalty()
 
-        return lower_cbma_set_up and upper_cbma_set_up
+        return True
 
     def __is_valid_ipv6_local(self, address: tuple[str, int]) -> bool:
         """
@@ -857,24 +861,38 @@ class CBMAAdaptation(object):
         self.__delete_vlan_interfaces()
         self.__shutdown_and_delete_bridge(self.BR_NAME)
 
+    def __stop_controller(self, controller, name: str) -> bool:
+        """
+        Helper method to stop a CBMA controller.
+        :param controller: The CBMA controller object.
+        :param name: Name of the CBMA controller (e.g., "lower CBMA").
+        :return: Boolean indicating whether the controller was stopped successfully.
+        """
+        stopped = False
+        if controller:
+            try:
+                self.logger.debug(f"Stopping {name}")
+                stopped = controller.stop()
+            except Exception as e:
+                self.logger.error(f"Error stopping {name}: {e}")
+        else:
+            stopped = True
+        self.logger.debug(f"{name} stopped status: {stopped}")
+        return stopped
+
     def stop_cbma(self) -> bool:
         """
         Stops CBMA by terminating CBMA processes. Also
         destroys batman and bridge interfaces.
         :return: Boolean to indicate success.
         """
-        lower_stopped = False
-        upper_stopped = False
-        try:
-            self.logger.debug("Stopping CBMA...")
+        lower_stopped = self.__stop_controller(
+            self.__lower_cbma_controller, "lower CBMA"
+        )
+        upper_stopped = self.__stop_controller(
+            self.__upper_cbma_controller, "upper CBMA"
+        )
 
-            lower_stopped = self.__lower_cbma_controller.stop()
-            upper_stopped = self.__upper_cbma_controller.stop()
+        self.__cleanup_cbma()
 
-            self.logger.debug("CBMA processes terminated, continue cleanup...")
-        except Exception as e:
-            self.logger.error(f"Stop CBMA error: {e}")
-        finally:
-            self.__cleanup_cbma()
-            self.logger.debug("CBMA cleanup finished")
         return lower_stopped and upper_stopped
