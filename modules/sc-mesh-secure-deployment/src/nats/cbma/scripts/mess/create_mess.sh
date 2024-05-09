@@ -52,8 +52,11 @@ create_macscbpad_interface()
 	bridge link set dev "$MACSCBPAD_NAME" learning_sync off
 	ip link set dev "$MACSCBPAD_NAME" type bridge_slave bcast_flood on
 	ip link set dev "$MACSCBPAD_NAME" type bridge_slave neigh_suppress off || true
-	ebtables -t nat -A "$MACBR_NAME" -o "$MACSCBPAD_NAME" -d '!' Broadcast -j DROP
-	ebtables -t nat -A PREROUTING -i "$MACSCBPAD_NAME" -j dnat --to-destination ff:ff:ff:ff:ff:ff && ebtables -t nat -A "$MACBR_NAME" -o "$MACSCBPAD_NAME" -j dnat --to-destination "$REMOTE_MAC"
+
+	#ebtables -t nat -A "$MACBR_NAME" -o "$MACSCBPAD_NAME" -d '!' Broadcast -j DROP
+	#ebtables -t nat -A PREROUTING -i "$MACSCBPAD_NAME" -j dnat --to-destination ff:ff:ff:ff:ff:ff && ebtables -t nat -A "$MACBR_NAME" -o "$MACSCBPAD_NAME" -j dnat --to-destination "$REMOTE_MAC"
+	ebtables -t nat -A PREROUTING -i "$MACSCBPAD_NAME" -j dnat --to-destination ff:ff:ff:ff:ff:ff && ebtables -t nat -A "$MACBR_NAME" -o "$MACSCBPAD_NAME" -d Broadcast -j dnat --to-destination "$REMOTE_MAC"
+
 	if ! ip link set dev "$MACSCBPAD_NAME" up; then
 		ip link delete "$MACSCBPAD_NAME"
 		return `false`
@@ -136,7 +139,10 @@ create_macsec_interface()
 	bridge fdb add "$REMOTE_MAC" dev "$MACSEC_NAME" && ip link set dev "$MACSEC_NAME" type bridge_slave learning off
 	ip link set dev "$MACSEC_NAME" type bridge_slave bcast_flood off || true
 	ip link set dev "$MACSEC_NAME" type bridge_slave neigh_suppress off || true
-	ebtables -t nat -A "$MACBR_NAME" -o "$MACSEC_NAME" -d Broadcast -j DROP
+
+	#ebtables -t nat -A "$MACBR_NAME" -o "$MACSEC_NAME" -d Broadcast -j DROP
+	ebtables -t nat -A "$MACBR_NAME" -o "$MACSEC_NAME" -d "$REMOTE_MAC" -j ACCEPT
+
 	if ! ip link set dev "$MACSEC_NAME" up; then
 		ip link delete "$MACSEC_NAME"
 		return `false`
