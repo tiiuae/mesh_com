@@ -309,9 +309,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
 
                 mesh_conf.write(f'id{str(index)}_SLAAC="{self.slaac[index]}"\n')
 
-        except:
+        except Exception as error:
             self.comms_status[index].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
-            self.logger.error("not able to write new %s", f"{str(index)}_{file}")
+            self.logger.error("not able to write new %s", f"{str(index)}_{file}, {error}")
             return "FAIL", "not able to write new mesh.conf"
 
         self.comms_status[index].mesh_cfg_status = comms.STATUS.mesh_cfg_stored
