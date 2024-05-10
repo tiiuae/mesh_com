@@ -22,7 +22,6 @@ CBMA:
     - halow1
   red_interfaces:
     - wlan1
-    - vlan_red
 
 BATMAN:
   routing_algo: BATMAN_V
