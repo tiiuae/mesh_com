@@ -7,9 +7,8 @@ export SCN='/sys/class/net'
 
 cleanup_macscbpad_interface()
 {
-	ebtables -t nat -D "$MACBR_NAME" -o "$MACSCBPAD_NAME" -j dnat --to-destination "$REMOTE_MAC"
 	ebtables -t nat -D PREROUTING -i "$MACSCBPAD_NAME" -j dnat --to-destination ff:ff:ff:ff:ff:ff
-	ebtables -t nat -D "$MACBR_NAME" -o "$MACSCBPAD_NAME" -d '!' Broadcast -j DROP
+	ebtables -t nat -D "$MACBR_NAME" -o "$MACSCBPAD_NAME" -d Broadcast -j dnat --to-destination "$REMOTE_MAC"
 	ip link delete "$MACSCBPAD_NAME"
 }
 
@@ -26,7 +25,7 @@ cleanup_macscbub_interface()
 
 cleanup_macsec_interface()
 {
-	ebtables -t nat -D "$MACBR_NAME" -o "$MACSEC_NAME" -d Broadcast -j DROP
+	ebtables -t nat -D "$MACBR_NAME" -o "$MACSEC_NAME" -d "$REMOTE_MAC" -j ACCEPT
 	ip link delete "$MACSEC_NAME"
 }
 

@@ -52,8 +52,7 @@ create_macscbpad_interface()
 	bridge link set dev "$MACSCBPAD_NAME" learning_sync off
 	ip link set dev "$MACSCBPAD_NAME" type bridge_slave bcast_flood on
 	ip link set dev "$MACSCBPAD_NAME" type bridge_slave neigh_suppress off || true
-	ebtables -t nat -A "$MACBR_NAME" -o "$MACSCBPAD_NAME" -d '!' Broadcast -j DROP
-	ebtables -t nat -A PREROUTING -i "$MACSCBPAD_NAME" -j dnat --to-destination ff:ff:ff:ff:ff:ff && ebtables -t nat -A "$MACBR_NAME" -o "$MACSCBPAD_NAME" -j dnat --to-destination "$REMOTE_MAC"
+	ebtables -t nat -A PREROUTING -i "$MACSCBPAD_NAME" -j dnat --to-destination ff:ff:ff:ff:ff:ff && ebtables -t nat -A "$MACBR_NAME" -o "$MACSCBPAD_NAME" -d Broadcast -j dnat --to-destination "$REMOTE_MAC"
 	if ! ip link set dev "$MACSCBPAD_NAME" up; then
 		ip link delete "$MACSCBPAD_NAME"
 		return `false`
@@ -136,7 +135,7 @@ create_macsec_interface()
 	bridge fdb add "$REMOTE_MAC" dev "$MACSEC_NAME" && ip link set dev "$MACSEC_NAME" type bridge_slave learning off
 	ip link set dev "$MACSEC_NAME" type bridge_slave bcast_flood off || true
 	ip link set dev "$MACSEC_NAME" type bridge_slave neigh_suppress off || true
-	ebtables -t nat -A "$MACBR_NAME" -o "$MACSEC_NAME" -d Broadcast -j DROP
+	ebtables -t nat -A "$MACBR_NAME" -o "$MACSEC_NAME" -d "$REMOTE_MAC" -j ACCEPT
 	if ! ip link set dev "$MACSEC_NAME" up; then
 		ip link delete "$MACSEC_NAME"
 		return `false`
@@ -217,22 +216,8 @@ create_macvlan_interface()
 create_bridge_if_needed()
 {
 	if [ ! -e "$SCN/$MACBR_NAME/bridge" ]; then
-		if ! ip link add name "$MACBR_NAME" address "$LOCAL_MAC" mtu "$MACBR_MTU" type bridge; then
-			return `false`
-		fi
-		ip link set dev "$MACBR_NAME" group "$GROUP_ID" || true
-		ip link set dev "$MACBR_NAME" arp off || true
-		ip link set dev "$MACBR_NAME" multicast off || true
-		ip link set dev "$MACBR_NAME" alias "$LEVEL MACVLAN/MACsec bridge above $BASE_INTERFACE_NAME" || true
-		ip link set dev "$MACBR_NAME" addrgenmode eui64 || true
-		ip link set dev "$MACBR_NAME" type bridge no_linklocal_learn 1 || true
-		ebtables -t nat -N "$MACBR_NAME" || true
-		ebtables -t nat -A OUTPUT -j "$MACBR_NAME" --logical-out "$MACBR_NAME" || true
-		if ! ip link set dev "$MACBR_NAME" up \
-		|| ! batctl meshif "$BATMAN_NAME" interface add "$MACBR_NAME"; then
-			ip link delete "$MACBR_NAME"
-			return `false`
-		fi
+		>&2 echo "Error: creation has been moved to create_bridge.sh, $MACBR_NAME should exist"
+		return `false`
 	fi
 	create_macvlan_interface || return `false`
 	REMOTE_EUI64=`mac_to_eui64 "$REMOTE_MAC"`
