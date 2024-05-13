@@ -592,10 +592,6 @@ class CBMAAdaptation(object):
             interface_color = Constants.RED_INTERFACE.value
         elif interface_name == self.LOWER_BATMAN:
             interface_color = Constants.WHITE_INTERFACE.value
-        elif interface_name.startswith("halow"):
-            self.logger.error("Cannot set MTU size for halow interface %s"
-                              " as driver limitation", interface_name)
-            return
 
         # use color to set mtu size
         if interface_color == Constants.RED_INTERFACE.value:
@@ -611,9 +607,13 @@ class CBMAAdaptation(object):
         self.logger.info("Setting MTU size for %s to %s", interface_name, mtu_size)
 
         try:
-            subprocess.run(
+            ret = subprocess.run(
                 ["ip", "link", "set", "dev", interface_name, "mtu", mtu_size], check=True
             )
+            if ret.returncode != 0:
+                self.logger.error(
+                    "Error setting MTU size for %s! Error: %s", interface_name, ret
+                )
         except subprocess.CalledProcessError as e:
             self.logger.error(
                 "Error setting MTU size for %s! Error: %s", interface_name, e
