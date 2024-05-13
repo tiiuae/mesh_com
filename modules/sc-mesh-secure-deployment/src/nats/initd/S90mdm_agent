@@ -18,9 +18,9 @@ BC_CERT_FILE=$(find /opt/crypto/rsa/birth/filebased/DNS/ -type f -name '*.local.
 BC_CA_FILE="/opt/mspki/rsa/certificate_chain.crt"
 
 if [ -e "$BC_CA_FILE" ] && [ -e "$BC_KEY_FILE" ] && [ -e "$BC_CERT_FILE" ]; then
-  command_args="-k $BC_KEY_FILE -c $BC_CERT_FILE -r $BC_CA_FILE"
+  command_args="-k $BC_KEY_FILE -c $BC_CERT_FILE -r $BC_CA_FILE -i bat0"
 else
-  command_args=""
+  command_args="-i bat0"
 fi
 
 LOG_FILE=/opt/mdm_agent.log
