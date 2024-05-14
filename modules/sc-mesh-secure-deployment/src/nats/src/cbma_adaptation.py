@@ -599,13 +599,9 @@ class CBMAAdaptation(object):
         self.logger.info("Setting MTU size for %s to %s", interface_name, mtu_size)
 
         try:
-            ret = subprocess.run(
+            subprocess.run(
                 ["ip", "link", "set", "dev", interface_name, "mtu", mtu_size], check=True
             )
-            if ret.returncode != 0:
-                self.logger.error(
-                    "Error setting MTU size for %s! Error: %s", interface_name, ret
-                )
         except subprocess.CalledProcessError as e:
             self.logger.error(
                 "Error setting MTU size for %s! Error: %s", interface_name, e
