@@ -109,21 +109,25 @@ class TestSettings(unittest.TestCase):
                 jsoned, "./tests", "mesh.conf"
             )
             self.assertEqual(ret, "OK", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+            self.assertEqual(mesh_status, "Mesh configuration stored", msg=f"mesh_status: {mesh_status}")
 
             # settings json is invalid
             ret, mesh_status = self.settings.handle_mesh_settings(
                 """{}""", "./tests", "mesh.conf"
             )
             self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
-            #
-            # # # settings json is invalid
+            self.assertEqual(mesh_status, "JSON format not correct 'api_version'",
+                             msg=f"mesh_status: {mesh_status}")
 
+            # settings json is invalid
             ret, mesh_status = self.settings.handle_mesh_settings(
                 """{"radio_index": "0", "api_version": 1,"ssid": "test;_mesh", "key":"1230","country": "fi","frequency": "5220","tx_power": "5","mode": "mesh","priority":"long_range","role":"gcs"}}""",
                 "./tests",
                 "test.conf",
             )
             self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+            self.assertEqual(mesh_status, "JSON format not correct Extra data: line 1 column 178 (char 177)",
+                             msg=f"mesh_status: {mesh_status}")
 
             del cmd_dict
 
@@ -138,6 +142,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid SSID, id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
     def test_handle_mesh_settings_validate_parameters_key(self):
@@ -150,6 +155,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid WPA3 PSK, id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
     def test_handle_mesh_settings_validate_parameters_mode(self):
@@ -163,6 +169,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid mode, id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
     def test_handle_mesh_settings_validate_parameters_frequency(self):
@@ -175,6 +182,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid frequency (can't convert to integer), id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
         cmd_dict = deepcopy(cmd_dict_org)
@@ -184,6 +192,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid frequency, id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
     def test_handle_mesh_settings_validate_parameters_frequency_mcc(self):
@@ -196,6 +205,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid mcc frequency (can't convert to integer), id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
         cmd_dict = deepcopy(cmd_dict_org)
@@ -205,6 +215,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid mcc frequency, id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
     def test_handle_mesh_settings_validate_parameters_cc(self):
@@ -217,6 +228,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid country code, id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
     def test_handle_mesh_settings_validate_parameters_tx_power(self):
@@ -229,6 +241,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid tx power (can't convert to integer), id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
         cmd_dict = deepcopy(cmd_dict_org)
@@ -238,6 +251,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid tx power, id 0", msg=f"mesh_status: {mesh_status}")
 
     def test_handle_mesh_settings_validate_parameters_priority(self):
         cmd_dict = deepcopy(cmd_dict_org)
@@ -249,6 +263,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid priority, id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
     def test_handle_mesh_settings_validate_parameters_role(self):
@@ -261,6 +276,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid role, id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
     def test_handle_mesh_settings_validate_parameters_mptcp(self):
@@ -273,6 +289,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid mptcp value, id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
     def test_handle_mesh_settings_validate_parameters_slaac(self):
@@ -285,6 +302,7 @@ class TestSettings(unittest.TestCase):
             jsoned, "./tests", "mesh.conf"
         )
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid slaac ifaces, id 0", msg=f"mesh_status: {mesh_status}")
         del cmd_dict
 
     def test_handle_mesh_settings_validate_parameters_channel_change(self):
@@ -296,6 +314,7 @@ class TestSettings(unittest.TestCase):
         )
         #other settings are clean and empty
         self.assertEqual(ret, "FAIL", msg=f"ret: {ret}, mesh_status: {mesh_status}")
+        self.assertEqual(mesh_status, "Invalid radio_index or frequency index 1", msg=f"mesh_status: {mesh_status}")
         del channel_change_dict
 
     def test_handle_mesh_settings_load_settings(self):
@@ -328,6 +347,8 @@ class TestSettings(unittest.TestCase):
 
                 # Ensure that the method returns the expected values
                 self.assertEqual(ret, "OK", msg=f"ret: {ret}, info: {info}")
+                self.assertEqual(info, "Mesh configuration loaded",
+                                 msg=f"info: {info}")
 
         with patch("os.path.exists", return_value=False):
             # Patch the open function to return the mock file content
@@ -335,3 +356,5 @@ class TestSettings(unittest.TestCase):
                 ret, info = self.settings._CommsSettings__load_settings()
                 mock_file.assert_called_once_with("/opt/mesh_default.conf", "r", encoding="utf-8")
                 self.assertEqual(ret, "OK", msg=f"ret: {ret}, info: {info}")
+                self.assertEqual(info, "Mesh configuration loaded",
+                                 msg=f"info: {info}")

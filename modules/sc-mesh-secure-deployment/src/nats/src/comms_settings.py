@@ -68,25 +68,31 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
             return "FAIL", "Invalid mode"
         self.logger.debug("validate mesh settings mode ok")
 
-        if index > len(self.frequency) or \
-                validation.validate_frequency(int(self.frequency[index])) is False:
-            return "FAIL", "Invalid frequency"
-        self.logger.debug("validate mesh settings freq ok")
+        try:
+            if validation.validate_frequency(int(self.frequency[index])) is False:
+                return "FAIL", "Invalid frequency"
+            self.logger.debug("validate mesh settings freq ok")
+        except ValueError:
+            return "FAIL", "Invalid frequency (can't convert to integer)"
 
-        if index > len(self.frequency_mcc) or \
-                validation.validate_frequency(int(self.frequency_mcc[index])) is False:
-            return "FAIL", "Invalid mcc frequency"
-        self.logger.debug("validate mesh settings mcc freq ok")
+        try:
+            if validation.validate_frequency(int(self.frequency_mcc[index])) is False:
+                return "FAIL", "Invalid mcc frequency"
+            self.logger.debug("validate mesh settings mcc freq ok")
+        except ValueError:
+            return "FAIL", "Invalid mcc frequency (can't convert to integer)"
 
         if index > len(self.country) or \
                 validation.validate_country_code(self.country[index]) is False:
             return "FAIL", "Invalid country code"
         self.logger.debug("validate mesh settings country ok")
 
-        if index > len(self.tx_power) or \
-                validation.validate_tx_power(int(self.tx_power[index])) is False:
-            return "FAIL", "Invalid tx power"
-        self.logger.debug("validate mesh settings tx power ok")
+        try:
+            if validation.validate_tx_power(int(self.tx_power[index])) is False:
+                return "FAIL", "Invalid tx power"
+            self.logger.debug("validate mesh settings tx power ok")
+        except ValueError:
+            return "FAIL", "Invalid tx power (can't convert to integer)"
 
         if index > len(self.priority) or \
                 validation.validate_priority(self.priority[index]) is False:
