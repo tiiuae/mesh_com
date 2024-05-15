@@ -139,6 +139,7 @@ if __name__ == '__main__':
     ftl.register_logger_function("rssi [MAC,dBm;MAC,dBm ...]", wifi_stats.get_rssi)
     ftl.register_logger_function("txpower [dBm]", wifi_stats.get_txpower)
     ftl.register_logger_function("noise [dBm]", wifi_stats.get_noise)
+    ftl.register_logger_function("Halow SNR", wifi_stats.get_snr)
     ftl.register_logger_function("RX MCS [MAC,MCS;MAC,MCS ...]", wifi_stats.get_rx_mcs)
     ftl.register_logger_function("TX MCS [MAC,MCS;MAC,MCS ...]", wifi_stats.get_tx_mcs)
     ftl.register_logger_function("RX throughput [Bits/s]", wifi_stats.get_rx_throughput)
@@ -178,6 +179,11 @@ if __name__ == '__main__':
     ftl.register_logger_function("3v3 current [mA]", info.get_3v3_current)
     ftl.register_logger_function("DCin (XT30) voltage [mV]", info.get_dc_voltage)
     ftl.register_logger_function("DCin (XT30) current [mA]", info.get_dc_current)
+
+    # radio wait loop:
+    while not wifi_stats.is_up(INTERFACE_ARG) or not wifi_stats.is_mesh(INTERFACE_ARG):
+        print(f"{INTERFACE_ARG} is not UP or not in mesh-point mode. Waiting...")
+        time.sleep(2)
 
     ftl.create_csv(f"{wifi_stats.get_mac_addr()}{UNIQUE_ARG}")
 
