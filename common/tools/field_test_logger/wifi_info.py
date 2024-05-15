@@ -172,8 +172,8 @@ class WifiInfo:
             if "tx bitrate:" in line:
                 if "MCS" in line:
                     tx_mcs = line[line.index("MCS")+4:line.index("MCS") + 6]
-                else:
-                    if halow_stations is None and self.__interface.startswith("halow"):
+                elif self.__interface.startswith("halow"):
+                    if halow_stations is None:
                         halow_stations = self.get_halow_stations()
                     try:
                         tx_mcs = halow_stations.get(station_mac)[0]
@@ -182,8 +182,8 @@ class WifiInfo:
             elif "rx bitrate:" in line:
                 if "MCS" in line:
                     rx_mcs = line[line.index("MCS")+4:line.index("MCS") + 6]
-                else:
-                    if halow_stations is None and self.__interface.startswith("halow"):
+                elif self.__interface.startswith("halow"):
+                    if halow_stations is None:
                         halow_stations = self.get_halow_stations()
                     try:
                         rx_mcs = halow_stations.get(station_mac)[1]
