@@ -310,36 +310,32 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
         """
         Get wpa_supplicant process ID.
         """
-        # Run commands in pieces
-        ps_command = ["ps", "ax"]
         try:
-            grep_command = [
-                "grep",
-                "-E",
-                f"[w]pa_supplicant-11s_id{str(self.index)}.conf",
-            ]
-        except IndexError:
-            self.__logger.error("IndexError: index=%s", str(self.index))
+            # Construct the command as a list
+            ps_command = ["ps", "ax"]
+            grep_pattern = f"[w]pa_supplicant-11s_id{str(self.index)}.conf"
+            grep_command = ["grep", "-E", grep_pattern]
+            awk_command = ["awk", "{print $1}"]
+
+            # Execute the commands using subprocess.run and pipe the output
+            with subprocess.Popen(ps_command, stdout=subprocess.PIPE) as ps_process:
+                with subprocess.Popen(grep_command, stdin=ps_process.stdout,
+                                      stdout=subprocess.PIPE) as grep_process:
+                    with subprocess.Popen(awk_command, stdin=grep_process.stdout,
+                                          stdout=subprocess.PIPE) as awk_process:
+                        # Wait for completion and store the output
+                        output, error = awk_process.communicate()
+
+            if error:
+                raise RuntimeError(f"Error getting wpa_supplicant PID: {error}")
+
+            wpa_supplicant_pid = output.decode().strip()
+            self.__logger.debug("wpa_supplicant PID: %s", wpa_supplicant_pid)
+            return wpa_supplicant_pid
+
+        except (ValueError, RuntimeError) as e:
+            self.__logger.error(f"Error getting wpa_supplicant PID: {e}")
             return ""
-        awk_command = ["awk", "{print $1}"]
-
-        ps_process = subprocess.Popen(ps_command, stdout=subprocess.PIPE)
-        grep_process = subprocess.Popen(
-            grep_command, stdin=ps_process.stdout, stdout=subprocess.PIPE
-        )
-        awk_process = subprocess.Popen(
-            awk_command, stdin=grep_process.stdout, stdout=subprocess.PIPE
-        )
-
-        # Wait for completion and store the output
-        output, error = awk_process.communicate()
-        if error:
-            raise RuntimeError(
-                f"Error getting wpa_supplicant PID: {str(error)}"
-            )
-
-        self.__logger.debug("wpa_supplicant PID: %s", output.decode().strip())
-        return output.decode()
 
     def __get_wpa_cli_status(self):
         """
@@ -412,29 +408,34 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
             self.__logger.debug("address=%s", self.__wpa_status.address)
             self.__logger.debug("uuid=%s", self.__wpa_status.uuid)
 
-    @staticmethod
-    def __get_hostapd_pid() -> str:
+
+    def __get_hostapd_pid(self) -> str:
         """
         Get hostapd process ID.
         """
-        # Run commands in pieces
-        ps_command = ["ps", "ax"]
-        grep_command = ["grep", "-E", r"hostapd\-"]
-        awk_command = ["awk", "{print $1}"]
+        try:
+            # Construct the command as a list
+            command = ["ps", "ax"]
+            grep_pattern = "hostapd-"
+            grep_command = ["grep", "-E", grep_pattern]
+            awk_command = ["awk", "{print $1}"]
 
-        ps_process = subprocess.Popen(ps_command, stdout=subprocess.PIPE)
-        grep_process = subprocess.Popen(
-            grep_command, stdin=ps_process.stdout, stdout=subprocess.PIPE
-        )
-        awk_process = subprocess.Popen(
-            awk_command, stdin=grep_process.stdout, stdout=subprocess.PIPE
-        )
+            # Execute the commands using subprocess.run and pipe the output
+            with subprocess.Popen(command, stdout=subprocess.PIPE) as ps_process:
+                with subprocess.Popen(grep_command, stdin=ps_process.stdout, stdout=subprocess.PIPE,
+                                      ) as grep_process:
+                    with subprocess.Popen(awk_command, stdin=grep_process.stdout,
+                                          stdout=subprocess.PIPE) as awk_process:
+                        # Decode and strip the output
+                        output = awk_process.stdout.read().decode().strip()
 
-        # Wait for completion and store the output
-        output, error = awk_process.communicate()
-        if error:
-            raise RuntimeError("Error getting hostapd PID: {!r}".format(error))
-        return output.decode()
+            if not output:
+                raise RuntimeError("No hostapd process found")
+
+            return output
+        except (ValueError, RuntimeError) as e:
+            self.__logger.error(f"Error getting hostapd PID: {e}")
+            return ""
 
     def __get_hostapd_cli_status(self):
         """
@@ -540,4 +541,3 @@ class CommsStatus:  # pylint: disable=too-many-instance-attributes
                 self.__mesh_cfg_status,
                 self.__is_mission_cfg,
             )
-
