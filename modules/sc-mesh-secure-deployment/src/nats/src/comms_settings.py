@@ -53,47 +53,64 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
         self.logger.debug("validate mesh settings")
 
         # pylint: disable=too-many-return-statements
-        if validation.validate_ssid(self.ssid[index]) is False:
+        if index > len(self.ssid) or \
+                validation.validate_ssid(self.ssid[index]) is False:
             return "FAIL", "Invalid SSID"
         self.logger.debug("validate mesh settings ssid ok")
 
-        if validation.validate_wpa3_psk(self.key[index]) is False:
+        if index > len(self.key) or \
+                validation.validate_wpa3_psk(self.key[index]) is False:
             return "FAIL", "Invalid WPA3 PSK"
         self.logger.debug("validate mesh settings wpa3 ok")
 
-        if validation.validate_mode(self.mode[index]) is False:
+        if index > len(self.mode) or \
+                validation.validate_mode(self.mode[index]) is False:
             return "FAIL", "Invalid mode"
         self.logger.debug("validate mesh settings mode ok")
 
-        if validation.validate_frequency(int(self.frequency[index])) is False:
-            return "FAIL", "Invalid frequency"
-        self.logger.debug("validate mesh settings freq ok")
+        try:
+            if validation.validate_frequency(int(self.frequency[index])) is False:
+                return "FAIL", "Invalid frequency"
+            self.logger.debug("validate mesh settings freq ok")
+        except ValueError:
+            return "FAIL", "Invalid frequency (can't convert to integer)"
 
-        if validation.validate_frequency(int(self.frequency_mcc[index])) is False:
-            return "FAIL", "Invalid mcc frequency"
-        self.logger.debug("validate mesh settings mcc freq ok")
+        try:
+            if validation.validate_frequency(int(self.frequency_mcc[index])) is False:
+                return "FAIL", "Invalid mcc frequency"
+            self.logger.debug("validate mesh settings mcc freq ok")
+        except ValueError:
+            return "FAIL", "Invalid mcc frequency (can't convert to integer)"
 
-        if validation.validate_country_code(self.country[index]) is False:
+        if index > len(self.country) or \
+                validation.validate_country_code(self.country[index]) is False:
             return "FAIL", "Invalid country code"
         self.logger.debug("validate mesh settings country ok")
 
-        if validation.validate_tx_power(int(self.tx_power[index])) is False:
-            return "FAIL", "Invalid tx power"
-        self.logger.debug("validate mesh settings tx power ok")
+        try:
+            if validation.validate_tx_power(int(self.tx_power[index])) is False:
+                return "FAIL", "Invalid tx power"
+            self.logger.debug("validate mesh settings tx power ok")
+        except ValueError:
+            return "FAIL", "Invalid tx power (can't convert to integer)"
 
-        if validation.validate_priority(self.priority[index]) is False:
+        if index > len(self.priority) or \
+                validation.validate_priority(self.priority[index]) is False:
             return "FAIL", "Invalid priority"
         self.logger.debug("validate mesh settings priority ok")
 
-        if validation.validate_role(self.role) is False:
+        if index > len(self.role) or \
+                validation.validate_role(self.role) is False:
             return "FAIL", "Invalid role"
         self.logger.debug("validate mesh settings role ok")
 
-        if validation.validate_mptcp(self.mptcp[index]) is False:
+        if index > len(self.mptcp) or \
+                validation.validate_mptcp(self.mptcp[index]) is False:
             return "FAIL", "Invalid mptcp value"
         self.logger.debug("validate mesh settings mptcp ok")
 
-        if validation.validate_slaac(self.slaac[index]) is False:
+        if index > len(self.slaac) or \
+                validation.validate_slaac(self.slaac[index]) is False:
             return "FAIL", "Invalid slaac ifaces"
         self.logger.debug("validate mesh settings slaac ifaces ok")
 
@@ -300,9 +317,9 @@ class CommsSettings:  # pylint: disable=too-few-public-methods, too-many-instanc
 
                 mesh_conf.write(f'id{str(index)}_SLAAC="{self.slaac[index]}"\n')
 
-        except:
+        except Exception as error:
             self.comms_status[index].mesh_cfg_status = comms.STATUS.mesh_cfg_not_stored
-            self.logger.error("not able to write new %s", f"{str(index)}_{file}")
+            self.logger.error("not able to write new %s", f"{str(index)}_{file}, {error}")
             return "FAIL", "not able to write new mesh.conf"
 
         self.comms_status[index].mesh_cfg_status = comms.STATUS.mesh_cfg_stored

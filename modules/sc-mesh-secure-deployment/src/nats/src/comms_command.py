@@ -117,20 +117,8 @@ class Command:  # pylint: disable=too-many-instance-attributes
                 ret, info = self.__radio_up_all(cc)
             else:
                 ret, info = self.__radio_up_single()
-        elif self.command == COMMAND.reboot:
-            ret, info = "FAIL", "Command not implemented"
-        elif self.command == COMMAND.get_logs:
-            ret, info, data = self.__get_logs(self.param)
         elif self.command == COMMAND.debug:
             ret, info, data = self.__debug(cc, self.param)
-        elif self.command == COMMAND.enable_visualisation:
-            ret, info = self.__enable_visualisation(cc)
-        elif self.command == COMMAND.disable_visualisation:
-            ret, info = self.__disable_visualisation(cc)
-        elif self.command == COMMAND.get_config:
-            ret, info, data = self.__get_configs(self.param)
-        elif self.command == COMMAND.get_identity:
-            ret, info, data = self.get_identity()  # type: ignore[assignment]
         else:
             ret, info = "FAIL", "Command not supported"
         return ret, info, data
@@ -208,14 +196,6 @@ class Command:  # pylint: disable=too-many-instance-attributes
                 )
 
         self.logger.debug("Default mesh command applied")
-
-        if self.comms_status[int(self.radio_index)].is_visualisation_active:
-            status, _ = self.__disable_visualisation(cc)
-            if status == "FAIL":
-                return (
-                    "FAIL",
-                    "Revoke failed partially." + " Visualisation is still active",
-                )
 
         return "OK", "Mesh settings revoked"
 
@@ -370,42 +350,6 @@ class Command:  # pylint: disable=too-many-instance-attributes
         self.logger.debug("All radios activated")
         return "OK", "All radios activated"
 
-    def __enable_visualisation(self, cc) -> Tuple[str, str]:
-        try:
-            cc.telemetry.run()
-        except Exception as e:
-            self.logger.error("Failed to enable visualisation, %s", e)
-            return "FAIL", "Failed to enable visualisation"
-
-        self.logger.debug("Visualisation enabled")
-        self.comms_status[int(self.radio_index)].is_visualisation_active = True
-        return "OK", "Visualisation enabled"
-
-    def __disable_visualisation(self, cc) -> Tuple[str, str]:
-        try:
-            cc.telemetry.stop()
-            cc.visualisation_enabled = False
-        except Exception as e:
-            self.logger.error("Failed to disable visualisation, %s", e)
-            return "FAIL", "Failed to disable visualisation"
-
-        self.logger.debug("Visualisation disabled")
-        self.comms_status[int(self.radio_index)].is_visualisation_active = False
-        return "OK", "Visualisation disabled"
-
-    @staticmethod
-    def __read_log_file(filename) -> bytes:
-        """
-        read file and return the content as bytes and base64 encoded
-
-        param: filename: str
-        return: (int, bytes)
-        """
-        # read as bytes as b64encode expects bytes
-        with open(filename, "rb") as file:
-            file_log = file.read()
-        return base64.b64encode(file_log)
-
     def __debug(self, cc, param) -> Tuple[str, str, str]:
         file = ""
         try:
@@ -432,102 +376,3 @@ class Command:  # pylint: disable=too-many-instance-attributes
 
         self.logger.debug("__debug done")
         return "OK", f"'{p}' DEBUG COMMAND done", file_b64.decode()
-
-    def __get_logs(self, param) -> Tuple[str, str, str]:
-        file = ""
-        try:
-            files = LogFiles()
-            if param == files.WPA:
-                file_b64 = self.__read_log_file(
-                    files.WPA_LOG + "_id" + self.radio_index + ".log"
-                )
-            elif param == files.HOSTAPD:
-                file_b64 = self.__read_log_file(
-                    files.HOSTAPD_LOG + "_id" + self.radio_index + ".log"
-                )
-            elif param == files.CONTROLLER:
-                file_b64 = self.__read_log_file(files.CONTROLLER_LOG)
-            elif param == files.DMESG:
-                ret = subprocess.run(
-                    [files.DMESG_CMD],
-                    shell=False,
-                    check=True,
-                    capture_output=True,
-                )
-                if ret.returncode != 0:
-                    return "FAIL", f"{file} file read failed", ""
-                file_b64 = base64.b64encode(ret.stdout)
-            else:
-                return "FAIL", "Log file not supported", ""
-
-        except Exception as e:
-            self.logger.error("Log reading failed, %s", e)
-            return "FAIL", f"{param} log reading failed", ""
-
-        self.logger.debug("__getlogs done")
-        return "OK", "wpa_supplicant log", file_b64.decode()
-
-    def __get_configs(self, param) -> Tuple[str, str, str]:
-        file_b64 = b"None"
-        try:
-            files = ConfigFiles()
-            self.comms_status[int(self.radio_index)].refresh_status()
-            if param == files.WPA:
-                file_b64 = self.__read_log_file(
-                    f"/var/run/wpa_supplicant-11s_id{self.radio_index}.conf"
-                )
-            elif param == files.HOSTAPD:
-                file_b64 = self.__read_log_file(
-                    f"/var/run/hostapd-{self.radio_index}.conf"
-                )
-            else:
-                return "FAIL", "Parameter not supported", ""
-
-        except Exception as e:
-            self.logger.error("Not able to get configs, %s", e)
-            return "FAIL", "Not able to get config file", ""
-
-        self.logger.debug("__get_configs done")
-        return "OK", f"{param}", file_b64.decode()
-
-    def get_identity(self) -> Tuple[str, str, Union[str, dict]]:
-        """
-        Gathers identity, NATS server url and wireless interface
-        device information and returns that in JSON compatible
-        dictionary format.
-
-        Returns:
-            tuple: (str, str, str | dict) -- A tuple that contains
-            always textual status and description elements. 3rd
-            element is JSON compatible in  normal cases but in
-            case of failure it is an empty string.
-        """
-
-        identity_dict = {}
-        nats_ip = "NA"
-        try:
-            files = ConfigFiles()
-            for status in self.comms_status:
-                status.refresh_status()
-
-            with open(files.IDENTITY, "rb") as file:
-                identity = file.read()
-            identity_dict["identity"] = identity.decode().strip()
-
-            # pylint: disable=c-extension-no-member
-            ips = ni.ifaddresses("br-lan")
-            for item in ips[ni.AF_INET6]:
-                if item["addr"].startswith("fd"):
-                    nats_ip = item["addr"]
-                    break
-
-            identity_dict["nats_url"] = f"nats://[{nats_ip}]:4222"
-            identity_dict[
-                "interfaces"
-            ] = CommsInterfaces().get_wireless_device_info()  # type: ignore
-        except Exception as e:
-            self.logger.error("Not able to get identity, %s", e)
-            return "FAIL", "Not able to get identity file", ""
-
-        self.logger.debug("get_identity done")
-        return "OK", "Identity and NATS URL", identity_dict
