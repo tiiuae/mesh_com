@@ -4,7 +4,7 @@ netifaces==0.11.0
 cryptography==3.3.2
 requests==2.26.0
 PyYAML==6.0.1
-pyroute2==0.5.7
+pyroute2==0.6.10
 pyOpenSSL==19.1.0
 
 # FMO

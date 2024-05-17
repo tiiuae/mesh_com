@@ -43,3 +43,9 @@ echo -e "Not tested files as not MDM content or tested elsewhere:\n $not_used" >
 # deactivate virtualenv
 deactivate
 
+# Clean up __pycache__ directories
+find . -type d -name '__pycache__' -exec rm -rf {} +
+# Clean up unittest venv
+rm -rf unittest
+# Clean up coverage tool's SQL database
+rm -f .coverage
