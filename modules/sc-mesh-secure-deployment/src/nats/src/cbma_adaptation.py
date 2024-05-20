@@ -45,7 +45,7 @@ class CBMAAdaptation(object):
         """
         self.__comms_ctrl: CommsController = comms_ctrl
         self.logger: logging.Logger = logger.getChild("CBMAAdaptation")
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.INFO)
         self.__interfaces: List[Interface] = []
         self.__lock = lock
         self.__cbma_certs_path = Constants.ECDSA_BIRTH_FILEBASED.value
