@@ -38,6 +38,7 @@ class TestMdmAgent(unittest.TestCase):
         """
         Test the interface_monitor_cb method
         """
+        self.mdm_agent.service_monitor.running = False
         self.mdm_agent.interface_monitor_cb([])
         self.assertEqual(self.mdm_agent._MdmAgent__interfaces, [])
 
