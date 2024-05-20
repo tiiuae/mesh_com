@@ -13,7 +13,7 @@ import json
 import random
 import fnmatch
 import ipaddress
-from pyroute2 import IPRoute, NetlinkError  # type: ignore[import-not-found, import-untyped]
+from pyroute2 import IPRoute, NetlinkError, arp  # type: ignore[import-not-found, import-untyped]
 import errno
 
 from src import cbma_paths
@@ -60,6 +60,7 @@ class CBMAAdaptation(object):
         self.BR_NAME: str = Constants.BR_NAME.value
         self.LOWER_BATMAN: str = Constants.LOWER_BATMAN.value
         self.UPPER_BATMAN: str = Constants.UPPER_BATMAN.value
+        self.ALLOWED_KIND_LIST = {"vlan", "batadv"}
 
         # Set minimum required configuration
         self.__white_interfaces = [self.LOWER_BATMAN]
@@ -121,7 +122,7 @@ class CBMAAdaptation(object):
 
             if parent_interface and vlan_id:
                 try:
-                     # Create VLAN interface
+                    # Create VLAN interface
                     subprocess.run(
                         [
                             "ip",
@@ -203,13 +204,23 @@ class CBMAAdaptation(object):
             ifname = link.get_attr("IFLA_IFNAME")
             ifstate = link.get_attr("IFLA_OPERSTATE")
             mac_address = link.get_attr("IFLA_ADDRESS")
+            ifi_type = link.get('ifi_type')
+            kind = None
+            
+            link_info = link.get_attr("IFLA_LINKINFO")
+            if link_info:
+                kind = link_info.get_attr("IFLA_INFO_KIND")
 
             interface_info = {
                 "interface_name": ifname,
                 "operstate": ifstate,
                 "mac_address": mac_address,
             }
-            interfaces.append(interface_info)
+            if ifi_type in (arp.ARPHRD_ETHER, arp.ARPHRD_IEEE80211):
+                # Filters out interfaces with kinds like dummy, sit, and bridge
+                # thus should add only physical interfaces, vlan and batadv interfaces
+                if kind is None or kind in self.ALLOWED_KIND_LIST:
+                    interfaces.append(interface_info)
         ip.close()
 
         self.__interfaces.clear()
@@ -483,8 +494,9 @@ class CBMAAdaptation(object):
             octets = interface_mac.split(":")
             first_octet = int(octets[0], 16)
             flipped_first_octet = first_octet ^ 2
-
-            return f"{flipped_first_octet}:{':'.join(octets[1:])}"
+             # Format the flipped first octet back to hexadecimal
+            octets[0] = format(flipped_first_octet, '02x')
+            return ":".join(octets)
 
     def __init_batman_and_bridge(self) -> None:
         if_name = self.__comms_ctrl.settings.mesh_vif[0]
@@ -511,8 +523,8 @@ class CBMAAdaptation(object):
 
         # Set random MAC address for the bridge
         self.__set_interface_mac(self.BR_NAME, self.__create_mac(True))
-        self.__wait_for_interface(self.LOWER_BATMAN)
-        self.__wait_for_interface(self.UPPER_BATMAN)
+        self.__wait_for_interface(self.LOWER_BATMAN, 10)
+        self.__wait_for_interface(self.UPPER_BATMAN, 10)
 
     def stop_radios(self) -> bool:
         """

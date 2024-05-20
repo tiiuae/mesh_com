@@ -2,8 +2,8 @@ Name                                Stmts   Miss  Cover   Missing
 -----------------------------------------------------------------
 mdm_agent.py                          456    313    31%   104-105, 144, 165-216, 246, 250-254, 265-273, 282-284, 290, 297-365, 378-379, 388-392, 402-497, 505-550, 560-595, 606-629, 650, 661-667, 683-719, 737-741, 747-761, 774-835, 846-897, 901-919
 src/__init__.py                         0      0   100%
-src/bat_ctrl_utils.py                 130     19    85%   40-41, 78-79, 135-136, 161-162, 173, 193-194, 224-225, 254-263, 277-279
-src/cbma_adaptation.py                458    372    19%   81-82, 90-102, 112-181, 184-192, 195-219, 225-239, 242-249, 257-294, 297-302, 309-319, 322-325, 328-338, 341-348, 352-399, 403-419, 422-462, 470-483, 486-511, 518-532, 536-563, 578-606, 616-647, 657-668, 671-682, 693-721, 729-765, 774-845, 848-855, 864-874, 882-891
+src/bat_ctrl_utils.py                 129     16    88%   77-78, 134-135, 160-161, 172, 192-193, 223-224, 253-254, 276-278
+src/cbma_adaptation.py                481     51    89%   181-182, 250, 298-299, 351-353, 417, 459-462, 476, 506-508, 545-546, 563-564, 569-573, 576-577, 587, 620-621, 651-652, 691-693, 706, 722-726, 742-743, 781-782, 813, 827-838, 861-862, 891-892
 src/cbma_paths.py                       7      0   100%
 src/comms_command.py                  192     39    80%   88, 90, 94-102, 105, 107, 112, 117, 121, 142-144, 147-150, 155-157, 164, 175, 189-190, 235-240, 251, 262, 291, 309-310, 322, 336-337, 349, 373-375
 src/comms_common.py                    26      0   100%
@@ -11,15 +11,15 @@ src/comms_config_store.py              21      0   100%
 src/comms_controller.py                38      5    87%   33, 48, 79-82
 src/comms_if_monitor.py                56      2    96%   95-96
 src/comms_service_discovery.py         88     14    84%   114-115, 147, 152-153, 162, 180-211
-src/comms_settings.py                 253     27    89%   12-13, 156-157, 172-192, 257-264, 320-323, 363, 370
+src/comms_settings.py                 253     25    90%   156-157, 172-192, 257-264, 320-323, 363, 370
 src/comms_status.py                   302     23    92%   70, 194, 225-227, 240-242, 247, 251-253, 257-261, 270, 278, 294, 302, 330, 433, 436-438
-src/constants.py                       44      0   100%
+src/constants.py                       47      0   100%
 src/interface.py                        5      0   100%
 src/validation.py                     104      2    98%   221-222
 tests/__init__.py                       0      0   100%
 tests/service_discovery_helper.py      22      0   100%
 tests/test_bat_ctrl_utils.py          129     10    92%   232-233, 241-242, 245-246, 249-250, 253-254
-tests/test_cbma_adaptation.py         206     12    94%   60-61, 212-215, 220-221, 228-231
+tests/test_cbma_adaptation.py         209      8    96%   213-216, 221-222, 231-232
 tests/test_command.py                 210      0   100%
 tests/test_config_store.py             26      0   100%
 tests/test_constants.py                27      0   100%
@@ -31,6 +31,6 @@ tests/test_settings.py                173      0   100%
 tests/test_status.py                  128      8    94%   28-35
 tests/test_validation.py              146      0   100%
 -----------------------------------------------------------------
-TOTAL                                3200    841    74%
+TOTAL                                3434    523    85%
 Not tested files as not MDM content or tested elsewhere:
  batadvvis.py,batstat.py,fmo_agent.py,comms_nats_discovery.py,cbma/*,debug_tests/*,comms_mesh_telemetry.py,comms_interface_info.py
