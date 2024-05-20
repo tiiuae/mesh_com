@@ -523,8 +523,8 @@ class CBMAAdaptation(object):
 
         # Set random MAC address for the bridge
         self.__set_interface_mac(self.BR_NAME, self.__create_mac(True))
-        self.__wait_for_interface(self.LOWER_BATMAN, 10)
-        self.__wait_for_interface(self.UPPER_BATMAN, 10)
+        self.__wait_for_interface(self.LOWER_BATMAN)
+        self.__wait_for_interface(self.UPPER_BATMAN)
 
     def stop_radios(self) -> bool:
         """
