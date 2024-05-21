@@ -896,8 +896,7 @@ async def main_mdm(keyfile=None, certfile=None, ca_file=None, interface=None) ->
     finally:
         signal_handler(signal.SIGUSR1, signal_handler)
 
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Mesh Settings")
     parser.add_argument("-k", "--keyfile", help="TLS keyfile", required=False)
     parser.add_argument("-c", "--certfile", help="TLS certfile", required=False)
@@ -917,3 +916,6 @@ if __name__ == "__main__":
         main_mdm(args.keyfile, args.certfile, args.ca, args.interface)
     )
     loop.close()
+
+if __name__ == "__main__":
+    main()
