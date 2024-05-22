@@ -13,8 +13,8 @@ import json
 import random
 import fnmatch
 import ipaddress
-from pyroute2 import IPRoute, NetlinkError, arp  # type: ignore[import-not-found, import-untyped]
 import errno
+from pyroute2 import IPRoute, NetlinkError, arp  # type: ignore[import-not-found, import-untyped]
 
 from src import cbma_paths
 from src.comms_controller import CommsController
@@ -86,24 +86,93 @@ class CBMAAdaptation(object):
             self.__cbma_config = self.__config.read("CBMA")
             self.__vlan_config = self.__config.read("VLAN")
 
-        # Extend/update default configs using yaml file content
+        # Create VLAN interfaces if configured
+        self.__create_vlan_interfaces()
+
         if self.__cbma_config:
-            white_interfaces = self.__cbma_config.get("white_interfaces")
-            red_interfaces = self.__cbma_config.get("red_interfaces")
-            exclude_interfaces = self.__cbma_config.get("exclude_interfaces")
+            white_interfaces = self.__cbma_config.get("white_interfaces") or []
+            red_interfaces = self.__cbma_config.get("red_interfaces") or []
+            exclude_interfaces = self.__cbma_config.get("exclude_interfaces") or []
             self.logger.info(f"White interfaces config: {white_interfaces}")
             self.logger.info(f"Red interfaces config: {red_interfaces}")
             self.logger.info(f"Exclude interfaces config: {exclude_interfaces}")
 
-            if white_interfaces:
+            valid = self.__validate_cbma_config(
+                exclude_interfaces, white_interfaces, red_interfaces
+            )
+            # Extend/update default configs using validated yaml file content
+            if valid:
                 self.__white_interfaces.extend(white_interfaces)
-            if red_interfaces:
                 self.__red_interfaces.extend(red_interfaces)
-            if exclude_interfaces:
                 self.__na_cbma_interfaces.extend(exclude_interfaces)
 
-        # Create VLAN interfaces if configured
-        self.__create_vlan_interfaces()
+    def __validate_cbma_config(
+        self,
+        exclude_interfaces: List[str],
+        white_interfaces: List[str],
+        red_interfaces: List[str],
+    ) -> bool:
+        # Init empty list
+        black_interfaces: List[str] = []
+
+        if any(
+            Constants.LOWER_BATMAN.value in interface_list
+            or Constants.UPPER_BATMAN.value in interface_list
+            for interface_list in [exclude_interfaces, white_interfaces, red_interfaces]
+        ):
+            self.logger.error("bat0/bat1 should not exist in CBMA configs!")
+            return False
+
+        with self.__lock:
+            self.__get_interfaces()
+            interfaces = deepcopy(self.__interfaces)
+
+            for interface in interfaces:
+                black_interfaces.append(interface.interface_name)
+        # Remove interfaces that do not have a certificate
+        filtered_black_interfaces = []
+        for interface in black_interfaces:
+            mac_addr = self.__get_mac_addr(interface)
+            if self.__has_certificate(self.__cbma_certs_path, mac_addr):
+                filtered_black_interfaces.append(interface)
+
+        black_interfaces = filtered_black_interfaces
+        if not black_interfaces:
+            self.logger.error("No valid black interfaces!")
+            return False
+
+        # Remove interfaces in exclude_config from black_interfaces
+        black_interfaces = [
+            interface
+            for interface in black_interfaces
+            if interface not in exclude_interfaces
+        ]
+        if not black_interfaces:
+            self.logger.error("No black interfaces left if applied exclude_interfaces!")
+            return False
+
+        # Remove interfaces in white_config list from black_interfaces
+        black_interfaces = [
+            interface
+            for interface in black_interfaces
+            if interface not in white_interfaces
+        ]
+        if not black_interfaces:
+            self.logger.error("No black interfaces left if applied white_interfaces!")
+            return False
+
+        # Remove interfaces in white_config list from black_interfaces
+        black_interfaces = [
+            interface
+            for interface in black_interfaces
+            if interface not in red_interfaces
+        ]
+        if not black_interfaces:
+            self.logger.error("No black interfaces left if applied red_interfaces!")
+            return False
+
+        self.logger.info("Black interfaces after validation: ", black_interfaces)
+        return True
 
     def __create_vlan_interfaces(self) -> bool:
         success = True
@@ -190,8 +259,12 @@ class CBMAAdaptation(object):
 
         for vlan_name, _ in self.__vlan_config.items():
             try:
-                # Delete existing VLAN interface if it exists
-                subprocess.run(["ip", "link", "delete", vlan_name], check=True)
+                if any(
+                    interface.interface_name == vlan_name
+                    for interface in self.__interfaces
+                ):
+                    # Delete existing VLAN interface
+                    subprocess.run(["ip", "link", "delete", vlan_name], check=True)
             except subprocess.CalledProcessError as e:
                 self.logger.error(f"Error deleting VLAN interface {vlan_name}: {e}")
                 success = False
@@ -204,9 +277,9 @@ class CBMAAdaptation(object):
             ifname = link.get_attr("IFLA_IFNAME")
             ifstate = link.get_attr("IFLA_OPERSTATE")
             mac_address = link.get_attr("IFLA_ADDRESS")
-            ifi_type = link.get('ifi_type')
+            ifi_type = link.get("ifi_type")
             kind = None
-            
+
             link_info = link.get_attr("IFLA_LINKINFO")
             if link_info:
                 kind = link_info.get_attr("IFLA_INFO_KIND")
@@ -383,7 +456,9 @@ class CBMAAdaptation(object):
         # Remove interfaces without certificates from lower CBMA interface list
         for interface in interfaces_without_certificate:
             self.logger.debug(
-                "Interface %s doesn't have certificate!, mac %s", interface.interface_name, interface.mac_address
+                "Interface %s doesn't have certificate!, mac %s",
+                interface.interface_name,
+                interface.mac_address,
             )
             if interface in self.__lower_cbma_interfaces:
                 self.__lower_cbma_interfaces.remove(interface)
@@ -420,7 +495,9 @@ class CBMAAdaptation(object):
         start_time = time.time()
         while True:
             try:
-                result = subprocess.check_output(["iw", "dev", "wlan1", "info"]).decode()
+                result = subprocess.check_output(
+                    ["iw", "dev", "wlan1", "info"]
+                ).decode()
                 if "type AP" in result:
                     return True
 
@@ -494,8 +571,8 @@ class CBMAAdaptation(object):
             octets = interface_mac.split(":")
             first_octet = int(octets[0], 16)
             flipped_first_octet = first_octet ^ 2
-             # Format the flipped first octet back to hexadecimal
-            octets[0] = format(flipped_first_octet, '02x')
+            # Format the flipped first octet back to hexadecimal
+            octets[0] = format(flipped_first_octet, "02x")
             return ":".join(octets)
 
     def __init_batman_and_bridge(self) -> None:
@@ -740,7 +817,9 @@ class CBMAAdaptation(object):
                 # Add the modified IPv6 address to the interface
                 ip.addr("add", index=index, address=new_address, prefixlen=64)
         except Exception as e:
-            self.logger.warning(f"Error adding global ipv6 address for interface {interface_name}: {e}")
+            self.logger.warning(
+                f"Error adding global ipv6 address for interface {interface_name}: {e}"
+            )
 
     def __setup_lower_cbma(self) -> bool:
         """
@@ -867,6 +946,7 @@ class CBMAAdaptation(object):
         return intf_added
 
     def __cleanup_cbma(self) -> None:
+        self.__get_interfaces()
         self.__shutdown_interface(self.LOWER_BATMAN)
         self.__shutdown_interface(self.UPPER_BATMAN)
 

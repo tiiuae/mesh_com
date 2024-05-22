@@ -1,16 +1,18 @@
 import subprocess
 import os
-import yaml
 import logging
-from pyroute2 import IPRoute, arp
 import unittest
 from unittest.mock import MagicMock, patch
+from parameterized import parameterized
+
+from pyroute2 import IPRoute
+import yaml
 from src.cbma_adaptation import CBMAAdaptation
 from src import cbma_paths
 from controller import CBMAController
-import time
 
 
+# pylint: disable=broad-except, protected-access
 class TestCBMAAdaptation(unittest.TestCase):
 
     INTERFACE_SETTINGS = [
@@ -129,16 +131,68 @@ class TestCBMAAdaptation(unittest.TestCase):
             red_interfaces:
                 - wlan1
             """
+        # No black interfaces left if applied exclude_interfaces
+        cls.yaml_content_4 = {
+            "CBMA": {
+                "exclude_interfaces": ["ifdummy0_black", "ifdummy3_black"],
+                "white_interfaces": ["ifdummy2_white"],
+                "red_interfaces": ["ifdummy1_red", "vlan_red"],
+            },
+            "BATMAN": {
+                "routing_algo": "BATMAN_IV",
+                "hop_penalty": {
+                    "meshif": {"bat0": 0, "bat1": 0},
+                    "hardif": {"halow1": 20},
+                },
+            },
+        }
+        # No black interfaces if applied exclude_interfaces + white_interfaces
+        cls.yaml_content_5 = {
+            "CBMA": {
+                "exclude_interfaces": ["ifdummy0_black"],
+                "white_interfaces": ["ifdummy3_black", "ifdummy2_white"],
+                "red_interfaces": ["ifdummy1_red", "vlan_red"],
+            },
+            "BATMAN": {
+                "routing_algo": "BATMAN_IV",
+                "hop_penalty": {
+                    "meshif": {"bat0": 0, "bat1": 0},
+                    "hardif": {"halow1": 20},
+                },
+            },
+        }
+        # No black interfaces if applied exclude_interfaces
+        # + white_interfaces + red_interfaces
+        cls.yaml_content_6 = {
+            "CBMA": {
+                "exclude_interfaces": [],
+                "white_interfaces": ["ifdummy3_black", "ifdummy2_white"],
+                "red_interfaces": ["ifdummy1_red", "vlan_red", "ifdummy0_black"],
+            },
+            "BATMAN": {
+                "routing_algo": "BATMAN_IV",
+                "hop_penalty": {
+                    "meshif": {"bat0": 0, "bat1": 0},
+                    "hardif": {"halow1": 20},
+                },
+            },
+        }
 
         # Write YAML content to files
         # Not forcing yaml file content in same order as in dictionary in order
         # to ensure yaml file parsing work properly.
-        with open("ms_config.yaml", "w", encoding="utf-8") as file_1:
-            yaml.dump(cls.yaml_content_1, file_1)
-        with open("ms_config2.yaml", "w", encoding="utf-8") as file_2:
-            yaml.dump(cls.yaml_content_2, file_2)
-        with open("invalid_yaml_file.yaml", "w", encoding="utf-8") as file_3:
-            file_3.write(cls.yaml_content_3)
+        with open("ms_config.yaml", "w", encoding="utf-8") as file:
+            yaml.dump(cls.yaml_content_1, file)
+        with open("ms_config2.yaml", "w", encoding="utf-8") as file:
+            yaml.dump(cls.yaml_content_2, file)
+        with open("invalid_yaml_file.yaml", "w", encoding="utf-8") as file:
+            file.write(cls.yaml_content_3)
+        with open("ms_config4.yaml", "w", encoding="utf-8") as file:
+            yaml.dump(cls.yaml_content_4, file)
+        with open("ms_config5.yaml", "w", encoding="utf-8") as file:
+            yaml.dump(cls.yaml_content_5, file)
+        with open("ms_config6.yaml", "w", encoding="utf-8") as file:
+            yaml.dump(cls.yaml_content_6, file)
 
         # Create fakecertificate file
         cls.fake_certificate = "just fake"
@@ -170,14 +224,6 @@ class TestCBMAAdaptation(unittest.TestCase):
             in cls.CBMA_FAKE_SUCCESS_FOR_INTERFACES,
         )
 
-        # Patch CBMAAdaptation.__get_mac_addr() to return ifdummy0_black
-        # interface's MAC that will be given as a parameter to create MAC
-        # for lower batman
-        cls.patcher_get_mac_addr = patch.object(
-            CBMAAdaptation,
-            "_CBMAAdaptation__get_mac_addr",
-            return_value="12:34:56:78:90:ab",
-        )
         # Patch CBMAAdaptation.get_base_mtu_size() to return such a small MTU
         # size that it will work on Ubuntu with default Batman without jumbo
         # frame support
@@ -195,17 +241,19 @@ class TestCBMAAdaptation(unittest.TestCase):
         # Start patches
         cls.mock_has_certificate = cls.patcher_has_certificate.start()
         cls.mock_add_interface = cls.patcher_add_interface.start()
-        cls.mock_get_mac_addr = cls.patcher_get_mac_addr.start()
         cls.mock_get_base_mtu_size = cls.patcher_get_base_mtu_size.start()
         cls.mock_comms_ctrl_instance = cls.patcher_comms_ctrl.start()
 
     @classmethod
     def tearDownClass(cls):
-        # Delete created YAML files
+        # Delete created yaml/crt files
         for file_name in [
             "ms_config.yaml",
             "ms_config2.yaml",
             "invalid_yaml_file.yaml",
+            "ms_config4.yaml",
+            "ms_config5.yaml",
+            "ms_config6.yaml",
             "./MAC/fake_mac.crt",
         ]:
             try:
@@ -234,7 +282,6 @@ class TestCBMAAdaptation(unittest.TestCase):
         # Stop patches
         cls.patcher_has_certificate.stop()
         cls.patcher_add_interface.stop()
-        cls.patcher_get_mac_addr.stop()
         cls.patcher_get_base_mtu_size.stop()
         cls.patcher_comms_ctrl.stop()
 
@@ -245,8 +292,9 @@ class TestCBMAAdaptation(unittest.TestCase):
     def setUp(self):
         # Instantiates CBMAAdaptation with ms_config.yaml. Used for most of the tests.
         # Tip: comment following line to get traces from CBMA adaptation. Note that it
-        # will break some of the tests as well.
+        # will break some of the tests that relies on logger outputs.
         self.logger = MagicMock()
+
         self.cbma_adaptation = CBMAAdaptation(
             self.mock_comms_ctrl, self.logger, self.mock_lock, "ms_config.yaml"
         )
@@ -257,10 +305,16 @@ class TestCBMAAdaptation(unittest.TestCase):
         self.cbma_adaptation.stop_cbma()
 
     def test_setup_cbma(self):
-        # Finally try to setup CBMA
-        self.patcher_get_mac_addr.start()
-        result = self.cbma_adaptation.setup_cbma()
-        self.assertTrue(result)
+        # Patch CBMAAdaptation.__get_mac_addr() to return ifdummy0_black
+        # interface's MAC that will be given as a parameter to create MAC
+        # for lower batman
+        with patch.object(
+            CBMAAdaptation,
+            "_CBMAAdaptation__get_mac_addr",
+            return_value="12:34:56:78:90:ab",
+        ):
+            result = self.cbma_adaptation.setup_cbma()
+            self.assertTrue(result)
 
     def test_stop_cbma(self):
         result = self.cbma_adaptation.stop_cbma()
@@ -274,9 +328,13 @@ class TestCBMAAdaptation(unittest.TestCase):
         )
         # Allow "dummy" interfaces during unit testing
         self.cbma_adaptation2.ALLOWED_KIND_LIST.add("dummy")
-
-        setup_result = self.cbma_adaptation2.setup_cbma()
-        self.assertTrue(setup_result)
+        with patch.object(
+            CBMAAdaptation,
+            "_CBMAAdaptation__get_mac_addr",
+            return_value="12:34:56:78:90:ab",
+        ):
+            setup_result = self.cbma_adaptation2.setup_cbma()
+            self.assertTrue(setup_result)
         stop_result = self.cbma_adaptation2.stop_cbma()
         self.assertTrue(stop_result)
 
@@ -323,9 +381,6 @@ class TestCBMAAdaptation(unittest.TestCase):
         self.assertTrue(result)
         result = self.cbma_adaptation._CBMAAdaptation__delete_vlan_interfaces()
         self.assertFalse(result)
-
-        # Finally create VLAN interfaces again to avoid confusing errors in
-        # teardown phase
 
     def test_creating_and_deleting_bridge_interface(self):
         # First bridge creation should succeed fine without any warning prints
@@ -407,6 +462,7 @@ class TestCBMAAdaptation(unittest.TestCase):
         )
         # Reset the mock to clear previous calls
         self.cbma_adaptation.logger.debug.reset_mock()
+        self.cbma_adaptation.logger.error.reset_mock()
 
         # Try adding existing interface to bridge
         self.cbma_adaptation._CBMAAdaptation__add_interface_to_bridge(
@@ -417,6 +473,7 @@ class TestCBMAAdaptation(unittest.TestCase):
         self.cbma_adaptation.logger.error.assert_not_called()
 
     def test_set_interface_up(self):
+        self.cbma_adaptation.logger.error.reset_mock()
         # vlan_red_ create in cbma_adaptation instantiation,
         # setting it up should pass
         self.cbma_adaptation._CBMAAdaptation__set_interface_up("vlan_red")
@@ -427,7 +484,6 @@ class TestCBMAAdaptation(unittest.TestCase):
         self.cbma_adaptation.logger.error.assert_called_once()
 
     def test_get_mac_addr(self):
-        self.patcher_get_mac_addr.stop()
         # Update interfaces list from where to get MAC
         self.cbma_adaptation._CBMAAdaptation__get_interfaces()
         # Get MAC
@@ -435,7 +491,6 @@ class TestCBMAAdaptation(unittest.TestCase):
         self.assertIsNotNone(result)
         result = self.cbma_adaptation._CBMAAdaptation__get_mac_addr("foobar")
         self.assertIsNone(result)
-        self.patcher_get_mac_addr.start()
 
     def test_has_certificate(self):
         self.patcher_has_certificate.stop()
@@ -478,7 +533,6 @@ class TestCBMAAdaptation(unittest.TestCase):
                     ifindex 6
                     wdev 0x1
                     addr e4:5f:01:bd:6d:cb
-                    ssid comms_sleeve#6dcb
                     type managed
                     wiphy 0
                     channel 1 (2412 MHz), width: 20 MHz, center1: 2412 MHz
@@ -503,3 +557,55 @@ class TestCBMAAdaptation(unittest.TestCase):
         self.cbma_adaptation.logger.warning.assert_called_with(
             "__wait_for_interface timeout for %s", "vlan_red"
         )
+
+    def _validate_interfaces_config(self, cbma_adaptation):
+        cbma_config = getattr(cbma_adaptation, "_CBMAAdaptation__cbma_config", None)
+        white_interfaces = cbma_config.get("white_interfaces")
+        red_interfaces = cbma_config.get("red_interfaces")
+        exclude_interfaces = cbma_config.get("exclude_interfaces")
+        return cbma_adaptation._CBMAAdaptation__validate_cbma_config(
+            exclude_interfaces, white_interfaces, red_interfaces
+        )
+
+    def _test_invalid_config(self, cbma_adaptation, expected_error_msg):
+        cbma_adaptation.logger.error.reset_mock()
+        result = self._validate_interfaces_config(cbma_adaptation)
+        self.assertFalse(result)
+        cbma_adaptation.logger.error.assert_called_with(expected_error_msg)
+
+    def test_validate_cbma_config_success(self):
+        # Default cbma_adaptation uses valid ms_config.yaml
+        result = self._validate_interfaces_config(self.cbma_adaptation)
+        self.assertTrue(result)
+        self.cbma_adaptation.logger.info.assert_called_with(
+            "Black interfaces after validation: ", ["ifdummy0_black", "ifdummy3_black"]
+        )
+
+    @parameterized.expand([
+        ("ms_config4.yaml", "No black interfaces left if applied exclude_interfaces!"),
+        ("ms_config5.yaml", "No black interfaces left if applied white_interfaces!"),
+        ("ms_config6.yaml", "No black interfaces left if applied red_interfaces!"),
+    ])
+    def test_invalid_cbma_configs(self, config_file, expected_error_msg):
+        # Stop default CBMAAdaptation to remove VLAN interfaces
+        self.cbma_adaptation.stop_cbma()
+        # Instantiate CBMAAdaptation with parametrized config file
+        self.cbma_adaptation2 = CBMAAdaptation(
+            self.mock_comms_ctrl, self.logger, self.mock_lock, config_file
+        )
+        # Reset mock as validation fails in isntantiation phase as
+        # dummy test interfaces are not allowed in that phase yet.
+        self.cbma_adaptation2.logger.error.reset_mock()
+        self.cbma_adaptation2.ALLOWED_KIND_LIST.add("dummy")
+        self._test_invalid_config(self.cbma_adaptation2, expected_error_msg)
+
+    @parameterized.expand([
+        ("No valid black interfaces!"),
+    ])
+    def test_cbma_configs_without_certificates(self, expected_error_msg):
+        self.patcher_has_certificate.stop()
+        self.cbma_adaptation.logger.error.reset_mock()
+        # Allo dummy type of interfaces in testing phase
+        self.cbma_adaptation.ALLOWED_KIND_LIST.add("dummy")
+        self._test_invalid_config(self.cbma_adaptation, expected_error_msg)
+        self.patcher_has_certificate.start()
