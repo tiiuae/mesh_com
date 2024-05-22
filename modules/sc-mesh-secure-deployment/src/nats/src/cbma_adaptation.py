@@ -90,9 +90,9 @@ class CBMAAdaptation(object):
         self.__create_vlan_interfaces()
 
         if self.__cbma_config:
-            white_interfaces = self.__cbma_config.get("white_interfaces") or []
-            red_interfaces = self.__cbma_config.get("red_interfaces") or []
-            exclude_interfaces = self.__cbma_config.get("exclude_interfaces") or []
+            white_interfaces = self.__cbma_config.get("white_interfaces", [])
+            red_interfaces = self.__cbma_config.get("red_interfaces", [])
+            exclude_interfaces = self.__cbma_config.get("exclude_interfaces", [])
             self.logger.info(f"White interfaces config: {white_interfaces}")
             self.logger.info(f"Red interfaces config: {red_interfaces}")
             self.logger.info(f"Exclude interfaces config: {exclude_interfaces}")
@@ -115,6 +115,13 @@ class CBMAAdaptation(object):
         # Init empty list
         black_interfaces: List[str] = []
 
+        # Validate input param types
+        if not isinstance(white_interfaces, list) or \
+           not isinstance(red_interfaces, list) or \
+           not isinstance(exclude_interfaces, list):
+            self.logger.error("Input params are not lists!")
+            return False
+           
         if any(
             Constants.LOWER_BATMAN.value in interface_list
             or Constants.UPPER_BATMAN.value in interface_list
@@ -141,7 +148,7 @@ class CBMAAdaptation(object):
             self.logger.error("No valid black interfaces!")
             return False
 
-        # Remove interfaces in exclude_config from black_interfaces
+        # Remove interfaces in exclude_config list from black_interfaces
         black_interfaces = [
             interface
             for interface in black_interfaces
@@ -151,7 +158,7 @@ class CBMAAdaptation(object):
             self.logger.error("No black interfaces left if applied exclude_interfaces!")
             return False
 
-        # Remove interfaces in white_config list from black_interfaces
+        # Remove interfaces in white_interfaces list from black_interfaces
         black_interfaces = [
             interface
             for interface in black_interfaces
@@ -161,7 +168,7 @@ class CBMAAdaptation(object):
             self.logger.error("No black interfaces left if applied white_interfaces!")
             return False
 
-        # Remove interfaces in white_config list from black_interfaces
+        # Remove interfaces in red_interfaces list from black_interfaces
         black_interfaces = [
             interface
             for interface in black_interfaces
@@ -567,14 +574,11 @@ class CBMAAdaptation(object):
             mac[0] |= 0x02  # Set the locally administered bit
             return bytes(mac).hex(sep=":", bytes_per_sep=1)
         else:
-            # Split MAC address into octets and flip the locally administered bit
-            octets = interface_mac.split(":")
-            first_octet = int(octets[0], 16)
-            flipped_first_octet = first_octet ^ 2
-            # Format the flipped first octet back to hexadecimal
-            octets[0] = format(flipped_first_octet, "02x")
-            return ":".join(octets)
-
+            # Flip the locally administered bit
+            mac_bytes = bytearray.fromhex(interface_mac.replace(':', ''))
+            mac_bytes[0] ^= 0x2
+            return mac_bytes.hex(sep=':', bytes_per_sep=1)
+ 
     def __init_batman_and_bridge(self) -> None:
         if_name = self.__comms_ctrl.settings.mesh_vif[0]
         if if_name.startswith("halow"):

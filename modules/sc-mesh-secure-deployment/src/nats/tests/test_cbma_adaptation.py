@@ -178,6 +178,16 @@ class TestCBMAAdaptation(unittest.TestCase):
             },
         }
 
+        cls.yaml_content_7 = """
+            CBMA:
+              exclude_interfaces:
+                - vlan_black
+              white_interfaces: None
+              red_interfaces:
+                "wlan1"
+            BATMAN:
+              routing_algo: BATMAN_IV
+            """
         # Write YAML content to files
         # Not forcing yaml file content in same order as in dictionary in order
         # to ensure yaml file parsing work properly.
@@ -193,6 +203,8 @@ class TestCBMAAdaptation(unittest.TestCase):
             yaml.dump(cls.yaml_content_5, file)
         with open("ms_config6.yaml", "w", encoding="utf-8") as file:
             yaml.dump(cls.yaml_content_6, file)
+        with open("ms_config7.yaml", "w", encoding="utf-8") as file:
+            file.write(cls.yaml_content_7)
 
         # Create fakecertificate file
         cls.fake_certificate = "just fake"
@@ -254,6 +266,7 @@ class TestCBMAAdaptation(unittest.TestCase):
             "ms_config4.yaml",
             "ms_config5.yaml",
             "ms_config6.yaml",
+            "ms_config7.yaml",
             "./MAC/fake_mac.crt",
         ]:
             try:
@@ -320,7 +333,7 @@ class TestCBMAAdaptation(unittest.TestCase):
         result = self.cbma_adaptation.stop_cbma()
         self.assertTrue(result)
 
-    def test_setup__and_stop_cbma2(self):
+    def test_setup_and_stop_cbma2(self):
         # Tries to setup and stop CBMA with such config
         # that doesn't have VLAN definitions.
         self.cbma_adaptation2 = CBMAAdaptation(
@@ -585,6 +598,7 @@ class TestCBMAAdaptation(unittest.TestCase):
         ("ms_config4.yaml", "No black interfaces left if applied exclude_interfaces!"),
         ("ms_config5.yaml", "No black interfaces left if applied white_interfaces!"),
         ("ms_config6.yaml", "No black interfaces left if applied red_interfaces!"),
+        ("ms_config7.yaml", "Input params are not lists!"),
     ])
     def test_invalid_cbma_configs(self, config_file, expected_error_msg):
         # Stop default CBMAAdaptation to remove VLAN interfaces
