@@ -4,7 +4,6 @@ Batman control utility module for CBMA Adaptation
 import logging
 import subprocess
 from typing import Optional, Union
-import re
 from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
 
 from src.constants import Constants
@@ -73,8 +72,8 @@ class BatCtrlUtils(object):
                     ip.link("add", ifname=batman_if, kind="batadv", address=mac_addr)
                 else:
                     ip.link("add", ifname=batman_if, kind="batadv")
-                # Add interface to the book keeping list
-                self.__bat_interfaces.append(batman_if)
+            # Add interface to the book keeping list
+            self.__bat_interfaces.append(batman_if)
         except Exception as e:
             self.logger.error(
                 "Error creating Batman interface %s: %s",

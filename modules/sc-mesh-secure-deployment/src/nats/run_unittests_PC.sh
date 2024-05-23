@@ -26,8 +26,9 @@ python3 -m venv unittest
 source unittest/bin/activate
 
 # install dependencies to virtualenv
-pip install coverage==7.4.4  # this is for testing purpose
 pip install -r requirements.txt
+# install testing only related dependencies
+pip install -r ./tests/requirements.txt
 
 # List of files not to used for coverage calculation.
 # Files tested elsewhere or not needed to be tested or not mesh shield content
@@ -43,3 +44,9 @@ echo -e "Not tested files as not MDM content or tested elsewhere:\n $not_used" >
 # deactivate virtualenv
 deactivate
 
+# Clean up __pycache__ directories
+find . -type d -name '__pycache__' -exec rm -rf {} +
+# Clean up unittest venv
+rm -rf unittest
+# Clean up coverage tool's SQL database
+rm -f .coverage

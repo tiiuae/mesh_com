@@ -12,9 +12,9 @@ from copy import deepcopy
 import json
 import random
 import fnmatch
-import re
 import ipaddress
-from pyroute2 import IPRoute  # type: ignore[import-not-found, import-untyped]
+import errno
+from pyroute2 import IPRoute, NetlinkError, arp  # type: ignore[import-not-found, import-untyped]
 
 from src import cbma_paths
 from src.comms_controller import CommsController
@@ -30,7 +30,7 @@ from models.certificates import CBMACertificates
 # pylint: disable=broad-except, invalid-name, too-many-instance-attributes
 class CBMAAdaptation(object):
     """
-    CBMA Control
+    CBMA Adaptation
     """
 
     def __init__(
@@ -60,6 +60,7 @@ class CBMAAdaptation(object):
         self.BR_NAME: str = Constants.BR_NAME.value
         self.LOWER_BATMAN: str = Constants.LOWER_BATMAN.value
         self.UPPER_BATMAN: str = Constants.UPPER_BATMAN.value
+        self.ALLOWED_KIND_LIST = {"vlan", "batadv"}
 
         # Set minimum required configuration
         self.__white_interfaces = [self.LOWER_BATMAN]
@@ -85,29 +86,106 @@ class CBMAAdaptation(object):
             self.__cbma_config = self.__config.read("CBMA")
             self.__vlan_config = self.__config.read("VLAN")
 
-        # Extend/update default configs using yaml file content
+        # Create VLAN interfaces if configured
+        self.__create_vlan_interfaces()
+
         if self.__cbma_config:
-            white_interfaces = self.__cbma_config.get("white_interfaces")
-            red_interfaces = self.__cbma_config.get("red_interfaces")
-            exclude_interfaces = self.__cbma_config.get("exclude_interfaces")
+            white_interfaces = self.__cbma_config.get("white_interfaces", [])
+            red_interfaces = self.__cbma_config.get("red_interfaces", [])
+            exclude_interfaces = self.__cbma_config.get("exclude_interfaces", [])
             self.logger.info(f"White interfaces config: {white_interfaces}")
             self.logger.info(f"Red interfaces config: {red_interfaces}")
             self.logger.info(f"Exclude interfaces config: {exclude_interfaces}")
 
-            if white_interfaces:
+            valid = self.__validate_cbma_config(
+                exclude_interfaces, white_interfaces, red_interfaces
+            )
+            # Extend/update default configs using validated yaml file content
+            if valid:
                 self.__white_interfaces.extend(white_interfaces)
-            if red_interfaces:
                 self.__red_interfaces.extend(red_interfaces)
-            if exclude_interfaces:
                 self.__na_cbma_interfaces.extend(exclude_interfaces)
 
-        # Create VLAN interfaces if configured
-        self.__create_vlan_interfaces()
+    def __validate_cbma_config(
+        self,
+        exclude_interfaces: List[str],
+        white_interfaces: List[str],
+        red_interfaces: List[str],
+    ) -> bool:
+        # Init empty list
+        black_interfaces: List[str] = []
 
-    def __create_vlan_interfaces(self) -> None:
-        if not self.__vlan_config:
-            self.logger.info("No VLAN configuration found")
-            return
+        # Validate input param types
+        if not isinstance(white_interfaces, list) or \
+           not isinstance(red_interfaces, list) or \
+           not isinstance(exclude_interfaces, list):
+            self.logger.error("Input params are not lists!")
+            return False
+
+        if any(
+            Constants.LOWER_BATMAN.value in interface_list
+            or Constants.UPPER_BATMAN.value in interface_list
+            for interface_list in [exclude_interfaces, white_interfaces, red_interfaces]
+        ):
+            self.logger.error("bat0/bat1 should not exist in CBMA configs!")
+            return False
+
+        with self.__lock:
+            self.__get_interfaces()
+            interfaces = deepcopy(self.__interfaces)
+
+            for interface in interfaces:
+                black_interfaces.append(interface.interface_name)
+        # Remove interfaces that do not have a certificate
+        filtered_black_interfaces = []
+        for interface in black_interfaces:
+            mac_addr = self.__get_mac_addr(interface)
+            if self.__has_certificate(self.__cbma_certs_path, mac_addr):
+                filtered_black_interfaces.append(interface)
+
+        black_interfaces = filtered_black_interfaces
+        if not black_interfaces:
+            self.logger.error("No valid black interfaces!")
+            return False
+
+        # Remove interfaces in exclude_config list from black_interfaces
+        black_interfaces = [
+            interface
+            for interface in black_interfaces
+            if interface not in exclude_interfaces
+        ]
+        if not black_interfaces:
+            self.logger.error("No black interfaces left if applied exclude_interfaces!")
+            return False
+
+        # Remove interfaces in white_interfaces list from black_interfaces
+        black_interfaces = [
+            interface
+            for interface in black_interfaces
+            if interface not in white_interfaces
+        ]
+        if not black_interfaces:
+            self.logger.error("No black interfaces left if applied white_interfaces!")
+            return False
+
+        # Remove interfaces in red_interfaces list from black_interfaces
+        black_interfaces = [
+            interface
+            for interface in black_interfaces
+            if interface not in red_interfaces
+        ]
+        if not black_interfaces:
+            self.logger.error("No black interfaces left if applied red_interfaces!")
+            return False
+
+        self.logger.info("Black interfaces after validation: %s", black_interfaces)
+        return True
+
+    def __create_vlan_interfaces(self) -> bool:
+        success = True
+        if self.__vlan_config is None:
+            self.logger.debug("No VLAN configuration found")
+            return success
 
         for vlan_name, vlan_data in self.__vlan_config.items():
             self.logger.info(f"{vlan_name}, {vlan_data}")
@@ -120,9 +198,6 @@ class CBMAAdaptation(object):
 
             if parent_interface and vlan_id:
                 try:
-                    # Delete existing VLAN interface if it exists
-                    subprocess.run(["ip", "link", "delete", vlan_name], check=False)
-
                     # Create VLAN interface
                     subprocess.run(
                         [
@@ -176,35 +251,60 @@ class CBMAAdaptation(object):
                         f"VLAN interface {vlan_name} created and configured."
                     )
                 except subprocess.CalledProcessError as e:
+                    success = False
                     self.logger.error(f"Error creating VLAN interface {vlan_name}: {e}")
             else:
+                success = False
                 self.logger.error(f"Invalid configuration for VLAN {vlan_name}.")
+        return success
 
-    def __delete_vlan_interfaces(self) -> None:
+    def __delete_vlan_interfaces(self) -> bool:
+        success = True
         if not self.__vlan_config:
-            return
+            self.logger.debug("No VLAN interfaces to delete")
+            return success
 
         for vlan_name, _ in self.__vlan_config.items():
             try:
-                # Delete existing VLAN interface if it exists
-                subprocess.run(["ip", "link", "delete", vlan_name], check=False)
+                if any(
+                    interface.interface_name == vlan_name
+                    for interface in self.__interfaces
+                ):
+                    # Delete existing VLAN interface
+                    subprocess.run(["ip", "link", "delete", vlan_name], check=True)
             except subprocess.CalledProcessError as e:
                 self.logger.error(f"Error deleting VLAN interface {vlan_name}: {e}")
+                success = False
+        return success
 
     def __get_interfaces(self) -> None:
         interfaces = []
-        ipr = IPRoute()
-        for link in ipr.get_links():
+        ip = IPRoute()
+        for link in ip.get_links():
             ifname = link.get_attr("IFLA_IFNAME")
             ifstate = link.get_attr("IFLA_OPERSTATE")
             mac_address = link.get_attr("IFLA_ADDRESS")
+            ifi_type = link.get("ifi_type")
+            kind = None
+
+            link_info = link.get_attr("IFLA_LINKINFO")
+            if link_info:
+                kind = link_info.get_attr("IFLA_INFO_KIND")
 
             interface_info = {
                 "interface_name": ifname,
                 "operstate": ifstate,
                 "mac_address": mac_address,
             }
-            interfaces.append(interface_info)
+            if ifi_type in (arp.ARPHRD_ETHER, arp.ARPHRD_IEEE80211):
+                # Filters out interfaces with kinds like dummy, sit, and bridge
+                # thus should add only physical interfaces, vlan and batadv interfaces
+                if kind is None or kind in self.ALLOWED_KIND_LIST:
+                    interfaces.append(interface_info)
+                # We want to monitor also br-lan status thus expcetion to basic rules
+                elif kind == "bridge" and ifname== Constants.BR_NAME.value:
+                    interfaces.append(interface_info)
+        ip.close()
 
         self.__interfaces.clear()
 
@@ -221,22 +321,19 @@ class CBMAAdaptation(object):
             interfaces,
         )
 
-    def __create_bridge(self, bridge_name) -> None:
+    def __create_bridge(self, bridge_name) -> bool:
+        success = True
         ip = IPRoute()
         try:
-            bridge_indices = ip.link_lookup(ifname=bridge_name)
-            if not bridge_indices:
-                ip.link("add", ifname=bridge_name, kind="bridge")
-
-        except Exception as e:
-            self.logger.exception(
-                "Error creating bridge %s! Error: %s",
-                bridge_name,
-                e,
-            )
-
+            ip.link("add", ifname=bridge_name, kind="bridge")
+        except NetlinkError as e:
+            if e.code == errno.EEXIST and "File exists" in e.args[1]:
+                self.logger.warning("Bridge %s already exists!", bridge_name)
+            else:
+                success = False
         finally:
             ip.close()
+        return success
 
     def __set_interface_mac(self, interface, new_mac):
         try:
@@ -244,7 +341,6 @@ class CBMAAdaptation(object):
             subprocess.check_call(
                 ["ip", "link", "set", "dev", interface, "address", new_mac]
             )
-
         except subprocess.CalledProcessError as e:
             self.logger.error(
                 "Error setting MAC address for %s! Error: %s", interface, e
@@ -283,7 +379,7 @@ class CBMAAdaptation(object):
             ip.link("set", index=interface_index, master=bridge_index)
 
         except Exception as e:
-            self.logger.debug(
+            self.logger.error(
                 "Error adding interface %s to bridge %s! Error: %s",
                 interface_to_add,
                 bridge_name,
@@ -324,24 +420,29 @@ class CBMAAdaptation(object):
                 return interface.mac_address
         return None  # Interface not found in the list
 
-    def __shutdown_and_delete_bridge(self, bridge_name: str) -> None:
+    def __shutdown_and_delete_bridge(self, bridge_name: str) -> bool:
+        success = True
         ip = IPRoute()
         try:
             index = ip.link_lookup(ifname=bridge_name)[0]
             ip.link("set", index=index, state="down")
             ip.link("delete", index=index)
         except IndexError:
-            self.logger.debug(
+            self.logger.warning(
                 "Not able to delete bridge %s! Bridge not found!", bridge_name
             )
+        except Exception as e:
+            success = False
+            self.logger.error("Error %s deleting bridge %s!", e, bridge_name)
         finally:
             ip.close()
+        return success
 
     def __has_certificate(self, cert_path: str, mac: str) -> bool:
         certificate_path = f"{cert_path}/MAC/{mac}.crt"
 
         if not os.path.exists(certificate_path):
-            self.logger.warning("Certificate not found: %s", certificate_path)
+            self.logger.debug("Certificate not found: %s", certificate_path)
             return False
 
         self.logger.debug("Certificate found: %s", certificate_path)
@@ -365,7 +466,9 @@ class CBMAAdaptation(object):
         # Remove interfaces without certificates from lower CBMA interface list
         for interface in interfaces_without_certificate:
             self.logger.debug(
-                "Interface %s doesn't have certificate!", interface.interface_name
+                "Interface %s doesn't have certificate!, mac %s",
+                interface.interface_name,
+                interface.mac_address,
             )
             if interface in self.__lower_cbma_interfaces:
                 self.__lower_cbma_interfaces.remove(interface)
@@ -398,21 +501,20 @@ class CBMAAdaptation(object):
             if interface in self.__lower_cbma_interfaces:
                 self.__lower_cbma_interfaces.remove(interface)
 
-    @staticmethod
-    def __wait_for_ap(timeout: int = 4) -> bool:
+    def __wait_for_ap(self, timeout: int = 4) -> bool:
         start_time = time.time()
         while True:
             try:
-                result = subprocess.check_output(["iw", "dev", "wlan1", "info"])
-                result_str = result.decode("utf-8")
-                # Use regular expressions to extract the interface type
-                match = re.search(r"type\s+([\w-]+)", result_str)
-                if match.group(1) == "AP":
+                result = subprocess.check_output(
+                    ["iw", "dev", "wlan1", "info"]
+                ).decode()
+                if "type AP" in result:
                     return True
 
                 elapsed_time = time.time() - start_time
 
                 if elapsed_time >= timeout:
+                    self.logger.warning("__wait_for_ap timeout")
                     return False  # Timeout reached
                 time.sleep(1)
             except subprocess.CalledProcessError:
@@ -451,10 +553,10 @@ class CBMAAdaptation(object):
         start_time = time.time()
         while True:
             try:
-                socket.create_server(
+                with socket.create_server(
                     (link_local_address, 0, 0, index), family=socket.AF_INET6
-                )
-                return True
+                ):
+                    return True
             except Exception:
                 elapsed_time = time.time() - start_time
                 if elapsed_time >= timeout:
@@ -475,12 +577,10 @@ class CBMAAdaptation(object):
             mac[0] |= 0x02  # Set the locally administered bit
             return bytes(mac).hex(sep=":", bytes_per_sep=1)
         else:
-            # Split MAC address into octets and flip the locally administered bit
-            octets = interface_mac.split(":")
-            first_octet = int(octets[0], 16)
-            flipped_first_octet = first_octet ^ 2
-
-            return f"{flipped_first_octet}:{':'.join(octets[1:])}"
+            # Flip the locally administered bit
+            mac_bytes = bytearray.fromhex(interface_mac.replace(':', ''))
+            mac_bytes[0] ^= 0x2
+            return mac_bytes.hex(sep=':', bytes_per_sep=1)
 
     def __init_batman_and_bridge(self) -> None:
         if_name = self.__comms_ctrl.settings.mesh_vif[0]
@@ -562,6 +662,14 @@ class CBMAAdaptation(object):
 
         return True
 
+    def __get_base_mtu_size(self):
+        """
+        Function to get base mtu size. Functions return value
+        can be patched during unit testing to support smaller
+        mtu sizes.
+        """
+        return Constants.BASE_MTU_SIZE.value
+
     def __set_mtu_size(self, interface_name: str, interface_color: str = None) -> None:
         """
         Set the MTU size for the specified interface color.
@@ -575,9 +683,9 @@ class CBMAAdaptation(object):
             interface_name: The name of the interface
             interface_color: The color of the interface
         """
-        BASE_MTU_SIZE = 1500
-        MACSEC_OVERHEAD = 16
-        BATMAN_OVERHEAD = 24
+        BASE_MTU_SIZE = self.__get_base_mtu_size()
+        MACSEC_OVERHEAD = Constants.MACSEC_OVERHEAD.value
+        BATMAN_OVERHEAD = Constants.BATMAN_OVERHEAD.value
 
         # if upper or lower batman
         if interface_name == self.UPPER_BATMAN:
@@ -600,7 +708,8 @@ class CBMAAdaptation(object):
 
         try:
             subprocess.run(
-                ["ip", "link", "set", "dev", interface_name, "mtu", mtu_size], check=True
+                ["ip", "link", "set", "dev", interface_name, "mtu", mtu_size],
+                check=True,
             )
         except subprocess.CalledProcessError as e:
             self.logger.error(
@@ -678,7 +787,6 @@ class CBMAAdaptation(object):
                 if self.__is_valid_ipv6_local((ip_address, prefix_length)):
                     ip.close()
                     return ip_address
-            ip.close()
         return ""
 
     def __add_global_ipv6_address(self, interface_name: str, new_prefix: str) -> None:
@@ -703,7 +811,7 @@ class CBMAAdaptation(object):
 
                 # Modify the prefix
                 new_address = (
-                    new_prefix + link_local_address[link_local_address.find("::") + 1 :]
+                    new_prefix + link_local_address[link_local_address.find("::") + 1:]
                 )
                 self.logger.debug(
                     f"Current {interface_name} Local IPv6 address: {link_local_address}"
@@ -715,10 +823,10 @@ class CBMAAdaptation(object):
 
                 # Add the modified IPv6 address to the interface
                 ip.addr("add", index=index, address=new_address, prefixlen=64)
-                ip.close()
-
         except Exception as e:
-            self.logger.error(f"Error: {e}")
+            self.logger.warning(
+                f"Error adding global ipv6 address for interface {interface_name}: {e}"
+            )
 
     def __setup_lower_cbma(self) -> bool:
         """
@@ -830,7 +938,7 @@ class CBMAAdaptation(object):
                 ret = self.__upper_cbma_controller.add_interface(
                     _interface.interface_name
                 )
-                self.logger.debug(
+                self.logger.info(
                     f"Upper CBMA interfaces added: {_interface.interface_name} "
                     f"status: {ret}"
                 )
@@ -845,6 +953,7 @@ class CBMAAdaptation(object):
         return intf_added
 
     def __cleanup_cbma(self) -> None:
+        self.__get_interfaces()
         self.__shutdown_interface(self.LOWER_BATMAN)
         self.__shutdown_interface(self.UPPER_BATMAN)
 
@@ -887,5 +996,6 @@ class CBMAAdaptation(object):
         )
 
         self.__cleanup_cbma()
+        self.stop_radios()
 
         return lower_stopped and upper_stopped
