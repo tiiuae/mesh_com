@@ -4,7 +4,7 @@ import base64
 import json
 import os
 import unittest
-from unittest.mock import patch, MagicMock, AsyncMock, mock_open
+from unittest.mock import patch, MagicMock, AsyncMock, mock_open, call
 import ssl
 import signal
 import requests
@@ -108,7 +108,6 @@ class TestMdmAgent(unittest.TestCase):
 
     @patch('mdm_agent.requests.post')
     @patch('mdm_agent.glob.glob')
-    # @patch('builtins.open', new_callable=mock_open, read_data=b'test_data') # @patch.object(mdm_agent.MdmAgent, '_MdmAgent__config_store', create=True)
     def test_upload_certificate_bundle_makes_request(self, mock_glob, mock_post):
         """
         Test the upload_certificate_bundle method
@@ -215,7 +214,12 @@ class TestMdmAgent(unittest.TestCase):
         status = self.agent._MdmAgent__action_feature_yaml(response)
 
         self.assertEqual(status, "OK")
-        self.agent.logger.debug.assert_any_call("No changes in features config, not updating.")
+        # Check for both expected debug calls
+        expected_calls = [
+            call("config: {'payload': {'features': {'feature1': True, 'feature2': False}}} previous: {'payload': {'features': {'feature1': True, 'feature2': False}}}"),
+            call('No changes in features config, not updating.')
+        ]
+        self.agent.logger.debug.assert_has_calls(expected_calls, any_order=False)
 
     def test_action_feature_yaml_key_error(self):
         """
@@ -274,6 +278,12 @@ class TestMdmAgent(unittest.TestCase):
         status = self.agent._MdmAgent__action_radio_configuration(response)
 
         self.assertEqual(status, "OK")
+        expected_calls = [
+            call("No previous mesh config"),
+            call("ret: %s info: %s", "OK", 'damn good'),
+            call("ret: %s info: %s", "OK", 'commands done')
+        ]
+        self.agent.logger.debug.assert_has_calls(expected_calls, any_order=False)
         self.assertEqual(self.agent._MdmAgent__previous_config_mesh, response.text.strip())
 
     def test_action_radio_configuration_no_changes(self):
@@ -385,6 +395,10 @@ class TestMdmAgent(unittest.TestCase):
         result = self.agent._MdmAgent__validate_response(mock_response,
                                                          mdm_agent.ConfigType.DEBUG_CONFIG)
         self.assertEqual(result, 'OK')
+
+        result = self.agent._MdmAgent__validate_response(mock_response,
+                                                     "SPECIAL_UNITTEST_CONFIG")
+        self.assertEqual(result, 'FAIL')
 
     @patch('mdm_agent.socket.create_connection')
     @patch('mdm_agent.ssl.create_default_context')
