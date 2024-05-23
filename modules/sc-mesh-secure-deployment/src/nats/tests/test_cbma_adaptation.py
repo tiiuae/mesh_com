@@ -559,7 +559,7 @@ class TestCBMAAdaptation(unittest.TestCase):
         mock_sleep.assert_called()
         self.cbma_adaptation.logger.warning.assert_called_with("__wait_for_ap timeout")
 
-    def test_wait_for_and_shutdown_interface(self):
+    def test_wait_for_interface(self):
         # Should be up by default
         result = self.cbma_adaptation._CBMAAdaptation__wait_for_interface("vlan_red")
         self.assertTrue(result)
@@ -591,7 +591,7 @@ class TestCBMAAdaptation(unittest.TestCase):
         result = self._validate_interfaces_config(self.cbma_adaptation)
         self.assertTrue(result)
         self.cbma_adaptation.logger.info.assert_called_with(
-            "Black interfaces after validation: ", ["ifdummy0_black", "ifdummy3_black"]
+            "Black interfaces after validation: %s", ["ifdummy0_black", "ifdummy3_black"]
         )
 
     @parameterized.expand([

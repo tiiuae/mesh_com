@@ -121,7 +121,7 @@ class CBMAAdaptation(object):
            not isinstance(exclude_interfaces, list):
             self.logger.error("Input params are not lists!")
             return False
-           
+
         if any(
             Constants.LOWER_BATMAN.value in interface_list
             or Constants.UPPER_BATMAN.value in interface_list
@@ -178,7 +178,7 @@ class CBMAAdaptation(object):
             self.logger.error("No black interfaces left if applied red_interfaces!")
             return False
 
-        self.logger.info("Black interfaces after validation: ", black_interfaces)
+        self.logger.info("Black interfaces after validation: %s", black_interfaces)
         return True
 
     def __create_vlan_interfaces(self) -> bool:
@@ -300,6 +300,9 @@ class CBMAAdaptation(object):
                 # Filters out interfaces with kinds like dummy, sit, and bridge
                 # thus should add only physical interfaces, vlan and batadv interfaces
                 if kind is None or kind in self.ALLOWED_KIND_LIST:
+                    interfaces.append(interface_info)
+                # We want to monitor also br-lan status thus expcetion to basic rules
+                elif kind == "bridge" and ifname== Constants.BR_NAME.value:
                     interfaces.append(interface_info)
         ip.close()
 
@@ -439,7 +442,7 @@ class CBMAAdaptation(object):
         certificate_path = f"{cert_path}/MAC/{mac}.crt"
 
         if not os.path.exists(certificate_path):
-            self.logger.warning("Certificate not found: %s", certificate_path)
+            self.logger.debug("Certificate not found: %s", certificate_path)
             return False
 
         self.logger.debug("Certificate found: %s", certificate_path)
@@ -578,7 +581,7 @@ class CBMAAdaptation(object):
             mac_bytes = bytearray.fromhex(interface_mac.replace(':', ''))
             mac_bytes[0] ^= 0x2
             return mac_bytes.hex(sep=':', bytes_per_sep=1)
- 
+
     def __init_batman_and_bridge(self) -> None:
         if_name = self.__comms_ctrl.settings.mesh_vif[0]
         if if_name.startswith("halow"):
@@ -935,7 +938,7 @@ class CBMAAdaptation(object):
                 ret = self.__upper_cbma_controller.add_interface(
                     _interface.interface_name
                 )
-                self.logger.debug(
+                self.logger.info(
                     f"Upper CBMA interfaces added: {_interface.interface_name} "
                     f"status: {ret}"
                 )

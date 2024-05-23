@@ -26,10 +26,9 @@ python3 -m venv unittest
 source unittest/bin/activate
 
 # install dependencies to virtualenv
-pip install coverage==7.4.4  # this is for testing purpose
 pip install -r requirements.txt
-pip install pyroute2==0.7.12  # This version is needed on Ubuntu
-pip install parameterized==0.9.0  # Used in unit tests only
+# install testing only related dependencies
+pip install -r ./tests/requirements.txt
 
 # List of files not to used for coverage calculation.
 # Files tested elsewhere or not needed to be tested or not mesh shield content
