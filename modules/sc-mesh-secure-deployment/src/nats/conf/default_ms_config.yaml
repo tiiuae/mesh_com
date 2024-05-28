@@ -28,8 +28,8 @@ BATMAN:
   routing_algo: BATMAN_V
   hop_penalty:
     meshif:
-      bat0: 0
-      bat1: 0
+      bat0: 1
+      bat1: 1
     hardif:
       halow1: 20
 
