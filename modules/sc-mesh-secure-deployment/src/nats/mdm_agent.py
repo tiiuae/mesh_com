@@ -283,6 +283,17 @@ class MdmAgent:
             self.service_monitor.close()
             self.__service_monitor_thread.join()
 
+    def __handle_mdm_service_unavailable(self):
+        """
+        Sets self.mdm_service_available to false and restarts
+        service monitor.
+        :param: -
+        :return: -
+        """
+        self.mdm_service_available = False
+        self.stop_service_discovery()
+        self.start_service_discovery()
+
     def start_interface_monitor(self) -> None:
         """
         Start interface monitoring
@@ -385,11 +396,15 @@ class MdmAgent:
                 verify=self.__ca,
                 timeout=20,
             )
-        except requests.exceptions.ConnectionError as err:
-            self.logger.error(
-                "HTTP request failed with error: %s", err
-            )
-            return requests.Response()
+        except requests.exceptions.ConnectTimeout as e:
+            self.logger.error("Get device config timed out: %s", e)
+        except requests.exceptions.ConnectionError as e:
+            self.logger.error("Get device config failed due to connection error: %s", e)
+            self.__handle_mdm_service_unavailable()
+        except requests.exceptions.RequestException as e:
+            self.logger.error("Get device config failed due to request error: %s", e)
+            self.__handle_mdm_service_unavailable()
+        return requests.Response()
 
     def __action_certificates(
         self, response: requests.Response, certificate_type: str
@@ -660,10 +675,14 @@ class MdmAgent:
             )
         except FileNotFoundError as e:
             self.logger.error("Certificate file not found: %s", e)
-        except requests.RequestException as e:
-            self.logger.error(
-                "Post request failed with error: %s", e
-            )
+        except requests.ConnectTimeout as e:
+            self.logger.error("Certificate download timed out: %s", e)
+        except requests.exceptions.ConnectionError as e:
+            self.logger.error("Certificate download failed due to connection error: %s", e)
+            self.__handle_mdm_service_unavailable()
+        except requests.exceptions.RequestException as e:
+            self.logger.error("Certificate download failed due to request error: %s", e)
+            self.__handle_mdm_service_unavailable()
         return requests.Response()
 
     def upload_certificate_bundle(self) -> requests.Response:
@@ -712,10 +731,14 @@ class MdmAgent:
             )
         except FileNotFoundError as e:
             self.logger.error("Certificate file not found: %s", e)
-        except requests.RequestException as e:
-            self.logger.error(
-                "Post request failed with error: %s", e
-            )
+        except requests.exceptions.ConnectTimeout as e:
+            self.logger.error("Certificate upload timed out: %s", e)
+        except requests.exceptions.ConnectionError as e:
+            self.logger.error("Certificate upload failed due to connection error: %s", e)
+            self.__handle_mdm_service_unavailable()
+        except requests.exceptions.RequestException as e:
+            self.logger.error("Certificate upload request error: %s", e)
+            self.__handle_mdm_service_unavailable()
         return requests.Response()
 
     def __validate_response(
