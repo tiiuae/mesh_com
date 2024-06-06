@@ -178,7 +178,7 @@ random_mac_address()
 
 create_macvlan_interface()
 {
-	if ! ip link add link "$BASE_INTERFACE_NAME" name "$MACVLAN_NAME" address "$LOCAL_MAC" mtu "$MACVLAN_MTU" type macvlan mode source bcqueuelen 0 \
+	if ! ip link add link "$BASE_INTERFACE_NAME" name "$MACVLAN_NAME" address "$LOCAL_MAC" mtu "$MACVLAN_MTU" type macvlan mode source nodst bcqueuelen 0 \
 	|| ! ip link set link dev "$MACVLAN_NAME" type macvlan macaddr add "$REMOTE_MAC"; then
 		return `false`
 	fi
@@ -216,12 +216,12 @@ create_macvlan_interface()
 create_bridge_if_needed()
 {
 	if [ ! -e "$SCN/$MACBR_NAME/bridge" ]; then
-		>&2 echo "Error: creation has been moved to create_bridge.sh, $MACBR_NAME should exist"
-		return `false`
+		>&2 echo "WARN: $MACBR_NAME doesn't exist when it should, recreating it but something is misbehaving"
+		"${BASH_SOURCE%/*}/create_bridge.sh" "$L_OR_U" "$BASE_INTERFACE_NAME" || return $?
 	fi
 	create_macvlan_interface || return `false`
 	REMOTE_EUI64=`mac_to_eui64 "$REMOTE_MAC"`
-        REMOTE_LLA="fe80::$REMOTE_EUI64"
+	REMOTE_LLA="fe80::$REMOTE_EUI64"
 	ip neigh replace "$REMOTE_LLA" lladdr "$REMOTE_MAC" dev "$MACBR_NAME"
 }
 

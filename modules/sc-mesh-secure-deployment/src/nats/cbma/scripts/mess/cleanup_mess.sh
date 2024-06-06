@@ -1,9 +1,7 @@
-#! /bin/bash
+#!/bin/bash
 
 
-
-export SCN='/sys/class/net'
-
+source "${BASH_SOURCE%/*}/constants.rc"
 
 cleanup_macscbpad_interface()
 {
@@ -33,6 +31,7 @@ cleanup_macsec_interface()
 
 cleanup_macvlan_interface()
 {
+	[ -e "$SCN/$MACVLAN_NAME" ] || return 0
 	cleanup_macscbub_interface
 	cleanup_macsec_interface
 	ip link delete "$MACVLAN_NAME"

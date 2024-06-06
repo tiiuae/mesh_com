@@ -47,6 +47,7 @@ cleanup_mdm_agent_files() {
     command ssh ${ID_RSA:+-i "$ID_RSA"} $SSH_OPTIONS "root@$IP" bash <<-EOF || exit 6
 			rm -f /opt/certs_uploaded
 			rm -rf /opt/certs || :
+			rm -rf /opt/mdm || :
 		EOF
 }
 
@@ -122,6 +123,6 @@ fi
 stop_mdm_agent "$IP" "$ID_RSA"
 cleanup_logs "$IP" "$ID_RSA"
 cleanup_mdm_agent_files "$IP" "$ID_RSA"
-upgrade_cbma "$CBMA" "$IP" "$ID_RSA"
+# upgrade_cbma "$CBMA" "$IP" "$ID_RSA"
 # upgrade_birthcerts "$IP" "$ID_RSA"
 start_mdm_agent "$IP" "$ID_RSA"
