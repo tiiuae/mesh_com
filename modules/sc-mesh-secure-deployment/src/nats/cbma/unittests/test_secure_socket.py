@@ -1,6 +1,9 @@
 import os
+import sys
 
 from OpenSSL import SSL
+
+sys.path.insert(0, os.path.normpath(os.path.join(os.path.dirname(__file__), os.pardir)))
 
 from secure_socket.secure_socket import FileBasedSecureSocket
 from models.certificates import CBMACertificates

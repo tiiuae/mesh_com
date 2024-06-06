@@ -7,7 +7,7 @@ KEYPAIR_TYPE="rsa"    # Can be ecdsa, eddsa, or rsa
 
 DEFAULT_LOG_LEVEL="INFO"
 
-BASE_MTU="1400"
+BASE_MTU="1500"
 
 CBMA_DEBUG=0
 BAT_DEBUG=0
@@ -104,8 +104,7 @@ setup_wlan() {
     # ip netns exec "$I" ip link set dev "$WLAN" name "wlp1s${I}"
     # ip netns exec "$I" iw dev "wlp1s${I}" set type mesh
 
-    # NOTE - No need to set MTU for now
-    # ip netns exec "$I" ip link set dev "wlp1s${I}" mtu $((BASE_MTU + 80))
+    ip netns exec "$I" ip link set dev "wlp1s${I}" mtu $((BASE_MTU + 80))
 
     ip netns exec "$I" ip link set dev "wlp1s${I}" address "00:20:91:0${I}:0${I}:0${I}"
     ip netns exec "$I" ip link set dev "wlp1s${I}" up
@@ -126,7 +125,7 @@ setup_eth() {
     ip link add "$ETH" type veth peer name "eth${I}" netns "$I"
 
     # NOTE - No need to set MTU for now
-    # ip netns exec "$I" ip link set dev "eth${I}" mtu $((BASE_MTU + 108))
+    ip netns exec "$I" ip link set dev "eth${I}" mtu $((BASE_MTU + 108))
     ip netns exec "$I" ip link set dev "eth${I}" address "00:20:91:${I}0:${I}0:${I}0"
 
     ip link set "$ETH" up

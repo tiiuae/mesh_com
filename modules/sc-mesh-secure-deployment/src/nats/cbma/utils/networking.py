@@ -1,13 +1,12 @@
 from struct import Struct
 from ipaddress import IPv6Address
 
-from . import logging, common
+from . import common
 
 
 LLA_PREFIX = 'fe80'
 
 pack_ipv6 = Struct('!16s').pack
-logger = logging.get_logger()
 
 
 def get_interface_mac_address(interface: str) -> str:

@@ -19,16 +19,6 @@ ip link set wlp1s0 up
 # Connect wlp1s0 to the mesh if it isn't - Need a working wpa_supplicant_11s.conf
 wpa_supplicant -i wlp1s0 -c wpa_supplicant_11s.conf -D nl80211 -B
 
-# Prepare lower-batman interface (using wlp1s0 locally administered MAC)
-ip link del bat0 2>/dev/null
-ip link add name bat0 type batadv
-ip link set bat0 address $(read a < /sys/class/net/wlp1s0/address && printf "%02x${a:2}\n" $(( 0x${a:0:2} ^ 0x2 )))
-ip link set bat0 up
-
-# Create upper-batman inteface
-ip link del bat1 2>/dev/null
-ip link add name bat1 type batadv
-
 # Install Python dependencies - Recommended to create + activate a venv before
 $ python3 -m pip install -r requirements.txt
 
@@ -45,6 +35,17 @@ $ python3 standalone.py -i wlp1s0          # Runs lower-CBMA by default
 $ python3 standalone.py -i bat0 -b bat1    # Add -u if lower-CBMA wasn't established beforehand
 # NOTE: if bat0 doesn't have the same MAC as any of its attached interfaces (like LA wlp1s0 one)
 #       you will have to generate certificates for it as a workaround
+
+# Optional - Now done automatically by standalone.py
+#   Prepare lower-batman interface (using wlp1s0 locally administered MAC)
+ip link del bat0 2>/dev/null
+ip link add name bat0 type batadv
+ip link set bat0 address $(read a < /sys/class/net/wlp1s0/address && printf "%02x${a:2}\n" $(( 0x${a:0:2} ^ 0x2 )))
+ip link set bat0 up
+
+#   Create upper-batman inteface
+ip link del bat1 2>/dev/null
+ip link add name bat1 type batadv
 ```
 
 

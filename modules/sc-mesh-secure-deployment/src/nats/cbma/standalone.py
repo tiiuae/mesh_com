@@ -1,3 +1,4 @@
+import os
 import sys
 import argparse
 
@@ -14,8 +15,9 @@ logger = get_logger(log_dir='.')
 
 
 BATMAN_ROUTING_ALG = 'BATMAN_V'
+CBMA_ROOT = os.path.normpath(os.path.dirname(__file__))
 
-def get_interface_locally_administed_mac(interface: str) -> str:
+def get_interface_locally_administered_mac(interface: str) -> str:
     mac = get_interface_mac_address(interface)
     mac_bytes = bytearray.fromhex(mac.replace(':', ''))
     mac_bytes[0] ^= 0x2  # Locally administered bit
@@ -34,6 +36,32 @@ def destroy_batman(batman: str) -> None:
         return
     destroy_batman_str = f"ip link del {batman}"
     run_command_retcode(destroy_batman_str.split())
+
+def get_mtu_from_constants_rc(exclude: list[str] = []) -> int:
+    mtu = 0
+    constants_rc = f"{CBMA_ROOT}/scripts/mess/constants.rc"
+    with open(constants_rc, 'r') as f:
+        for line in f.readlines():
+            if line.startswith('#') or not '=' in line \
+               or not ('OVERHEAD' in line or 'HOPEFULLY' in line):
+                continue
+            for e in exclude:
+                if e in line:
+                    break
+            else:
+                try:
+                    mtu += int(line.split('=')[-1].strip())
+                except ValueError:
+                    logger.warning(f"Ignoring '{line.strip()}' for MTU calculation")
+    if not mtu:
+        logger.error(f"Unable to get MTU value from {constants_rc}")
+        sys.exit(255)
+
+    return mtu
+
+def set_interface_mtu(interface: str, mtu: int) -> bool:
+    cmd_str = f"ip link set {interface} mtu {mtu}"
+    return not run_command_retcode(cmd_str.split())
 
 
 if __name__ == '__main__':
@@ -101,6 +129,17 @@ if __name__ == '__main__':
     certificates = CBMACertificates(cert_dir, key, chain, ca)
 
     is_upper = args.upper or any('bat' in i and glob(f"/sys/class/net/*/upper_{i}") for i in interfaces)
+
+    mtu_base = get_mtu_from_constants_rc(exclude=['OVERHEAD'])
+    mtu_overhead = get_mtu_from_constants_rc(exclude=['HOPEFULLY'])
+    if not is_upper:
+        mtu_overhead *= 2
+    mtu = mtu_base + mtu_overhead
+
+    for i in interfaces:
+        if not set_interface_mtu(i, mtu):
+            sys.exit(255)
+
     enable_macsec_encryption = is_upper
     try:
         controller = CBMAController(args.port,
@@ -113,7 +152,7 @@ if __name__ == '__main__':
         sys.exit(255)
 
     if not (existing_batman := f"/sys/class/net/{args.batman}" in glob("/sys/class/net/*")):
-        mac = get_interface_locally_administed_mac(interfaces[0])
+        mac = get_interface_locally_administered_mac(interfaces[0])
         create_batman(args.batman, mac)
     try:
         logger.info(f"Adding {interfaces} to the CBMAController")

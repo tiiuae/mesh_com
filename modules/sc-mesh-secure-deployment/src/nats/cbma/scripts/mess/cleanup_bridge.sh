@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-export SCN='/sys/class/net'
+source "${BASH_SOURCE%/*}/constants.rc"
 
 cleanup_bridge_if_needed()
 {
