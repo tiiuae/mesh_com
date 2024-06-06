@@ -94,4 +94,4 @@ class Constants(Enum):
     # MTU sizes
     BASE_MTU_SIZE: int = 1500
     MACSEC_OVERHEAD: int = 16
-    BATMAN_OVERHEAD: int = 24
+    BATMAN_OVERHEAD: int = 48
