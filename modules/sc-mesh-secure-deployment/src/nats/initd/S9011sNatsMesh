@@ -1,0 +1,127 @@
+#!/bin/bash
+
+source /opt/mesh-helper.sh
+# sources mesh configuration
+
+RADIO_INDEX=$2   # $2: index of the mesh.conf file to be used e.g. "id0"
+
+source_configuration "${RADIO_INDEX:2}"
+
+DAEMON="mesh-11s_nats.sh"
+DIR="/opt/"
+_WIFI="${RADIO_INDEX}_MESH_VIF"
+_MODE="${RADIO_INDEX}_MODE"
+LOG_FILE=/opt/mesh_11s_${RADIO_INDEX}.log
+
+SYNC_LOCK="/var/run/mesh_start.lock"
+
+# The daemon's name (to ensure uniqueness and for stop, restart and status)
+name="mesh-11s_nats_${RADIO_INDEX}"
+
+# The path of the daemon executable
+daemon="/usr/bin/daemon"
+
+# Other configuration parameters for the service
+pidfiles="/var/run"
+user=""
+chroot=""
+chdir=""
+umask=""
+stdout="$LOG_FILE"
+stderr="$LOG_FILE"
+daemon_start_args="--delay=11 --attempts=1 --respawn --ignore-eof"
+
+case "$1" in
+    start)
+        if mkdir $SYNC_LOCK 2>/dev/null; then
+           echo "I have a lock $RADIO_INDEX PID $$"
+        else
+           echo "Instance is already running. Waiting..."
+           # Wait for the lock directory to be removed, indicating the previous instance finished
+           while [ -d "$SYNC_LOCK" ]; do
+             sleep $(( (RANDOM % 5) + 1 ))
+           done
+           mkdir "$SYNC_LOCK"
+           echo "I have a lock $$"
+        fi
+
+        printf 'Starting %s: ' "$DAEMON"
+        if [ "${!_MODE}" == "ap+mesh_scc" ] || [ "${!_MODE}" == "ap+mesh_mcc" ]; then
+          mode=mesh
+        else
+          mode=${!_MODE}
+        fi
+
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "$name is already running."
+        else
+            echo "Starting $name..."
+            "$daemon" $daemon_start_args \
+                --name "$name" --pidfiles "$pidfiles" \
+                ${user:+--user $user} ${chroot:+--chroot $chroot} \
+                ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
+                ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
+                -- $DIR$DAEMON $mode $RADIO_INDEX
+            echo done.
+        fi
+        rmdir "$SYNC_LOCK"
+        ;;
+
+
+    stop)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Stopping $name..."
+            "$daemon" --stop --name "$name" --pidfiles "$pidfiles"
+            echo done.
+            kill -9 "$(ps ax | grep -E "[w]pa_supplicant\-11s_$RADIO_INDEX" | awk {'print $1'})"
+            rm -fr /var/run/wpa_supplicant_"${RADIO_INDEX}" 2>/dev/null
+            ifconfig "${!_WIFI}" down 2>/dev/null
+        else
+            echo "$name is not running."
+        fi
+        ;;
+
+
+    restart|reload)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Stopping $name..."
+            "$daemon" --stop --name "$name" --pidfiles "$pidfiles"
+            echo done.
+            kill -9 "$(ps ax | grep -E "[w]pa_supplicant\-11s_$RADIO_INDEX" | awk {'print $1'})"
+            rm -fr /var/run/wpa_supplicant_"${RADIO_INDEX}" 2>/dev/null
+            ifconfig "${!_WIFI}" down 2>/dev/null
+            sleep 1
+        fi
+
+        if [ "${!_MODE}" == "ap+mesh_scc" ] || [ "${!_MODE}" == "ap+mesh_mcc" ]; then
+          mode=mesh
+        else
+          mode=${!_MODE}
+        fi
+
+        echo "Starting $name..."
+        "$daemon" $daemon_start_args \
+            --name "$name" --pidfiles "$pidfiles" \
+            ${user:+--user $user} ${chroot:+--chroot $chroot} \
+            ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
+            ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
+            -- $DIR$DAEMON $mode $RADIO_INDEX
+        echo done.
+        ;;
+
+
+    status)
+        "$daemon" --running --name "$name" --pidfiles "$pidfiles" --verbose
+        ;;
+
+
+    *)
+        echo "usage: $0 <start|stop|restart|reload|status>" >&2
+        exit 1
+esac
+
+
+exit 0

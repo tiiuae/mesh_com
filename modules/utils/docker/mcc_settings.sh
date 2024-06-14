@@ -1,5 +1,5 @@
 #! /bin/bash
-
+source ./qos_olsrd_conf.sh
 configure()
 {
   if [ -f "/opt/mesh.conf" ]; then
@@ -16,6 +16,8 @@ configure()
       meshVersion=$MSVERSION
       ML=$ML
       bridge=$BRIDGE
+      subnet=$SUBNET
+      wifi_interface=$WIFI_INTERFACE
   else
       mode="mesh"
   fi
@@ -28,7 +30,6 @@ mesh_if_mac="$(ip -brief link | grep "$mesh_if" | awk '{print $3; exit}')"
 ip_random="$(echo "$mesh_if_mac" | cut -b 16-17)"
 br_lan_ip="192.168.1."$((16#$ip_random))
 ifname_ap="$(ifconfig -a | grep "wlan*" | awk -F':' '{ print $1 }')"
-
 
 calculate_wifi_channel()
 {
@@ -48,7 +49,6 @@ calculate_wifi_channel()
         exit 1
     fi
 }
-
 
 # mcc_settings
 echo "Running mcc_settings"
@@ -79,34 +79,52 @@ EOF
 
 # Start AP
 /usr/sbin/hostapd -B /var/run/hostapd.conf -f /tmp/hostapd.log
-# Bridge AP and Mesh
+
+# Bridge AP and Mesh for Batman-avd and routing for QoS-OLSR
 if [ "$algo" = "olsr" ]; then
-      brctl addif br-lan "$mesh_if" "$ifname_ap"
-      iptables -A FORWARD --in-interface "$mesh_if" -j ACCEPT
-      killall olsrd 2>/dev/null
-      (olsrd -i br-lan -d 0)&
-      ifconfig "$mesh_if" mtu 1500
-else
-      ##batman-adv###
-      brctl addif br-lan bat0 "$ifname_ap"
-      iptables -A FORWARD --in-interface bat0 -j ACCEPT
-      ifconfig bat0 mtu 1500
+  brctl addif br-lan "$ifname_ap"
+  IPV6_PREFIX=$( echo fd`dd if=/dev/urandom bs=7 count=1 status=none | xxd -p` | sed 's/\(....\)/\1:/g' )
+  ip addr add $SUBNET.1/24 dev br-lan 
+  ip addr add $IPV6_PREFIX:1/64 dev br-lan
+  create_olsrd_config "$WIFI_INTERFACE" "$SUBNET" 
+  create_olsrd_config6 "$WIFI_INTERFACE" "$IPV6_PREFIX"
+  create_dhcpd_config "$SUBNET"
+  dhcpd -f br-lan
+  create_radvd_config "$IPV6_PREFIX"
+  br_lan_ip="$SUBNET."$((16#$ip_random))	
+  wlp1s0_ip="192.168.11."$((16#$ip_random))
+  ifconfig br-lan up
+  ifconfig "$WIFI_INTERFACE" "$wlp1s0_ip" 
+  #iptables -A FORWARD --in-interface $mesh_if -j ACCEPT
+  #iptables -A FORWARD -i br-lan -o $mesh_if -j ACCEPT 
+  #iptables -A FORWARD -o br-lan -i $mesh_if -j ACCEPT
+  killall olsrd 2>/dev/null	
+  qos-olsrd -i "$WIFI_INTERFACE" -d 0 -f /etc/olsrd/olsrd.conf
+  qos-olsrd -i "$WIFI_INTERFACE" -d 0 -f /etc/olsrd/olsrd6.conf
+  ifconfig "$mesh_if" mtu 1500
+  #Automatically assign the IP address on the brlan for the other interface 
+  dhcpd -cf  /etc/dhcp/dhcpd.conf br-lan
+elif [ "$algo" = "batman-adv" ]; then
+  brctl addif br-lan bat0 "$ifname_ap"
+  iptables -A FORWARD --in-interface bat0 -j ACCEPT
+  # Set mtu back to 1500 to support e2e connectivity
+  # TODO: Investigate this as it should still work with 1460
+  ifconfig bat0 mtu 1500
+  ifconfig br-lan mtu 1500
+  echo "$br_lan_ip"
+  ifconfig br-lan "$br_lan_ip" netmask "255.255.255.0"
+  ifconfig br-lan up
+  echo
+  ifconfig br-lan
+  # Add forwarding rules from AP to $mesh_if interface
+  iptables -P FORWARD ACCEPT
+  #route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
+  #route add -net 192.168.1.0 gw $br_lan_ip netmask 255.255.255.0 dev br-lan
+  #iptables -A FORWARD --in-interface bat0 -j ACCEPT
+  #iptables --table nat -A POSTROUTING --out-interface  "$ifname_ap" -j MASQUERADE
+else 
+  echo You may choose for now either batman-adv or olsr protocol
+  exit 1	
 fi
 
-# Set mtu back to 1500 to support e2e connectivity
-# TODO: Investigate this as it should still work with 1460
-ifconfig br-lan mtu 1500
-
-ifconfig br-lan "$br_lan_ip" netmask "255.255.255.0"
-ifconfig br-lan up
-echo
-ifconfig br-lan
-# Add forwarding rules from AP to $mesh_if interface
-iptables -P FORWARD ACCEPT
-route del -net 192.168.1.0 gw 0.0.0.0 netmask 255.255.255.0 dev br-lan
-route add -net 192.168.1.0 gw "$br_lan_ip" netmask 255.255.255.0 dev br-lan
-iptables --table nat -A POSTROUTING --out-interface "$ifname_ap" -j MASQUERADE
-
-#setup minimalistic Mumble server configuration
-rm /etc/umurmur.conf
-cp /opt/mesh_com/modules/utils/docker/umurmur.conf /etc/umurmur.conf
+radvd -C /etc/radvd.conf -d 0

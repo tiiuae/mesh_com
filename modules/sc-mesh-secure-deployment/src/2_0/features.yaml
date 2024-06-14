@@ -1,0 +1,11 @@
+# By Defualt the features are disabled. To enable please type true
+
+CBMA: false
+PHY: false
+RSS: false
+IDS: false
+jamming: false
+
+# will enable/disable all NATS features + FMO, dependency: jamming
+FMO: false
+

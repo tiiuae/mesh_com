@@ -1,0 +1,124 @@
+import socket
+import ssl
+import sys
+sys.path.insert(0, '../')
+from tools.verification_tools import *
+from tools.custom_logger import CustomLogger
+from tools.utils import mac_to_ipv6, get_mac_addr
+import glob
+import random
+import time
+
+MAX_RETRIES = 5
+MIN_WAIT_TIME = 1  # seconds
+MAX_WAIT_TIME = 3  # seconds
+
+logger_instance = CustomLogger("authClient")
+
+
+
+class AuthClient:
+    CLIENT_TIMEOUT = 60
+
+    def __init__(self, interface, server_mac, server_port, cert_path, ca_path, mua):
+        self.sslServerIP = mac_to_ipv6(server_mac)
+        self.sslServerPort = server_port
+        self.CERT_PATH = cert_path
+        # FIXME: temporary hard coding for key path
+        if "/crypto/ecdsa" in self.CERT_PATH:
+            self.KEY_PATH = "/opt/crypto/ecdsa/birth/filebased"
+        elif "/crypto/rsa" in self.CERT_PATH:
+            self.KEY_PATH = "/opt/crypto/rsa/birth/filebased"
+        self.interface = interface
+        self.secure_client_socket = None
+        self.logger = logger_instance.get_logger()
+        self.ca = ca_path
+        self.mymac = get_mac_addr(self.interface)
+        self.server_mac = server_mac
+        self.mua = mua
+
+    def establish_connection(self):
+        # Create an SSL context
+        context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH,
+                                             cafile=glob.glob(self.ca)[0])
+        context.minimum_version = ssl.TLSVersion.TLSv1_3
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_REQUIRED
+
+        # Uncomment to enable Certificate Revocation List (CRL) check
+        # context.verify_flags = ssl.VERIFY_CRL_CHECK_LEAF
+
+        context.load_cert_chain(
+            certfile=glob.glob(f"{self.CERT_PATH}/MAC/{self.mymac}.crt")[0],
+            keyfile=glob.glob(f"{self.KEY_PATH}/private.key")[0],
+        )
+
+        # Detect if the server IP is IPv4 or IPv6 and create a socket accordingly
+        if ":" in self.sslServerIP:
+            clientSocket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        else:
+            clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        # Make the client socket suitable for secure communication
+        self.secure_client_socket = context.wrap_socket(clientSocket)
+        self.secure_client_socket.settimeout(self.CLIENT_TIMEOUT)
+        try:
+            result = self.connection(self.secure_client_socket)
+            if result['authenticated']:
+                self.mua.auth_pass(secure_client_socket=self.secure_client_socket, client_mac=self.server_mac)
+            else:
+                self.mua.auth_fail(client_mac=self.server_mac)
+        except Exception as e:
+            self.logger.error("Define better this exception.", exc_info=True)
+            self.mua.auth_fail(client_mac=self.server_mac)
+        # finally:
+        #     # Close the socket
+        #     secureClientSocket.close()
+
+    def connection(self, secureClientSocket):
+        result = {
+            'IP': self.sslServerIP,
+            'authenticated': False
+        }
+
+        try:
+            self.to_validate(secureClientSocket, result)
+        except Exception as e:
+            self.logger.error("An error occurred during the connection process.", exc_info=True)
+
+        finally:
+            return result
+
+    def to_validate(self, secureClientSocket, result):
+        # If the IP is a link-local IPv6 address, connect it with the interface index
+        retries = 0
+        while retries < MAX_RETRIES:
+            try:
+                if self.sslServerIP.startswith("fe80"):
+                    secureClientSocket.connect(
+                        (self.sslServerIP, self.sslServerPort, 0, socket.if_nametoindex(self.interface)))
+                else:
+                    secureClientSocket.connect((self.sslServerIP, self.sslServerPort))
+                break  # break out of loop if connection is successful
+            except:
+                retries += 1
+                if retries < MAX_RETRIES:
+                    wait_time = random.uniform(MIN_WAIT_TIME, MAX_WAIT_TIME)
+                    self.logger.info(f"Connection refused. Retrying in {wait_time:.2f} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    self.logger.error("Exceeded maximum retry attempts. Unable to connect to server.")
+                    #raise ServerConnectionRefusedError("Unable to connect to server socket")
+                    return
+
+        server_cert = secureClientSocket.getpeercert(binary_form=True)
+        if not server_cert:
+            self.logger.error("Unable to get the server certificate", exc_info=True)
+            #raise CertificateNoPresentError("Unable to get the server certificate")
+            return
+        store_peer_certificate(peer_cert=server_cert, peer_mac=self.server_mac, logger=self.logger)
+        result['authenticated'] = verify_cert(server_cert, self.ca, self.sslServerIP, self.interface, self.logger)
+
+        # # Safe to proceed with the communication, even if the certificate is not authenticated
+        # msgReceived = secureClientSocket.recv(1024)
+        # logger.info(f"Secure communication received from server: {msgReceived.decode()}")

@@ -1,7 +1,7 @@
 import csv
 import os
 import time
-import sys
+import argparse
 from datetime import datetime
 
 import wifi_info
@@ -44,7 +44,7 @@ class FieldTestLogger:
         self.__logger_output = []
         self.__filename = ""
 
-    def create_csv(self, suffix : str):
+    def create_csv(self, suffix: str):
         now_str = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         self.__filename = f"{now_str}_{suffix}.csv"
         self.__construct_csv_header()
@@ -63,7 +63,7 @@ class FieldTestLogger:
             wr = csv.writer(csvfile, delimiter=',')
             wr.writerow(self.__logger_output)
 
-    def register_logger_function(self, name : str, function):
+    def register_logger_function(self, name: str, function):
         """
         params:
             [name] name of the header row element
@@ -94,12 +94,40 @@ def timestamp() -> str:
 
 
 if __name__ == '__main__':
+    argparse = argparse.ArgumentParser(description='Field Test Logger',
+                                       prog='field_test_logger.py')
+    argparse.add_argument('-u', '--unique', help='Add unique suffix to log file name')
+    argparse.add_argument('-i', '--interface',
+                          help='Specify wifi interface name e.g. wlp1s0 (default: wlp1s0)')
+    argparse.add_argument('-b', '--batman',
+                          help="Specify batman interface name e.g. bat0 (default: bat0)")
+
+    args = argparse.parse_args()
+
+    if args.batman is None:
+        BATMAN_ARG = "bat0"
+    else:
+        BATMAN_ARG = args.batman
+
+    if args.interface is None:
+        INTERFACE_ARG = "wlp1s0"
+    else:
+        INTERFACE_ARG = args.interface
+
+    if args.unique is None or args.unique == "":
+        UNIQUE_ARG = f"_{INTERFACE_ARG}_{BATMAN_ARG}"
+    else:
+        UNIQUE_ARG = f"_{INTERFACE_ARG}_{BATMAN_ARG}_{args.unique}"
+
+    try:
+        with open("/etc/comms_pcb_version", "r") as file_r:
+            PCB_VERSION = file_r.read().strip().split("=")[1]
+    except FileNotFoundError:
+        PCB_VERSION = "unknown"
+
     ftl = FieldTestLogger()
-    wifi_stats = wifi_info.WifiInfo(LOGGING_INTERVAL_SECONDS)
-    info = infoparser.InfoParser()
-    uc_arg = ""
-    if len(sys.argv) > 1:
-        uc_arg = f"_{sys.argv[1]}"
+    wifi_stats = wifi_info.WifiInfo(LOGGING_INTERVAL_SECONDS, INTERFACE_ARG, BATMAN_ARG)
+    info = infoparser.InfoParser(PCB_VERSION)
 
     ftl.register_logger_function("Timestamp", timestamp)
     wifi_stats.update()
@@ -111,6 +139,7 @@ if __name__ == '__main__':
     ftl.register_logger_function("rssi [MAC,dBm;MAC,dBm ...]", wifi_stats.get_rssi)
     ftl.register_logger_function("txpower [dBm]", wifi_stats.get_txpower)
     ftl.register_logger_function("noise [dBm]", wifi_stats.get_noise)
+    ftl.register_logger_function("Halow SNR", wifi_stats.get_snr)
     ftl.register_logger_function("RX MCS [MAC,MCS;MAC,MCS ...]", wifi_stats.get_rx_mcs)
     ftl.register_logger_function("TX MCS [MAC,MCS;MAC,MCS ...]", wifi_stats.get_tx_mcs)
     ftl.register_logger_function("RX throughput [Bits/s]", wifi_stats.get_rx_throughput)
@@ -131,6 +160,17 @@ if __name__ == '__main__':
     ftl.register_logger_function("wifi temp [mC]", info.get_wifi_temp)
     ftl.register_logger_function("tmp100 [mC]", info.get_tmp100)
 
+    ftl.register_logger_function("3V3 mpcie3 voltage [mV]", info.get_mpcie3_voltage)
+    ftl.register_logger_function("3V3 mpcie3 current [mA]", info.get_mpcie3_current)
+    ftl.register_logger_function("3V3 mpcie5 voltage [mV]", info.get_mpcie5_voltage)
+    ftl.register_logger_function("3V3 mpcie5 current [mA]", info.get_mpcie5_current)
+    ftl.register_logger_function("3V3 mpcie7 voltage [mV]", info.get_mpcie7_voltage)
+    ftl.register_logger_function("3V3 mpcie7 current [mA]", info.get_mpcie7_current)
+
+    ftl.register_logger_function("bme280 rel. humidity [m%]", info.get_humidity)
+    ftl.register_logger_function("bme280 pressure [kPa]", info.get_pressure)
+    ftl.register_logger_function("bme280 temperature [mC]", info.get_temperature)
+
     ftl.register_logger_function("battery voltage [uV]", info.get_battery_voltage)
     ftl.register_logger_function("battery current [uA]", info.get_battery_current)
     ftl.register_logger_function("nRF voltage [mV]", info.get_nrf_voltage)
@@ -140,7 +180,12 @@ if __name__ == '__main__':
     ftl.register_logger_function("DCin (XT30) voltage [mV]", info.get_dc_voltage)
     ftl.register_logger_function("DCin (XT30) current [mA]", info.get_dc_current)
 
-    ftl.create_csv(f"{wifi_stats.get_mac_addr()}{uc_arg}")
+    # radio wait loop:
+    while not wifi_stats.is_up(INTERFACE_ARG) or not wifi_stats.is_mesh(INTERFACE_ARG):
+        print(f"{INTERFACE_ARG} is not UP or not in mesh-point mode. Waiting...")
+        time.sleep(2)
+
+    ftl.create_csv(f"{wifi_stats.get_mac_addr()}{UNIQUE_ARG}")
 
     while True:
         start = time.time()

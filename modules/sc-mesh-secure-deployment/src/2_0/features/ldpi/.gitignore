@@ -1,0 +1,28 @@
+# Byte-compiled / optimized files
+*.py[cod]
+__pycache__/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# IDE specific files
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Editor backups
+*~
+
+datasets/
+ldpi/training/samples/
+scripts/

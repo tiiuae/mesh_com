@@ -1,0 +1,80 @@
+#!/bin/sh
+
+# The daemon's name (to ensure uniqueness and for stop, restart and status)
+name="alfred"
+
+# The path of the Python executable
+exec="/usr/bin/alfred"
+network_interface=${2:-wlp1s0}
+command_args="-i $network_interface -m"
+
+[ -x "$exec" ] || exit 0
+
+# The path of the daemon executable
+daemon="/usr/bin/daemon"
+
+# Other configuration parameters for the service
+pidfiles="/var/run"
+user=""
+chroot=""
+chdir=""
+umask=""
+stdout="daemon.info"
+stderr="daemon.err"
+daemon_start_args="--delay=11 --attempts=1 --respawn"
+
+case "$1" in
+    start)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "$name is already running."
+        else
+            echo "Starting $name..."
+            "$daemon" $daemon_start_args \
+                --name "$name" --pidfiles "$pidfiles" \
+                ${user:+--user $user} ${chroot:+--chroot $chroot} \
+                ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
+                ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
+                -- "$exec" $command_args
+            echo done.
+        fi
+        ;;
+
+
+    stop)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Stopping $name..."
+            "$daemon" --stop --name "$name" --pidfiles "$pidfiles"
+            echo done.
+        else
+            echo "$name is not running."
+        fi
+        ;;
+
+
+    restart|reload)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Restarting $name..."
+            "$daemon" --restart --name "$name" --pidfiles "$pidfiles"
+            echo done.
+        else
+            echo "$name is not running."
+            exit 0
+        fi
+        ;;
+
+
+    status)
+        "$daemon" --running --name "$name" --pidfiles "$pidfiles" --verbose
+        ;;
+
+
+    *)
+        echo "usage: $0 <start|stop|restart|reload|status>" >&2
+        exit 1
+esac
+
+
+exit 0

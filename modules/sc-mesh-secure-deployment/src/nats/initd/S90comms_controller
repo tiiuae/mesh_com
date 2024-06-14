@@ -1,0 +1,90 @@
+#!/bin/sh
+
+# The daemon's name (to ensure uniqueness and for stop, restart and status)
+name="comms_controller"
+
+# The path of the Python executable
+python_exec="/usr/bin/python"
+exec="/opt/nats/fmo_agent.py"
+
+KEY_FILE="/etc/ssl/private/comms_auth_private_key.pem"
+CERT_FILE="/etc/ssl/certs/comms_auth_cert.pem"
+
+if [ -e "$KEY_FILE" ] && [ -e "$CERT_FILE" ]; then
+  command_args="-s 0.0.0.0 -p 4222 -k $KEY_FILE -c $CERT_FILE"
+else
+  command_args="-s 0.0.0.0 -p 4222"
+fi
+
+[ -x "$python_exec" ] || exit 0
+[ -f "$exec" ] || exit 0
+
+# The path of the daemon executable
+daemon="/usr/bin/daemon"
+
+LOG_FILE=/opt/comms_controller.log
+# Other configuration parameters for the service
+pidfiles="/var/run"
+user=""
+chroot=""
+chdir=""
+umask=""
+stdout="$LOG_FILE"
+stderr="$LOG_FILE"
+daemon_start_args="--delay=11 --attempts=1 --respawn"
+
+case "$1" in
+    start)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "$name is already running."
+        else
+            echo "Starting $name..."
+            "$daemon" $daemon_start_args \
+                --name "$name" --pidfiles "$pidfiles" \
+                ${user:+--user $user} ${chroot:+--chroot $chroot} \
+                ${chdir:+--chdir $chdir} ${umask:+--umask $umask} \
+                ${stdout:+--stdout $stdout} ${stderr:+--stderr $stderr} \
+                --  "$python_exec" "$exec" $command_args
+            echo done.
+        fi
+        ;;
+
+
+    stop)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Stopping $name..."
+            "$daemon" --stop --name "$name" --pidfiles "$pidfiles"
+            echo done.
+        else
+            echo "$name is not running."
+        fi
+        ;;
+
+
+    restart|reload)
+        if "$daemon" --running --name "$name" --pidfiles "$pidfiles"
+        then
+            echo "Restarting $name..."
+            "$daemon" --restart --name "$name" --pidfiles "$pidfiles"
+            echo done.
+        else
+            echo "$name is not running."
+            exit 0
+        fi
+        ;;
+
+
+    status)
+        "$daemon" --running --name "$name" --pidfiles "$pidfiles" --verbose
+        ;;
+
+
+    *)
+        echo "usage: $0 <start|stop|restart|reload|status>" >&2
+        exit 1
+esac
+
+
+exit 0

@@ -1,18 +1,17 @@
 import subprocess
 import re
 
-EXPECTED_INTERFACE = "wlp1s0"
-
 
 class WifiInfo:
 
-    def __init__(self, interval):
+    def __init__(self, interval, interface, batman_interface):
         self.__neighbors = ""
         self.__originators = ""
         self.__channel = ""
         self.__country = ""
         self.__txpower = ""
         self.__noise = ""
+        self.__snr = "NaN"         # halow specific
         self.__rx_throughput = 0
         self.__tx_throughput = 0
         self.__stations = {}
@@ -20,12 +19,22 @@ class WifiInfo:
         self.__old_rx_bytes = 0
         self.__old_tx_bytes = 0
         self.__interval_seconds = interval
+        self.__interface = interface
+        self.__batman_interface = batman_interface
 
     # ----------------------------------------
 
+    def __run_command(self, cmd):
+        try:
+            with subprocess.Popen(cmd, stdout=subprocess.PIPE) as proc:
+                return proc.communicate()[0].decode().rstrip()
+        except FileNotFoundError:
+            print(f"Error running command: {cmd}")
+            return ""
+
     def get_mac_addr(self):
         try:
-            with open(f"/sys/class/net/{EXPECTED_INTERFACE}/address", 'r') as f:
+            with open(f"/sys/class/net/{self.__interface}/address", 'r') as f:
                 value = f.readline()
                 return value.strip()
         except:
@@ -53,6 +62,9 @@ class WifiInfo:
         out = out[:-1]
 
         return out
+
+    def get_snr(self):
+        return self.__snr
 
     def get_rx_mcs(self):
         out = ""
@@ -92,8 +104,7 @@ class WifiInfo:
 
     def __update_channel_and_twpower(self):
         iw_cmd = ['iw', 'dev']
-        iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
-        out = iw_proc.communicate()[0].decode().rstrip()
+        out = self.__run_command(iw_cmd)
 
         lines = out.split("\n")
 
@@ -111,7 +122,7 @@ class WifiInfo:
                 phyname = line.rstrip()
 
             # Correct interface is wlp1s0
-            if f"Interface {EXPECTED_INTERFACE}" in line:
+            if f"Interface {self.__interface}" in line:
                 interface_ok = True
                 # Capture correct phyname for later usage
                 __phyname = phyname.replace('#', '')
@@ -131,10 +142,8 @@ class WifiInfo:
         self.__txpower = txpower
 
     def __update_mcs_and_rssi(self):
-        iw_cmd = ['iw', 'dev', f"{EXPECTED_INTERFACE}", 'station', 'dump']
-        iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
-        out = iw_proc.communicate()[0].decode().rstrip()
-
+        iw_cmd = ['iw', 'dev', f"{self.__interface}", 'station', 'dump']
+        out = self.__run_command(iw_cmd)
         lines = out.split("\n")
 
         station_mac = "NaN"
@@ -142,29 +151,84 @@ class WifiInfo:
         rx_mcs = "NaN"
         rssi = "NaN"
 
+        # halow station info fetched from cli_app if needed.
+        halow_stations = None
+
         for line in lines:
             if "Station" in line:
                 # Line format is 'Station AA:BB:CC:DD:EE:FF (on wlp1s0)'
                 station_mac = line.split()[1]
 
-            if "signal:" in line and "]" in line:
-                # Line format is 'signal: -21 [-26, -30, -24] dBm'
+            if "signal:" in line:
                 rssi = line[line.index("signal:")+len("signal:"):].strip()
-                rssi = rssi[:rssi.index("]")+1]
+                if "]" in line:
+                    # Line format is 'signal: -21 [-26, -30, -24] dBm'
+                    rssi = rssi[:rssi.index("]")+1]
+                else:
+                    # halow station dump does not contain [].
+                    # rssi: "-63 dBm" --> drop the last 4 characters
+                    rssi = rssi[:-4]
 
             if "tx bitrate:" in line:
                 if "MCS" in line:
                     tx_mcs = line[line.index("MCS")+4:line.index("MCS") + 6]
+                elif self.__interface.startswith("halow"):
+                    if halow_stations is None:
+                        halow_stations = self.get_halow_stations()
+                    try:
+                        tx_mcs = halow_stations.get(station_mac)[0]
+                    except (IndexError, TypeError):
+                        pass
             elif "rx bitrate:" in line:
                 if "MCS" in line:
                     rx_mcs = line[line.index("MCS")+4:line.index("MCS") + 6]
-
+                elif self.__interface.startswith("halow"):
+                    if halow_stations is None:
+                        halow_stations = self.get_halow_stations()
+                    try:
+                        rx_mcs = halow_stations.get(station_mac)[1]
+                    except (IndexError, TypeError):
+                        pass
                 self.__stations[station_mac] = [rssi, tx_mcs, rx_mcs]
 
+    def get_halow_stations(self) -> dict:
+        cli_app_cmd = ['/usr/local/bin/cli_app', 'show', 'sta', '0', 'all']
+        out = self.__run_command(cli_app_cmd)
+        lines = out.split("\n")
+        data_begins = False
+        halow_stations = {}
+        for line in lines:
+            if data_begins:
+                # 0          84:25:3f:9c:0a:e9    2      ASSOC   3.00MBit/s(MCS 7)  0.30MBit/s(MCS 0)
+                cols = line.split()
+                if len(cols) == 8:
+                    halow_stations[cols[1]] = [cols[5][:-1], cols[7][:-1]]
+            if "=======" in line:
+                data_begins = True
+            if "Duplicate" in line:
+                break
+        return halow_stations
+
+    def __update_snr(self):
+        if self.__interface.startswith("halow"):
+            cmd = ["/usr/local/bin/cli_app", "show", "signal"]
+            out = self.__run_command(cmd)
+            mac_snr = {}
+            for line in out.splitlines():
+                splitted = line.split()
+                if "MAC addr" in line and len(splitted) > 3:
+                    mac = splitted[3]
+                if "snr" in line and len(splitted) > 8:
+                    mac_snr[mac] = splitted[9]
+
+            self.__snr = ';'.join([f"{k},{v}" for k, v in mac_snr.items()])
+        else:
+            self.__snr = "NaN"
+
+
     def __update_noise(self):
-        iw_cmd = ['iw', 'dev', f"{EXPECTED_INTERFACE}", 'survey', 'dump']
-        iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
-        out = iw_proc.communicate()[0].decode().rstrip()
+        iw_cmd = ['iw', 'dev', f"{self.__interface}", 'survey', 'dump']
+        out = self.__run_command(iw_cmd)
 
         lines = out.split("\n")
         found_in_use = False
@@ -183,8 +247,7 @@ class WifiInfo:
 
     def __update_country_code(self):
         iw_cmd = ['iw', 'reg', 'get']
-        iw_proc = subprocess.Popen(iw_cmd, stdout=subprocess.PIPE)
-        out = iw_proc.communicate()[0].decode().rstrip()
+        out = self.__run_command(iw_cmd)
 
         lines = out.split("\n")
 
@@ -216,7 +279,7 @@ class WifiInfo:
         tx_bytes = 0
 
         for line in lines:
-            if EXPECTED_INTERFACE in line:
+            if self.__interface in line:
                 parts = line.split()
                 rx_bytes = int(parts[1]) - self.__old_rx_bytes
                 tx_bytes = int(parts[9]) - self.__old_tx_bytes
@@ -232,33 +295,41 @@ class WifiInfo:
         #print(f"tx throughput: {self.tx_throughput}")
 
     def __update_batman_neighbors(self):
-        batctl_cmd = ['batctl', 'n', '-n', '-H']
+        batctl_cmd = ['batctl', 'meshif', self.__batman_interface, 'n']
+        out = self.__run_command(batctl_cmd)
 
-        batctl_proc = subprocess.Popen(batctl_cmd,
-                                       stdout=subprocess.PIPE)
+        routing_algo = None
+        lines = out.split('\n')
+        for line in lines:
+            if "B.A.T.M.A.N. adv" in line:
+                if "BATMAN_V" in line:
+                    routing_algo = "BATMAN_V"
+                    break
 
-        out = batctl_proc.communicate()[0].decode().rstrip()
+        if routing_algo == "BATMAN_V":
+            node_index = 0
+        else:
+            node_index = 1
 
         lines = out.split("\n")
 
         nodes = ""
 
         for line in lines:
+            if "Neighbor" in line or "B.A.T.M.A.N. adv" in line:
+                continue
             node_stats = line.split()
-            if len(node_stats) == 3:
-                nodes = f"{nodes}{node_stats[1]},{node_stats[2][:-1]};"
+            if len(node_stats) >= node_index + 2:
+                nodes = f"{nodes}{node_stats[node_index]},{node_stats[node_index + 1]};"
 
         # Remove semicolon after last node in list
         self.__neighbors = nodes[:-1]
         #print(self.neighbors)
 
     def __update_batman_originators(self):
-        batctl_cmd = ['batctl', 'o', '-n', '-H']
+        batctl_cmd = ['batctl', 'meshif', self.__batman_interface, 'o', '-n', '-H']
+        out = self.__run_command(batctl_cmd)
 
-        batctl_proc = subprocess.Popen(batctl_cmd,
-                                       stdout=subprocess.PIPE)
-
-        out = batctl_proc.communicate()[0].decode().rstrip()
         # Remove parentheses and square brackets
         out = re.sub('[()\\[\\]]', '', out)
 
@@ -275,6 +346,32 @@ class WifiInfo:
 
     # ----------------------------------------
 
+    @staticmethod
+    def is_up(interface):
+        cmd = ['ip', 'link', 'show', 'dev', interface]
+        try:
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
+            # Check if the interface state is not "DOWN"
+            if 'state UP' in output:
+                return True
+            return False
+        except subprocess.CalledProcessError as e:
+            print(f"Error running command: {e}")
+            return False
+
+    @staticmethod
+    def is_mesh(interface):
+        cmd = ['iw', 'dev', interface, 'info']
+        try:
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
+            # Check if the interface type is "mesh point"
+            if 'type mesh point' in output:
+                return True
+            return False
+        except subprocess.CalledProcessError as e:
+            print(f"Error running command: {e}")
+            return False
+
     def update(self):
         """
         Update variables with latest info
@@ -283,6 +380,7 @@ class WifiInfo:
         self.__update_noise()
         self.__update_country_code()
         self.__update_mcs_and_rssi()
+        self.__update_snr()
         self.__update_throughputs()
         self.__update_batman_neighbors()
         self.__update_batman_originators()
