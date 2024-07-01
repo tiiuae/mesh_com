@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 
 NUM_NODES=2
@@ -7,7 +7,7 @@ KEYPAIR_TYPE="rsa"    # Can be ecdsa, eddsa, or rsa
 
 DEFAULT_LOG_LEVEL="INFO"
 
-BASE_MTU="1500"
+CONSTANTS_RC="mess/constants.rc"
 
 CBMA_DEBUG=0
 BAT_DEBUG=0
@@ -26,6 +26,7 @@ LOG_LEVEL="${LOG_LEVEL:-$DEFAULT_LOG_LEVEL}"
 NODES=$(awk -vA=$(printf "%d" \'A) -vc=$NUM_NODES 'BEGIN{while(n<c)printf "%c\n",A + n++}')
 TOTAL_NUM_INTERFACES=0
 
+
 check_dependencies() {
     echo -n "[+] Checking dependencies... "
 
@@ -34,7 +35,7 @@ check_dependencies() {
         exit 1
     fi
 
-    for t in brctl ebtables batctl faketime; do
+    for t in ebtables batctl faketime ip iw sed grep awk modprobe killall; do
         if ! type $t >/dev/null 2>&1; then
             printf "\n[!] FATAL: '$t' is missing!\n"
             exit 1
@@ -84,13 +85,29 @@ wait_until_interface_ready() {
 }
 
 
+get_base_mtu_from_constants_rc() (
+    DIR="${1:-.}"
+
+    . "${DIR}/${CONSTANTS_RC}"
+    echo $HOPEFULLY1500
+)
+
+
+get_mtu_overhead_from_constants_rc() (
+    DIR="${1:-.}"
+
+    . "${DIR}/${CONSTANTS_RC}"
+    echo $((MACSEC_OVERHEAD + BATMAN_OVERHEAD))
+)
+
+
 setup_wlan() {
     I="$1"
     WLAN="$2"
 
     TOTAL_NUM_INTERFACES=$((TOTAL_NUM_INTERFACES + 1))
 
-    PHY="$(echo /sys/class/ieee80211/*/device/net/$WLAN | cut -d / -f 5)"
+    read PHY < "/sys/class/net/$WLAN/phy80211/name"
 
     iw dev "$WLAN" del 2>/dev/null
     iw phy "$PHY" interface add "$WLAN" type mesh
@@ -104,7 +121,8 @@ setup_wlan() {
     # ip netns exec "$I" ip link set dev "$WLAN" name "wlp1s${I}"
     # ip netns exec "$I" iw dev "wlp1s${I}" set type mesh
 
-    ip netns exec "$I" ip link set dev "wlp1s${I}" mtu $((BASE_MTU + 80))
+    ip netns exec "$I" ip link set dev "wlp1s${I}" mtu $((BASE_MTU + MTU_OVERHEAD + \
+                                                                     MTU_OVERHEAD * START_UPPER_BATMAN))
 
     ip netns exec "$I" ip link set dev "wlp1s${I}" address "00:20:91:0${I}:0${I}:0${I}"
     ip netns exec "$I" ip link set dev "wlp1s${I}" up
@@ -124,8 +142,8 @@ setup_eth() {
 
     ip link add "$ETH" type veth peer name "eth${I}" netns "$I"
 
-    # NOTE - No need to set MTU for now
-    ip netns exec "$I" ip link set dev "eth${I}" mtu $((BASE_MTU + 108))
+    ip netns exec "$I" ip link set dev "eth${I}" mtu $((BASE_MTU + MTU_OVERHEAD + \
+                                                                   MTU_OVERHEAD * START_UPPER_BATMAN))
     ip netns exec "$I" ip link set dev "eth${I}" address "00:20:91:${I}0:${I}0:${I}0"
 
     ip link set "$ETH" up
@@ -145,12 +163,14 @@ setup_bat() {
     ip netns exec "$I" ip link add "$BAT" type batadv
 
     if [ -n "$IFACE" ]; then
-        MAC="$(ip netns exec "$I" cat "/sys/class/net/$IFACE/address")"
+        MAC="$(a="$(ip netns exec "$I" cat "/sys/class/net/$IFACE/address")" && \
+                    printf "%02x${a#??}\n" $(( 0x${a%%:*} ^ 0x2 )))"
         ip netns exec "$I" ip link set dev "$BAT" address "$MAC"
     fi
 
-    # NOTE - No need to set MTU for now
-    # ip netns exec "$I" ip link set dev "eth${I}" mtu $((BASE_MTU + 108))
+    if [ $START_UPPER_BATMAN -eq 1 -a "$BAT" = "bat0" ]; then
+        ip netns exec "$I" ip link set dev "$BAT" mtu $(( BASE_MTU + MTU_OVERHEAD )) 2>/dev/null
+    fi
 
     ip netns exec "$I" ip link set "$BAT" up
 
@@ -178,8 +198,12 @@ setup_nodes() {
 
         setup_wlan "$I" "wlan${N}"
         setup_eth "$I" "veth${N}"
+
         setup_bat "$I" "bat0" "wlp1s${I}"
-        setup_bat "$I" "bat1"
+        [ $START_UPPER_BATMAN -eq 0 ] || (
+            MTU_OVERHEAD=0
+            setup_bat "$I" "bat1"
+        )
 
         N=$((N + 1))
     done
@@ -282,7 +306,12 @@ launch_upper_cbma() {
 
 wait_for_batman_neighbors() {
     BAT_IFACE="$1"
-    bat_neighbors=$(( TOTAL_NUM_INTERFACES / NUM_NODES ))
+
+    if [ "$BAT_IFACE" = "bat0" ]; then
+        bat_neighbors=$(( TOTAL_NUM_INTERFACES - TOTAL_NUM_INTERFACES / NUM_NODES ))
+    else
+        bat_neighbors=$(( NUM_NODES - 1 ))
+    fi
 
     for I in $NODES; do
         printf "[+] Waiting for ${BAT_IFACE} neighbors in CBMA node ${I}... ${CBMA_DEBUG:+\n}${BAT_DEBUG:+\n}"
@@ -333,10 +362,15 @@ check_dependencies
     set +e
 
     DIR="$(dirname $0)"
+    BASE_MTU="$(get_base_mtu_from_constants_rc "$DIR")"
+    MTU_OVERHEAD="$(get_mtu_overhead_from_constants_rc "$DIR")"
 
     trap interrupt_handler INT EXIT QUIT KILL
 
     check_max_nest_dev
+
+    . "${0%/*}/${CONSTANTS_RC}"
+    MTU_OVERHEAD=$((MACSEC_OVERHEAD + BATMAN_OVERHEAD))
 
     setup_nodes
 

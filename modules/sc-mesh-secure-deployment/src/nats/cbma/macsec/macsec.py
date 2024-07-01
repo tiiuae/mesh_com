@@ -34,8 +34,6 @@ class MACsec(object):
 
         self.tx_key: str = ''
         self.rx_key: str = ''
-        self.tx_port: int = 0
-        self.rx_port: int = 0
 
 
     def __termination_handler(self) -> None:
@@ -57,14 +55,12 @@ class MACsec(object):
 
     def update_config(self, conn: SecureConnection) -> bool:
         try:
-            keys, ports = get_macsec_config(conn)
+            tx_key, rx_key = get_macsec_config(conn)
             conn.close()
         except Exception as e:
             logger.error(f"Exception when obtaining MACsec configuration: {e}")
             conn.close()
             return False
-        tx_key, rx_key = keys
-        tx_port, rx_port = ports
 
         if self.is_upper:
             self.tx_key = tx_key.hex()[:self.UPPER_KEY_LENGTH]
@@ -72,9 +68,6 @@ class MACsec(object):
         else:
             self.tx_key = tx_key.hex()[:self.LOWER_KEY_LENGTH]
             self.rx_key = rx_key.hex()[:self.LOWER_KEY_LENGTH]
-
-        self.tx_port = tx_port
-        self.rx_port = rx_port
 
         return True
 
