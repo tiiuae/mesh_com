@@ -130,16 +130,6 @@ if __name__ == '__main__':
 
     is_upper = args.upper or any('bat' in i and glob(f"/sys/class/net/*/upper_{i}") for i in interfaces)
 
-    mtu_base = get_mtu_from_constants_rc(exclude=['OVERHEAD'])
-    mtu_overhead = get_mtu_from_constants_rc(exclude=['HOPEFULLY'])
-    if not is_upper:
-        mtu_overhead *= 2
-    mtu = mtu_base + mtu_overhead
-
-    for i in interfaces:
-        if not set_interface_mtu(i, mtu):
-            sys.exit(255)
-
     enable_macsec_encryption = is_upper
     try:
         controller = CBMAController(args.port,
@@ -151,9 +141,23 @@ if __name__ == '__main__':
         logger.error(f"Exception when creating the CBMAController: {e}")
         sys.exit(255)
 
+    mtu_base = get_mtu_from_constants_rc(exclude=['OVERHEAD'])
+    mtu_overhead = get_mtu_from_constants_rc(exclude=['HOPEFULLY'])
+    mtu_batman = mtu_base
+
+    if not is_upper:
+        mtu_batman += mtu_overhead
+        mtu_overhead *= 2
+
+    mtu = mtu_base + mtu_overhead
+    for i in interfaces:
+        if not set_interface_mtu(i, mtu):
+            sys.exit(255)
+
     if not (existing_batman := f"/sys/class/net/{args.batman}" in glob("/sys/class/net/*")):
         mac = get_interface_locally_administered_mac(interfaces[0])
         create_batman(args.batman, mac)
+        set_interface_mtu(args.batman, mtu_batman)
     try:
         logger.info(f"Adding {interfaces} to the CBMAController")
         for iface in interfaces:

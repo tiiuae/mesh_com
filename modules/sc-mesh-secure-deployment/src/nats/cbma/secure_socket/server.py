@@ -32,7 +32,7 @@ class FileBasedSecureSocketServer(FileBasedSecureSocket):
         self.client_ipv6 = client_ipv6
         self.macsec_callback = macsec_callback
 
-        super().__init__(certificates, SSL.TLSv1_2_METHOD)
+        super().__init__(certificates, SSL.SSLv23_METHOD)
 
 
     def __create_socket_connection_object(self) -> FileBasedSecureConnection:
