@@ -10,16 +10,18 @@ from secure_socket.secure_connection import SecureConnection
 from . import logging
 
 
+MACSEC_CONFIG_VERSION = 1
+
 BYTES_LENGTH = 128
-MAX_MACSEC_PORT = 2 ** 16
 
 MAX_RETRIES = 5
 MIN_WAIT_TIME = 0.1  # seconds
 MAX_WAIT_TIME = 1    # seconds
 
-_macsec_ports: list[int] = []
+macsec_struct_format = '!{}sH'.format(BYTES_LENGTH * 2)
+macsec_struct_v1 = Struct(macsec_struct_format)
+# TODO - Add future structs here: macsec_struct_v2 = Struct(macsec_struct_format + 's16')
 
-macsec_struct = Struct('!{}sH'.format(BYTES_LENGTH * 2))
 logger = logging.get_logger()
 
 
@@ -36,23 +38,6 @@ def xor_bytes(local_key: bytes, peer_key: bytes) -> bytes:
         raise ValueError('Key lengths do not match the expected length')
     result = bytes(a ^ b for a, b in zip(local_key, peer_key))
     return result
-
-
-def get_macsec_port() -> int:
-    # TODO - Check ports in used with ip macsec
-    port = random.randint(1, MAX_MACSEC_PORT)
-
-    _macsec_ports.append(port)
-    return port
-
-
-def free_macsec_port(port: int) -> bool:
-    try:
-        _macsec_ports.remove(port)
-        return True
-    except ValueError:
-        logger.error(f"MACsec port {port} wasn't reserved")
-    return False
 
 
 def send_macsec_config(conn: SecureConnection, my_config: bytes) -> int:
@@ -100,29 +85,41 @@ def exchange_macsec_config(conn: SecureConnection, my_config: bytes) -> bytes:
     return peer_config
 
 
-def get_macsec_config(conn: SecureConnection) -> Tuple[Tuple[bytes, bytes], Tuple[int, int]]:
+def get_macsec_config(conn: SecureConnection) -> Tuple[bytes, bytes]:
     peer_ipv6 = conn.get_peer_name()[0]
 
     logger.debug(f"Generating MACsec configuration for {peer_ipv6}")
 
     my_tx_key_bytes = generate_random_bytes()
     my_rx_key_bytes = generate_random_bytes()
-    rx_port = get_macsec_port()
+    my_version = MACSEC_CONFIG_VERSION
 
-    my_packed_config = macsec_struct.pack(my_tx_key_bytes + my_rx_key_bytes, rx_port)
+    my_packed_config = macsec_struct_v1.pack(my_tx_key_bytes + my_rx_key_bytes, my_version)
     peer_packed_config = exchange_macsec_config(conn, my_packed_config)
 
-    peer_config = macsec_struct.unpack(peer_packed_config)
+    peer_packed_config_size = len(peer_packed_config)
+    if peer_packed_config_size < macsec_struct_v1.size:
+        raise ValueError(f"Size of received data from {peer_ipv6} is lower than minimum expected: {peer_packed_config_size} < {macsec_struct_v1.size}")
+
+    peer_config = macsec_struct_v1.unpack(peer_packed_config[:macsec_struct_v1.size])
     peer_rx_key_bytes = peer_config[0][:BYTES_LENGTH]
     peer_tx_key_bytes = peer_config[0][BYTES_LENGTH:]
-    tx_port = peer_config[1]
+    peer_version = peer_config[1]
+
+    config_version = min(my_version, max(peer_version, 1))
+    if my_version != peer_version:
+        # NOTE - Prior to version v1 the version field was a never-used MACsec random port
+        # TODO - This is temporarily here to be used in future newer config versions
+        logger.debug(f"Ignore -> Version mismatch in MACsec configurations => our: {my_version} - theirs: {peer_version} - using: {config_version}")
+
+    # TODO - Add here extraction of future configs fields, for example:
+    # if config_version == 2:
+    #     peer_config = macsec_struct_v2.unpack(peer_packed_config[:macsec_struct_v2.size])
+    #     peer_cipher = peer_config[2]
 
     tx_key = xor_bytes(my_tx_key_bytes, peer_tx_key_bytes)
     rx_key = xor_bytes(my_rx_key_bytes, peer_rx_key_bytes)
 
-    keys = (tx_key, rx_key)
-    ports = (rx_port, tx_port)
-
     logger.debug(f"MACsec configuration for {peer_ipv6} generated successfully")
 
-    return (keys, ports)
+    return tx_key, rx_key
