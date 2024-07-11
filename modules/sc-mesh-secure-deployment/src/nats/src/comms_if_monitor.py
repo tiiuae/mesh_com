@@ -6,8 +6,10 @@ to be used by MDM agent to get network interface statuss.
 # pylint: disable=too-few-public-methods, too-many-nested-blocks
 from typing import Callable, List, Dict
 import subprocess
+import time
 from copy import deepcopy
 from pyroute2 import IPRoute
+from pyroute2.netlink.exceptions import NetlinkDumpInterrupted
 
 DUMMY_INTERFACE_NAME = 'ifdummy0'
 
@@ -24,7 +26,15 @@ class CommsInterfaceMonitor:
         self.__ipr = IPRoute()
 
     def __get_initial_interfaces(self):
-        for link in self.__ipr.get_links():
+        ip_links = []
+        while True:
+            try:
+                ip_links = self.__ipr.get_links()
+                break
+            except NetlinkDumpInterrupted:
+                time.sleep(1)
+
+        for link in ip_links:
             interface_info = self.__get_interface_info(link)
             if interface_info:
                 self.__interfaces.append(interface_info)
