@@ -15,6 +15,7 @@ import fnmatch
 import ipaddress
 import errno
 from pyroute2 import IPRoute, NetlinkError, arp  # type: ignore[import-not-found, import-untyped]
+from pyroute2.netlink.exceptions import NetlinkDumpInterrupted
 
 from src import cbma_paths
 from src.comms_controller import CommsController
@@ -280,7 +281,16 @@ class CBMAAdaptation(object):
     def __get_interfaces(self) -> None:
         interfaces = []
         ip = IPRoute()
-        for link in ip.get_links():
+
+        ip_links = []
+        while True:
+            try:
+                ip_links = ip.get_links()
+                break
+            except NetlinkDumpInterrupted:
+                time.sleep(1)
+
+        for link in ip_links:
             ifname = link.get_attr("IFLA_IFNAME")
             ifstate = link.get_attr("IFLA_OPERSTATE")
             mac_address = link.get_attr("IFLA_ADDRESS")
