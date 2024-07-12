@@ -15,7 +15,6 @@ import fnmatch
 import ipaddress
 import errno
 from pyroute2 import IPRoute, NetlinkError, arp  # type: ignore[import-not-found, import-untyped]
-from pyroute2.netlink.exceptions import NetlinkDumpInterrupted
 
 from src import cbma_paths
 from src.comms_controller import CommsController
@@ -287,7 +286,7 @@ class CBMAAdaptation(object):
             try:
                 ip_links = ip.get_links()
                 break
-            except NetlinkDumpInterrupted:
+            except NetlinkError:
                 time.sleep(1)
 
         for link in ip_links:
@@ -661,9 +660,9 @@ class CBMAAdaptation(object):
         # interface exists and is ready to be added to bridge.
         for interface_name in self.__comms_ctrl.settings.mesh_vif:
             self.logger.debug("mesh_vif: %s", interface_name)
-            timeout = 3
+            timeout = 5
             if interface_name.startswith("halow"):
-                timeout = 10
+                timeout = 20
             self.__wait_for_interface(interface_name, timeout)
 
         for mode in self.__comms_ctrl.settings.mode:

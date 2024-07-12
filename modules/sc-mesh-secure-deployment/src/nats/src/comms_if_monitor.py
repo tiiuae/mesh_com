@@ -8,8 +8,7 @@ from typing import Callable, List, Dict
 import subprocess
 import time
 from copy import deepcopy
-from pyroute2 import IPRoute
-from pyroute2.netlink.exceptions import NetlinkDumpInterrupted
+from pyroute2 import IPRoute, NetlinkError
 
 DUMMY_INTERFACE_NAME = 'ifdummy0'
 
@@ -31,7 +30,7 @@ class CommsInterfaceMonitor:
             try:
                 ip_links = self.__ipr.get_links()
                 break
-            except NetlinkDumpInterrupted:
+            except NetlinkError:
                 time.sleep(1)
 
         for link in ip_links:
