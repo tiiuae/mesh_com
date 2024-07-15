@@ -73,7 +73,9 @@ class CommsInterfaceMonitor:
             try:
                 # Hox! get() is a blocking call thus stop() doesn't
                 # have much affect when execution is blocked within get().
-                messages = self.__ipr.get()
+                # TODO - Using bufsize=-1 is broken in pyroute2 0.7.12
+                # NOTE - bufsize=-1 required to prevent "No buffer space available" error
+                messages = self.__ipr.get(bufsize=-1)
                 for msg in messages:
                     if msg["event"] == "RTM_NEWLINK" or msg["event"] == "RTM_DELLINK":
                         interface_info = self.__get_interface_info(msg)
