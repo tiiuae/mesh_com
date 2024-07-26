@@ -93,10 +93,7 @@ class CCAScan:
                                 print(f"Interference is detected at operating frequency [{self.cur_freq}]")
                                 self.detection = True
                             else:
-                                self.detection = False
-                                
-                            #----- Assign the value to the variable
-                            #----- 
+                                self.detection = False 
                     else:
                         print("Expected cca report format is missing!")
                         
