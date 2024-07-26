@@ -56,6 +56,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          build-args: |
+            "ARTIFACTORY_CLOUD_TOKEN=${{ secrets.ARTIFACTORY_CLOUD_TOKEN }}"
           platforms: linux/amd64,linux/arm64,linux/riscv64
           file: ./modules/mesh_com/Dockerfile
           push: true

@@ -16,6 +16,8 @@ iname=${PACKAGE_NAME:=mesh_com}
 
 iversion=${PACKAGE_VERSION:=latest}
 
+artifactory_cloud_token=${ARTIFACTORY_CLOUD_TOKEN:?ARTIFACTORY_CLOUD_TOKEN is not set}
+
 docker build \
   --build-arg UID=$(id -u) \
   --build-arg GID=$(id -g) \
