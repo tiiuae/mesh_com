@@ -1,73 +1,43 @@
 #!/bin/bash
 source /var/run/mptcp.conf
+
 ### MPTCP  ###
+_slaac=$(grep "SLAAC" /var/run/mptcp.conf | awk -F '=' '{print $2}')
+_slaac_interfaces=$(echo $_slaac | tr ' ' '\n' | sort | uniq | tr '\n' ' ' | sed -e 's/[[:space:]]*$//')
+
 iface_list=$(grep 'INTERFACE' /var/run/mptcp.conf)
-i=1;
+i=0;
 while read n;
 do
    iface=$(echo $n | awk -F "=" 'NR==1{print $2}');
-   echo $iface;
-   IP=$(ifconfig $iface | grep 'inet' | cut -d: -f2 | awk '{print $2}')
-   NM=$(ifconfig $iface | grep 'netmask' | cut -d: -f2 | awk '{print $4}')
-   IFS=. read -r i1 i2 i3 i4 <<< $IP
-   IFS=. read -r m1 m2 m3 m4 <<< $NM
-   NP=$(printf "%d.%d.%d.%d\n" "$((i1 & m1))" "$((i2 & m2))" "$((i3 & m3))" "$((i4 & m4))")
-   MASK=$(ip addr show $iface | grep 'inet'| cut -d: -f2 | awk '{print $2}' | awk -F "/" '{print $2}')
-
-   ip rule add from $IP table $i
-   ip route add $NP/$MASK dev $iface scope link table $i
-
-   ip mptcp endpoint add $IP signal
-
-   if  [[ $iface == $BRIDGE_IFACE ]]; then
-   	  BR_NP=$NP
-      BR_MASK=$MASK
+   echo "iface: $iface"
+   if [ "$iface" == "wlp2s0" ]; then
+       IPv6_prefix="fd1d::"
+   elif [ "$iface" == "halow1" ]; then
+        IPv6_prefix="fdbd::"
    fi
-   i=$(($i+1));
+   
+   echo "_slaac_interfaces: $_slaac_interfaces"
+   for _slaac_interface in $_slaac_interfaces; do
+   	MAC_ADDRESS_FILE="/sys/class/net/$_slaac_interface/address"
+        MAC_ADDRESS=`cat "$MAC_ADDRESS_FILE"`
+        echo "MAC_ADDRESS: $MAC_ADDRESS"
+        # Split the MAC address into its components
+	mac_parts=(${MAC_ADDRESS//:/ })
+	# Invert the 7th bit of the first byte
+	first_byte=$(printf "%02x" $((0x${mac_parts[0]} ^ 0x02)))
+	# Assemble the EUI-64 address
+	eui64="${first_byte}${mac_parts[1]}:${mac_parts[2]}ff:fe${mac_parts[3]}:${mac_parts[4]}${mac_parts[5]}"
+        # Combine the IPv6 prefix with the EUI-64 address
+	IPv6_address="${IPv6_prefix}${eui64}/64"
+        echo "IPv6_address:$IPv6_address"
+        i=$(($i+1));
+        ip -6 addr add $IPv6_address dev $iface
+        ip -6 rule add from $IPv6_address table $i
+        ip route add $IPv6_prefix/64 dev $iface scope link table $i
+        ip mptcp endpoint add $IPv6_prefix$eui64 signal
+  done  
 done <<< "$iface_list"
-ip mptcp limits set subflow $SUBFLOWS add_addr_accepted $SUBFLOWS
 
-BR_PHY=$(brctl show | grep $BRIDGE_IFACE | awk -F " " '{printf $4}')
-iptables -A FORWARD ! -p tcp -m physdev --physdev-in $BR_PHY -j ACCEPT
-
-### PROXY ###
-###iptables ss-redir rules###
-iptables -t nat -N SSREDIR
-
-iptables -t nat -A PREROUTING -p tcp -j SSREDIR
-
-iptables -t nat -A SSREDIR -p tcp -d 127.0.0.0/8 -j RETURN
-iptables -t nat -A SSREDIR -p tcp -d 10.0.0.0/8 -j RETURN
-
-iptables -t nat -A SSREDIR -p tcp  -s $BR_NP/$BR_MASK -j REDIRECT --to-ports 1080
-
-##currently the server ips (end system's ip) are hardcoded here. However with SLAAC this should be fixed
-cat <<EOF > /var/run/ss-redir.json
-{
-    "server" : ["192.168.2.20"],
-    "server_port" : 8388,
-    "local_address" : "0.0.0.0",
-    "local_port" : 1080,
-    "password" : "mptcp",
-    "timeout" : 300,
-    "method" : "aes-256-cfb",
-}
-EOF
-
-cat <<EOF > /var/run/ss-server.json
-{
-    "server" : ["[::0]", "0.0.0.0"],
-    "server_port" : 8388,
-    "local_port" : 1080,
-    "password" : "mptcp",
-    "timeout" : 300,
-    "method" : "aes-256-cfb",
-}
-EOF
-mptcpize run ss-redir -c /var/run/ss-redir.json &
-mptcpize run ss-server -c /var/run/ss-server.json &
-
-
-
-
-
+ip mptcp limits set subflow $i add_addr_accepted $i
+echo "SUBFLOWS=$i" >> /var/run/mptcp.conf
