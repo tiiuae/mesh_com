@@ -13,7 +13,7 @@ logger = get_logger()
 
 class FileBasedSecureContext(SecureContextInterface):
     CTX_OPTIONS: int = SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3 | SSL.OP_NO_TLSv1 | \
-                       SSL.OP_NO_TLSv1_1
+                       SSL.OP_NO_TLSv1_1 | SSL.OP_NO_TLSv1_2
     SSL_SESSION_TIMEOUT: int = 60  # seconds
 
     def __init__(self,
