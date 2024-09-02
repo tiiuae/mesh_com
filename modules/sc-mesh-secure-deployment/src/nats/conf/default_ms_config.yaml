@@ -19,7 +19,6 @@ CBMA:
     - vlan_black
     - vlan_red
   white_interfaces: 
-    - halow1
   red_interfaces:
     - wlan1
     - usb0
