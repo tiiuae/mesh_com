@@ -1,4 +1,5 @@
 from traffic_monitor import TrafficMonitor
+from routing_manager import *
 import time
 import logging
 
@@ -12,7 +13,7 @@ class MonitorController:
         self.transition_in_progress = False  # Flag to prevent multiple transitions
 
     def start_always_on_monitoring(self):
-        logging.info(f"Starting traffic monitoring on always-on radio {self.always_on_radio}...")
+        logging.info(f"Starting traffic monitoring on always-on radio {self.always_on_radio}!")
         self.monitor = TrafficMonitor(
             iface=self.always_on_radio,
             monitor_interval=self.config['traffic_monitor']['monitor_interval'],
@@ -38,15 +39,20 @@ class MonitorController:
 
     def handle_high_traffic(self):
         # Stop monitoring on the always-on radio
-        logging.info(f"Stopping the traffic monitor on {self.monitor.iface}...")
+        logging.info(f"Stopping the traffic monitor on {self.monitor.iface}!")
         self.monitor.stop_monitoring()
 
-        logging.warning(f"Starting {self.on_demand_radio} mesh to handle high traffic!")
+        logging.warning(f"Starting {self.on_demand_radio} mesh to handle high traffic...")
         # Start the on-demand mesh
         self.multi_radio_manager.start_mesh(self.on_demand_radio, 1)
 
-        # Remove if any Throughput override is applied.
+        # Send message to CBMA to enable security interface & attach to batman-adv for routing
         # TBD
+        # For timebeing, attach mesh interface directly to bat0
+        add_interface_to_batman("bat0", self.on_demand_radio)
+
+        # Remove if any Throughput override is applied.
+        restore_batman_routing(self.on_demand_radio)
 
         # Wait for 60 seconds to avoid frequent enable/disable of on-demand mesh
         time.sleep(60)
@@ -72,14 +78,15 @@ class MonitorController:
 
     def handle_low_traffic(self):
         # Stop the on-demand monitoring
-        logging.info(f"Stopping the traffic monitor on {self.monitor.iface}...")
+        logging.info(f"Stopping the traffic monitor on {self.monitor.iface}!")
         self.monitor.stop_monitoring()
 
         # Apply Throughput override using Routing Manager so that switching of traffic will be smooth
-        # logging.info(f"Applying Throughput override for {self.monitor.iface} iface!")
-        # TBD
+        logging.info(f"Applying Throughput override for {self.on_demand_radio} iface!")
+        override_batman_routing(self.on_demand_radio)
+
         # Wait for 30 seconds, complete override takes time due to EWMA (Exponentially weighted moving average)
-        # time.sleep(30) 
+        time.sleep(30) 
 
         # Disable the on-demand mesh
         logging.warning(f"Stopping on-demand radio {self.on_demand_radio} mesh!")

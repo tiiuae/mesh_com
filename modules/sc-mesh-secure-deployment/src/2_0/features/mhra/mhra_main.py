@@ -63,6 +63,10 @@ def main():
     # Disable mesh mode on the on-demand radio if it is enabled
     if multi_radio_manager.is_mesh_mode_enabled(on_demand_radio, 1):
         logging.info(f"Mesh mode is enabled for {on_demand_radio}. Disabling it...")
+        
+        # TBD
+        # Routing Override may be required if this device joined ongoing mesh and traffic is on-going
+
         multi_radio_manager.stop_mesh(on_demand_radio, 1)
         logging.info(f"Mesh mode disabled for {on_demand_radio}.")
 
