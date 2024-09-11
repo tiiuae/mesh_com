@@ -179,6 +179,7 @@ EOF
       # /usr/local/bin/cli_app set txpwr fixed 23
       /usr/local/bin/cli_app set gi long
       /usr/local/bin/cli_app set support_ch_width 1
+      /usr/local/bin/cli_app set mesh_rssi_threshold -105
 
       # Batman parameters
       if [ "$routing_algo" == "batman-adv" ]; then
