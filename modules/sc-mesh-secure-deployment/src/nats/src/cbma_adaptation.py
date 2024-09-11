@@ -90,9 +90,9 @@ class CBMAAdaptation(object):
         self.__create_vlan_interfaces()
 
         if self.__cbma_config:
-            white_interfaces = self.__cbma_config.get("white_interfaces", [])
-            red_interfaces = self.__cbma_config.get("red_interfaces", [])
-            exclude_interfaces = self.__cbma_config.get("exclude_interfaces", [])
+            white_interfaces = self.__cbma_config.get("white_interfaces") or []
+            red_interfaces = self.__cbma_config.get("red_interfaces") or []
+            exclude_interfaces = self.__cbma_config.get("exclude_interfaces") or []
             self.logger.info(f"White interfaces config: {white_interfaces}")
             self.logger.info(f"Red interfaces config: {red_interfaces}")
             self.logger.info(f"Exclude interfaces config: {exclude_interfaces}")
