@@ -2,6 +2,7 @@ from traffic_monitor import TrafficMonitor
 from routing_manager import *
 import time
 import logging
+from mhra_comms import send_enable_on_demand_radio
 
 class MonitorController:
     def __init__(self, multi_radio_manager, config, always_on_radio, on_demand_radio):
@@ -45,6 +46,9 @@ class MonitorController:
         logging.warning(f"Starting {self.on_demand_radio} mesh to handle high traffic...")
         # Start the on-demand mesh
         self.multi_radio_manager.start_mesh(self.on_demand_radio, 1)
+
+        # Request other nodes also enable the on-demand mesh
+        send_enable_on_demand_radio() 
 
         # Send message to CBMA to enable security interface & attach to batman-adv for routing
         # TBD

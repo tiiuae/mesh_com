@@ -1,5 +1,6 @@
 from multiradio_manager import MultiRadioManager
 from monitor_controller import MonitorController
+from mhra_comms import start_mhra_comms_server
 from config import create_default_config, load_config
 import time
 import logging
@@ -69,6 +70,9 @@ def main():
 
         multi_radio_manager.stop_mesh(on_demand_radio, 1)
         logging.info(f"Mesh mode disabled for {on_demand_radio}.")
+
+    # Start MHRA Communication Server (Runs on Seperate thread)
+    start_mhra_comms_server()
 
     # Initialize and start monitoring using MonitorController
     monitor_controller = MonitorController(multi_radio_manager, config, always_on_radio, on_demand_radio)
