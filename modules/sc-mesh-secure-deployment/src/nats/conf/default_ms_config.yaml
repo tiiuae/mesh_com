@@ -18,8 +18,10 @@ CBMA:
     - osf0
     - vlan_black
     - vlan_red
+    - sap0
+    - sta0
+    - wfd0
   white_interfaces: 
-    - halow1
   red_interfaces:
     - wlan1
     - usb0

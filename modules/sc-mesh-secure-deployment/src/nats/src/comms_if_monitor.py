@@ -6,8 +6,9 @@ to be used by MDM agent to get network interface statuss.
 # pylint: disable=too-few-public-methods, too-many-nested-blocks
 from typing import Callable, List, Dict
 import subprocess
+import time
 from copy import deepcopy
-from pyroute2 import IPRoute
+from pyroute2 import IPRoute, NetlinkError
 
 DUMMY_INTERFACE_NAME = 'ifdummy0'
 
@@ -24,7 +25,15 @@ class CommsInterfaceMonitor:
         self.__ipr = IPRoute()
 
     def __get_initial_interfaces(self):
-        for link in self.__ipr.get_links():
+        ip_links = []
+        while True:
+            try:
+                ip_links = self.__ipr.get_links()
+                break
+            except NetlinkError:
+                time.sleep(1)
+
+        for link in ip_links:
             interface_info = self.__get_interface_info(link)
             if interface_info:
                 self.__interfaces.append(interface_info)
@@ -64,7 +73,9 @@ class CommsInterfaceMonitor:
             try:
                 # Hox! get() is a blocking call thus stop() doesn't
                 # have much affect when execution is blocked within get().
-                messages = self.__ipr.get()
+                # TODO - Using bufsize=-1 is broken in pyroute2 0.7.12
+                # NOTE - bufsize=-1 required to prevent "No buffer space available" error
+                messages = self.__ipr.get(bufsize=-1)
                 for msg in messages:
                     if msg["event"] == "RTM_NEWLINK" or msg["event"] == "RTM_DELLINK":
                         interface_info = self.__get_interface_info(msg)

@@ -24,6 +24,7 @@ jobs:
           ROS: 1
           ROS_DISTRO: ${{ matrix.ros2_distro }}
           PACKAGE_NAME: mesh_com
+          ARTIFACTORY_CLOUD_TOKEN: ${{ secrets.ARTIFACTORY_CLOUD_TOKEN }}
         run: |
           set -eux
           mkdir bin
@@ -31,13 +32,14 @@ jobs:
           ./build.sh ../bin/
           popd
 
-      - uses: jfrog/setup-jfrog-cli@v2
+      - uses: jfrog/setup-jfrog-cli@v4
         env:
-          JF_ARTIFACTORY_1: ${{ secrets.ARTIFACTORY_CLOUD_TOKEN }}
+          JF_URL: https://artifactory.ssrcdevops.tii.ae
+          JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_CLOUD_TOKEN }}
 
       - name: Upload to Artifactory
         env:
-          ARTIFACTORY_REPO: ssrc-deb-public-local
+          ARTIFACTORY_REPO: debian-public-local
           DISTRIBUTION: focal
           COMPONENT: fog-sw
           ARCHITECTURE: amd64

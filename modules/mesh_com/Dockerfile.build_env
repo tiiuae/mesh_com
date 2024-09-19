@@ -9,25 +9,24 @@ ARG COMMIT_ID
 ARG GIT_VER
 ARG PACKAGE_NAME
 # Install build dependencies
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    curl \
-    python3-bloom \
-    fakeroot \
-    dh-make \
-    dh-python \
-    python3-pytest \
-    ros-${ROS_DISTRO}-ament-flake8 \
-    ros-${ROS_DISTRO}-ament-pep257 \
-    batctl \
-    alfred \
+RUN apt update \
+    && apt install -y --no-install-recommends \
+       curl \
+       python3-bloom \
+       fakeroot \
+       dh-make \
+       dh-python \
+       python3-pytest \
+       ros-${ROS_DISTRO}-ament-flake8 \
+       ros-${ROS_DISTRO}-ament-pep257 \
+       batctl \
+       alfred \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g $GID builder && \
     useradd -m -u $UID -g $GID -g builder builder && \
     usermod -aG sudo builder && \
     echo 'builder ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-
-RUN echo "deb [trusted=yes] https://ssrc.jfrog.io/artifactory/ssrc-deb-public-local focal fog-sw" >> /etc/apt/sources.list
 
 WORKDIR /$PACKAGE_NAME
 

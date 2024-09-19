@@ -90,9 +90,9 @@ class CBMAAdaptation(object):
         self.__create_vlan_interfaces()
 
         if self.__cbma_config:
-            white_interfaces = self.__cbma_config.get("white_interfaces", [])
-            red_interfaces = self.__cbma_config.get("red_interfaces", [])
-            exclude_interfaces = self.__cbma_config.get("exclude_interfaces", [])
+            white_interfaces = self.__cbma_config.get("white_interfaces") or []
+            red_interfaces = self.__cbma_config.get("red_interfaces") or []
+            exclude_interfaces = self.__cbma_config.get("exclude_interfaces") or []
             self.logger.info(f"White interfaces config: {white_interfaces}")
             self.logger.info(f"Red interfaces config: {red_interfaces}")
             self.logger.info(f"Exclude interfaces config: {exclude_interfaces}")
@@ -280,7 +280,16 @@ class CBMAAdaptation(object):
     def __get_interfaces(self) -> None:
         interfaces = []
         ip = IPRoute()
-        for link in ip.get_links():
+
+        ip_links = []
+        while True:
+            try:
+                ip_links = ip.get_links()
+                break
+            except NetlinkError:
+                time.sleep(1)
+
+        for link in ip_links:
             ifname = link.get_attr("IFLA_IFNAME")
             ifstate = link.get_attr("IFLA_OPERSTATE")
             mac_address = link.get_attr("IFLA_ADDRESS")
@@ -651,9 +660,9 @@ class CBMAAdaptation(object):
         # interface exists and is ready to be added to bridge.
         for interface_name in self.__comms_ctrl.settings.mesh_vif:
             self.logger.debug("mesh_vif: %s", interface_name)
-            timeout = 3
+            timeout = 5
             if interface_name.startswith("halow"):
-                timeout = 10
+                timeout = 20
             self.__wait_for_interface(interface_name, timeout)
 
         for mode in self.__comms_ctrl.settings.mode:
