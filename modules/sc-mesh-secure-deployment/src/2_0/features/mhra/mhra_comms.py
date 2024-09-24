@@ -9,10 +9,9 @@ import time
 MULTICAST_GROUP = 'ff05::1'  # IPv6 multicast address for entire network
 MULTICAST_PORT = 5765
 
-def mhra_comms_server():
+def start_mhra_comms_server():
     """
-    UDP server listening for multicast messages.
-    Runs in a separate thread.
+    Setup the MHRA UDP server socket.
     """
     # Create a socket for IPv6 UDP communication
     sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -33,28 +32,43 @@ def mhra_comms_server():
 
     logging.info(f"Server listening on {MULTICAST_GROUP}:{MULTICAST_PORT}")
 
-    while True:
+    return sock
+
+
+def check_mhra_comms_server(sock, monitor_controller):
+    """
+    UDP server to handle multicast messages within the main thread.
+    
+    Parameters:
+    sock (socket): The UDP socket for communication.
+    monitor_controller (MonitorController): The instance of MonitorController to manage radio state.
+    """
+    try:
         # Receive data from the socket
         data, address = sock.recvfrom(1024)
         message = data.decode('utf-8')
 
-        # Log the source IPv6 address
+        # Log the source IPv6 address and message
         logging.info(f"Received message from {address[0]}")
         logging.info(f"Message: {message}")
-        
+
         # Parse the JSON message
         parsed_message = json.loads(message)
         logging.info(f"Parsed Message: {parsed_message}")
 
-
-def start_mhra_comms_server():
-    """
-    Start the MHRA UDP server in a separate thread.
-    """
-    server_thread = threading.Thread(target=mhra_comms_server)
-    server_thread.daemon = True  # Daemonize the thread to exit with the main program
-    server_thread.start()
-    logging.info("MHRA communication server thread started.")
+        # Check if the message contains the command to enable the on-demand radio
+        if parsed_message.get("msg_type") == "COMMAND" and parsed_message.get("payload", {}).get("command") == "ENABLE_ON_DEMAND_RADIO":
+            logging.info("Received command to enable on-demand radio.")
+            
+            # Call the on_demand_radio_enable_req function from the MonitorController
+            monitor_controller.on_demand_radio_enable_req()
+        else:
+            logging.info("Received message is not an ENABLE_ON_DEMAND_RADIO command.")
+    
+    except json.JSONDecodeError as e:
+        logging.error(f"Failed to decode JSON message: {str(e)}")
+    except Exception as e:
+        logging.error(f"Error processing the received message: {str(e)}")
 
 
 def mhra_comms_client(message, ttl_value=1):

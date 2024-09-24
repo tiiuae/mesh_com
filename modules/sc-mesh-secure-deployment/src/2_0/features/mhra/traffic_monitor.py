@@ -65,22 +65,19 @@ class TrafficMonitor:
         self.prev_rx_bytes = self._get_rx_bytes()
         self.prev_tx_errors = self._get_tx_errors()
         
-        while self.monitoring:
-            time.sleep(self.monitor_interval)
-            self._monitor_traffic()
+    def check_monitoring(self):
+        """Check the traffic stats periodically."""
+        self._monitor_traffic()
+        self.report()
+        # Trigger traffic threshold callback if thresholds are crossed
+        if (self.tx_rate > self.threshold_high or self.tx_rate < self.threshold_low or
+            self.rx_rate > self.threshold_high or self.rx_rate < self.threshold_low):
+            if self.traffic_threshold_cb:
+                self.traffic_threshold_cb(self.tx_rate, self.rx_rate)
 
-            self.report()  # For debugging purposes
-
-            # Trigger traffic threshold callback if thresholds are crossed
-            if (self.tx_rate > self.threshold_high or self.tx_rate < self.threshold_low or
-                self.rx_rate > self.threshold_high or self.rx_rate < self.threshold_low):
-                if self.traffic_threshold_cb:
-                    self.traffic_threshold_cb(self.tx_rate, self.rx_rate)
-
-            # Trigger error callback if error threshold is crossed
-            if self.tx_errors >= self.error_threshold:
-                if self.error_cb:
-                    self.error_cb(self.tx_errors)
+        if self.tx_errors >= self.error_threshold:
+            if self.error_cb:
+                self.error_cb(self.tx_errors)
 
     def stop_monitoring(self):
         """Stop the traffic monitoring process."""

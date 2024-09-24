@@ -1,9 +1,10 @@
 from multiradio_manager import MultiRadioManager
 from monitor_controller import MonitorController
-from mhra_comms import start_mhra_comms_server
+from mhra_comms import start_mhra_comms_server, check_mhra_comms_server
 from config import create_default_config, load_config
 import time
 import logging
+import select
 
 # Configure logging
 logging.basicConfig(
@@ -71,12 +72,39 @@ def main():
         multi_radio_manager.stop_mesh(on_demand_radio, 1)
         logging.info(f"Mesh mode disabled for {on_demand_radio}.")
 
-    # Start MHRA Communication Server (Runs on Seperate thread)
-    start_mhra_comms_server()
+    # Start MHRA Communication Server
+    server_socket = start_mhra_comms_server()
 
     # Initialize and start monitoring using MonitorController
     monitor_controller = MonitorController(multi_radio_manager, config, always_on_radio, on_demand_radio)
-    monitor_controller.start_always_on_monitoring()
+    monitor_controller.start_always_on_monitoring() 
+    
+    # start_always_on_monitoring is non-blocking call now, main is responsbile to call check_monitoring periodically
+
+    last_monitor_check = time.time()
+
+    # Main event loop
+    while True:
+        current_time = time.time()
+
+        # Calculate how much time is left for the next monitoring check or other timed events
+        time_until_next_monitor = max(0, monitor_controller.monitor.monitor_interval - (current_time - last_monitor_check))
+
+        # Prepare for select: we are only watching the server socket
+        sockets_to_watch = [server_socket]
+
+        # Use select to wait for either socket activity or the next time-based event
+        readable, _, _ = select.select(sockets_to_watch, [], [], time_until_next_monitor)
+
+        # Handle incoming UDP messages
+        if readable:
+            check_mhra_comms_server(server_socket, monitor_controller)
+            # we may need to reset last_monitor_check time if on-demand radio enabled
+
+        # If it's time to run the traffic monitoring
+        if current_time - last_monitor_check >= monitor_controller.monitor.monitor_interval:
+            monitor_controller.check_monitoring()
+            last_monitor_check = current_time
 
 if __name__ == "__main__":
     main()

@@ -16,7 +16,8 @@ default_config = {
         'monitor_interval': 10,
         'threshold_high': 400,
         'threshold_low': 100,
-        'traffic_error_threshold': 10
+        'traffic_error_threshold': 10,
+        'dwell_time': 60,
     }
 }
 
