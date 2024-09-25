@@ -172,6 +172,10 @@ class CommsServiceMonitor:
                           "ipv6_addresses": info._ipv6_addresses,
                           "port": info.port,"status": service_available}
 
+                if service_available and info.port == None:
+                    self.__logger.error("Service is available but port in mDNS response is None, will keep listening for more packets")
+                    return
+
                 self.service_callback(**kwargs)
 
 
