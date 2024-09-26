@@ -10,14 +10,15 @@ from enum import auto, Enum
 from typing import List, Tuple, Dict
 from netstring import encode, decode
 from itertools import islice
+import subprocess
 
-#from options import Options
-#from util import get_mesh_freq, map_freq_to_channel
+from config import Config
+from rmacs_setup import get_mesh_freq
 from logging_config import logger
 
 action_to_id = {
     "bad_channel_quality_index": 0,
-    "channel_report": 1,
+    "channel_quality_report": 1,
     "operating_frequency": 2,
     "switch_frequency": 3
 }
@@ -36,34 +37,34 @@ class ServerState(Enum):
 
 class ServerEvent(Enum):
     BAD_CHANNEL_QUALITY_INDEX = auto()
-    CHANNEL_QUALITY_REPORT = auto()
+    #CHANNEL_QUALITY_REPORT = auto()
     NEW_TARGET_FREQUENCY = auto()
     CHANNEL_SWITCH_REQUEST = auto()
     CHANNEL_SWITCH_REQUEST_SENT = auto()
     TARGET_FREQ_EQ_CURRENT = auto()
     PERIODIC_OPERATING_FREQ_BROADCAST = auto()
     BROADCAST_COMPLETE = auto()
-    CHANNEL_QUALITY_UPDATE_COMPLETE = auto()
+    #CHANNEL_QUALITY_UPDATE_COMPLETE = auto()
     FREQUENCY_HOPPING_COMPLETE = auto()
     RESET_COMPLETE = auto()
 
 
 class RMACSServerFSM:
     def __init__(self, server):
-        self.args = Options()
+        self.args = Config()
         self.state: ServerState = ServerState.IDLE  # Set the initial state
         self.server: RMACSServer = server  # Reference to the server object
 
         # Transition table
         self.transitions = {
             (ServerState.IDLE, ServerEvent.BAD_CHANNEL_QUALITY_INDEX): (ServerState.ADAPTIVE_FREQUENCY_HOPPING, self.server.adaptive_frequency_hopping),
-            (ServerState.IDLE, ServerEvent.CHANNEL_QUALITY_REPORT): (ServerState.UPDATE_FREQ_HOPPING_SEQUENCE, self.server.broadcast_target_freq),
+            #(ServerState.IDLE, ServerEvent.CHANNEL_QUALITY_REPORT): (ServerState.UPDATE_FREQ_HOPPING_SEQUENCE, self.server.broadcast_target_freq),
             (ServerState.IDLE, ServerEvent.PERIODIC_OPERATING_FREQ_BROADCAST): (ServerState.BROADCAST_OPERATING_FREQ, self.server.broadcast_target_freq),
-            (ServerState.UPDATE_FREQ_HOPPING_SEQUENCE, ServerEvent.CHANNEL_QUALITY_UPDATE_COMPLETE): (ServerState.IDLE, None),
+            #(ServerState.UPDATE_FREQ_HOPPING_SEQUENCE, ServerEvent.CHANNEL_QUALITY_UPDATE_COMPLETE): (ServerState.IDLE, None),
             (ServerState.BROADCAST_OPERATING_FREQ, ServerEvent.BROADCAST_COMPLETE): (ServerState.IDLE, None),
             (ServerState.ADAPTIVE_FREQUENCY_HOPPING, ServerEvent.CHANNEL_SWITCH_REQUEST): (ServerState.SEND_CHANNEL_SWITCH_REQUEST, None),
-            (ServerState.ADAPTIVE_FREQUENCY_HOPPING, ServerEvent.FREQUENCY_HOPPING_COMPLETE): (ServerState.RESET_CLIENT_MESSAGES, None),
             (ServerState.SEND_CHANNEL_SWITCH_REQUEST, ServerEvent.CHANNEL_SWITCH_REQUEST_SENT): (ServerState.ADAPTIVE_FREQUENCY_HOPPING, None),
+            (ServerState.ADAPTIVE_FREQUENCY_HOPPING, ServerEvent.FREQUENCY_HOPPING_COMPLETE): (ServerState.RESET_CLIENT_MESSAGES, None),
             (ServerState.RESET_CLIENT_MESSAGES, ServerEvent.RESET_COMPLETE): (ServerState.IDLE, None),
         }
 
@@ -99,12 +100,15 @@ class RMACSServer:
         self.port = port
         self.serversocket = None
         self.clients: List[RMACSClientTwin] = []
-        self.args = Options()
+        self.args = Config()
         logger.info("Initialized server")
-        self.hopping_frequencies = []
-        self.seq_limit = 3
-        self.hop_interval = 0
-        self.stability_threshold = 0
+        self.nw_interface = self.args.nw_interface
+        self.freq_quality_report = self.args.freq_quality_report
+        self.seq_limit = self.args.seq_limit
+        self.hop_interval = self.args.hop_interval
+        self.stability_threshold = self.args.stability_threshold
+        
+
         #frequencies: list[tuple], seq_limit: int, hop_interval: int, stability_threshold: int
         # Initialize the lock for thread-safe access
         self.lock = threading.Lock()
@@ -118,6 +122,7 @@ class RMACSServer:
 
         # Internal Attributes
         self.operating_frequency: int = get_mesh_freq()
+        self.switch_frequency: int = self.operating_frequency
         self.healing_process_id: str = str(uuid.uuid4())  # Generate a unique ID at the start
 
         signal.signal(signal.SIGINT, self.signal_handler)
@@ -185,12 +190,13 @@ class RMACSServer:
                 if self.fsm.state == ServerState.IDLE:
                     current_time = time.time()
                     if self.check_bad_channel_quality_index():
-                        continue
-                    self.check_channel_quality_report()
+                        self.fsm.trigger(ServerEvent.BAD_CHANNEL_QUALITY_INDEX)
                     # Check if it's time to perform a periodic target frequency broadcast
                     if current_time - self.last_target_freq_broadcast >= self.args.periodic_target_freq_broadcast:
                         self.last_target_freq_broadcast = time.time()
                         self.fsm.trigger(ServerEvent.PERIODIC_OPERATING_FREQ_BROADCAST)
+                
+                self.check_and_update_channel_quality_report()                 
                 time.sleep(1)
             except Exception as e:
                 logger.info(f"Exception in run_server_fsm: {e}")
@@ -201,17 +207,27 @@ class RMACSServer:
         """
         for client in self.clients:
             if client.bad_channel_message:
-                self.fsm.trigger(ServerEvent.BAD_CHANNEL_QUALITY_INDEX)
+                self.freq = client.bad_channel_message['freq']
+                self.quality_index = client.bad_channel_message['qual']
+                self.freq_quality_report.update({self.freq: self.quality_index})
                 return True
         return False
-    def check_channel_quality_report(self) -> None:
+    
+    
+    def check_and_update_channel_quality_report(self) -> None:
         """
         Check for a channel quality report message from any connected client.
         """
         for client in self.clients:
             if client.channel_report_message:
-                self.fsm.trigger(ServerEvent.CHANNEL_QUALITY_REPORT)
-                break
+                self.freq = client.channel_report_message['freq']
+                self.quality_index = client.channel_report_message['qual']
+                self.freq_quality_report.update({self.freq: self.quality_index})
+                
+                # Parse the channel_quality_message and update freq_quality_report list
+                #self.fsm.trigger(ServerEvent.CHANNEL_QUALITY_REPORT)
+                # write the logic to update here.
+            
 
     def send_data_clients(self, data) -> None:
         """
@@ -250,13 +266,13 @@ class RMACSServer:
     def adaptive_frequency_hopping(self, trigger_event):
         # 
         top_freq_stability_counter, index = 0
-        sorted_frequencies = sorted(self.hopping_frequencies, key=lambda x: x[1])
+        sorted_frequencies = sorted(self.freq_quality_report, key=lambda x: x[1])
         top_freq = sorted_frequencies[0]
         # Ensure the seq_limit doesn't exceed the length of sorted_frequencies
         seq_limit = min(seq_limit, len(sorted_frequencies))
         while top_freq_stability_counter < self.stability_threshold:
             # Continue hopping between the best frequencies
-            switch_freq = sorted_frequencies[index]
+            self.switch_freq = sorted_frequencies[index]
             self.fsm.trigger(ServerEvent.CHANNEL_SWITCH_REQUEST)
             
             # Wait for the current hop interval before switching to the next frequency
@@ -280,13 +296,28 @@ class RMACSServer:
             # Exit if the top frequency stays the same for the stability threshold period
             if top_freq_stability_counter >= self.stability_threshold:
                 print(f"Top frequency {top_freq} has been stable for {self.stability_threshold} consecutive checks. Exiting.")
-                self.fsm.trigger(ServerEvent.FREQUENCY_HOPPING_COMPLETE)
+                self.switch_frequency(top_freq)
+                self.operating_frequency = top_freq
+                self.switch_freq = top_freq
+                self.fsm.trigger(ServerEvent.CHANNEL_SWITCH_REQUEST)
                 break
-
+          
+        if top_freq_stability_counter >= self.stability_threshold:
+            self.fsm.trigger(ServerEvent.FREQUENCY_HOPPING_COMPLETE)
     
-    def switch_frequency(self, switch_freq: int) -> None:
-        
-        pass
+    def switch_frequency(frequency: int, interface: str, bandwidth: int, beacons_count: int ) -> None:
+        run_cmd = f"iw dev {interface} switch freq {frequency} {bandwidth}MHz beacons {beacons_count}"
+        try:
+            result = subprocess.run(run_cmd, 
+                                shell=True, 
+                                capture_output=True, 
+                                text=True)
+            if(result.returncode != 0):
+                print("Failed to execute the switch frequency command")
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error: {e}")
+            return None
 
 
     def send_switch_frequency_message(self, trigger_event) -> None:
@@ -321,7 +352,7 @@ class RMACSClientTwin(threading.Thread):
         self.clients = clients
         self.host = host
         self.running: bool = True
-        self.args = Options()
+        self.args = Config()
         self.bad_channel_message: Dict = {}
         self.channel_report_message: Dict = {}
         self.listen_thread = threading.Thread(target=self.receive_messages)
@@ -362,7 +393,7 @@ class RMACSClientTwin(threading.Thread):
                         self.bad_channel_message = unpacked_data
 
                     # Channel report received from client
-                    elif action_str == "channel_report":
+                    elif action_str == "channel_quality_report":
                         self.channel_report_message = unpacked_data
 
                 except msgpack.UnpackException as e:
@@ -398,8 +429,7 @@ class RMACSClientTwin(threading.Thread):
 
 
 def main():
-    args = Options()
-
+    args = Config()
     host: str = args.rmacs_osf_orchestrator
     port: int = args.port
     server: RMACSServer = RMACSServer(host, port)
