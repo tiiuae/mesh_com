@@ -51,7 +51,7 @@ class CBMAAdaptation(object):
         self.__cbma_certs_path = Constants.ECDSA_BIRTH_FILEBASED.value
         self.__upper_cbma_certs_path = Constants.DOWNLOADED_RSA_CERTS_PATH.value
         self.__upper_cbma_ca_cert_path = Constants.DOWNLOADED_UPPER_CBMA_CA_CERT.value
-        self.__upper_cbma_key_path = Constants.RSA_BIRTH_KEY
+        self.__upper_cbma_key_path = Constants.RSA_BIRTH_KEY.value
         self.__lower_cbma_controller = None
         self.__upper_cbma_controller = None
         self.__lower_cbma_interfaces: List[Interface] = []
