@@ -142,6 +142,8 @@ if __name__ == '__main__':
     ftl.register_logger_function("Halow SNR", wifi_stats.get_snr)
     ftl.register_logger_function("RX MCS [MAC,MCS;MAC,MCS ...]", wifi_stats.get_rx_mcs)
     ftl.register_logger_function("TX MCS [MAC,MCS;MAC,MCS ...]", wifi_stats.get_tx_mcs)
+    ftl.register_logger_function("Exp. throughput(Mbps) [MAC,Exp.Tput ...]", wifi_stats.get_expected_throughput)
+    ftl.register_logger_function("inactive time (ms) [MAC,inactive time ...]", wifi_stats.get_inactive_time)
     ftl.register_logger_function("RX throughput [Bits/s]", wifi_stats.get_rx_throughput)
     ftl.register_logger_function("TX throughput [Bits/s]", wifi_stats.get_tx_throughput)
     ftl.register_logger_function("Neighbors", wifi_stats.get_neighbors)
