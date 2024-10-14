@@ -88,6 +88,24 @@ class WifiInfo:
 
         return out
 
+    def get_expected_throughput(self):
+        out = ""
+        for i in self.__stations.keys():
+            # Expected throughput is at index 3
+            out = f"{out}{i},{self.__stations[i][3]};"
+
+        # Remove semicolon after the last station
+        return out[:-1]
+
+    def get_inactive_time(self):
+        out = ""
+        for i in self.__stations.keys():
+            # Inactive Time is at index 4
+            out = f"{out}{i},{self.__stations[i][4]};"
+
+        # Remove semicolon after the last station
+        return out[:-1]
+
     def get_txpower(self):
         return self.__txpower
 
@@ -150,6 +168,8 @@ class WifiInfo:
         tx_mcs = "NaN"
         rx_mcs = "NaN"
         rssi = "NaN"
+        expected_throughput = "NaN"
+        inactive_time = "NaN"
 
         # halow station info fetched from cli_app if needed.
         halow_stations = None
@@ -189,7 +209,24 @@ class WifiInfo:
                         rx_mcs = halow_stations.get(station_mac)[1]
                     except (IndexError, TypeError):
                         pass
-                self.__stations[station_mac] = [rssi, tx_mcs, rx_mcs]
+
+            if "expected throughput:" in line:
+                # Extract the value and remove the "Mbps" suffix
+                throughput_str = line.split("expected throughput:")[1].strip().replace("Mbps", "").strip()
+                try:
+                    expected_throughput = float(throughput_str)
+                except ValueError:
+                    pass
+
+            if "inactive time:" in line:
+                # Extract the value and remove the "ms" suffix
+                inactive_time_str = line.split("inactive time:")[1].strip().replace("ms", "").strip()
+                try:
+                    inactive_time = int(inactive_time_str)
+                except ValueError:
+                    pass
+
+        self.__stations[station_mac] = [rssi, tx_mcs, rx_mcs, expected_throughput, inactive_time]
 
     def get_halow_stations(self) -> dict:
         cli_app_cmd = ['/usr/local/bin/cli_app', 'show', 'sta', '0', 'all']
