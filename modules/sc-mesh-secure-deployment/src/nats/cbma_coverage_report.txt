@@ -1,0 +1,42 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.0.0, pluggy-1.4.0 -- /home/mika/work/nix/mesh_com/modules/sc-mesh-secure-deployment/src/nats/unittest_cbma/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/mika/work/nix/mesh_com/modules/sc-mesh-secure-deployment/src/nats
+plugins: cov-5.0.0
+collecting ... collected 2 items
+
+cbma/unittests/test_certificate_handler.py::test_openssl_certificate PASSED [ 50%]
+cbma/unittests/test_secure_socket.py::TestCreateSSLContext::test_certificate_loading PASSED [100%]
+
+---------- coverage: platform linux, python 3.10.12-final-0 ----------
+Name                                             Stmts   Miss  Cover   Missing
+------------------------------------------------------------------------------
+cbma/cbma.py                                       134    134     0%   1-207
+cbma/certificates/certificates.py                   29      3    90%   20, 28, 44
+cbma/controller.py                                 122    122     0%   1-169
+cbma/models/certificates.py                         19      3    84%   17, 21, 25
+cbma/models/secure_socket/secure_connection.py      28      8    71%   10, 15, 20, 25, 30, 35, 40, 45
+cbma/models/secure_socket/secure_context.py          8      1    88%   13
+cbma/models/secure_socket/verification.py           11      1    91%   19
+cbma/secure_socket/__init__.py                       0      0   100%
+cbma/secure_socket/client.py                        79     79     0%   1-127
+cbma/secure_socket/secure_connection.py             47     28    40%   27-30, 34, 38, 42-46, 50-56, 60-70
+cbma/secure_socket/secure_context.py                34      7    79%   58-61, 65-68
+cbma/secure_socket/secure_socket.py                 11      2    82%   14-16
+cbma/secure_socket/server.py                        73     73     0%   1-105
+cbma/secure_socket/verification.py                  78     54    31%   43-54, 58-68, 72-76, 80-103, 107-114, 128-145
+cbma/standalone.py                                 106    106     0%   1-175
+cbma/unittests/test_certificate_handler.py          19      0   100%
+cbma/unittests/test_secure_socket.py                24      3    88%   27, 33-34
+cbma/utils/__init__.py                               0      0   100%
+cbma/utils/certificates.py                          22     14    36%   18-33
+cbma/utils/common.py                                38     29    24%   12-28, 33-48, 52, 56, 60-61
+cbma/utils/logging.py                              132     73    45%   29, 49, 58-60, 68-69, 87-123, 127-136, 145, 154-159, 169-199
+cbma/utils/macsec.py                                81     81     0%   1-125
+cbma/utils/multicast.py                              2      2     0%   3-8
+cbma/utils/networking.py                            30     21    30%   13-16, 20-25, 29-40, 44-49
+------------------------------------------------------------------------------
+TOTAL                                             1127    844    25%
+
+
+============================== 2 passed in 0.22s ===============================
