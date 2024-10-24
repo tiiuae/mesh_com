@@ -22,6 +22,7 @@ from src.constants import Constants
 from src.interface import Interface
 from src import comms_config_store
 from src.bat_ctrl_utils import BatCtrlUtils
+from src.comms_service_refresh import CommsServiceRefresh
 
 from controller import CBMAController
 from models.certificates import CBMACertificates
@@ -85,6 +86,7 @@ class CBMAAdaptation(object):
         if self.__config is not None:
             self.__cbma_config = self.__config.read("CBMA")
             self.__vlan_config = self.__config.read("VLAN")
+            self.__hostname = self.__config.read("hostname")
 
         # Create VLAN interfaces if configured
         self.__create_vlan_interfaces()
@@ -105,6 +107,9 @@ class CBMAAdaptation(object):
                 self.__white_interfaces.extend(white_interfaces)
                 self.__red_interfaces.extend(red_interfaces)
                 self.__na_cbma_interfaces.extend(exclude_interfaces)
+
+        self.__service_refresh = CommsServiceRefresh(self.__hostname, logger)
+        self.__service_thread = None
 
     def __validate_cbma_config(
         self,
@@ -279,6 +284,24 @@ class CBMAAdaptation(object):
                 self.logger.error(f"Error deleting VLAN interface {vlan_name}: {e}")
                 success = False
         return success
+
+    def __set_hostname(self) -> None:
+        """
+        Set hostname for device configured in ms_config.yaml.
+        """
+        try:
+            subprocess.run(["hostname", self.__hostname], check=True)
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Error setting hostname {self.__hostname}: {e}")
+
+    def __update_avahi_hostname(self) -> None:
+        """
+        Update avahi hostname for device configured in ms_config.yaml.
+        """
+        try:
+            subprocess.run(["avahi-set-host-name", self.__hostname], check=True)
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Error updating avahi hostname {self.__hostname}: {e}")
 
     def __get_interfaces(self) -> None:
         interfaces = []
@@ -809,6 +832,10 @@ class CBMAAdaptation(object):
         :return: True if both lower and upper CBMA was setup
                  successfully. Returns False otherwise.
         """
+        # hostname updates
+        self.__set_hostname()
+        self.__update_avahi_hostname()
+
         self.__init_batman_and_bridge()
 
         self.__update_cbma_interface_lists()
@@ -840,6 +867,10 @@ class CBMAAdaptation(object):
 
         # Set batman hop penalty
         self.__batman.set_hop_penalty()
+
+        # Start the service publisher thread
+        self.__service_thread = threading.Thread(target=self.__service_refresh.dns_service_refresh)
+        self.__service_thread.start()
 
         return True
 
@@ -1089,5 +1120,9 @@ class CBMAAdaptation(object):
 
         self.__cleanup_cbma()
         self.stop_radios()
+
+        self.__service_refresh.shutdown_service()
+        if self.__service_thread is not None:
+            self.__service_thread.join()
 
         return lower_stopped and upper_stopped
