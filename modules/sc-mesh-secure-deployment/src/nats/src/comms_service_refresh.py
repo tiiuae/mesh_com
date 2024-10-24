@@ -48,12 +48,3 @@ class CommsServiceRefresh:
         Shutdown the service
         """
         self.__event.set()
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger("CommsServiceRefresh")
-    comms_service_refresh = CommsServiceRefresh("mika-battlestation", logger)
-    comms_service_refresh.dns_service_refresh()
-    time.sleep(100)
-    # Wait for the service to be registered
-    comms_service_refresh.shutdown_service()
