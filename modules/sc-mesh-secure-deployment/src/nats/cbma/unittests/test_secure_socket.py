@@ -26,7 +26,7 @@ class TestCreateSSLContext(object):
             def verify(self, conn, cert, errnum, depth, ok) -> bool:
                 return True
 
-        secure_socket = TestSecureSocket(cert_paths, SSL.TLS_SERVER_METHOD)
+        secure_socket = TestSecureSocket(cert_paths, SSL.SSLv23_METHOD)
         try:
             secure_socket.create_ssl_context()
             assert True

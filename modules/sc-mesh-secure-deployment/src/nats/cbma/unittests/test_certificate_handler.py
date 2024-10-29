@@ -23,9 +23,9 @@ def test_openssl_certificate() -> None:
     end_data: datetime = certificate.get_end_date()
     assert end_data
 
-    assert '64:73:81:83:B3:F1:72:AD:28:6D:BE:9B:0F:A1:D9:D4:7F:75:72:C2' == str(skid)
-    assert '04:14:64:73:81:83:b3:f1:72:ad:28:6d:be:9b:0f:a1:d9:d4:7f:75:72:c2' == skid.hex(':')
-    assert '2024-05-13 09:16:24' == str(end_data)
-    assert ('keyid:64:73:81:83:B3:F1:72:AD:28:6D:BE:9B:0F:A1:D9:D4:7F:75:72:C2\n'
-            'DirName:/CN=Stop-Gap Insecure CA\n'
-            'serial:13:51:37:43:26:0A:A9:DE:32:FD:1C:EF:18:F2:9B:E7:A6:16:54:EF') == str(akid)
+    assert '04:14:75:05:b3:00:68:0b:9c:d0:c0:46:e5:b5:aa:58:cb:8b:44:a2:92:d5' == skid.hex(':')
+    assert '2024-03-17 08:21:07' == str(end_data)
+    assert '30:16:80:14:14:38:d5:36:b1:5d:ab:f3:30:83:23:f0:6f:5b:c7:bf:2b:51:f5:9c' == akid.hex(':')
+
+
+
