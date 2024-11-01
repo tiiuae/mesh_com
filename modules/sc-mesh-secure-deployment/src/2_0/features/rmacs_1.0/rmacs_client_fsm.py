@@ -23,8 +23,6 @@ from rmacs_setup import get_mesh_freq, get_ipv6_addr, get_mac_address
 from spectral_scan import Spectral_Scan
 from rmacs_comms import rmacs_comms, send_data
 
-MULTICAST_GROUP = 'ff02::1'  # IPv6 multicast address for entire network
-MULTICAST_PORT = 12345
 
 action_to_id = {
     "bad_channel_quality_index": 0,
@@ -120,9 +118,7 @@ class ClientFSM:
             (ClientState.MONITOR_ERROR, ClientEvent.ERROR): (ClientState.OPERATING_CHANNEL_SCAN, self.client.channel_scan),
             (ClientState.MONITOR_ERROR, ClientEvent.NO_ERROR): (ClientState.IDLE, None),
             (ClientState.OPERATING_CHANNEL_SCAN, ClientEvent.GOOD_CHANNEL_QUALITY_INDEX): (ClientState.MONITOR_TRAFFIC, self.client.traffic_monitoring),
-            #(ClientState.OPERATING_CHANNEL_SCAN, ClientEvent.BAD_CHANNEL_QUALITY_INDEX): (ClientState.IDLE, self.client.run_client_fsm),
             (ClientState.OPERATING_CHANNEL_SCAN, ClientEvent.BAD_CHANNEL_QUALITY_INDEX): (ClientState.REPORT_BCQI, self.client.sending_bad_channel_quality_index),
-            #(ClientState.REPORT_BCQI, ClientEvent.SENT_BAD_CHANNEL_QUALITY_INDEX): (ClientState.IDLE, self.client.run_client_fsm),
             (ClientState.REPORT_BCQI, ClientEvent.SENT_BAD_CHANNEL_QUALITY_INDEX): (ClientState.IDLE, None),
             (ClientState.CHANNEL_SCAN, ClientEvent.PERFORMED_CHANNEL_SCAN): (ClientState.REPORT_CHANNEL_QUALITY, self.client.report_channel_quality),
             (ClientState.REPORT_CHANNEL_QUALITY, ClientEvent.REPORTED_CHANNEL_QUALITY): (ClientState.IDLE, None),
@@ -187,12 +183,9 @@ class InterferenceDetection(threading.Thread):
     stop:
     traffic_monitoring:
     '''
-    def __init__(self, node_id: str) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.node_id = node_id
-        #self.host = host
-        #self.port = port
-
+        #self.node_id = node_id
         # Initialize client objects
         self.fsm = ClientFSM(self)
         self.args = Config()
@@ -203,6 +196,10 @@ class InterferenceDetection(threading.Thread):
         self.switching_frequency = self.args.starting_frequency
         self.freq_list = self.args.freq_list
         self.freq_index = -1
+        # Control channel interfaces
+        self.ch_interfaces = self.args.control_channel_interfaces
+        self.sockets: Dict = {}
+        self.listen_threads: list = []
         
         # Initialize the Scanning Object
         self.scan = Spectral_Scan()
@@ -221,56 +218,44 @@ class InterferenceDetection(threading.Thread):
         self.phy_error = 0   
         self.tx_timeout = 0   
 
-        ## Internal variables
-        #self.socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-        #self.current_frequency: int = get_mesh_freq(self.nw_interface)
-        #self.healing_process_id: str = None
-        #self.operating_frequency: int = np.nan
-        #self.best_freq: int = np.nan
-        #self.freq_quality: dict = {}
         self.num_retries = 0
         self.max_retries = 3
         self.max_error_check = self.args.max_error_check
-#
-        ## Time for periodic events' variables (in seconds)
-        #self.time_last_scan: float = 0
-        #self.time_last_switch: float = 0
-#
+
         ## Create listen and client run FSM threads
         self.running = False
-        self.listen_thread = threading.Thread(target=self.receive_messages)
+        
+        
+        self.processed_ids = set()
+        logger.info(f"The processed_id : {id(self.processed_ids)}")
+        self.msg_id_lock = threading.Lock()
+        
         self.run_client_fsm_thread = threading.Thread(target=self.run_client_fsm)
         
     def run(self) -> None:
         """
         Connect to the orchestrator node and start the client's operation in separate threads for running the FSM and receiving messages.
         """
-        self.running = True
-        self.connect_to_rmacs_comms()
-        self.listen_thread.start()
-        self.run_client_fsm_thread.start()
-        #asyncio.run(self.run_client_fsm()) 
+        try:
+            self.running = True
+            for interface in self.ch_interfaces:
+                try:
+                    socket = rmacs_comms(interface)
+                    self.sockets[interface] = socket
+                    listen_thread = threading.Thread(target=self.receive_messages, args=(socket, interface))
+                    self.listen_threads.append(listen_thread)
+                    listen_thread.start()
+                    logger.info(f"Listening on interface: {interface}")
+                except ConnectionError as e:
+                    logger.error(f"Connection error on {interface}: {e}")
+            # Start the server FSM thread
+            logger.info("Server started and listening...")
+            
+            self.run_client_fsm_thread.start()
+        except Exception as e:
+            logger.error(f"Unexpected error while starting server: {e}")
+            self.stop()
 
-    def connect_to_rmacs_comms(self) -> None:
-        """
-        Connect to rmacs_comms via br-lan
-        """
-        max_retries: int = 3
-        number_retries: int = 0
-        logger.info('connect to rmacs comms')
-        while number_retries < max_retries:
-            try:
-                self.socket = rmacs_comms()
-                logger.info("Socket Connection is successfull")
-                break
-            except ConnectionRefusedError:
-                number_retries += 1
-                #logger.error(f"OSF server connection failed... retry #{number_retries}")
-
-            if number_retries == max_retries:
-                sys.exit("Server unreachable")
-
-            time.sleep(2)
 
     def run_client_fsm(self) -> None:
         """
@@ -286,7 +271,7 @@ class InterferenceDetection(threading.Thread):
                     count +=1
                     self.fsm.trigger(ClientEvent.TRAFFIC_MONITOR)
                 # Sleep for a short duration before checking conditions again
-                time.sleep(60)
+                time.sleep(5)
             except Exception as e:
                 logger.info(f"Exception in run: {e}")
                 return None
@@ -310,25 +295,27 @@ class InterferenceDetection(threading.Thread):
             logger.info(f"Error: {e}")
             return None
                     
-    def receive_messages(self) -> None:
+    def receive_messages(self, socket, interface) -> None:
         """
         Receive incoming messages from the orchestrator.
         """
         logger.info("Client receive msg thread is started.........")
         # A set to store the unique IDs of processed messages
-        self.processed_ids = set()
-        
+        # self.processed_ids = set()
+        # logger.info(f"The processed_id : {id(self.processed_ids)}")
+        thread_id = threading.get_native_id()
+        logger.info(f"The running thread id is : {thread_id}")
         while self.running:
             try:
                 # Receive incoming messages and decode the netstring encoded data
                 try:
-                    data = decode(self.socket.recv(1024))
+                    data = decode(socket.recv(1024))
                     if not data:
                         logger.info("No data...")
                         break
                 except Exception as e:
                     # Handle netstring decoding errors
-                    logger.error(f"Failed to decode netstring: {e}")
+                    logger.error(f"Failed to decode netstring: {e} via interface : {interface} ")
                     break
 
                 # Deserialize the MessagePack message
@@ -336,27 +323,30 @@ class InterferenceDetection(threading.Thread):
                     unpacked_data = msgpack.unpackb(data, raw=False)
                     
                     message_id: str = unpacked_data.get("message_id")
-                    if message_id in self.processed_ids:
-                        logger.info(f"Message with ID {message_id} has already been processed. Ignoring.")
-                    else:
-                        logger.info(f"Processing message: {message_id}")
-                        # Add the unique ID to the processed set
-                        self.processed_ids.add(message_id)
-                        action_id: int = unpacked_data.get("a_id")
-                        action_str: str = id_to_action.get(action_id)
-                        logger.info(f"Received message: {unpacked_data}")
+                    with self.msg_id_lock:
+                        if message_id in self.processed_ids:
+                            logger.info(f"{thread_id}: Duplicate Msg : Message with ID {message_id} has already been processed and was received from interface : {interface}. Ignoring.")
+                        else:
+                            logger.info(f"{thread_id}: New Msg: Processing message: {message_id} : msg : {unpacked_data} via interface : {interface}")
+                            # Add the unique ID to the processed set
+
+                            #with self.msg_id_lock:
+                            self.processed_ids.add(message_id)
+                            action_id: int = unpacked_data.get("a_id")
+                            action_str: str = id_to_action.get(action_id)
+                            #logger.info(f"Received message: {unpacked_data} via interface : {interface}")
 
 
-                        # Handle frequency switch request
-                        if action_str in ["switch_frequency", "operating_frequency"]:
-                            requested_switch_freq = unpacked_data.get("freq")
-                            self.update_operating_freq(requested_switch_freq)
-                            cur_freq = get_mesh_freq(self.nw_interface)
-                            logger.info(f"The requested switch freq: {requested_switch_freq} and current operating freq: {cur_freq}")
-                            if cur_freq != self.operating_frequency:
-                                self.switching_frequency = requested_switch_freq
-                                logger.info(f"Handling action_str : {action_str}")
-                                self.fsm.trigger(ClientEvent.EXT_SWITCH_EVENT)
+                            # Handle frequency switch request
+                            if action_str in ["switch_frequency", "operating_frequency"]:
+                                requested_switch_freq = unpacked_data.get("freq")
+                                self.update_operating_freq(requested_switch_freq)
+                                cur_freq = get_mesh_freq(self.nw_interface)
+                                logger.info(f"The requested switch freq: {requested_switch_freq} and current operating freq: {cur_freq} via interface : {interface}")
+                                if cur_freq != self.operating_frequency:
+                                    self.switching_frequency = requested_switch_freq
+                                    logger.info(f"Handling action_str : {action_str} via interface : {interface}")
+                                    self.fsm.trigger(ClientEvent.EXT_SWITCH_EVENT)
 
 
                 except msgpack.UnpackException as e:
@@ -379,17 +369,26 @@ class InterferenceDetection(threading.Thread):
         curr_freq: int = get_mesh_freq(self.nw_interface)
         action_id: int = action_to_id["bad_channel_quality_index"]
         message_id: str = str(uuid.uuid4())  
-        data = {'a_id': action_id, 'n_id': self.node_id, 'message_id': message_id,
+        data = {'a_id': action_id,'message_id': message_id,
                 'freq': curr_freq, 'qual': self.channel_quality_index, 'tx_rate': self.traffic_rate,'phy_error' : self.phy_error, 'tx_timeout' : self.tx_timeout,
                 'device': self.mac_address}
         logger.info(f'Sending BCQI report to Multicast group: {data}')
         repeat = 2
         while repeat:
-            send_data(self.socket, data)
+            # Loop through the sockets dictionary and send data
+            for interface, socket in self.sockets.items():
+                self.send_to_socket(socket, data, interface)
             repeat -= 1                  
         self.update_db(("bcqi_monitor", curr_freq))
         self.fsm.trigger(ClientEvent.SENT_BAD_CHANNEL_QUALITY_INDEX)
-        
+       
+    def send_to_socket(self, socket, data, interface):
+        try:
+            send_data(socket, data, interface)
+            logger.info(f"Successfully sent data to {interface}")
+        except Exception as e:
+            logger.error(f"Error sending data to {interface}: {e}")
+    
     def report_channel_quality(self, trigger_event) -> None:
         """
         Report channel quality to orchestrator if data is valid.
@@ -400,10 +399,13 @@ class InterferenceDetection(threading.Thread):
         logger.info("Reporting channel Quality...")
         action_id: int = action_to_id["channel_quality_report"]
         message_id: str = str(uuid.uuid4()) 
-        data = {'a_id': action_id, 'n_id': self.node_id, 'freq': self.scan_freq, 'qual': self.channel_quality_index, 'tx_rate': self.traffic_rate,
+        data = {'a_id': action_id,'freq': self.scan_freq, 'qual': self.channel_quality_index, 'tx_rate': self.traffic_rate,
                 'phy_error' : self.phy_error, 'tx_timeout' : self.tx_timeout,'message_id': message_id, 'device': self.mac_address}
         logger.info(f'Sending Channel quality report to Multicast group: {data}')
-        send_data(self.socket, data)
+        
+        # Loop through the sockets dictionary and send data
+        for interface, socket in self.sockets.items():
+            self.send_to_socket(socket, data, interface)
         self.fsm.trigger(ClientEvent.REPORTED_CHANNEL_QUALITY)
     
     def switch_frequency(self, trigger_event) -> None:
@@ -602,11 +604,7 @@ class InterferenceDetection(threading.Thread):
     
 def main():
     args = Config()
-    #host: str = get_ipv6_addr('br-lan')
-    #port: int = args.port
-    #node_id: str = get_ipv6_addr(args.osf_interface)
-    node_id: str = 'e'
-    client = InterferenceDetection(node_id)
+    client = InterferenceDetection()
     logger.info('RMACS client thread is started....')
     client.start()
     

@@ -1,6 +1,11 @@
 import os
-import netifaces
+import netifaces as ni
 import subprocess
+import re
+import numpy as np
+import pandas as pd
+from config import Config
+from logging_config import logger
 
 
 #class Setup:
@@ -79,15 +84,19 @@ def get_ipv6_addr(interface) -> str:
     :return: The IPv6 address as a string.
     """
     # Retrieve the IPv6 addresses associated with the osf_interface
-    ipv6_addresses = netifaces.ifaddresses(interface).get(netifaces.AF_INET6, [])
-    if ipv6_addresses:
-        for addr_info in ipv6_addresses:
-            if 'addr' in addr_info and addr_info['addr'].startswith('fd'):
-                return addr_info['addr']
-            else:
-                return None
-    else:
-        return None
+    prefix = 'fdd8'
+    addresses = ni.ifaddresses(interface).get(ni.AF_INET6, [])
+
+    # Loop through the addresses to find the one that starts with the specified prefix
+    for addr_info in addresses:
+        ipv6_addr = addr_info['addr']
+        if ipv6_addr.startswith(prefix):
+            return ipv6_addr
+
+    return None  # Return None if no address with the specified prefix is found
+
+
+
     
 def get_channel_bw(interface) -> int:
     
@@ -109,7 +118,7 @@ def get_channel_bw(interface) -> int:
         print(f"Error: {e}")
         return None
     
-def switch_frequency(frequency: int, interface: str, bandwidth: int, beacons_count: int ) -> None:
+def channel_switch_announcement(frequency: int, interface: str, bandwidth: int, beacons_count: int ) -> None:
     run_cmd = f"iw dev {interface} switch freq {frequency} {bandwidth}MHz beacons {beacons_count}"
     try:
         result = subprocess.run(run_cmd, 
@@ -122,3 +131,58 @@ def switch_frequency(frequency: int, interface: str, bandwidth: int, beacons_cou
     except subprocess.CalledProcessError as e:
         print(f"Error: {e}")
         return None
+
+def get_mesh_freq(interface) -> int:
+    """
+    Get the mesh frequency of the device.
+
+    :return: An integer representing the mesh frequency.
+    """
+    mesh_freq: int = np.nan
+
+    try:
+        iw_output = subprocess.check_output(['iw', 'dev'], encoding='utf-8')
+        iw_output = re.sub(r'\s+', ' ', iw_output).split(' ')
+
+        # Extract interface sections from iw_output
+        idx_list = [idx - 1 for idx, val in enumerate(iw_output) if val == "Interface"]
+        if len(idx_list) > 1:
+            idx_list.pop(0)
+
+        # Calculate the start and end indices for interface sections
+        start_indices = [0] + idx_list
+        end_indices = idx_list + ([len(iw_output)] if idx_list[-1] != len(iw_output) else [])
+
+        # Use zip to create pairs of start and end indices, and extract interface sections
+        iw_interfaces = [iw_output[start:end] for start, end in zip(start_indices, end_indices)]
+
+        # Check if mesh interface is up and get freq
+        for interface_list in iw_interfaces:
+            try:
+                if interface in interface_list and "mesh" in interface_list and "channel" in interface_list:
+                    channel_index = interface_list.index("channel") + 2
+                    mesh_freq = int(re.sub("[^0-9]", "", interface_list[channel_index]).split()[0])
+                    break
+            except Exception as e:
+                logger.error(f"Get mesh freq exception: {e}")
+    except Exception as e:
+        logger.error(f"Get mesh freq exception: {e}")
+
+    return mesh_freq
+
+def get_mac_address(interface):
+    mac_address_path = f"/sys/class/net/{interface}/address"
+    try:
+        with open(mac_address_path, "r") as file:
+            mac_address = file.read().strip()
+        if mac_address:
+            logger.info(f"MAC address is : {mac_address}")
+            return mac_address
+        else:
+            logger.info("Failed to get MAC address")
+            return None
+    except FileNotFoundError:
+        print(f"Interface {interface} not found.")
+    except Exception as e:
+        print(f"Error reading operstate: {e}")
+        
