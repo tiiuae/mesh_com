@@ -127,8 +127,9 @@ class BatCtrlUtils(object):
                 ["batctl", "meshif", batman_if, "fragmentation", "1"], check=True
             )
 
+            ogm_interval = "5000" if is_upper else "500"
             subprocess.run(
-                ["batctl", "meshif", batman_if, "orig_interval", "5000"], check=True
+                ["batctl", "meshif", batman_if, "orig_interval", ogm_interval], check=True
             )
 
         except subprocess.CalledProcessError as e:

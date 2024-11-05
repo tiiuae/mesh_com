@@ -22,6 +22,7 @@ from src.constants import Constants
 from src.interface import Interface
 from src import comms_config_store
 from src.bat_ctrl_utils import BatCtrlUtils
+from src.comms_service_refresh import CommsServiceRefresh
 
 from controller import CBMAController
 from models.certificates import CBMACertificates
@@ -51,7 +52,7 @@ class CBMAAdaptation(object):
         self.__cbma_certs_path = Constants.ECDSA_BIRTH_FILEBASED.value
         self.__upper_cbma_certs_path = Constants.DOWNLOADED_RSA_CERTS_PATH.value
         self.__upper_cbma_ca_cert_path = Constants.DOWNLOADED_UPPER_CBMA_CA_CERT.value
-        self.__upper_cbma_key_path = Constants.RSA_BIRTH_KEY
+        self.__upper_cbma_key_path = Constants.RSA_BIRTH_KEY.value
         self.__lower_cbma_controller = None
         self.__upper_cbma_controller = None
         self.__lower_cbma_interfaces: List[Interface] = []
@@ -60,7 +61,7 @@ class CBMAAdaptation(object):
         self.BR_NAME: str = Constants.BR_NAME.value
         self.LOWER_BATMAN: str = Constants.LOWER_BATMAN.value
         self.UPPER_BATMAN: str = Constants.UPPER_BATMAN.value
-        self.ALLOWED_KIND_LIST = {"vlan", "batadv"}
+        self.ALLOWED_KIND_LIST = {"vlan", "batadv", "dsa"}
 
         # Set minimum required configuration
         self.__white_interfaces = [self.LOWER_BATMAN]
@@ -85,6 +86,7 @@ class CBMAAdaptation(object):
         if self.__config is not None:
             self.__cbma_config = self.__config.read("CBMA")
             self.__vlan_config = self.__config.read("VLAN")
+            self.__hostname = self.__config.read("hostname")
 
         # Create VLAN interfaces if configured
         self.__create_vlan_interfaces()
@@ -106,6 +108,9 @@ class CBMAAdaptation(object):
                 self.__red_interfaces.extend(red_interfaces)
                 self.__na_cbma_interfaces.extend(exclude_interfaces)
 
+        self.__service_refresh = CommsServiceRefresh(self.__hostname, logger)
+        self.__service_thread = None
+
     def __validate_cbma_config(
         self,
         exclude_interfaces: List[str],
@@ -116,9 +121,11 @@ class CBMAAdaptation(object):
         black_interfaces: List[str] = []
 
         # Validate input param types
-        if not isinstance(white_interfaces, list) or \
-           not isinstance(red_interfaces, list) or \
-           not isinstance(exclude_interfaces, list):
+        if (
+            not isinstance(white_interfaces, list)
+            or not isinstance(red_interfaces, list)
+            or not isinstance(exclude_interfaces, list)
+        ):
             self.logger.error("Input params are not lists!")
             return False
 
@@ -270,12 +277,31 @@ class CBMAAdaptation(object):
                     interface.interface_name == vlan_name
                     for interface in self.__interfaces
                 ):
+                    self.__shutdown_interface(vlan_name)
                     # Delete existing VLAN interface
                     subprocess.run(["ip", "link", "delete", vlan_name], check=True)
             except subprocess.CalledProcessError as e:
                 self.logger.error(f"Error deleting VLAN interface {vlan_name}: {e}")
                 success = False
         return success
+
+    def __set_hostname(self) -> None:
+        """
+        Set hostname for device configured in ms_config.yaml.
+        """
+        try:
+            subprocess.run(["hostname", self.__hostname], check=True)
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Error setting hostname {self.__hostname}: {e}")
+
+    def __update_avahi_hostname(self) -> None:
+        """
+        Update avahi hostname for device configured in ms_config.yaml.
+        """
+        try:
+            subprocess.run(["avahi-set-host-name", self.__hostname], check=True)
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Error updating avahi hostname {self.__hostname}: {e}")
 
     def __get_interfaces(self) -> None:
         interfaces = []
@@ -310,8 +336,8 @@ class CBMAAdaptation(object):
                 # thus should add only physical interfaces, vlan and batadv interfaces
                 if kind is None or kind in self.ALLOWED_KIND_LIST:
                     interfaces.append(interface_info)
-                # We want to monitor also br-lan status thus expcetion to basic rules
-                elif kind == "bridge" and ifname== Constants.BR_NAME.value:
+                # We want to monitor also br-lan status thus exception to basic rules
+                elif kind == "bridge" and ifname == Constants.BR_NAME.value:
                     interfaces.append(interface_info)
         ip.close()
 
@@ -362,6 +388,7 @@ class CBMAAdaptation(object):
         ip = IPRoute()
 
         try:
+            # Get the index of the bridge
             bridge_indices = ip.link_lookup(ifname=bridge_name)
             if bridge_indices:
                 bridge_index = bridge_indices[0]
@@ -374,7 +401,6 @@ class CBMAAdaptation(object):
 
             # Get the index of the interface to add
             interface_indices = ip.link_lookup(ifname=interface_to_add)
-
             if not interface_indices:
                 self.logger.debug(
                     "Cannot add interface %s to bridge %s!",
@@ -384,9 +410,27 @@ class CBMAAdaptation(object):
                 return
 
             interface_index = interface_indices[0]
-            # Add the interface to the bridge
-            ip.link("set", index=interface_index, master=bridge_index)
 
+            # Get the current interface details
+            interface_info = ip.get_links(interface_index)[0]
+            current_master = interface_info.get("master")
+
+            if current_master == bridge_index:
+                self.logger.info(
+                    "Interface %s is already part of the bridge %s.",
+                    interface_to_add,
+                    bridge_name,
+                )
+            else:
+                # Add the interface to the bridge
+                ip.link("set", index=interface_index, master=bridge_index)
+                self.logger.info(
+                    "Successfully added interface %s to bridge %s.",
+                    interface_to_add,
+                    bridge_name,
+                )
+            # Bring the interface up
+            self.__set_interface_up(interface_to_add)
         except Exception as e:
             self.logger.error(
                 "Error adding interface %s to bridge %s! Error: %s",
@@ -415,6 +459,7 @@ class CBMAAdaptation(object):
         try:
             index = ip.link_lookup(ifname=interface_name)[0]
             ip.link("set", index=index, state="down")
+            ip.link("set", index=index, master=None)
         except IndexError:
             self.logger.debug(
                 "Not able to shutdown interface %s! Interface not found!",
@@ -510,6 +555,35 @@ class CBMAAdaptation(object):
             if interface in self.__lower_cbma_interfaces:
                 self.__lower_cbma_interfaces.remove(interface)
 
+    def __update_red_interfaces_list(self):
+        """
+        Updates the red_interfaces list:
+        1. Filters red_interfaces to keep only those interfaces that exist in self.__interfaces.
+        2. Handles mutually exclusive interfaces, removing eth/end interfaces if a lan interface is found.
+        3. Ensures "UPPER_BATMAN" is present in the red_interfaces list.
+        """
+        # Step 1: Filter red_interfaces to keep only interfaces that exist in self.__interfaces.
+        red_interfaces = [
+            interface
+            for interface in self.__red_interfaces
+            if any(iface.interface_name == interface for iface in self.__interfaces)
+        ]
+
+        # Step 2: Remove eth_end_interfaces if any lan interface is found in red_interfaces.
+        lan_interfaces = {"lan1", "lan2", "lan3"}
+        eth_end_interfaces = {"eth0", "end0", "end1"}
+
+        if any(lan in red_interfaces for lan in lan_interfaces):
+            red_interfaces = [
+                iface for iface in red_interfaces if iface not in eth_end_interfaces
+            ]
+
+        # Step 3: Ensure "UPPER_BATMAN" is present in the red_interfaces list.
+        if self.UPPER_BATMAN not in red_interfaces:
+            red_interfaces.append(self.UPPER_BATMAN)
+        # Update the internal red interfaces list.
+        self.__red_interfaces = red_interfaces
+
     def __wait_for_ap(self, timeout: int = 4) -> bool:
         start_time = time.time()
         while True:
@@ -587,13 +661,40 @@ class CBMAAdaptation(object):
             return bytes(mac).hex(sep=":", bytes_per_sep=1)
         else:
             # Flip the locally administered bit
-            mac_bytes = bytearray.fromhex(interface_mac.replace(':', ''))
+            mac_bytes = bytearray.fromhex(interface_mac.replace(":", ""))
             mac_bytes[0] ^= 0x2
-            return mac_bytes.hex(sep=':', bytes_per_sep=1)
+            return mac_bytes.hex(sep=":", bytes_per_sep=1)
+
+    def __create_mac_for_bridge(self) -> str:
+        """
+        Creates a MAC address for the bridge. MAC is created from osf, eth0,
+        end0, end1 or wlan1 interface MAC by flipping the local admin bit.
+        In case all those interfaces are configured as black interfaces
+        (i.e. they are configured as red or white interfaces or excluded from CBMA)
+        then a random MAC is generated for the bridge.
+
+        :return: generated MAC for the bridge usage
+        """
+        interfaces: List[str] = ["osf", "eth0", "end0", "end1", "wlan1"]
+        for interface in interfaces:
+            if (
+                interface in self.__white_interfaces
+                or interface in self.__red_interfaces
+                or interface in self.__na_cbma_interfaces
+            ):
+                mac = self.__get_mac_addr(interface)
+                if mac:
+                    # Flip the locally administered bit
+                    mac_bytes = bytearray.fromhex(mac.replace(":", ""))
+                    if not (mac_bytes[0] & 0x2):
+                        mac_bytes[0] |= 0x2
+                        return mac_bytes.hex(sep=":", bytes_per_sep=1)
+        # Generate random MAC in case didn't get any earlier
+        return self.__create_mac(True)
 
     def __init_batman_and_bridge(self) -> None:
         if_name = self.__comms_ctrl.settings.mesh_vif[0]
-        if if_name.startswith("halow"):
+        if if_name.startswith("halow") or if_name.startswith("morse"):
             if_pattern = "wlp*s0"
             for interface_name in self.__comms_ctrl.settings.mesh_vif:
                 if fnmatch.fnmatch(interface_name, if_pattern):
@@ -615,7 +716,7 @@ class CBMAAdaptation(object):
         self.__create_bridge(self.BR_NAME)
 
         # Set random MAC address for the bridge
-        self.__set_interface_mac(self.BR_NAME, self.__create_mac(True))
+        self.__set_interface_mac(self.BR_NAME, self.__create_mac_for_bridge())
         self.__wait_for_interface(self.LOWER_BATMAN)
         self.__wait_for_interface(self.UPPER_BATMAN)
 
@@ -661,7 +762,7 @@ class CBMAAdaptation(object):
         for interface_name in self.__comms_ctrl.settings.mesh_vif:
             self.logger.debug("mesh_vif: %s", interface_name)
             timeout = 5
-            if interface_name.startswith("halow"):
+            if interface_name.startswith("halow") or interface_name.startswith("morse"):
                 timeout = 20
             self.__wait_for_interface(interface_name, timeout)
 
@@ -731,9 +832,14 @@ class CBMAAdaptation(object):
         :return: True if both lower and upper CBMA was setup
                  successfully. Returns False otherwise.
         """
+        # hostname updates
+        self.__set_hostname()
+        self.__update_avahi_hostname()
+
         self.__init_batman_and_bridge()
 
         self.__update_cbma_interface_lists()
+        self.__update_red_interfaces_list()
 
         # Set radios on
         self.__setup_radios()
@@ -761,6 +867,10 @@ class CBMAAdaptation(object):
 
         # Set batman hop penalty
         self.__batman.set_hop_penalty()
+
+        # Start the service publisher thread
+        self.__service_thread = threading.Thread(target=self.__service_refresh.dns_service_refresh)
+        self.__service_thread.start()
 
         return True
 
@@ -962,6 +1072,11 @@ class CBMAAdaptation(object):
         return intf_added
 
     def __cleanup_cbma(self) -> None:
+        """
+        Shuts down /which removes them from bridge also) Batman interfaces
+        and then deletes them. Also deletes any created VLAN interfaces but
+        lets bridge remain for eample for ethernet usage.
+        """
         self.__get_interfaces()
         self.__shutdown_interface(self.LOWER_BATMAN)
         self.__shutdown_interface(self.UPPER_BATMAN)
@@ -970,7 +1085,6 @@ class CBMAAdaptation(object):
         self.__batman.destroy_batman_interface(self.UPPER_BATMAN)
 
         self.__delete_vlan_interfaces()
-        self.__shutdown_and_delete_bridge(self.BR_NAME)
 
     def __stop_controller(self, controller, name: str) -> bool:
         """
@@ -1006,5 +1120,9 @@ class CBMAAdaptation(object):
 
         self.__cleanup_cbma()
         self.stop_radios()
+
+        self.__service_refresh.shutdown_service()
+        if self.__service_thread is not None:
+            self.__service_thread.join()
 
         return lower_stopped and upper_stopped

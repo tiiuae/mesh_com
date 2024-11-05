@@ -2,6 +2,9 @@
 # Mesh Shield config file #
 ###########################
 
+# hostname of the device
+hostname: nixos
+
 # All the interfaces are black by default.
 # Excluded interfaces or interfaces without macsec certificates are not added to lower CBMA.
 # White interfaces are added to upper CBMA and are excluded automatically from lower CBMA.
@@ -21,10 +24,16 @@ CBMA:
     - sap0
     - sta0
     - wfd0
-  white_interfaces: 
+    - end0
+    - end1
+  white_interfaces:
   red_interfaces:
     - wlan1
     - usb0
+    - eth0
+    - end0
+    - end1
+    - lan1
 
 BATMAN:
   routing_algo: BATMAN_V
@@ -35,17 +44,17 @@ BATMAN:
     hardif:
       halow1: 20
 
-VLAN:
+#VLAN:
 # Remember that IP address definitions for such interface that is added to
 # CBMA's red_interfaces list (i.e. br-lan bridge) are not effective.
-  vlan_black:
-    parent_interface: eth0
-    vlan_id: 100
-    ipv4_address: 192.168.1.1
-    ipv4_subnet_mask: 255.255.255.0
-    ipv6_local_address: fe80::192.168.1.1
-    ipv6_prefix_length: 64
-  vlan_red:
-    parent_interface: eth0
-    vlan_id: 200
+#  vlan_black:
+#    parent_interface: eth0
+#    vlan_id: 100
+#    ipv4_address: 192.168.1.1
+#    ipv4_subnet_mask: 255.255.255.0
+#    ipv6_local_address: fe80::192.168.1.1
+#    ipv6_prefix_length: 64
+#  vlan_red:
+#    parent_interface: eth0
+#    vlan_id: 200
   
