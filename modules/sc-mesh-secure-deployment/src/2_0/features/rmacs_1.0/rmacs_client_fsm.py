@@ -9,6 +9,7 @@ from collections import deque
 import subprocess
 import uuid
 import json
+import os
 
 import msgpack
 import numpy as np
@@ -16,13 +17,14 @@ import pandas as pd
 from netstring import encode, decode
 
 from logging_config import logger
-from config import Config
-#from rmacs_setup import get_ipv6_addr
+from config import create_default_config, load_config
 from traffic_monitor import TrafficMonitor
 from rmacs_setup import get_mesh_freq, get_ipv6_addr, get_mac_address
 from spectral_scan import Spectral_Scan
 from rmacs_comms import rmacs_comms, send_data
 
+config_file_path = '/etc/meshshield/rmacs_config.yaml'
+CONFIG_DIR = "/etc/meshshield"
 
 action_to_id = {
     "bad_channel_quality_index": 0,
@@ -31,6 +33,7 @@ action_to_id = {
     "switch_frequency": 3
 }
 id_to_action = {v: k for k, v in action_to_id.items()}
+
 
 class ClientState(Enum):
     IDLE = auto()
@@ -41,8 +44,6 @@ class ClientState(Enum):
     REPORT_BCQI = auto()
     REPORT_CHANNEL_QUALITY = auto()
     CHANNEL_SWITCH = auto()
-    #OFF_BAND_SCAN = auto()
-    #NO_INTERFERENCE_DETECTED = auto()
       
     
 class ClientEvent(Enum):
@@ -62,10 +63,7 @@ class ClientEvent(Enum):
     SWITCH_NOT_REQUIRED = auto
     SWITCH_SUCCESSFUL = auto
     SWITCH_UNSUCCESSFUL = auto
-    #SENT_GOOD_CHANNEL_QUALITY_INDEX = auto()
-    
     EXT_SWITCH_EVENT = auto()
-    #EXT_DATA_REQUEST = auto()
 
 class UniqueDeque:
     def __init__(self):
@@ -105,7 +103,6 @@ class UniqueDeque:
 class ClientFSM:
     def __init__(self, client):
         # Initial state
-        self.args = Config
         self.state = ClientState.IDLE
         self.client = client
         self.event_queue = UniqueDeque()
@@ -185,19 +182,21 @@ class InterferenceDetection(threading.Thread):
     '''
     def __init__(self) -> None:
         super().__init__()
-        #self.node_id = node_id
         # Initialize client objects
         self.fsm = ClientFSM(self)
-        self.args = Config()
+        # Load the configuration
+        config = load_config(config_file_path)
         self.traffic_monitor = TrafficMonitor()
-        self.channel_bandwidth = self.args.channel_bandwidth
-        self.client_beacon_count = self.args.client_beacon_count
-        self.nw_interface = self.args.nw_interface
-        self.switching_frequency = self.args.starting_frequency
-        self.freq_list = self.args.freq_list
-        self.freq_index = -1
+        self.channel_bandwidth = config['RMACS_Config']['channel_bandwidth']
+        print(f"the *********** channel bandwidth = {self.channel_bandwidth}")
+        self.client_beacon_count = config['RMACS_Config']['client_beacon_count']
+        self.nw_interface = config['RMACS_Config']['nw_interface']
+        self.switching_frequency = config['RMACS_Config']['starting_frequency']
+        self.freq_list = config['RMACS_Config']['freq_list']
         # Control channel interfaces
-        self.ch_interfaces = self.args.control_channel_interfaces
+        self.ch_interfaces = config['RMACS_Config']['radio_interfaces']
+        
+        self.freq_index = -1
         self.sockets: Dict = {}
         self.listen_threads: list = []
         
@@ -205,11 +204,11 @@ class InterferenceDetection(threading.Thread):
         self.scan = Spectral_Scan()
         
         # Channel Quality index
-        self.channel_quality_index = 0
+        self.channel_quality_index_threshold = config['RMACS_Config']['channel_quality_index_threshold']
         
         # Error Monitoring threshold
-        self.phy_error_limit = self.args.phy_error_limit
-        self.tx_timeout_limit = self.args.tx_timeout_limit
+        self.phy_error_limit = config['RMACS_Config']['phy_error_limit']
+        self.tx_timeout_limit = config['RMACS_Config']['tx_timeout_limit']
         
         # Device MAC address
         self.mac_address = get_mac_address(self.nw_interface)
@@ -220,7 +219,9 @@ class InterferenceDetection(threading.Thread):
 
         self.num_retries = 0
         self.max_retries = 3
-        self.max_error_check = self.args.max_error_check
+        self.max_error_check = config['RMACS_Config']['max_error_check']
+        
+        self.periodic_recovery_switch = config['RMACS_Config']['periodic_recovery_switch']
 
         ## Create listen and client run FSM threads
         self.running = False
@@ -487,7 +488,7 @@ class InterferenceDetection(threading.Thread):
             self.scan_freq = get_mesh_freq(self.nw_interface)
             self.channel_report = self.perform_scan(self.scan_freq)
             self.channel_quality_index = self.channel_quality_estimator(self.channel_report)
-            if self.channel_quality_index > self.args.channel_quality_index_threshold:
+            if self.channel_quality_index > self.channel_quality_index_threshold:
                 logger.info("Trigger Bad Channel Qaulity index")
                 self.fsm.trigger(ClientEvent.BAD_CHANNEL_QUALITY_INDEX)
                 #self.send_messages(self.channel_report)
@@ -567,7 +568,7 @@ class InterferenceDetection(threading.Thread):
         while self.running:
             current_time = time.time()
             # If periodic switch timer ended, switch frequency again
-            if current_time - self.last_time >= self.args.periodic_recovery_switch:
+            if current_time - self.last_time >= self.periodic_recovery_switch:
                 self.fsm.trigger(ClientEvent.PERIODIC_SWITCH)
                 self.last_time = current_time
                 break
@@ -603,9 +604,18 @@ class InterferenceDetection(threading.Thread):
     
     
 def main():
-    args = Config()
-    client = InterferenceDetection()
     logger.info('RMACS client thread is started....')
+    if not os.path.exists(CONFIG_DIR):
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        logger.info(f"Created configuration directory: {CONFIG_DIR}")
+
+
+    # Create the default configuration file if it doesn't exist
+    create_default_config(config_file_path)
+
+    # Load the configuration
+    #config = load_config(config_file_path)
+    client = InterferenceDetection()
     client.start()
     
     

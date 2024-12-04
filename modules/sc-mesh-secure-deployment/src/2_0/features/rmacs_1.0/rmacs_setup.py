@@ -4,13 +4,7 @@ import subprocess
 import re
 import numpy as np
 import pandas as pd
-from config import Config
 from logging_config import logger
-
-
-#class Setup:
-#   def __init__(self):
-#       self.scan_interface = [("ath9k", "wlp3s0"),("ath10k","wlp2s0"),("halow", "halow1")]
 
 # Channel to frequency and frequency to channel mapping
 CH_TO_FREQ = {1: 2412, 2: 2417, 3: 2422, 4: 2427, 5: 2432, 6: 2437, 7: 2442, 8: 2447, 9: 2452, 10: 2457, 11: 2462,
@@ -185,4 +179,78 @@ def get_mac_address(interface):
         print(f"Interface {interface} not found.")
     except Exception as e:
         print(f"Error reading operstate: {e}")
+       
+def is_process_running(process_name: str) -> bool:
+    """
+    Check if a process with a given name is currently running.
+
+    param process_name: The name of the process to check.
+
+    return: True if the process is running, False otherwise.
+    """
+    try:
+        ps_output = subprocess.check_output(['ps', 'aux']).decode('utf-8')
+        if process_name in ps_output:
+            return True
+        else:
+            return False
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error occurred while checking process: {e}")
+        return False
+
+
+def get_pid_by_process_name(process_name: str) -> int:
+    """
+    Get the Process ID (PID) of a process by its name.
+
+    param: The name of the process to search for.
+
+    return: The PID of the process if found, or 0 if the process is not found.
+    """
+    try:
+        # List processes and filter by name
+        ps_output = subprocess.check_output(['ps', 'aux'], text=True)
+        for line in ps_output.split('\n'):
+            if process_name in line:
+                pid = int(line.split()[0])
+                return pid
+        return 0  # Process not found
+    except subprocess.CalledProcessError:
+        return 0
+
+
+def kill_process_by_pid(process_name: str) -> None:
+    """
+    Attempt to kill a process by its name.
+
+    param: The name of the process to be killed.
+    """
+    if is_process_running(process_name):
+        # Retrieve the Process ID (PID) of the specified process
+        pid = get_pid_by_process_name(process_name)
+        try:
+            subprocess.check_output(['kill', str(pid)])
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to kill process: {e}")  # Failed to kill the process
+    else:
+        logger.info(f"{process_name} not running, nothing to kill.") 
         
+
+def run_command(command, config, error_message) -> None:
+    """
+    Execute a shell command and check for success.
+
+    param command: The shell command to execute in the form of list of strings.
+    param error_message: Error message to display if the command fails.
+    """
+    try:
+        # Run the command, redirecting both stdout and stderr to the log file
+        with open(config['RMACS_Config']['log_file'], 'a') as subprocess_output:
+            # Redirect the output to the log file
+            return_code = subprocess.call(command, shell=False, stdout=subprocess_output, stderr=subprocess_output)
+
+        if return_code != 0:
+            logger.error(f"Command {command} failed with return code {return_code}")
+    except Exception as e:
+        logger.error(f"{error_message}. Error: {e}")
+        raise Exception(error_message) from e

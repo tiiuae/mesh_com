@@ -8,18 +8,22 @@ from netstring import encode, decode
 import msgpack
 
 
-from config import Config, MULTICAST_CONFIG 
+#from config_old import Config, MULTICAST_CONFIG
+from config import create_default_config, load_config 
 from logging_config import logger
 from rmacs_setup import get_mesh_freq, get_ipv6_addr
-# Multicast address and port configuration
+
+config_file_path = '/etc/meshshield/rmacs_config.yaml'
 
 def get_multicast_config(interface):
     """
     Retrieve multicast group and port based on the interface.
     """
-    config = MULTICAST_CONFIG.get(interface)
+    config = load_config(config_file_path)
+    multicast_config = config.get("MULTICAST_CONFIG",{})
+    _config = multicast_config.get(interface)
     if config:
-        return config['group'], config['port']
+        return _config['group'], _config['port']
     else:
         raise ValueError(f"Unknown interface: {interface}")
 

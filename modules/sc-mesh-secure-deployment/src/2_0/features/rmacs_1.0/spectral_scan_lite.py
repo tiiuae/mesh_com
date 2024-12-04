@@ -23,7 +23,7 @@ class SpectralScanLite:
     A class SpectralScanLite to scan ath9k based Radio interface card (Doodle card)
     Scan report is in binary format, to be converted to text format.
     '''
-    def __init(self, driver: str, interface: str):
+    def __init__(self, driver: str, interface: str):
         self.phy_interface = Setup.get_phy_interface(driver)
         self.is_interface_up = Setup.get_interface_operstate(interface)
         self.scan_interface = "TBD"

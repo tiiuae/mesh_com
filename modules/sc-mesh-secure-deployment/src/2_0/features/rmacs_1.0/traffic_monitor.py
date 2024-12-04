@@ -1,8 +1,8 @@
 import os 
 import time
 import subprocess
-from config import Config
-
+from config import load_config
+config_file_path = '/etc/meshshield/rmacs_config.yaml'
 
 class TrafficMonitor:
     '''
@@ -22,10 +22,10 @@ class TrafficMonitor:
         self.phy_error_wait_time = 2
         self.tx_timeout_wait_time = 2
         # Set the Network interface  
-        self.args = Config()
-        self.phy_interface = self.args.phy_interface
-        self.nw_interface = self.args.nw_interface
-        self.traffic_threshold =  self.args.traffic_threshold
+        config = load_config(config_file_path)
+        self.phy_interface = config['RMACS_Config']['phy_interface']
+        self.nw_interface = config['RMACS_Config']['nw_interface']
+        self.traffic_threshold =  config['RMACS_Config']['traffic_threshold']
         #Network statistics file 
         self.tx_bytes_path = f"/sys/class/net/{self.nw_interface}/statistics/tx_bytes"
         self.tx_error_path = f"/sys/class/net/{self.nw_interface}/statistics/tx_errors"
@@ -47,14 +47,19 @@ class TrafficMonitor:
         Returns: 
         int : Return the network traffic in bytes
         '''  
-        self.prev_tx_bytes = self.cur_tx_bytes
+        self.prev_tx_bytes = self.read_sysfs_file(self.tx_bytes_path)
+        time.sleep(self.tx_timeout_wait_time)
         self.cur_tx_bytes = self.read_sysfs_file(self.tx_bytes_path)
-        self.traffic =  self.get_traffic_status()
-        if self.traffic > self.traffic_threshold:
-            print(f"The traffic is : {self.traffic}")
-            return self.traffic
+        if self.prev_tx_bytes is not None and self.cur_tx_bytes is not None: 
+            self.traffic = ((self.cur_tx_bytes - self.prev_tx_bytes) * 8)/ (self.tx_rate_wait_time * 1000) #kbps 
+            print(f"Traffic : {self.traffic}")
+            if self.traffic > self.traffic_threshold:
+                print(f"Current Traffic: {self.traffic} in Kbps above threshold traffic : {self.traffic_threshold} in Kbps")
+                return self.traffic
+            else:
+                print(f"There is no traffic, let's go for channel scan......")
+                return 0
         else:
-            print(f"There is no traffic, let's go for channel scan......")
             return 0
 
                

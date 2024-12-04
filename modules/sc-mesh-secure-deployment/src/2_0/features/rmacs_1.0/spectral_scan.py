@@ -11,19 +11,20 @@ import re
 
 import pandas as pd
 
-from config import Config
+from config import load_config
+config_file_path = '/etc/meshshield/rmacs_config.yaml'
 from rmacs_setup import get_mesh_freq, get_channel_bw, get_interface_operstate, get_phy_interface
 from logging_config import logger
 
 class Spectral_Scan:
     def __init__(self):
         self.VALUES = dict()
-        self.args = Config()
-        self.phy_interface = self.args.phy_interface
-        self.nw_interface = self.args.nw_interface
+        config = load_config(config_file_path)
+        self.phy_interface = config['RMACS_Config']['phy_interface']
+        self.nw_interface = config['RMACS_Config']['nw_interface']
         self.is_interface_up = get_interface_operstate(self.nw_interface)
-        self.driver = self.args.driver
-        self.bin_file = self.args.bin_file
+        self.driver = config['RMACS_Config']['driver']
+        self.bin_file = config['RMACS_Config']['bin_file']
         print(" Spectral scan init method called............")
         #self.scan_interface = "TBD"
 
@@ -118,18 +119,3 @@ class Spectral_Scan:
             return [{"error": f"Failed to parse JSON: {e}"}]
        
        
-    
-'''
- 
-def main():
-    print('Im main method...........')
-    scan = Spectral_Scan()
-    scan.initialize_scan()
-    scan.execute_scan("5220")
-    scan.run_fft_eval("5220")
-
-
-if __name__ == "__main__":
-    main()
-    
-'''

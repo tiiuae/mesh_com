@@ -12,8 +12,10 @@ from netstring import encode, decode
 from itertools import islice
 import subprocess
 
-from config import Config, MULTICAST_CONFIG
-from rmacs_setup import get_mesh_freq, get_ipv6_addr, channel_switch_announcement, get_mac_address
+from config import load_config
+
+config_file_path = '/etc/meshshield/rmacs_config.yaml'
+from rmacs_util import get_mesh_freq, get_mac_address
 from logging_config import logger
 from rmacs_comms import rmacs_comms, send_data
 
@@ -55,7 +57,6 @@ class ServerEvent(Enum):
 
 class RMACSServerFSM:
     def __init__(self, server):
-        self.args = Config()
         self.state = ServerState.IDLE
         self.server = server
 
@@ -96,20 +97,19 @@ class RMACSServer:
         """
         Initializes the RMACS Server object.
 
-        :param host: The host address to bind the orchestrator/server to.
-        :param port: The port number to bind the orchestrator/server to.
         """
         # Initialize server objects and attributes
         self.running = False
         self.fsm = RMACSServerFSM(self)
-        self.args = Config()
-        self.nw_interface = self.args.nw_interface
-        self.freq_quality_report = self.args.freq_quality_report
-        self.seq_limit = self.args.seq_limit
-        self.hop_interval = self.args.hop_interval
-        self.stability_threshold = self.args.stability_threshold
+        #self.args = Config() 
+        config = load_config(config_file_path)
+        self.nw_interface = config['RMACS_Config']['nw_interface']
+        self.freq_quality_report = config['RMACS_Config']['freq_quality_report']
+        self.seq_limit = config['RMACS_Config']['seq_limit']
+        self.hop_interval = config['RMACS_Config']['hop_interval']
+        self.stability_threshold = config['RMACS_Config']['stability_threshold']
         # Control channel interfaces
-        self.ch_interfaces = self.args.control_channel_interfaces
+        self.ch_interfaces = config['RMACS_Config']['radio_interfaces']
         self.sockets: Dict = {}
         self.listen_threads: list = []
         
@@ -120,18 +120,18 @@ class RMACSServer:
         
         self.top_freq_stability_counter = 0
         self.pfh_index = 0
-        self.seq_limit = self.args.seq_limit
+        self.seq_limit = config['RMACS_Config']['seq_limit']
         self.sorted_frequencies: list = [] 
         self.top_freq = 0
-        self.report_expiry_threshold = self.args.report_expiry_threshold
+        self.report_expiry_threshold = config['RMACS_Config']['report_expiry_threshold']
         
         # Variables for Channel Switch 
-        self.channel_bandwidth: int = self.args.channel_bandwidth
-        self.beacon_count: int = self.args.beacon_count
-        self.buffer_period: int = self.args.buffer_period
+        self.channel_bandwidth: int = config['RMACS_Config']['channel_bandwidth']
+        self.beacon_count: int = config['RMACS_Config']['beacon_count']
+        self.buffer_period: int = config['RMACS_Config']['buffer_period']
         
         # BCQI 
-        self.bcqi_threshold_time = self.args.bcqi_threshold_time
+        self.bcqi_threshold_time = config['RMACS_Config']['bcqi_threshold_time']
 
         #frequencies: list[tuple], seq_limit: int, hop_interval: int, stability_threshold: int
         # Initialize the lock for thread-safe access
@@ -142,6 +142,7 @@ class RMACSServer:
         
         # Time for periodic events' variables (in seconds)
         self.last_operating_freq_broadcast: float = time.time()
+        self.periodic_operating_freq_broadcast = config['RMACS_Config']['periodic_operating_freq_broadcast']
 
         # Internal Attributes
         self.operating_frequency: int = get_mesh_freq(self.nw_interface)
@@ -150,7 +151,7 @@ class RMACSServer:
         self.healing_process_id: str = str(uuid.uuid4())  # Generate a unique ID at the start
         
         # Update to DB
-        self.update_flag = self.args.update_flag
+        self.update_flag = config['RMACS_Config']['update_flag']
         
         # A set to store the unique IDs of processed messages
         self.processed_ids = set()
@@ -219,7 +220,7 @@ class RMACSServer:
                         self.fsm.trigger(ServerEvent.BAD_CHANNEL_QUALITY_INDEX)
                     
                     # Check if it's time to perform a periodic operating frequency broadcast
-                    if current_time - self.last_operating_freq_broadcast >= self.args.periodic_operating_freq_broadcast:
+                    if current_time - self.last_operating_freq_broadcast >= self.periodic_operating_freq_broadcast:
                         logger.info("Broadcast Operating Frequency.....")
                         self.last_operating_freq_broadcast = time.time()
                         self.fsm.trigger(ServerEvent.PERIODIC_OPERATING_FREQ_BROADCAST)
@@ -244,9 +245,6 @@ class RMACSServer:
         self.update_channel_quality_report(self.msg)
         self.channel_report_message = None
         logger.info(f'Reset client mesage: {self.channel_report_message}')
-        #self.freq = client.channel_report_message['freq']
-        #self.quality_index = client.channel_report_message['qual']
-        #self.freq_quality_report.update({self.freq: self.quality_index})
         self.fsm.trigger(ServerEvent.CHANNEL_QUALITY_UPDATE_COMPLETE)
                      
     def update_channel_quality_report(self, message) -> None:
@@ -581,7 +579,6 @@ class RMACSServer:
 
 
 def main():
-    args = Config()
   
     server: RMACSServer = RMACSServer()
     server.start()

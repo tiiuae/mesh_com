@@ -1,84 +1,87 @@
+import yaml
 import os
-import socket
-import fcntl
-import struct
-from typing import List
+import logging
 
-VALID_CHANNELS = [36, 40, 44, 48, 149, 153, 157, 161]
-# Multicast group and port 
-MULTICAST_CONFIG = {
-'wlp1s0': {'group': 'ff02::1', 'port': 12345},
-'halow1': {'group':'ff02::1', 'port': 12346},
-'osf0': {'group': 'ff13::39', 'port': 12345}
+# Define default configuration  
+default_config = {
+    "MULTICAST_CONFIG": {
+        'wlp1s0': {'group': 'ff02::1', 'port': 12345},
+        'halow1': {'group': 'ff02::1', 'port': 12346},
+        'osf0': {'group': 'ff13::39', 'port': 12345},
+    },
+    "RMACS_Config": {
+        "orchestra_node": False,
+        "primary_radio" : "wlp1s0",
+        "osf_interface": "osf0",
+        "nw_interface": "wlp1s0",
+        "halow_interface": "halow",
+        "phy_interface": "phy1",
+        "driver": "ath10k",
+        "bridge_interface": "br-lan",
+        "addr_prefix": "fdd8",
+        "radio_interfaces": ["wlp1s0", "halow1", "osf0"],
+        "radio_interface": [
+            ["ath9k", "wlp3s0"],
+            ["ath10k", "wlp2s0"],
+            ["halow", "halow1"]
+        ],
+        "traffic_threshold": 2500,
+        "phy_error_limit": 1500,
+        "tx_timeout_limit": 1,
+        "monitoring_sleep_time": 30,
+        "max_error_check": 4,
+        "cooldown_period": 30,
+        "freq_quality_report": {
+            5180: {"nodes": {}, "Average_quality": 1},
+            5200: {"nodes": {}, "Average_quality": 1},
+            5220: {"nodes": {}, "Average_quality": 1},
+            5240: {"nodes": {}, "Average_quality": 1},
+        },
+        "freq_list": [5180, 5200, 5220, 5240],
+        "seq_limit": 3,
+        "hop_interval": 5,
+        "stability_threshold": 2,
+        "starting_frequency": "5180",
+        "report_expiry_threshold": 30,
+        "channel_bandwidth": 20,
+        "beacon_count": 10,
+        "client_beacon_count": 1,
+        "buffer_period": 2,
+        "channel_quality_index_threshold": 1,
+        "bcqi_threshold_time": 30,
+        "debug": False,
+        "update_flag": True,
+        "periodic_recovery_switch": 3.0,
+        "periodic_operating_freq_broadcast": 15.0,
+        "log_file": "/var/log/rmacs.log",
+        "bin_file": "/root/sample.bin",
+    }
 }
+def merge_dicts(default, user):
+    """Recursively merge user config into default config."""
+    for key, value in user.items():
+        if isinstance(value, dict) and key in default:
+            default[key] = merge_dicts(default[key], value)
+        else:
+            default[key] = value
+    return default
 
+def load_config(config_file_path):
+    """Load configuration by merging default and user-provided configs."""
+    if os.path.exists(config_file_path):
+        with open(config_file_path, 'r') as file:
+            user_config = yaml.safe_load(file)
+            config = merge_dicts(default_config.copy(), user_config)
+    else:
+        config = default_config
 
-class Config:
-    def __init__(self):
-        self.rmacs_osf_orchestrator: str = 'fde3:49c:9f74:4742:0:4c:372b:1c4f'
-        self.port: int = 8080
-        self.radio_index: str = "0"
-        self.starting_channel: int = 36
-        self.channels5: List[int] = [36, 40, 44, 48, 149, 153, 157, 161]
-        self.osf_interface: str = 'osf0'
-        self.nw_interface: str = 'wlp1s0'
-        self.phy_interface: str = 'phy1'
-        self.driver = "ath10k"
-        self.bridge_interface: str = 'br-lan'
-        self.addr_prefix: str = 'fdd8'
-        self.control_channel_interfaces = ['wlp1s0', 'halow1', 'osf0']
-        
-        
-        # Traffic Monitor and Error Monitor threshold
-        self.traffic_threshold = 2500
-        self.phy_error_limit = 1500
-        self.tx_timeout_limit = 1
-        
-        # Adaptive frequency hopping parameters 
-        #self.freq_quality_report: dict = {"5180":1,"5200":1,"5220":1,"5240":1}
-        self.freq_quality_report: dict = {5180:{'nodes':{}, 'Average_quality': 1},5200:{'nodes':{}, 'Average_quality': 1},5220:{'nodes':{}, 'Average_quality': 1},5240:{'nodes':{}, 'Average_quality': 1}}
-        self.freq_list: dict = [5180,5200,5220,5240]
-        self.seq_limit = 3
-        self.hop_interval: int = 5
-        self.stability_threshold: int = 2
-        self.starting_frequency = "5180"
-        self.report_expiry_threshold = 30 #secs
-        
-        # Channel details
-        self.channel_bandwidth: int = 20
-        self.beacon_count: int = 10
-        self.client_beacon_count: int = 1
-        self.buffer_period: int = 2
-        
-        # Channel Quality Estimation
-        self.channel_quality_index_threshold = 1
-        
-        # Traffic Monitoring
-        self.monitoring_sleep_time = 30 #sec
-    
-        # Error Monitoring
-        self.max_error_check = 4
-        self.cooldown_period = 30  #sec
-        
-        # BCQI
-        self.bcqi_threshold_time = 30 #sec
-            
-        
-        self.MR_MULTICAST_GROUP = 'ff02::1'  # IPv6 multicast address for entire network
-        self.MR_MULTICAST_PORT = 12345
-        self.OSF_MULTICAST_GROUP = 'ff13::39'  # IPv6 multicast address for entire network
-        self.OSF_MULTICAST_PORT = 12345
-        
-        self.debug: bool = False
-        self.update_flag: bool = True
-        self.min_rows: int = 16
-        self.periodic_scan: float = 30
-        self.periodic_recovery_switch: float = 3
-        self.periodic_operating_freq_broadcast: float = 15
-        self.data_gathering_wait_time: float = len(self.channels5) + 5
-        self.log_file: str = '/var/log/rmacs.log'
-        self.bin_file: str= '/root/sample.bin'
-        # Path to JSON file containing mean and std for spectral scan data normalization
-        #self.col_mean_std_path: str = '/opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/jamming/normalization_data/cols_mean_std.json'
+    return config
 
-   
+def create_default_config(config_file_path):
+    """Create a default configuration file if it does not exist."""
+    if not os.path.exists(config_file_path):
+        with open(config_file_path, 'w') as file:
+            yaml.dump(default_config, file, sort_keys=False)
+        logging.info(f"RMACS Default configuration file created at {config_file_path}")
+    else:
+        logging.info(f"RMACS Configuration file already exists at {config_file_path}")
