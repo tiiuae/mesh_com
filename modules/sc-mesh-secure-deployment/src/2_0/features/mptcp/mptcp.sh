@@ -15,6 +15,8 @@ do
        IPv6_prefix="fd1d::"
    elif [ "$iface" == "halow1" ]; then
         IPv6_prefix="fdbd::"
+   elif [ "$iface" == "br-lan" ]; then
+        IPv6_prefix="fdcd::"
    fi
    
    echo "_slaac_interfaces: $_slaac_interfaces"
@@ -41,3 +43,8 @@ done <<< "$iface_list"
 
 ip mptcp limits set subflow $i add_addr_accepted $i
 echo "SUBFLOWS=$i" >> /var/run/mptcp.conf
+
+
+olsrd -ipv6 > /opt/olsrd.log &
+
+mptcpize run ss-server -c /opt/mesh_com/modules/sc-mesh-secure-deployment/src/2_0/features/mptcp/ss-server_config.json > /opt/ss_server.log &

@@ -451,6 +451,7 @@ main () {
   # todo this needs to be moved
   if [ "$mptcp" == "enable" ]; then
     echo "MPTCP enabled"
+    [ ! -f /var/run/mptcp.conf ] && echo "INTERFACE_br=br-lan" > /var/run/mptcp.conf
     if [ $(grep -ic "INTERFACE_${INDEX}" /var/run/mptcp.conf) -eq 1 ]; then
         source /var/run/mptcp.conf
         sed -i "/INTERFACE_${INDEX}/d" /var/run/mptcp.conf
