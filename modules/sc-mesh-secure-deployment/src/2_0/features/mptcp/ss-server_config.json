@@ -1,0 +1,10 @@
+{
+        "server" : ["[::0]", "0.0.0.0"],
+        "mode":"tcp",
+        "server_port" : 8388,
+        "local_address":"::0",
+        "local_port" : 1080,
+        "password" : "sai",
+        "timeout" : 300,
+        "method" : "aes-256-cfb"
+}
