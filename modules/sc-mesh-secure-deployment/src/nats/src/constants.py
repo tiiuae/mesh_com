@@ -92,6 +92,6 @@ class Constants(Enum):
     FAIL_POLLING_TIME_SECONDS: int = 1
 
     # MTU sizes
-    BASE_MTU_SIZE: int = 1500
+    BASE_MTU_SIZE: int = 1372
     MACSEC_OVERHEAD: int = 16
     BATMAN_OVERHEAD: int = 48

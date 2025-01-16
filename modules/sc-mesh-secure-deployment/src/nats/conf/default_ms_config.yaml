@@ -3,7 +3,7 @@
 ###########################
 
 # hostname of the device
-hostname: nixos
+hostname: buildroot
 
 # All the interfaces are black by default.
 # Excluded interfaces or interfaces without macsec certificates are not added to lower CBMA.
