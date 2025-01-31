@@ -4,5 +4,5 @@ export MACSEC_OVERHEAD=16
 # needs more testing, an overhead of 32 might even occur if batman-adv uses 4 address mode
 export BATMAN_OVERHEAD=48
 
-export HOPEFULLY1500=1500
+export HOPEFULLY1500=1372
 export SCN='/sys/class/net'
