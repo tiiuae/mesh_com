@@ -1,5 +1,6 @@
 # Common mesh_com repository
 
+***Just a dummy change***
 Every module has own instructions about their usage:
 
 - ROS2 Node module usage instructions:
