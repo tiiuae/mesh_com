@@ -1,5 +1,5 @@
 cffi==1.14.6
-cryptography==3.3.2
+cryptography==46.0.5
 pycparser==2.20
 pyOpenSSL==19.1.0
 iniconfig==2.0.0
